@@ -23,28 +23,51 @@ exports.handler = async (event, context) => {
         from.setDate(from.getDate() - 30);
         const fromDate = from.toISOString().split('T')[0];
 
-        const response = await fetch(
-            `${API_BASE}/customers/orders-summary?from=${fromDate}&to=${to}`,
-            {
+        // Fetch all pages
+        let allData = [];
+        let cursor = null;
+        let hasMore = true;
+
+        while (hasMore) {
+            const url = cursor 
+                ? `${API_BASE}/customers/orders-summary?from=${fromDate}&to=${to}&cursor=${cursor}`
+                : `${API_BASE}/customers/orders-summary?from=${fromDate}&to=${to}`;
+
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                     'X-API-TOKEN': API_TOKEN
                 }
-            }
-        );
+            });
 
-        if (!response.ok) {
-            throw new Error(`API returned ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.data && Array.isArray(data.data)) {
+                allData = allData.concat(data.data);
+            }
+
+            // Check if there's a next page
+            if (data.meta && data.meta.next_cursor) {
+                cursor = data.meta.next_cursor;
+            } else {
+                hasMore = false;
+            }
         }
 
-        const data = await response.json();
-        
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify(data)
+            body: JSON.stringify({
+                success: true,
+                data: allData,
+                total: allData.length
+            })
         };
 
     } catch (error) {
