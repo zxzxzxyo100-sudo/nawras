@@ -774,7 +774,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div class="task-header"><div class="task-info"><h3>${store.name || 'بدون اسم'}</h3><div class="task-meta">
-            <div class="meta-item">📱 ${store.phone || '-'}</div><div class="meta-item">📍 ${store.city || '-'}</div>
+            <div class="meta-item">🔢 كود: ${store.id}</div><div class="meta-item">📱 ${store.phone || '-'}</div><div class="meta-item">📍 ${store.city || '-'}</div>
             <div class="meta-item">📅 ${regDate}</div><div class="meta-item">📦 آخر شحنة: ${lastShip}</div>
             <div class="meta-item">📊 الطرود: ${store.total_shipments || 0}</div>
         </div></div>${badge}</div>
