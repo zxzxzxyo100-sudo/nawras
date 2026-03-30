@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام النورس لإدارة المتاجر</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0066cc;
+            --primary-dark: #004999;
+            --success: #00a86b;
+            --warning: #ff9500;
+            --danger: #ff3b30;
+            --bg-main: #f5f7fa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #1a365d 0%, #2563eb 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #1a365d 0%, #2d3748 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: var(--shadow-lg);
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            text-align: center;
+            padding: 0 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .logo h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo p {
+            font-size: 0.875rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
+        }
+
+        .nav-menu {
+            padding: 1.5rem 0;
+        }
+
+        .nav-item {
+            padding: 0.875rem 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-weight: 500;
+            border-right: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-item.active {
+            background: rgba(59,130,246,0.2);
+            border-right-color: #3b82f6;
+        }
+
+        .nav-item .badge {
+            margin-right: auto;
+            background: var(--danger);
+            padding: 0.25rem 0.625rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .nav-icon {
+            font-size: 1.25rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-right: 280px;
+            padding: 2rem;
+        }
+
+        .header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .header-title p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .stat-card.onboarding::before { background: var(--primary); }
+        .stat-card.success::before { background: var(--success); }
+        .stat-card.retention::before { background: var(--warning); }
+        .stat-card.inactive::before { background: var(--danger); }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-card.onboarding .stat-icon { background: rgba(0,102,204,0.1); color: var(--primary); }
+        .stat-card.success .stat-icon { background: rgba(0,168,107,0.1); color: var(--success); }
+        .stat-card.retention .stat-icon { background: rgba(255,149,0,0.1); color: var(--warning); }
+        .stat-card.inactive .stat-icon { background: rgba(255,59,48,0.1); color: var(--danger); }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-change {
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Tasks Section */
+        .tasks-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .task-filters {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .filter-btn, .btn {
+            padding: 0.625rem 1.25rem;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Task Cards */
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .task-card {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .task-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .task-info h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 0.5rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-badge.new { background: rgba(0,102,204,0.1); color: var(--primary); }
+        .status-badge.active { background: rgba(0,168,107,0.1); color: var(--success); }
+        .status-badge.warning { background: rgba(255,149,0,0.1); color: var(--warning); }
+        .status-badge.critical { background: rgba(255,59,48,0.1); color: var(--danger); }
+
+        .task-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+            border-color: var(--success);
+        }
+
+        .btn-success:hover {
+            background: #008c5a;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .modal-header h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .close-modal {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg-main);
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0,102,204,0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .notification {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--success);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            font-weight: 600;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translate(-50%, -100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                padding: 0;
+            }
+            
+            .main-content {
+                margin-right: 0;
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">جاري تحميل البيانات...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>🦅 النورس</h1>
+                <p>نظام إدارة المتاجر</p>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="nav-item active" data-view="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>لوحة التحكم</span>
+                </div>
+                <div class="nav-item" data-view="onboarding">
+                    <span class="nav-icon">🎯</span>
+                    <span>المتاجر الجديدة</span>
+                    <span class="badge" id="onboarding-count">0</span>
+                </div>
+                <div class="nav-item" data-view="active">
+                    <span class="nav-icon">⭐</span>
+                    <span>المتاجر النشطة</span>
+                    <span class="badge" id="active-count" style="background: var(--success);">0</span>
+                </div>
+                <div class="nav-item" data-view="inactive">
+                    <span class="nav-icon">⚠️</span>
+                    <span>المتاجر الخاملة</span>
+                    <span class="badge" id="inactive-count" style="background: var(--warning);">0</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-title">
+                    <h2 id="page-title">لوحة التحكم</h2>
+                    <p id="page-subtitle">نظرة شاملة على جميع المتاجر</p>
+                </div>
+                <div class="user-info">
+                    <div>
+                        <div style="font-weight: 600;">مدير المبيعات</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">شركة النورس</div>
+                    </div>
+                    <div class="user-avatar">ن</div>
+                </div>
+            </div>
+
+            <!-- Dashboard View -->
+            <div id="dashboard-view">
+                <div class="stats-grid">
+                    <div class="stat-card onboarding">
+                        <div class="stat-header">
+                            <span class="stat-title">متاجر جديدة</span>
+                            <div class="stat-icon">🎯</div>
+                        </div>
+                        <div class="stat-value" id="stat-new">0</div>
+                        <div class="stat-change">
+                            <span>📅</span>
+                            <span>مسجلة خلال الشهر الأخير</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card success">
+                        <div class="stat-header">
+                            <span class="stat-title">متاجر نشطة</span>
+                            <div class="stat-icon">⭐</div>
+                        </div>
+                        <div class="stat-value" id="stat-active">0</div>
+                        <div class="stat-change">
+                            <span>📦</span>
+                            <span>تشحن بانتظام</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card retention">
+                        <div class="stat-header">
+                            <span class="stat-title">متاجر خاملة</span>
+                            <div class="stat-icon">⚠️</div>
+                        </div>
+                        <div class="stat-value" id="stat-inactive">0</div>
+                        <div class="stat-change">
+                            <span>⏰</span>
+                            <span>بدون شحنات مؤخراً</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card inactive">
+                        <div class="stat-header">
+                            <span class="stat-title">إجمالي الطرود</span>
+                            <div class="stat-icon">📦</div>
+                        </div>
+                        <div class="stat-value" id="stat-total-shipments">0</div>
+                        <div class="stat-change">
+                            <span>📊</span>
+                            <span>جميع الشحنات</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks View -->
+            <div id="tasks-view" style="display: none;">
+                <div class="tasks-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <span id="section-icon">📊</span>
+                            <span id="section-title">قائمة المتاجر</span>
+                        </h2>
+                    </div>
+                    <div class="task-list" id="task-list"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Call Modal -->
+    <div class="modal" id="call-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>تسجيل ملاحظة</h3>
+                <button class="close-modal" onclick="closeModal()">✕</button>
+            </div>
+            <form id="call-form">
+                <input type="hidden" id="store-id">
+                <div class="form-group">
+                    <label class="form-label">ملاحظة النورس</label>
+                    <textarea class="form-textarea" id="nawras-note" placeholder="اكتب ملاحظة عن هذا المتجر..." required></textarea>
+                </div>
+                <div class="task-actions">
+                    <button type="submit" class="btn btn-primary">حفظ الملاحظة</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_CONFIG = {
+            BASE_URL: '/api',  // Serverless functions endpoint
+            ENDPOINTS: {
+                NEW_CUSTOMERS: '/new-customers',
+                INACTIVE_CUSTOMERS: '/inactive-customers',
+                ORDERS_SUMMARY: '/orders-summary'
+            }
+        };
+
+        // Global State
+        let allStores = [];
+        let currentView = 'dashboard';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            setupNavigation();
+            await loadData();
+            hideLoading();
+        });
+
+        function setupNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const view = this.dataset.view;
+                    switchView(view);
+                });
+            });
+        }
+
+        async function loadData() {
+            try {
+                // Load all data from APIs
+                const [newCustomers, inactiveCustomers, ordersSummary] = await Promise.all([
+                    fetchAPI(API_CONFIG.ENDPOINTS.NEW_CUSTOMERS),
+                    fetchAPI(API_CONFIG.ENDPOINTS.INACTIVE_CUSTOMERS),
+                    fetchAPI(API_CONFIG.ENDPOINTS.ORDERS_SUMMARY)
+                ]);
+
+                // Process and merge data
+                processStoresData(newCustomers, inactiveCustomers, ordersSummary);
+                updateStats();
+                renderCurrentView();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showNotification('حدث خطأ في تحميل البيانات', 'error');
+            }
+        }
+
+        async function fetchAPI(endpoint) {
+            const response = await fetch(`${API_CONFIG.BASE_URL}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            return await response.json();
+        }
+
+        function processStoresData(newData, inactiveData, summaryData) {
+            allStores = [];
+            
+            // Process new customers
+            if (newData && newData.data) {
+                newData.data.forEach(store => {
+                    allStores.push({
+                        ...store,
+                        category: 'onboarding',
+                        notes: getStoredNotes(store.id) || []
+                    });
+                });
+            }
+
+            // Process inactive customers
+            if (inactiveData && inactiveData.data) {
+                inactiveData.data.forEach(store => {
+                    const existing = allStores.find(s => s.id === store.id);
+                    if (existing) {
+                        existing.category = 'inactive';
+                    } else {
+                        allStores.push({
+                            ...store,
+                            category: 'inactive',
+                            notes: getStoredNotes(store.id) || []
+                        });
+                    }
+                });
+            }
+
+            // Mark active stores (those not in new or inactive)
+            if (summaryData && summaryData.data) {
+                summaryData.data.forEach(store => {
+                    const existing = allStores.find(s => s.id === store.id);
+                    if (existing && existing.category === 'onboarding' && store.total_shipments > 10) {
+                        existing.category = 'active';
+                    } else if (!existing && store.status === 'active') {
+                        allStores.push({
+                            ...store,
+                            category: 'active',
+                            notes: getStoredNotes(store.id) || []
+                        });
+                    }
+                });
+            }
+        }
+
+        function getStoredNotes(storeId) {
+            const notes = localStorage.getItem(`store_notes_${storeId}`);
+            return notes ? JSON.parse(notes) : [];
+        }
+
+        function saveNote(storeId, note) {
+            const store = allStores.find(s => s.id === storeId);
+            if (!store) return;
+
+            const timestamp = new Date().toLocaleString('ar-EG');
+            const noteWithTime = `[${timestamp}] ${note}`;
+            
+            if (!store.notes) store.notes = [];
+            store.notes.push(noteWithTime);
+            
+            localStorage.setItem(`store_notes_${storeId}`, JSON.stringify(store.notes));
+        }
+
+        function updateStats() {
+            const newCount = allStores.filter(s => s.category === 'onboarding').length;
+            const activeCount = allStores.filter(s => s.category === 'active').length;
+            const inactiveCount = allStores.filter(s => s.category === 'inactive').length;
+            const totalShipments = allStores.reduce((sum, s) => sum + (s.total_shipments || 0), 0);
+
+            document.getElementById('stat-new').textContent = newCount;
+            document.getElementById('stat-active').textContent = activeCount;
+            document.getElementById('stat-inactive').textContent = inactiveCount;
+            document.getElementById('stat-total-shipments').textContent = totalShipments.toLocaleString('ar-EG');
+
+            document.getElementById('onboarding-count').textContent = newCount;
+            document.getElementById('active-count').textContent = activeCount;
+            document.getElementById('inactive-count').textContent = inactiveCount;
+        }
+
+        function switchView(view) {
+            currentView = view;
+            
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.view === view) {
+                    item.classList.add('active');
+                }
+            });
+
+            if (view === 'dashboard') {
+                document.getElementById('dashboard-view').style.display = 'block';
+                document.getElementById('tasks-view').style.display = 'none';
+                document.getElementById('page-title').textContent = 'لوحة التحكم';
+                document.getElementById('page-subtitle').textContent = 'نظرة شاملة على جميع المتاجر';
+            } else {
+                document.getElementById('dashboard-view').style.display = 'none';
+                document.getElementById('tasks-view').style.display = 'block';
+                renderCurrentView();
+            }
+        }
+
+        function renderCurrentView() {
+            if (currentView === 'dashboard') return;
+
+            const titles = {
+                onboarding: { icon: '🎯', title: 'المتاجر الجديدة', subtitle: 'العملاء المسجلين حديثاً' },
+                active: { icon: '⭐', title: 'المتاجر النشطة', subtitle: 'العملاء الذين يشحنون بانتظام' },
+                inactive: { icon: '⚠️', title: 'المتاجر الخاملة', subtitle: 'تحتاج متابعة ومكالمات' }
+            };
+
+            const config = titles[currentView];
+            document.getElementById('page-title').textContent = config.title;
+            document.getElementById('page-subtitle').textContent = config.subtitle;
+            document.getElementById('section-icon').textContent = config.icon;
+            document.getElementById('section-title').textContent = config.title;
+
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+
+            const stores = allStores.filter(s => s.category === currentView);
+
+            if (stores.length === 0) {
+                taskList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✨</div>
+                        <h3>لا توجد متاجر في هذا القسم</h3>
+                    </div>
+                `;
+                return;
+            }
+
+            stores.forEach(store => {
+                const card = createStoreCard(store);
+                taskList.appendChild(card);
+            });
+        }
+
+        function createStoreCard(store) {
+            const card = document.createElement('div');
+            card.className = 'task-card';
+
+            const lastShipment = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' 
+                ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG')
+                : 'لا يوجد';
+
+            const registeredDate = new Date(store.registered_at).toLocaleDateString('ar-EG');
+
+            let statusBadge = '';
+            if (store.category === 'onboarding') {
+                statusBadge = '<span class="status-badge new">متجر جديد</span>';
+            } else if (store.category === 'active') {
+                statusBadge = '<span class="status-badge active">نشط</span>';
+            } else {
+                statusBadge = '<span class="status-badge warning">خامل</span>';
+            }
+
+            card.innerHTML = `
+                <div class="task-header">
+                    <div class="task-info">
+                        <h3>${store.name}</h3>
+                        <div class="task-meta">
+                            <div class="meta-item">📱 ${store.phone}</div>
+                            <div class="meta-item">📍 ${store.city}</div>
+                            <div class="meta-item">📅 التسجيل: ${registeredDate}</div>
+                            <div class="meta-item">📦 آخر شحنة: ${lastShipment}</div>
+                            <div class="meta-item">📊 إجمالي الطرود: ${store.total_shipments || 0}</div>
+                        </div>
+                    </div>
+                    ${statusBadge}
+                </div>
+                ${store.notes && store.notes.length > 0 ? `
+                    <div style="background: var(--bg-main); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                        <strong style="display: block; margin-bottom: 0.5rem;">📝 ملاحظات النورس:</strong>
+                        ${store.notes.map(note => `<div style="padding: 0.25rem 0; color: var(--text-secondary); font-size: 0.875rem;">• ${note}</div>`).join('')}
+                    </div>
+                ` : ''}
+                <div class="task-actions">
+                    <button class="btn btn-primary" onclick="openNoteModal(${store.id})">
+                        <span>📝 إضافة ملاحظة</span>
+                    </button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        function openNoteModal(storeId) {
+            const store = allStores.find(s => s.id === storeId);
+            document.getElementById('store-id').value = storeId;
+            document.getElementById('call-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.classList.remove('active');
+            });
+            document.getElementById('call-form').reset();
+        }
+
+        document.getElementById('call-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const storeId = parseInt(document.getElementById('store-id').value);
+            const note = document.getElementById('nawras-note').value;
+
+            saveNote(storeId, note);
+            closeModal();
+            renderCurrentView();
+            showNotification('✅ تم حفظ الملاحظة بنجاح');
+        });
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            if (type === 'error') {
+                notification.style.background = 'var(--danger)';
+            }
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideUp 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function hideLoading() {
+            const loadingScreen = document.getElementById('loadingScreen');
+            loadingScreen.classList.add('hidden');
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }
+    </script>
+</body>
+</html>

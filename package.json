@@ -1,0 +1,13 @@
+{
+  "name": "nawras-crm",
+  "version": "1.0.0",
+  "description": "نظام إدارة المتاجر لشركة النورس",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": ["crm", "nawras", "ecommerce"],
+  "author": "Nawras Team",
+  "license": "MIT"
+}
