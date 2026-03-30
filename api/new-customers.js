@@ -1,46 +1,51 @@
 const https = require('https');
+const TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
 
-const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-const API_BASE = 'backoffice.nawris.algoriza.com';
-
-function httpsGet(path) {
+function apiReq(path) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: API_BASE,
-            path: '/external-api' + path,
-            method: 'GET',
-            headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
-        }, res => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
-        });
-        req.on('error', reject);
-        req.end();
+        https.request({ hostname: 'backoffice.nawris.algoriza.com', path: '/external-api' + path, headers: { 'Accept': 'application/json', 'X-API-TOKEN': TOKEN } }, res => {
+            let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+        }).on('error', reject).end();
     });
 }
 
-exports.handler = async (event) => {
-    const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
-
+// Vercel handler
+module.exports = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'OPTIONS') return res.status(200).end();
     try {
-        const daysAgo = parseInt((event.queryStringParameters || {}).days) || 30;
-        const since = new Date(); since.setDate(since.getDate() - daysAgo);
+        const days = parseInt(req.query.days) || 30;
+        const since = new Date(); since.setDate(since.getDate() - days);
         const sinceDate = since.toISOString().split('T')[0];
-
-        let allData = [], cursor = null, hasMore = true;
-        while (hasMore) {
-            const path = cursor
-                ? `/customers/new?since=${sinceDate}&cursor=${cursor}`
-                : `/customers/new?since=${sinceDate}`;
-            const data = await httpsGet(path);
-            if (data.data && Array.isArray(data.data)) allData = allData.concat(data.data);
-            cursor = data.meta && data.meta.next_cursor ? data.meta.next_cursor : null;
-            hasMore = !!cursor;
+        let all = [], cursor = null, more = true;
+        while (more) {
+            const p = cursor ? `/customers/new?since=${sinceDate}&cursor=${cursor}` : `/customers/new?since=${sinceDate}`;
+            const d = await apiReq(p);
+            if (d.data) all = all.concat(d.data);
+            cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
+            more = !!cursor;
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: allData, total: allData.length }) };
-    } catch (error) {
-        return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
-    }
+        res.json({ success: true, data: all, total: all.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// Netlify handler
+module.exports.handler = async (event) => {
+    const h = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: h, body: '' };
+    try {
+        const days = parseInt((event.queryStringParameters || {}).days) || 30;
+        const since = new Date(); since.setDate(since.getDate() - days);
+        const sinceDate = since.toISOString().split('T')[0];
+        let all = [], cursor = null, more = true;
+        while (more) {
+            const p = cursor ? `/customers/new?since=${sinceDate}&cursor=${cursor}` : `/customers/new?since=${sinceDate}`;
+            const d = await apiReq(p);
+            if (d.data) all = all.concat(d.data);
+            cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
+            more = !!cursor;
+        }
+        return { statusCode: 200, headers: h, body: JSON.stringify({ success: true, data: all, total: all.length }) };
+    } catch (e) { return { statusCode: 500, headers: h, body: JSON.stringify({ error: e.message }) }; }
 };
