@@ -1,6 +1,6 @@
 // Netlify/Vercel Serverless Function: /api/orders-summary.js
 
-const API_TOKEN = process.env.NAWRAS_API_TOKEN;
+const API_TOKEN = process.env.NAWRAS_API_TOKEN || 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
 const API_BASE = 'https://backoffice.nawris.algoriza.com/external-api';
 
 exports.handler = async (event, context) => {
