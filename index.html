@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النورس CRM - نظام إدارة المتاجر المتكامل</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        .dark { background-color: #111827; }
+        .dark body { background-color: #111827; color: #f9fafb; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script type="module">
+        import { createElement as h, useState, useEffect } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+
+        // Mock Tasks Data
+        const mockTasks = [
+            {
+                id: 1,
+                merchant_id: 101,
+                merchant_name: 'جواهد',
+                phone: '0928996981',
+                task_type: 'day_0_immediate',
+                priority: 'critical',
+                status: 'pending',
+                current_state: 'onboarding',
+                registered_at: new Date().toISOString(),
+                script_template: 'أهلاً خوي جواهد، نورت النورس. نبي نتأكد إن حسابك جاهز وهل محتاج أي مساعدة تقنية لتبدأ أول شحنة؟',
+                minutes_since_registration: 45
+            },
+            {
+                id: 2,
+                merchant_id: 102,
+                merchant_name: 'Alta moda',
+                phone: '0919821184',
+                task_type: 'retention_call_1',
+                priority: 'high',
+                status: 'pending',
+                current_state: 'retention',
+                registered_at: new Date(Date.now() - 86400000 * 20).toISOString(),
+                last_shipment_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+                script_template: 'خوي Alta moda، معاك إدارة الجودة. لاحظنا توقف الشحن، هل فيه إشكالية فنية أو مالية نقدروا نحلوها ليك؟'
+            }
+        ];
+
+        // Main App Component
+        function App() {
+            const [isDark, setIsDark] = useState(false);
+            const [currentPage, setCurrentPage] = useState('tasks'); // tasks, inactive, new, manager
+            const [inactiveMerchants, setInactiveMerchants] = useState([]);
+            const [newMerchants, setNewMerchants] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [tasks, setTasks] = useState(mockTasks);
+            const [showCallModal, setShowCallModal] = useState(null);
+
+            const toggleTheme = () => {
+                setIsDark(!isDark);
+                document.documentElement.classList.toggle('dark');
+            };
+
+            // Fetch inactive merchants
+            const fetchInactiveMerchants = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch('/.netlify/functions/inactive-customers?days=10');
+                    const data = await response.json();
+                    if (data.success) {
+                        setInactiveMerchants(data.data || []);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Fetch new merchants
+            const fetchNewMerchants = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch('/.netlify/functions/new-customers?days=30');
+                    const data = await response.json();
+                    if (data.success) {
+                        setNewMerchants(data.data || []);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                if (currentPage === 'inactive') fetchInactiveMerchants();
+                if (currentPage === 'new') fetchNewMerchants();
+            }, [currentPage]);
+
+            const completeTask = (taskId) => {
+                setTasks(tasks.map(t => 
+                    t.id === taskId ? { ...t, status: 'completed' } : t
+                ));
+                setShowCallModal(null);
+            };
+
+            return h('div', { className: 'flex min-h-screen' },
+                h(Sidebar, { isDark, toggleTheme, currentPage, setCurrentPage }),
+                h('main', { className: 'flex-1' },
+                    currentPage === 'tasks' && h(TasksPage, { 
+                        tasks, 
+                        showCallModal, 
+                        setShowCallModal, 
+                        completeTask 
+                    }),
+                    currentPage === 'inactive' && h(MerchantsPage, { 
+                        merchants: inactiveMerchants, 
+                        loading, 
+                        title: 'المتاجر الخاملة',
+                        type: 'inactive'
+                    }),
+                    currentPage === 'new' && h(MerchantsPage, { 
+                        merchants: newMerchants, 
+                        loading, 
+                        title: 'المتاجر الجديدة',
+                        type: 'new'
+                    }),
+                    currentPage === 'manager' && h(ManagerPage, {
+                        inactiveCount: inactiveMerchants.length,
+                        newCount: newMerchants.length
+                    })
+                )
+            );
+        }
+
+        // Sidebar Component
+        function Sidebar({ isDark, toggleTheme, currentPage, setCurrentPage }) {
+            const menuItems = [
+                { id: 'tasks', icon: '📋', label: 'مهام اليوم', badge: mockTasks.filter(t => t.status === 'pending').length },
+                { id: 'new', icon: '🆕', label: 'المتاجر الجديدة', badge: 136 },
+                { id: 'inactive', icon: '😴', label: 'المتاجر الخاملة', badge: 8413 },
+                { id: 'manager', icon: '📊', label: 'لوحة المدير', badge: null }
+            ];
+
+            return h('aside', { 
+                className: 'w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-lg'
+            },
+                // Logo
+                h('div', { className: 'p-6 border-b border-gray-200 dark:border-gray-700' },
+                    h('div', { className: 'flex items-center gap-3' },
+                        h('div', { 
+                            className: 'w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg text-2xl'
+                        }, '🦅'),
+                        h('div', null,
+                            h('h1', { className: 'text-2xl font-bold text-gray-900 dark:text-white' }, 'النورس'),
+                            h('p', { className: 'text-sm text-gray-500 dark:text-gray-400' }, 'نظام إدارة المتاجر')
+                        )
+                    )
+                ),
+                // Navigation
+                h('nav', { className: 'flex-1 p-4 space-y-2' },
+                    menuItems.map(item => h('button', {
+                        key: item.id,
+                        onClick: () => setCurrentPage(item.id),
+                        className: `w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${
+                            currentPage === item.id
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                        }`
+                    },
+                        h('span', { className: 'text-2xl' }, item.icon),
+                        h('span', { className: 'flex-1 text-right' }, item.label),
+                        item.badge && h('span', { 
+                            className: 'bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full' 
+                        }, item.badge)
+                    ))
+                ),
+                // Theme Toggle & User
+                h('div', { className: 'p-4 border-t border-gray-200 dark:border-gray-700 space-y-3' },
+                    h('button', {
+                        onClick: toggleTheme,
+                        className: 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all'
+                    },
+                        h('span', { className: 'text-2xl' }, isDark ? '☀️' : '🌙'),
+                        h('span', { className: 'font-semibold text-gray-700 dark:text-gray-300' }, 
+                            isDark ? 'الوضع النهاري' : 'الوضع الليلي'
+                        )
+                    ),
+                    h('div', { className: 'flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg' },
+                        h('div', { className: 'w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg' }, 'س'),
+                        h('div', { className: 'flex-1' },
+                            h('p', { className: 'font-bold' }, 'سيف الموظف'),
+                            h('p', { className: 'text-xs text-blue-100' }, 'موظف مبيعات')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Tasks Page
+        function TasksPage({ tasks, showCallModal, setShowCallModal, completeTask }) {
+            const pendingTasks = tasks.filter(t => t.status === 'pending');
+            const completedTasks = tasks.filter(t => t.status === 'completed');
+
+            return h('div', { className: 'p-8' },
+                h('div', { className: 'max-w-7xl mx-auto' },
+                    h('div', { className: 'mb-8' },
+                        h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-2' }, 'مهام اليوم'),
+                        h('p', { className: 'text-gray-600 dark:text-gray-400' }, 
+                            new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                        )
+                    ),
+                    // Stats
+                    h('div', { className: 'grid grid-cols-4 gap-4 mb-8' },
+                        [
+                            { label: 'معلقة', value: pendingTasks.length, color: 'blue', icon: '⏰' },
+                            { label: 'مكتملة', value: completedTasks.length, color: 'green', icon: '✅' },
+                            { label: 'متأخرة', value: 0, color: 'red', icon: '⚠️' },
+                            { label: 'حرجة', value: tasks.filter(t => t.priority === 'critical').length, color: 'yellow', icon: '🔥' }
+                        ].map((stat, i) => h('div', {
+                            key: i,
+                            className: `bg-${stat.color}-50 dark:bg-${stat.color}-900/20 rounded-2xl p-6`
+                        },
+                            h('div', { className: 'text-4xl mb-2' }, stat.icon),
+                            h('div', { className: 'text-3xl font-bold text-gray-900 dark:text-white' }, stat.value),
+                            h('div', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-400' }, stat.label)
+                        ))
+                    ),
+                    // Tasks
+                    h('div', { className: 'space-y-4' },
+                        tasks.map(task => h(TaskCard, { 
+                            key: task.id, 
+                            task, 
+                            onCallClick: () => setShowCallModal(task)
+                        }))
+                    ),
+                    showCallModal && h(CallModal, {
+                        task: showCallModal,
+                        onClose: () => setShowCallModal(null),
+                        onComplete: completeTask
+                    })
+                )
+            );
+        }
+
+        // Merchants Page (Inactive/New)
+        function MerchantsPage({ merchants, loading, title, type }) {
+            return h('div', { className: 'p-8' },
+                h('div', { className: 'max-w-7xl mx-auto' },
+                    h('div', { className: 'mb-8' },
+                        h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-2' }, title),
+                        h('p', { className: 'text-gray-600 dark:text-gray-400' }, 
+                            `إجمالي: ${merchants.length} متجر`
+                        )
+                    ),
+                    loading ? h('div', { className: 'text-center py-12' },
+                        h('div', { className: 'inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin' }),
+                        h('p', { className: 'mt-4 text-gray-600 dark:text-gray-400' }, 'جاري التحميل...')
+                    ) : h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
+                        merchants.slice(0, 20).map((merchant, i) => h(MerchantCard, { key: i, merchant, type }))
+                    )
+                )
+            );
+        }
+
+        // Merchant Card
+        function MerchantCard({ merchant, type }) {
+            const openWhatsApp = () => {
+                const waPhone = merchant.phone.replace(/^0/, '966');
+                const message = encodeURIComponent(`مرحباً ${merchant.name}، معك من شركة النورس للشحن`);
+                window.open(`https://wa.me/${waPhone}?text=${message}`, '_blank');
+            };
+
+            return h('div', {
+                className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all'
+            },
+                h('div', { className: 'flex items-start justify-between mb-4' },
+                    h('div', { className: 'flex-1' },
+                        h('h3', { className: 'text-xl font-bold text-gray-900 dark:text-white mb-2' }, merchant.name || 'غير محدد'),
+                        h('p', { className: 'text-gray-600 dark:text-gray-400 text-sm mb-1' }, `📱 ${merchant.phone}`),
+                        merchant.registration_date && h('p', { className: 'text-gray-500 dark:text-gray-500 text-xs' }, 
+                            `📅 تسجيل: ${merchant.registration_date}`
+                        ),
+                        merchant.last_shipment_date && h('p', { className: 'text-gray-500 dark:text-gray-500 text-xs' }, 
+                            `📦 آخر شحنة: ${merchant.last_shipment_date}`
+                        )
+                    ),
+                    h('span', { 
+                        className: `px-3 py-1 rounded-full text-xs font-bold ${
+                            type === 'inactive' 
+                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                                : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        }`
+                    }, type === 'inactive' ? 'خامل' : 'جديد')
+                ),
+                h('button', {
+                    onClick: openWhatsApp,
+                    className: 'w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg'
+                }, '💬 إضافة ملاحظة عبر واتساب')
+            );
+        }
+
+        // Manager Page
+        function ManagerPage({ inactiveCount, newCount }) {
+            return h('div', { className: 'p-8' },
+                h('div', { className: 'max-w-7xl mx-auto' },
+                    h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-8' }, 'لوحة المدير'),
+                    h('div', { className: 'grid grid-cols-3 gap-6 mb-8' },
+                        [
+                            { label: 'معدل الرد خلال 30 دقيقة', value: '85.3%', color: 'blue', icon: '⏰' },
+                            { label: 'معدل رضا العملاء', value: '92.1%', color: 'green', icon: '⭐' },
+                            { label: 'معدل نجاح الاستعادة', value: '67.4%', color: 'orange', icon: '📈' }
+                        ].map((kpi, i) => h('div', {
+                            key: i,
+                            className: `bg-gradient-to-br from-${kpi.color}-500 to-${kpi.color}-600 rounded-2xl p-8 text-white shadow-xl`
+                        },
+                            h('div', { className: 'text-5xl mb-4' }, kpi.icon),
+                            h('div', { className: 'text-4xl font-bold mb-2' }, kpi.value),
+                            h('div', { className: 'text-sm opacity-90' }, kpi.label)
+                        ))
+                    ),
+                    h('div', { className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg' },
+                        h('h2', { className: 'text-xl font-bold text-gray-900 dark:text-white mb-6' }, 'توزيع المتاجر'),
+                        h('div', { className: 'grid grid-cols-4 gap-4' },
+                            [
+                                { label: 'قيد الاحتضان', value: 136, color: 'blue' },
+                                { label: 'نشط', value: 2659, color: 'green' },
+                                { label: 'قيد الاستعادة', value: inactiveCount, color: 'orange' },
+                                { label: 'بارد', value: 342, color: 'gray' }
+                            ].map((stat, i) => h('div', {
+                                key: i,
+                                className: `text-center p-6 bg-${stat.color}-50 dark:bg-${stat.color}-900/20 rounded-xl`
+                            },
+                                h('div', { className: `text-3xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400 mb-1` }, stat.value),
+                                h('div', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-400' }, stat.label)
+                            ))
+                        )
+                    )
+                )
+            );
+        }
+
+        // Task Card Component (same as before)
+        function TaskCard({ task, onCallClick }) {
+            const priorityColors = {
+                critical: 'border-red-500 bg-red-50 dark:bg-red-900/10',
+                high: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
+                normal: 'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+            };
+
+            const openWhatsApp = () => {
+                const waPhone = task.phone.replace(/^0/, '966');
+                const message = encodeURIComponent(`مرحباً ${task.merchant_name}، معك من شركة النورس للشحن`);
+                window.open(`https://wa.me/${waPhone}?text=${message}`, '_blank');
+            };
+
+            return h('div', {
+                className: `border-r-4 rounded-2xl p-6 shadow-lg ${priorityColors[task.priority]} ${task.status === 'completed' ? 'opacity-60' : ''}`
+            },
+                h('div', { className: 'flex items-start justify-between mb-4' },
+                    h('div', null,
+                        h('h3', { className: 'text-xl font-bold text-gray-900 dark:text-white mb-2' }, task.merchant_name),
+                        h('p', { className: 'text-sm text-gray-600 dark:text-gray-400' }, `📱 ${task.phone}`)
+                    ),
+                    task.status === 'completed' && h('span', { className: 'text-green-600 font-bold' }, '✅ مكتملة')
+                ),
+                task.minutes_since_registration > 30 && h('div', {
+                    className: 'mb-4 p-3 bg-red-100 dark:bg-red-900/30 border-r-4 border-red-500 rounded-lg'
+                },
+                    h('p', { className: 'text-red-800 dark:text-red-300 font-bold text-sm' },
+                        `⏰ تجاوز ${task.minutes_since_registration} دقيقة`
+                    )
+                ),
+                task.script_template && h('div', {
+                    className: 'mb-4 p-4 bg-white/50 dark:bg-gray-700/50 rounded-xl'
+                },
+                    h('p', { className: 'text-gray-800 dark:text-gray-200 text-sm' }, task.script_template)
+                ),
+                task.status === 'pending' && h('div', { className: 'flex gap-3' },
+                    h('button', {
+                        onClick: onCallClick,
+                        className: 'flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 rounded-xl font-bold'
+                    }, '📞 مكالمة'),
+                    h('button', {
+                        onClick: openWhatsApp,
+                        className: 'bg-green-500 text-white px-4 py-3 rounded-xl font-bold'
+                    }, '💬')
+                )
+            );
+        }
+
+        // Call Modal (simplified)
+        function CallModal({ task, onClose, onComplete }) {
+            const [note, setNote] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (note.trim().length < 10) {
+                    setError('الملاحظة يجب أن تكون 10 أحرف على الأقل');
+                    return;
+                }
+                onComplete(task.id);
+            };
+
+            return h('div', {
+                className: 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm',
+                onClick: onClose
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-lg w-full m-4',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('h2', { className: 'text-2xl font-bold text-gray-900 dark:text-white mb-4' }, `مكالمة: ${task.merchant_name}`),
+                    error && h('div', { className: 'mb-4 p-3 bg-red-100 rounded-lg text-red-800' }, error),
+                    h('form', { onSubmit: handleSubmit },
+                        h('textarea', {
+                            value: note,
+                            onChange: (e) => setNote(e.target.value),
+                            placeholder: 'ملاحظة النورس (إلزامي - 10 أحرف على الأقل)',
+                            rows: 4,
+                            className: 'w-full px-4 py-3 border-2 rounded-xl mb-4 dark:bg-gray-700 dark:text-white'
+                        }),
+                        h('div', { className: 'flex gap-3' },
+                            h('button', {
+                                type: 'submit',
+                                className: 'flex-1 bg-blue-500 text-white px-4 py-3 rounded-xl font-bold'
+                            }, '💾 حفظ'),
+                            h('button', {
+                                type: 'button',
+                                onClick: onClose,
+                                className: 'px-4 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-bold'
+                            }, 'إلغاء')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Mount App
+        const root = createRoot(document.getElementById('app'));
+        root.render(h(App));
+    </script>
+</body>
+</html>
