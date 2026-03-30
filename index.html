@@ -757,7 +757,7 @@ function createStoreCard(store) {
     if (store.category === 'incubating' && days >= INCUBATION_DAYS && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="graduateStore(' + store.id + ')">🎓 تخريج</button>';
     if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore(' + store.id + ')">🔄 استعادة</button>';
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal(' + store.id + ')">📋 استبيان</button>';
-    if (store.category !== 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal(' + store.id + ')">🧊 تجميد</button>';
+    if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal(' + store.id + ')">🧊 تجميد</button>';
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore(' + store.id + ')">إلغاء التجميد</button>';
 
     let surveyHtml = '';
