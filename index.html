@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النورس CRM - نظام إدارة المتاجر</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        .dark { background-color: #111827; }
+        .dark body { background-color: #111827; color: #f9fafb; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script type="module">
+        // Error handling
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('Error:', msg, 'at', url, ':', line);
+            document.body.innerHTML = '<div style="padding:20px;background:red;color:white;font-size:20px;">خطأ: ' + msg + '</div>';
+            return false;
+        };
+
+        try {
+            const { createElement: h, useState, useEffect } = await import('https://esm.sh/react@18.2.0');
+            const { createRoot } = await import('https://esm.sh/react-dom@18.2.0/client');
+
+        // USER ROLES
+        const ROLES = {
+            NEW_MERCHANTS: 'new_merchants',
+            ACTIVE_MERCHANTS: 'active_merchants',
+            RETENTION: 'retention',
+            SALES_MANAGER: 'sales_manager',
+            GENERAL_MANAGER: 'general_manager'
+        };
+
+        const ROLE_LABELS = {
+            [ROLES.NEW_MERCHANTS]: 'مسؤول المتاجر الجديدة',
+            [ROLES.ACTIVE_MERCHANTS]: 'مسؤول المتاجر النشطة',
+            [ROLES.RETENTION]: 'مسؤول الاستعادة',
+            [ROLES.SALES_MANAGER]: 'مدير المبيعات',
+            [ROLES.GENERAL_MANAGER]: 'المدير العام'
+        };
+
+        // INITIAL USERS (stored in localStorage)
+        const getUsers = () => {
+            const saved = localStorage.getItem('users');
+            if (saved) return JSON.parse(saved);
+            const defaultUsers = [
+                { id: 1, username: 'new_officer', password: '123', name: 'أحمد المسؤول', role: ROLES.NEW_MERCHANTS },
+                { id: 2, username: 'active_officer', password: '123', name: 'سارة النشطة', role: ROLES.ACTIVE_MERCHANTS },
+                { id: 3, username: 'retention_officer', password: '123', name: 'محمد الاستعادة', role: ROLES.RETENTION },
+                { id: 4, username: 'manager', password: '123', name: 'فاطمة المديرة', role: ROLES.SALES_MANAGER },
+                { id: 5, username: 'admin', password: 'admin123', name: 'عبدالله المدير العام', role: ROLES.GENERAL_MANAGER }
+            ];
+            localStorage.setItem('users', JSON.stringify(defaultUsers));
+            return defaultUsers;
+        };
+
+        // App Component
+        function App() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [isDark, setIsDark] = useState(false);
+            
+            // Real Data from API
+            const [newMerchants, setNewMerchants] = useState([]);
+            const [activeMerchants, setActiveMerchants] = useState([]);
+            const [inactiveMerchants, setInactiveMerchants] = useState([]);
+            const [frozenMerchants, setFrozenMerchants] = useState([]);
+            
+            // Loading states
+            const [loading, setLoading] = useState(false);
+            
+            // Users
+            const [allUsers, setAllUsers] = useState(getUsers());
+
+            // Stats for KPIs
+            const [satisfactionStats, setSatisfactionStats] = useState({
+                daily: 0,
+                monthly: 0,
+                total: 0
+            });
+
+            const [officerStats, setOfficerStats] = useState({});
+
+            const toggleTheme = () => {
+                setIsDark(!isDark);
+                document.documentElement.classList.toggle('dark');
+            };
+
+            const handleLogin = (user) => {
+                setCurrentUser(user);
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                fetchAllData();
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                localStorage.removeItem('currentUser');
+            };
+
+            // Fetch data from API
+            const fetchAllData = async () => {
+                setLoading(true);
+                try {
+                    // Fetch new merchants
+                    const newRes = await fetch('/.netlify/functions/new-customers?days=30');
+                    const newData = await newRes.json();
+                    if (newData.success) {
+                        const merchants = (newData.data || []).map(m => ({
+                            ...m,
+                            minutes_since_registration: calculateMinutes(m.registration_date),
+                            is_golden: calculateMinutes(m.registration_date) < 60,
+                            contacted: false,
+                            assigned_to: null,
+                            contact_notes: [],
+                            frozen: false
+                        }));
+                        setNewMerchants(merchants);
+                    }
+
+                    // Fetch inactive merchants
+                    const inactiveRes = await fetch('/.netlify/functions/inactive-customers?days=10');
+                    const inactiveData = await inactiveRes.json();
+                    if (inactiveData.success) {
+                        const merchants = (inactiveData.data || []).map(m => ({
+                            ...m,
+                            retention_attempts: 0,
+                            assigned_to: null,
+                            retention_notes: [],
+                            frozen: false
+                        }));
+                        setInactiveMerchants(merchants);
+                    }
+
+                    // Active merchants (mock for now - replace with real API)
+                    const activeMock = Array.from({ length: 50 }, (_, i) => ({
+                        id: 3000 + i,
+                        customer_id: 3000 + i,
+                        name: `متجر نشط ${i + 1}`,
+                        phone: '0' + (930000000 + i),
+                        registration_date: new Date(Date.now() - Math.random() * 90 * 86400000).toISOString(),
+                        last_shipment_date: new Date(Date.now() - Math.random() * 7 * 86400000).toISOString(),
+                        total_shipments: Math.floor(Math.random() * 500) + 50,
+                        needs_survey: Math.random() > 0.7,
+                        assigned_to: null,
+                        survey_responses: [],
+                        frozen: false
+                    }));
+                    setActiveMerchants(activeMock);
+
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const calculateMinutes = (dateStr) => {
+                if (!dateStr) return 999;
+                const date = new Date(dateStr);
+                return Math.floor((Date.now() - date.getTime()) / 60000);
+            };
+
+            // Auto-distribute merchants (50 per officer)
+            const autoDistribute = () => {
+                const officers = allUsers.filter(u => 
+                    u.role === ROLES.NEW_MERCHANTS || 
+                    u.role === ROLES.ACTIVE_MERCHANTS || 
+                    u.role === ROLES.RETENTION
+                );
+
+                // Distribute new merchants
+                const newOfficers = officers.filter(o => o.role === ROLES.NEW_MERCHANTS);
+                if (newOfficers.length > 0) {
+                    const shuffled = [...newMerchants].sort(() => Math.random() - 0.5);
+                    setNewMerchants(shuffled.map((m, i) => ({
+                        ...m,
+                        assigned_to: newOfficers[Math.floor(i / 50) % newOfficers.length]?.id || null
+                    })));
+                }
+
+                // Distribute active merchants
+                const activeOfficers = officers.filter(o => o.role === ROLES.ACTIVE_MERCHANTS);
+                if (activeOfficers.length > 0) {
+                    const shuffled = [...activeMerchants].sort(() => Math.random() - 0.5);
+                    setActiveMerchants(shuffled.map((m, i) => ({
+                        ...m,
+                        assigned_to: activeOfficers[Math.floor(i / 50) % activeOfficers.length]?.id || null
+                    })));
+                }
+
+                // Distribute inactive merchants
+                const retentionOfficers = officers.filter(o => o.role === ROLES.RETENTION);
+                if (retentionOfficers.length > 0) {
+                    const shuffled = [...inactiveMerchants].sort(() => Math.random() - 0.5);
+                    setInactiveMerchants(shuffled.map((m, i) => ({
+                        ...m,
+                        assigned_to: retentionOfficers[Math.floor(i / 50) % retentionOfficers.length]?.id || null
+                    })));
+                }
+
+                alert('تم التوزيع التلقائي بنجاح! (50 متجر لكل موظف)');
+            };
+
+            // Freeze merchant
+            const freezeMerchant = (merchantId, reason, type) => {
+                const setter = type === 'new' ? setNewMerchants : 
+                              type === 'active' ? setActiveMerchants : 
+                              setInactiveMerchants;
+                const merchants = type === 'new' ? newMerchants : 
+                                 type === 'active' ? activeMerchants : 
+                                 inactiveMerchants;
+
+                const merchant = merchants.find(m => m.id === merchantId);
+                if (merchant) {
+                    setFrozenMerchants([...frozenMerchants, { ...merchant, frozen: true, freeze_reason: reason, freeze_date: new Date().toISOString() }]);
+                    setter(merchants.filter(m => m.id !== merchantId));
+                }
+            };
+
+            // Calculate officer stats
+            useEffect(() => {
+                const stats = {};
+                allUsers.forEach(user => {
+                    const newCount = newMerchants.filter(m => m.contacted && m.contact_notes.some(n => n.officer === user.name)).length;
+                    const activeCount = activeMerchants.filter(m => m.survey_responses.some(s => s.officer === user.name)).length;
+                    const retentionCount = inactiveMerchants.filter(m => m.retention_notes.some(n => n.officer === user.name)).length;
+                    stats[user.id] = {
+                        name: user.name,
+                        total: newCount + activeCount + retentionCount,
+                        new: newCount,
+                        active: activeCount,
+                        retention: retentionCount
+                    };
+                });
+                setOfficerStats(stats);
+            }, [newMerchants, activeMerchants, inactiveMerchants, allUsers]);
+
+            // Calculate satisfaction stats
+            useEffect(() => {
+                const today = new Date().setHours(0, 0, 0, 0);
+                const thisMonth = new Date().getMonth();
+                
+                let dailyTotal = 0, dailyCount = 0;
+                let monthlyTotal = 0, monthlyCount = 0;
+                let allTotal = 0, allCount = 0;
+
+                activeMerchants.forEach(m => {
+                    m.survey_responses.forEach(s => {
+                        const date = new Date(s.date);
+                        const avg = (s.responses.speed + s.responses.finance + s.responses.support + s.responses.returns + s.responses.trust) / 5;
+                        
+                        allTotal += avg;
+                        allCount++;
+
+                        if (date.setHours(0, 0, 0, 0) === today) {
+                            dailyTotal += avg;
+                            dailyCount++;
+                        }
+
+                        if (date.getMonth() === thisMonth) {
+                            monthlyTotal += avg;
+                            monthlyCount++;
+                        }
+                    });
+                });
+
+                setSatisfactionStats({
+                    daily: dailyCount > 0 ? ((dailyTotal / dailyCount) * 20).toFixed(1) : 0,
+                    monthly: monthlyCount > 0 ? ((monthlyTotal / monthlyCount) * 20).toFixed(1) : 0,
+                    total: allCount > 0 ? ((allTotal / allCount) * 20).toFixed(1) : 0
+                });
+            }, [activeMerchants]);
+
+            useEffect(() => {
+                const savedUser = localStorage.getItem('currentUser');
+                if (savedUser) {
+                    setCurrentUser(JSON.parse(savedUser));
+                    fetchAllData();
+                }
+            }, []);
+
+            // Save users to localStorage
+            useEffect(() => {
+                localStorage.setItem('users', JSON.stringify(allUsers));
+            }, [allUsers]);
+
+            if (!currentUser) {
+                return h(LoginPage, { onLogin: handleLogin });
+            }
+
+            return h('div', { className: 'flex min-h-screen' },
+                h(Sidebar, { currentUser, isDark, toggleTheme, onLogout }),
+                h(MainContent, {
+                    currentUser,
+                    newMerchants, setNewMerchants,
+                    activeMerchants, setActiveMerchants,
+                    inactiveMerchants, setInactiveMerchants,
+                    frozenMerchants, setFrozenMerchants,
+                    allUsers, setAllUsers,
+                    loading,
+                    autoDistribute,
+                    freezeMerchant,
+                    satisfactionStats,
+                    officerStats
+                })
+            );
+        }
+
+        // Login Page
+        function LoginPage({ onLogin }) {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const users = getUsers();
+                const user = users.find(u => u.username === username && u.password === password);
+                if (user) {
+                    onLogin(user);
+                } else {
+                    setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+                }
+            };
+
+            return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4' },
+                h('div', { className: 'bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md' },
+                    h('div', { className: 'text-center mb-8' },
+                        h('div', { className: 'w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mx-auto flex items-center justify-center mb-4 text-4xl' }, '🦅'),
+                        h('h1', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'النورس CRM'),
+                        h('p', { className: 'text-gray-600' }, 'نظام إدارة المتاجر')
+                    ),
+                    error && h('div', { className: 'mb-4 p-3 bg-red-100 text-red-800 rounded-xl text-sm font-semibold' }, error),
+                    h('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold text-gray-700 mb-2' }, 'اسم المستخدم'),
+                            h('input', {
+                                type: 'text',
+                                value: username,
+                                onChange: (e) => setUsername(e.target.value),
+                                required: true,
+                                className: 'w-full px-4 py-3 border-2 rounded-xl focus:border-blue-500 outline-none'
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold text-gray-700 mb-2' }, 'كلمة المرور'),
+                            h('input', {
+                                type: 'password',
+                                value: password,
+                                onChange: (e) => setPassword(e.target.value),
+                                required: true,
+                                className: 'w-full px-4 py-3 border-2 rounded-xl focus:border-blue-500 outline-none'
+                            })
+                        ),
+                        h('button', {
+                            type: 'submit',
+                            className: 'w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg'
+                        }, 'تسجيل الدخول')
+                    ),
+                    h('div', { className: 'mt-6 pt-6 border-t' },
+                        h('p', { className: 'text-xs text-gray-500 text-center mb-3' }, 'حسابات تجريبية:'),
+                        h('div', { className: 'text-xs space-y-1' },
+                            h('div', { className: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white p-2 rounded text-center font-bold' }, '👑 مدير عام: admin / admin123')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Sidebar Component
+        function Sidebar({ currentUser, isDark, toggleTheme, onLogout }) {
+            return h('aside', { className: 'w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-lg' },
+                h('div', { className: 'p-6 border-b border-gray-200 dark:border-gray-700' },
+                    h('div', { className: 'flex items-center gap-3 mb-4' },
+                        h('div', { className: 'w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-2xl' }, '🦅'),
+                        h('div', null,
+                            h('h1', { className: 'text-xl font-bold text-gray-900 dark:text-white' }, 'النورس CRM'),
+                            h('p', { className: 'text-xs text-gray-500 dark:text-gray-400' }, 'نظام إدارة المتاجر')
+                        )
+                    ),
+                    h('div', { 
+                        className: currentUser.role === ROLES.GENERAL_MANAGER 
+                            ? 'bg-gradient-to-r from-purple-500 to-purple-600 p-3 rounded-xl text-white'
+                            : 'bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl'
+                    },
+                        currentUser.role === ROLES.GENERAL_MANAGER && h('div', { className: 'flex items-center gap-2 mb-1' },
+                            h('span', { className: 'text-xl' }, '👑'),
+                            h('span', { className: 'text-xs font-bold' }, 'صلاحيات كاملة')
+                        ),
+                        h('p', { className: 'text-sm font-bold ' + (currentUser.role === ROLES.GENERAL_MANAGER ? 'text-white' : 'text-blue-900 dark:text-blue-300') }, currentUser.name),
+                        h('p', { className: 'text-xs ' + (currentUser.role === ROLES.GENERAL_MANAGER ? 'text-purple-100' : 'text-blue-700 dark:text-blue-400') }, ROLE_LABELS[currentUser.role])
+                    )
+                ),
+                h('div', { className: 'flex-1' }),
+                h('div', { className: 'p-4 border-t border-gray-200 dark:border-gray-700 space-y-3' },
+                    h('button', {
+                        onClick: toggleTheme,
+                        className: 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all'
+                    },
+                        h('span', { className: 'text-2xl' }, isDark ? '☀️' : '🌙'),
+                        h('span', { className: 'font-semibold text-gray-700 dark:text-gray-300' }, isDark ? 'الوضع النهاري' : 'الوضع الليلي')
+                    ),
+                    h('button', {
+                        onClick: onLogout,
+                        className: 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all font-semibold'
+                    },
+                        h('span', { className: 'text-2xl' }, '🚪'),
+                        h('span', null, 'تسجيل الخروج')
+                    )
+                )
+            );
+        }
+
+        // Main Content Router
+        function MainContent(props) {
+            const { currentUser } = props;
+            
+            if (currentUser.role === ROLES.GENERAL_MANAGER || currentUser.role === ROLES.SALES_MANAGER) {
+                return h(ManagerView, props);
+            }
+            
+            if (currentUser.role === ROLES.NEW_MERCHANTS) {
+                return h(NewMerchantsOfficerView, props);
+            }
+            
+            if (currentUser.role === ROLES.ACTIVE_MERCHANTS) {
+                return h(ActiveMerchantsOfficerView, props);
+            }
+            
+            if (currentUser.role === ROLES.RETENTION) {
+                return h(RetentionOfficerView, props);
+            }
+            
+            return h('div', { className: 'p-8' }, 'صلاحية غير معروفة');
+        }
+
+        // MANAGER VIEW (For both General and Sales Manager)
+        function ManagerView(props) {
+            const [currentTab, setCurrentTab] = useState('overview');
+            const { currentUser, newMerchants, activeMerchants, inactiveMerchants, frozenMerchants, satisfactionStats, officerStats } = props;
+
+            const tabs = [
+                { id: 'overview', label: '📊 لوحة المعلومات' },
+                { id: 'new', label: '🐣 المتاجر الجديدة', badge: newMerchants.length },
+                { id: 'active', label: '✅ المتاجر النشطة', badge: activeMerchants.length },
+                { id: 'retention', label: '😴 الاستعادة', badge: inactiveMerchants.length },
+                { id: 'frozen', label: '❄️ المجمدة', badge: frozenMerchants.length },
+                { id: 'distribution', label: '🔀 التوزيع' },
+                { id: 'users', label: '👥 المستخدمين' }
+            ];
+
+            return h('div', { className: 'flex-1 p-8 overflow-auto' },
+                h('div', { className: 'max-w-7xl mx-auto' },
+                    h('div', { className: 'mb-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl' },
+                        h('div', { className: 'flex items-center gap-4' },
+                            h('div', { className: 'text-6xl' }, '👑'),
+                            h('div', null,
+                                h('h1', { className: 'text-3xl font-bold mb-1' }, 
+                                    currentUser.role === ROLES.GENERAL_MANAGER ? 'لوحة المدير العام' : 'لوحة مدير المبيعات'
+                                ),
+                                h('p', { className: 'text-purple-100' }, 'اطلاع كامل على جميع أقسام النظام')
+                            )
+                        )
+                    ),
+                    
+                    h('div', { className: 'flex gap-2 mb-8 overflow-x-auto pb-2' },
+                        tabs.map(tab => h('button', {
+                            key: tab.id,
+                            onClick: () => setCurrentTab(tab.id),
+                            className: `px-4 py-2 rounded-xl font-bold whitespace-nowrap text-sm ${
+                                currentTab === tab.id 
+                                    ? 'bg-purple-500 text-white shadow-lg' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                            }`
+                        },
+                            tab.label,
+                            tab.badge !== undefined && h('span', { className: 'ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs' }, tab.badge)
+                        ))
+                    ),
+
+                    currentTab === 'overview' && h(OverviewTab, { ...props, satisfactionStats, officerStats }),
+                    currentTab === 'new' && h(NewMerchantsOfficerView, props),
+                    currentTab === 'active' && h(ActiveMerchantsOfficerView, props),
+                    currentTab === 'retention' && h(RetentionOfficerView, props),
+                    currentTab === 'frozen' && h(FrozenMerchantsView, props),
+                    currentTab === 'distribution' && h(DistributionTab, props),
+                    currentTab === 'users' && h(UsersTab, props)
+                )
+            );
+        }
+
+        // Overview Tab
+        function OverviewTab({ newMerchants, activeMerchants, inactiveMerchants, frozenMerchants, satisfactionStats, officerStats, autoDistribute }) {
+            const goldenCount = newMerchants.filter(m => m.is_golden && !m.contacted).length;
+
+            return h('div', { className: 'space-y-6' },
+                // Satisfaction Stats
+                h('div', { className: 'grid grid-cols-3 gap-6' },
+                    [
+                        { label: 'معدل الرضا اليومي', value: satisfactionStats.daily + '%', color: 'blue', icon: '📅' },
+                        { label: 'معدل الرضا الشهري', value: satisfactionStats.monthly + '%', color: 'green', icon: '📊' },
+                        { label: 'معدل الرضا الإجمالي', value: satisfactionStats.total + '%', color: 'purple', icon: '⭐' }
+                    ].map((stat, i) => h('div', {
+                        key: i,
+                        className: `bg-gradient-to-br from-${stat.color}-500 to-${stat.color}-600 p-6 rounded-2xl text-white shadow-xl`
+                    },
+                        h('div', { className: 'text-4xl mb-2' }, stat.icon),
+                        h('div', { className: 'text-3xl font-bold mb-1' }, stat.value),
+                        h('div', { className: 'text-sm' }, stat.label)
+                    ))
+                ),
+
+                // Main Stats
+                h('div', { className: 'grid grid-cols-4 gap-6' },
+                    [
+                        { label: 'جديد', value: newMerchants.length, color: 'blue', icon: '🐣' },
+                        { label: 'نشط', value: activeMerchants.length, color: 'green', icon: '✅' },
+                        { label: 'استعادة', value: inactiveMerchants.length, color: 'orange', icon: '😴' },
+                        { label: 'مجمد', value: frozenMerchants.length, color: 'gray', icon: '❄️' }
+                    ].map((stat, i) => h('div', {
+                        key: i,
+                        className: `bg-${stat.color}-50 dark:bg-${stat.color}-900/20 p-6 rounded-2xl text-center`
+                    },
+                        h('div', { className: 'text-5xl mb-3' }, stat.icon),
+                        h('div', { className: `text-4xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400 mb-1` }, stat.value),
+                        h('div', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-400' }, stat.label)
+                    ))
+                ),
+
+                // Golden Alert
+                goldenCount > 0 && h('div', { className: 'bg-gradient-to-r from-yellow-400 to-yellow-500 p-6 rounded-2xl shadow-xl' },
+                    h('div', { className: 'flex items-center gap-4' },
+                        h('span', { className: 'text-6xl' }, '⭐'),
+                        h('div', null,
+                            h('h2', { className: 'text-2xl font-bold text-yellow-900 mb-1' }, 'تنبيه: فرص ذهبية!'),
+                            h('p', { className: 'text-yellow-800' }, `${goldenCount} متجر جديد - يحتاج اتصال فوري`)
+                        )
+                    )
+                ),
+
+                // Officer Performance
+                h('div', { className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg' },
+                    h('h2', { className: 'text-xl font-bold text-gray-900 dark:text-white mb-4' }, 'أداء الموظفين - عدد عمليات التواصل'),
+                    h('div', { className: 'space-y-3' },
+                        Object.values(officerStats).map((stat, i) => h('div', {
+                            key: i,
+                            className: 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-xl'
+                        },
+                            h('span', { className: 'font-bold text-gray-900 dark:text-white' }, stat.name),
+                            h('div', { className: 'flex gap-4 text-sm' },
+                                h('span', { className: 'text-blue-600' }, `جديد: ${stat.new}`),
+                                h('span', { className: 'text-green-600' }, `نشط: ${stat.active}`),
+                                h('span', { className: 'text-orange-600' }, `استعادة: ${stat.retention}`),
+                                h('span', { className: 'text-purple-600 font-bold' }, `إجمالي: ${stat.total}`)
+                            )
+                        ))
+                    )
+                ),
+
+                // Auto Distribute Button
+                h('button', {
+                    onClick: autoDistribute,
+                    className: 'w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-blue-700 shadow-lg'
+                }, '🔀 توزيع تلقائي (50 متجر/موظف)')
+            );
+        }
+
+        // Distribution Tab
+        function DistributionTab({ newMerchants, setNewMerchants, activeMerchants, setActiveMerchants, inactiveMerchants, setInactiveMerchants, allUsers }) {
+            const assignMerchant = (id, userId, type) => {
+                const setter = type === 'new' ? setNewMerchants : type === 'active' ? setActiveMerchants : setInactiveMerchants;
+                const merchants = type === 'new' ? newMerchants : type === 'active' ? activeMerchants : inactiveMerchants;
+                setter(merchants.map(m => m.id === id ? { ...m, assigned_to: userId } : m));
+            };
+
+            const officers = allUsers.filter(u => u.role !== ROLES.GENERAL_MANAGER && u.role !== ROLES.SALES_MANAGER);
+
+            return h('div', { className: 'space-y-6' },
+                h('div', { className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg' },
+                    h('h2', { className: 'text-xl font-bold mb-4 text-gray-900 dark:text-white' }, 'توزيع المتاجر الجديدة'),
+                    h('div', { className: 'space-y-2 max-h-96 overflow-y-auto' },
+                        newMerchants.slice(0, 20).map(m => h('div', {
+                            key: m.id,
+                            className: 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm'
+                        },
+                            h('span', { className: 'font-semibold text-gray-900 dark:text-white' }, `#${m.customer_id} - ${m.name}`),
+                            h('select', {
+                                value: m.assigned_to || '',
+                                onChange: (e) => assignMerchant(m.id, parseInt(e.target.value) || null, 'new'),
+                                className: 'px-3 py-2 rounded-lg border dark:bg-gray-600 dark:text-white text-sm'
+                            },
+                                h('option', { value: '' }, 'غير مخصص'),
+                                officers.filter(o => o.role === ROLES.NEW_MERCHANTS).map(o => 
+                                    h('option', { key: o.id, value: o.id }, o.name)
+                                )
+                            )
+                        ))
+                    )
+                )
+            );
+        }
+
+        // Users Tab
+        function UsersTab({ allUsers, setAllUsers }) {
+            const [showAddUser, setShowAddUser] = useState(false);
+            const [newUser, setNewUser] = useState({ username: '', password: '', name: '', role: ROLES.NEW_MERCHANTS });
+
+            const addUser = () => {
+                if (!newUser.username || !newUser.password || !newUser.name) {
+                    alert('يرجى ملء جميع الحقول');
+                    return;
+                }
+                const maxId = Math.max(...allUsers.map(u => u.id), 0);
+                setAllUsers([...allUsers, { ...newUser, id: maxId + 1 }]);
+                setNewUser({ username: '', password: '', name: '', role: ROLES.NEW_MERCHANTS });
+                setShowAddUser(false);
+                alert('تم إضافة المستخدم بنجاح');
+            };
+
+            const deleteUser = (userId) => {
+                if (allUsers.find(u => u.id === userId)?.role === ROLES.GENERAL_MANAGER) {
+                    alert('لا يمكن حذف المدير العام');
+                    return;
+                }
+                if (confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
+                    setAllUsers(allUsers.filter(u => u.id !== userId));
+                    alert('تم الحذف بنجاح');
+                }
+            };
+
+            return h('div', { className: 'space-y-6' },
+                h('div', { className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg' },
+                    h('div', { className: 'flex items-center justify-between mb-6' },
+                        h('h2', { className: 'text-2xl font-bold text-gray-900 dark:text-white' }, 'إدارة المستخدمين'),
+                        h('button', {
+                            onClick: () => setShowAddUser(!showAddUser),
+                            className: 'bg-blue-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-600'
+                        }, showAddUser ? 'إلغاء' : '➕ إضافة مستخدم')
+                    ),
+
+                    showAddUser && h('div', { className: 'mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl' },
+                        h('div', { className: 'grid grid-cols-2 gap-3' },
+                            h('input', {
+                                type: 'text',
+                                value: newUser.username,
+                                onChange: (e) => setNewUser({...newUser, username: e.target.value}),
+                                placeholder: 'اسم المستخدم',
+                                className: 'px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white'
+                            }),
+                            h('input', {
+                                type: 'password',
+                                value: newUser.password,
+                                onChange: (e) => setNewUser({...newUser, password: e.target.value}),
+                                placeholder: 'كلمة المرور',
+                                className: 'px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white'
+                            }),
+                            h('input', {
+                                type: 'text',
+                                value: newUser.name,
+                                onChange: (e) => setNewUser({...newUser, name: e.target.value}),
+                                placeholder: 'الاسم الكامل',
+                                className: 'px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white'
+                            }),
+                            h('select', {
+                                value: newUser.role,
+                                onChange: (e) => setNewUser({...newUser, role: e.target.value}),
+                                className: 'px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white'
+                            },
+                                Object.entries(ROLE_LABELS).map(([key, label]) => 
+                                    h('option', { key, value: key }, label)
+                                )
+                            )
+                        ),
+                        h('button', {
+                            onClick: addUser,
+                            className: 'mt-3 w-full bg-green-500 text-white py-2 rounded-xl font-bold hover:bg-green-600'
+                        }, '✅ حفظ المستخدم')
+                    ),
+
+                    h('div', { className: 'space-y-3' },
+                        allUsers.map(user => h('div', {
+                            key: user.id,
+                            className: 'flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl'
+                        },
+                            h('div', null,
+                                h('p', { className: 'font-bold text-gray-900 dark:text-white' }, user.name),
+                                h('p', { className: 'text-sm text-gray-600 dark:text-gray-400' }, ROLE_LABELS[user.role]),
+                                h('p', { className: 'text-xs text-gray-500' }, `@${user.username}`)
+                            ),
+                            h('div', { className: 'flex gap-2' },
+                                user.role === ROLES.GENERAL_MANAGER 
+                                    ? h('span', { className: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-3 py-1 rounded-full text-xs font-bold' }, '👑 مدير عام')
+                                    : h('button', {
+                                        onClick: () => deleteUser(user.id),
+                                        className: 'bg-red-500 text-white px-3 py-1 rounded-lg text-sm font-bold hover:bg-red-600'
+                                    }, '🗑️ حذف')
+                            )
+                        ))
+                    )
+                )
+            );
+        }
+
+        // Frozen Merchants View
+        function FrozenMerchantsView({ frozenMerchants }) {
+            return h('div', { className: 'space-y-6' },
+                h('h2', { className: 'text-2xl font-bold text-gray-900 dark:text-white' }, `المتاجر المجمدة (${frozenMerchants.length})`),
+                frozenMerchants.length === 0 
+                    ? h('div', { className: 'bg-white dark:bg-gray-800 rounded-2xl p-12 text-center' },
+                        h('div', { className: 'text-6xl mb-4' }, '❄️'),
+                        h('p', { className: 'text-gray-600 dark:text-gray-400' }, 'لا توجد متاجر مجمدة')
+                    )
+                    : h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                        frozenMerchants.map(m => h('div', {
+                            key: m.id,
+                            className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border-r-4 border-gray-500'
+                        },
+                            h('div', { className: 'flex items-center gap-2 mb-3' },
+                                h('span', { className: 'bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs font-bold' }, `#${m.customer_id}`),
+                                h('h3', { className: 'text-lg font-bold text-gray-900 dark:text-white' }, m.name)
+                            ),
+                            h('p', { className: 'text-sm text-gray-600 dark:text-gray-400 mb-3' }, `📱 ${m.phone}`),
+                            h('div', { className: 'bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-xl' },
+                                h('p', { className: 'text-xs font-bold text-yellow-800 dark:text-yellow-300 mb-1' }, '📝 سبب التجميد:'),
+                                h('p', { className: 'text-sm text-gray-900 dark:text-white' }, m.freeze_reason)
+                            )
+                        ))
+                    )
+            );
+        }
+
+        // New Merchants Officer View
+        function NewMerchantsOfficerView({ currentUser, newMerchants, setNewMerchants, freezeMerchant }) {
+            const [showContactModal, setShowContactModal] = useState(null);
+            const [showFreezeModal, setShowFreezeModal] = useState(null);
+
+            const myMerchants = currentUser.role === ROLES.NEW_MERCHANTS 
+                ? newMerchants.filter(m => !m.assigned_to || m.assigned_to === currentUser.id)
+                : newMerchants;
+
+            const goldenMerchants = myMerchants.filter(m => m.is_golden && !m.contacted);
+            const regularMerchants = myMerchants.filter(m => !m.is_golden && !m.contacted);
+
+            const confirmContact = (merchantId, notes) => {
+                setNewMerchants(newMerchants.map(m => 
+                    m.id === merchantId 
+                        ? { ...m, contacted: true, contact_notes: [...m.contact_notes, { officer: currentUser.name, notes, date: new Date().toISOString() }] }
+                        : m
+                ));
+                setShowContactModal(null);
+            };
+
+            return h('div', { className: 'space-y-6' },
+                h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white' }, 'المتاجر الجديدة'),
+                
+                goldenMerchants.length > 0 && h('div', null,
+                    h('div', { className: 'bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 rounded-2xl mb-4' },
+                        h('h2', { className: 'text-xl font-bold text-yellow-900 flex items-center gap-2' },
+                            h('span', null, '⭐'),
+                            `فرص ذهبية (${goldenMerchants.length})`
+                        )
+                    ),
+                    h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                        goldenMerchants.map(m => h(MerchantCard, { 
+                            key: m.id, 
+                            merchant: m, 
+                            type: 'golden',
+                            onContact: () => setShowContactModal(m),
+                            onFreeze: () => setShowFreezeModal(m),
+                            showFreeze: [ROLES.GENERAL_MANAGER, ROLES.SALES_MANAGER].includes(currentUser.role)
+                        }))
+                    )
+                ),
+
+                regularMerchants.length > 0 && h('div', null,
+                    h('h2', { className: 'text-xl font-bold text-gray-900 dark:text-white mb-4' }, `متاجر جديدة (${regularMerchants.length})`),
+                    h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+                        regularMerchants.map(m => h(MerchantCard, { 
+                            key: m.id, 
+                            merchant: m, 
+                            type: 'new',
+                            onContact: () => setShowContactModal(m),
+                            onFreeze: () => setShowFreezeModal(m),
+                            showFreeze: [ROLES.GENERAL_MANAGER, ROLES.SALES_MANAGER].includes(currentUser.role)
+                        }))
+                    )
+                ),
+
+                showContactModal && h(ContactModal, {
+                    merchant: showContactModal,
+                    onClose: () => setShowContactModal(null),
+                    onConfirm: confirmContact
+                }),
+
+                showFreezeModal && h(FreezeModal, {
+                    merchant: showFreezeModal,
+                    onClose: () => setShowFreezeModal(null),
+                    onConfirm: (id, reason) => {
+                        freezeMerchant(id, reason, 'new');
+                        setShowFreezeModal(null);
+                    }
+                })
+            );
+        }
+
+        // Active Merchants Officer View
+        function ActiveMerchantsOfficerView({ currentUser, activeMerchants, setActiveMerchants, freezeMerchant }) {
+            const [showSurveyModal, setShowSurveyModal] = useState(null);
+            const [showFreezeModal, setShowFreezeModal] = useState(null);
+
+            const myMerchants = currentUser.role === ROLES.ACTIVE_MERCHANTS 
+                ? activeMerchants.filter(m => (!m.assigned_to || m.assigned_to === currentUser.id) && m.needs_survey)
+                : activeMerchants.filter(m => m.needs_survey);
+
+            const submitSurvey = (merchantId, responses) => {
+                setActiveMerchants(activeMerchants.map(m => 
+                    m.id === merchantId 
+                        ? { ...m, needs_survey: false, survey_responses: [...m.survey_responses, { officer: currentUser.name, responses, date: new Date().toISOString() }] }
+                        : m
+                ));
+                setShowSurveyModal(null);
+            };
+
+            return h('div', { className: 'space-y-6' },
+                h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-2' }, 'المتاجر النشطة - الاستبيانات'),
+                h('p', { className: 'text-gray-600 dark:text-gray-400 mb-6' }, `${myMerchants.length} متجر يحتاج استبيان`),
+                
+                h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                    myMerchants.map(m => h(MerchantCard, { 
+                        key: m.id, 
+                        merchant: m, 
+                        type: 'active',
+                        onSurvey: () => setShowSurveyModal(m),
+                        onFreeze: () => setShowFreezeModal(m),
+                        showFreeze: [ROLES.GENERAL_MANAGER, ROLES.SALES_MANAGER].includes(currentUser.role)
+                    }))
+                ),
+
+                showSurveyModal && h(SurveyModal, {
+                    merchant: showSurveyModal,
+                    onClose: () => setShowSurveyModal(null),
+                    onSubmit: submitSurvey
+                }),
+
+                showFreezeModal && h(FreezeModal, {
+                    merchant: showFreezeModal,
+                    onClose: () => setShowFreezeModal(null),
+                    onConfirm: (id, reason) => {
+                        freezeMerchant(id, reason, 'active');
+                        setShowFreezeModal(null);
+                    }
+                })
+            );
+        }
+
+        // Retention Officer View
+        function RetentionOfficerView({ currentUser, inactiveMerchants, setInactiveMerchants, freezeMerchant }) {
+            const [showRetentionModal, setShowRetentionModal] = useState(null);
+            const [showFreezeModal, setShowFreezeModal] = useState(null);
+
+            const myMerchants = currentUser.role === ROLES.RETENTION 
+                ? inactiveMerchants.filter(m => !m.assigned_to || m.assigned_to === currentUser.id)
+                : inactiveMerchants;
+
+            const recordAttempt = (merchantId, notes) => {
+                setInactiveMerchants(inactiveMerchants.map(m => 
+                    m.id === merchantId 
+                        ? { ...m, retention_attempts: m.retention_attempts + 1, retention_notes: [...m.retention_notes, { officer: currentUser.name, notes, date: new Date().toISOString() }] }
+                        : m
+                ));
+                setShowRetentionModal(null);
+            };
+
+            return h('div', { className: 'space-y-6' },
+                h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-2' }, 'الاستعادة - المتاجر المتوقفة'),
+                h('p', { className: 'text-gray-600 dark:text-gray-400 mb-6' }, `${myMerchants.length} متجر`),
+                
+                h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                    myMerchants.map(m => h(MerchantCard, { 
+                        key: m.id, 
+                        merchant: m, 
+                        type: 'retention',
+                        onRetention: () => setShowRetentionModal(m),
+                        onFreeze: () => setShowFreezeModal(m),
+                        showFreeze: [ROLES.GENERAL_MANAGER, ROLES.SALES_MANAGER].includes(currentUser.role)
+                    }))
+                ),
+
+                showRetentionModal && h(RetentionModal, {
+                    merchant: showRetentionModal,
+                    onClose: () => setShowRetentionModal(null),
+                    onRecord: recordAttempt
+                }),
+
+                showFreezeModal && h(FreezeModal, {
+                    merchant: showFreezeModal,
+                    onClose: () => setShowFreezeModal(null),
+                    onConfirm: (id, reason) => {
+                        freezeMerchant(id, reason, 'retention');
+                        setShowFreezeModal(null);
+                    }
+                })
+            );
+        }
+
+        // Merchant Card
+        function MerchantCard({ merchant, type, onContact, onSurvey, onRetention, onFreeze, showFreeze }) {
+            const openWhatsApp = () => {
+                const waPhone = merchant.phone.replace(/^0/, '966');
+                window.open(`https://wa.me/${waPhone}`, '_blank');
+            };
+
+            const borderColor = type === 'golden' ? 'border-yellow-500' : 
+                                type === 'new' ? 'border-blue-500' :
+                                type === 'active' ? 'border-green-500' :
+                                'border-orange-500';
+
+            return h('div', {
+                className: `bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-lg border-r-4 ${borderColor}`
+            },
+                h('div', { className: 'flex items-center gap-2 mb-3' },
+                    h('span', { className: 'bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs font-bold' }, `#${merchant.customer_id}`),
+                    h('h3', { className: 'text-lg font-bold text-gray-900 dark:text-white flex-1' }, merchant.name),
+                    type === 'golden' && h('span', { className: 'text-2xl' }, '⭐')
+                ),
+                h('p', { className: 'text-sm text-gray-600 dark:text-gray-400 mb-2' }, `📱 ${merchant.phone}`),
+                merchant.minutes_since_registration !== undefined && h('p', { 
+                    className: `text-xs font-bold mb-3 ${merchant.is_golden ? 'text-yellow-600' : 'text-gray-500'}` 
+                }, `⏱️ منذ ${merchant.minutes_since_registration} دقيقة`),
+                
+                h('div', { className: 'flex gap-2 flex-wrap' },
+                    h('button', {
+                        onClick: openWhatsApp,
+                        className: 'flex-1 bg-green-500 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-green-600'
+                    }, '💬'),
+                    onContact && h('button', {
+                        onClick: onContact,
+                        className: 'flex-1 bg-blue-500 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-blue-600'
+                    }, '✅ إثبات'),
+                    onSurvey && h('button', {
+                        onClick: onSurvey,
+                        className: 'flex-1 bg-blue-500 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-blue-600'
+                    }, '📝 استبيان'),
+                    onRetention && h('button', {
+                        onClick: onRetention,
+                        className: 'flex-1 bg-orange-500 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-orange-600'
+                    }, `🔄 محاولة ${merchant.retention_attempts + 1}`),
+                    showFreeze && h('button', {
+                        onClick: onFreeze,
+                        className: 'bg-gray-500 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-gray-600'
+                    }, '❄️')
+                )
+            );
+        }
+
+        // Contact Modal
+        function ContactModal({ merchant, onClose, onConfirm }) {
+            const [notes, setNotes] = useState('');
+
+            return h('div', {
+                className: 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4',
+                onClick: onClose
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-lg w-full',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('h2', { className: 'text-2xl font-bold mb-4 text-gray-900 dark:text-white' }, `إثبات التواصل: ${merchant.name}`),
+                    h('textarea', {
+                        value: notes,
+                        onChange: (e) => setNotes(e.target.value),
+                        placeholder: 'ملاحظات المكالمة (10 أحرف على الأقل)',
+                        rows: 4,
+                        className: 'w-full p-3 border-2 rounded-xl mb-4 dark:bg-gray-700 dark:text-white'
+                    }),
+                    h('div', { className: 'flex gap-3' },
+                        h('button', {
+                            onClick: () => notes.length >= 10 && onConfirm(merchant.id, notes),
+                            disabled: notes.length < 10,
+                            className: 'flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold disabled:opacity-50 hover:bg-blue-600'
+                        }, '✅ تأكيد'),
+                        h('button', {
+                            onClick: onClose,
+                            className: 'px-6 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-bold hover:bg-gray-300'
+                        }, 'إلغاء')
+                    )
+                )
+            );
+        }
+
+        // Survey Modal with detailed questions
+        function SurveyModal({ merchant, onClose, onSubmit }) {
+            const [responses, setResponses] = useState({
+                speed: { rating: 0, comment: '' },
+                finance: { rating: 0, comment: '' },
+                support: { rating: 0, comment: '' },
+                returns: { rating: 0, comment: '' },
+                trust: { rating: 0, comment: '' }
+            });
+
+            const questions = {
+                speed: 'السرعة - كيف تقيم سرعة توصيل الشحنات؟',
+                finance: 'التمويل - ما رأيك في خدمات الدفع والتحصيل؟',
+                support: 'الدعم الفني - كيف تقيم جودة الدعم؟',
+                returns: 'المرتجعات - ما رأيك في إدارة المرتجعات؟',
+                trust: 'الثقة - ما مدى ثقتك بخدماتنا؟'
+            };
+
+            const updateResponse = (key, field, value) => {
+                setResponses({...responses, [key]: {...responses[key], [field]: value}});
+            };
+
+            const canSubmit = Object.values(responses).every(r => r.rating > 0);
+
+            return h('div', {
+                className: 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto',
+                onClick: onClose
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-2xl w-full my-8',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('h2', { className: 'text-2xl font-bold mb-4 text-gray-900 dark:text-white' }, `استبيان: ${merchant.name}`),
+                    h('div', { className: 'space-y-4 mb-4' },
+                        Object.keys(responses).map(key => h('div', { key, className: 'border-b pb-4' },
+                            h('label', { className: 'block font-bold mb-2 text-gray-900 dark:text-white' }, questions[key]),
+                            h('div', { className: 'flex gap-2 mb-2' },
+                                [1,2,3,4,5].map(val => h('button', {
+                                    key: val,
+                                    onClick: () => updateResponse(key, 'rating', val),
+                                    className: `flex-1 py-2 rounded font-bold ${responses[key].rating === val ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`
+                                }, val))
+                            ),
+                            h('textarea', {
+                                value: responses[key].comment,
+                                onChange: (e) => updateResponse(key, 'comment', e.target.value),
+                                placeholder: 'ملاحظات تفصيلية (اختياري)',
+                                rows: 2,
+                                className: 'w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white text-sm'
+                            })
+                        ))
+                    ),
+                    h('div', { className: 'flex gap-3' },
+                        h('button', {
+                            onClick: () => canSubmit && onSubmit(merchant.id, responses),
+                            disabled: !canSubmit,
+                            className: 'flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold disabled:opacity-50 hover:bg-blue-600'
+                        }, '💾 حفظ الاستبيان'),
+                        h('button', {
+                            onClick: onClose,
+                            className: 'px-6 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-bold hover:bg-gray-300'
+                        }, 'إلغاء')
+                    )
+                )
+            );
+        }
+
+        // Retention Modal
+        function RetentionModal({ merchant, onClose, onRecord }) {
+            const [notes, setNotes] = useState('');
+
+            return h('div', {
+                className: 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4',
+                onClick: onClose
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-lg w-full',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('h2', { className: 'text-2xl font-bold mb-4 text-gray-900 dark:text-white' }, 
+                        `محاولة ${merchant.retention_attempts + 1}: ${merchant.name}`
+                    ),
+                    h('textarea', {
+                        value: notes,
+                        onChange: (e) => setNotes(e.target.value),
+                        placeholder: 'ملاحظات محاولة الاستعادة (10 أحرف على الأقل)',
+                        rows: 4,
+                        className: 'w-full p-3 border-2 rounded-xl mb-4 dark:bg-gray-700 dark:text-white'
+                    }),
+                    h('div', { className: 'flex gap-3' },
+                        h('button', {
+                            onClick: () => notes.length >= 10 && onRecord(merchant.id, notes),
+                            disabled: notes.length < 10,
+                            className: 'flex-1 bg-orange-500 text-white py-3 rounded-xl font-bold disabled:opacity-50 hover:bg-orange-600'
+                        }, '📝 تسجيل'),
+                        h('button', {
+                            onClick: onClose,
+                            className: 'px-6 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-bold hover:bg-gray-300'
+                        }, 'إلغاء')
+                    )
+                )
+            );
+        }
+
+        // Freeze Modal
+        function FreezeModal({ merchant, onClose, onConfirm }) {
+            const [reason, setReason] = useState('');
+
+            return h('div', {
+                className: 'fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4',
+                onClick: onClose
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-lg w-full',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('h2', { className: 'text-2xl font-bold mb-4 text-gray-900 dark:text-white' }, `تجميد: ${merchant.name}`),
+                    h('p', { className: 'text-sm text-gray-600 dark:text-gray-400 mb-4' }, 'سيتم نقل المتجر إلى قائمة المجمدة وعدم التواصل معه مرة أخرى'),
+                    h('textarea', {
+                        value: reason,
+                        onChange: (e) => setReason(e.target.value),
+                        placeholder: 'سبب التجميد (إلزامي - 10 أحرف على الأقل)',
+                        rows: 4,
+                        className: 'w-full p-3 border-2 rounded-xl mb-4 dark:bg-gray-700 dark:text-white'
+                    }),
+                    h('div', { className: 'flex gap-3' },
+                        h('button', {
+                            onClick: () => reason.length >= 10 && onConfirm(merchant.id, reason),
+                            disabled: reason.length < 10,
+                            className: 'flex-1 bg-gray-500 text-white py-3 rounded-xl font-bold disabled:opacity-50 hover:bg-gray-600'
+                        }, '❄️ تجميد'),
+                        h('button', {
+                            onClick: onClose,
+                            className: 'px-6 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl font-bold hover:bg-gray-300'
+                        }, 'إلغاء')
+                    )
+                )
+            );
+        }
+
+        // Mount App
+        const root = createRoot(document.getElementById('app'));
+        root.render(h(App));
+        
+        } catch (error) {
+            console.error('Failed to initialize:', error);
+            document.getElementById('app').innerHTML = `
+                <div style="padding:40px;text-align:center;">
+                    <h1 style="color:red;font-size:30px;">❌ خطأ في التحميل</h1>
+                    <p style="color:#666;margin-top:20px;">${error.message}</p>
+                    <button onclick="location.reload()" style="margin-top:20px;padding:15px 30px;background:#007bff;color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;">🔄 إعادة المحاولة</button>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
