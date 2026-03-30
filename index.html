@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النورس CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root">
+        <div class="min-h-screen flex items-center justify-center p-4">
+            <div class="text-center">
+                <div class="inline-block w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-gray-600">جاري التحميل...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import React from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+
+        const { createElement: h, useState, useEffect } = React;
+
+        // Roles
+        const ROLES = {
+            NEW: 'new',
+            ACTIVE: 'active',
+            RETENTION: 'retention',
+            MANAGER: 'manager',
+            ADMIN: 'admin'
+        };
+
+        // Users
+        const getUsers = () => {
+            const saved = localStorage.getItem('crm_users');
+            if (saved) return JSON.parse(saved);
+            return [
+                { id: 1, username: 'new_officer', password: '123', name: 'أحمد', role: ROLES.NEW },
+                { id: 2, username: 'active_officer', password: '123', name: 'سارة', role: ROLES.ACTIVE },
+                { id: 3, username: 'retention_officer', password: '123', name: 'محمد', role: ROLES.RETENTION },
+                { id: 4, username: 'manager', password: '123', name: 'فاطمة', role: ROLES.MANAGER },
+                { id: 5, username: 'admin', password: 'admin123', name: 'المدير العام', role: ROLES.ADMIN }
+            ];
+        };
+
+        // App
+        function App() {
+            const [user, setUser] = useState(null);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('crm_user');
+                if (saved) setUser(JSON.parse(saved));
+            }, []);
+
+            const login = (username, password) => {
+                const users = getUsers();
+                const found = users.find(u => u.username === username && u.password === password);
+                if (found) {
+                    setUser(found);
+                    localStorage.setItem('crm_user', JSON.stringify(found));
+                    return true;
+                }
+                return false;
+            };
+
+            const logout = () => {
+                setUser(null);
+                localStorage.removeItem('crm_user');
+            };
+
+            if (!user) {
+                return h(LoginPage, { onLogin: login });
+            }
+
+            return h('div', { className: 'min-h-screen bg-gray-100 p-8' },
+                h('div', { className: 'max-w-4xl mx-auto' },
+                    h('div', { className: 'bg-white rounded-2xl shadow-xl p-6 mb-6' },
+                        h('div', { className: 'flex items-center justify-between' },
+                            h('div', null,
+                                h('h1', { className: 'text-2xl font-bold text-gray-900' }, '🦅 النورس CRM'),
+                                h('p', { className: 'text-sm text-gray-600' }, `مرحباً ${user.name}`)
+                            ),
+                            h('button', {
+                                onClick: logout,
+                                className: 'bg-red-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-600'
+                            }, 'تسجيل خروج')
+                        )
+                    ),
+                    h(Dashboard, { user })
+                )
+            );
+        }
+
+        // Login
+        function LoginPage({ onLogin }) {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (onLogin(username, password)) {
+                    setError('');
+                } else {
+                    setError('خطأ في اسم المستخدم أو كلمة المرور');
+                }
+            };
+
+            return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4' },
+                h('div', { className: 'bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md' },
+                    h('div', { className: 'text-center mb-8' },
+                        h('div', { className: 'w-20 h-20 bg-blue-500 rounded-2xl mx-auto flex items-center justify-center mb-4 text-4xl' }, '🦅'),
+                        h('h1', { className: 'text-3xl font-bold mb-2' }, 'النورس CRM'),
+                        h('p', { className: 'text-gray-600' }, 'نظام إدارة المتاجر')
+                    ),
+                    error && h('div', { className: 'mb-4 p-3 bg-red-100 text-red-800 rounded-xl text-sm' }, error),
+                    h('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold mb-2' }, 'اسم المستخدم'),
+                            h('input', {
+                                type: 'text',
+                                value: username,
+                                onChange: (e) => setUsername(e.target.value),
+                                className: 'w-full px-4 py-3 border-2 rounded-xl',
+                                required: true
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold mb-2' }, 'كلمة المرور'),
+                            h('input', {
+                                type: 'password',
+                                value: password,
+                                onChange: (e) => setPassword(e.target.value),
+                                className: 'w-full px-4 py-3 border-2 rounded-xl',
+                                required: true
+                            })
+                        ),
+                        h('button', {
+                            type: 'submit',
+                            className: 'w-full bg-blue-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-600'
+                        }, 'تسجيل الدخول')
+                    ),
+                    h('div', { className: 'mt-6 text-xs text-center text-gray-500' },
+                        h('p', null, 'حسابات تجريبية:'),
+                        h('div', { className: 'mt-2 space-y-1' },
+                            h('div', null, 'admin / admin123 (مدير عام)'),
+                            h('div', null, 'manager / 123 (مدير مبيعات)'),
+                            h('div', null, 'new_officer / 123'),
+                            h('div', null, 'active_officer / 123'),
+                            h('div', null, 'retention_officer / 123')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Dashboard
+        function Dashboard({ user }) {
+            const [loading, setLoading] = useState(true);
+            const [newMerchants, setNewMerchants] = useState([]);
+            const [inactiveMerchants, setInactiveMerchants] = useState([]);
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            const fetchData = async () => {
+                try {
+                    // Fetch new merchants
+                    const newRes = await fetch('/.netlify/functions/new-customers?days=30');
+                    const newData = await newRes.json();
+                    if (newData.success) {
+                        setNewMerchants(newData.data || []);
+                    }
+
+                    // Fetch inactive
+                    const inactiveRes = await fetch('/.netlify/functions/inactive-customers?days=10');
+                    const inactiveData = await inactiveRes.json();
+                    if (inactiveData.success) {
+                        setInactiveMerchants(inactiveData.data || []);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            if (loading) {
+                return h('div', { className: 'text-center py-12' },
+                    h('div', { className: 'inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin' })
+                );
+            }
+
+            return h('div', { className: 'space-y-6' },
+                h('div', { className: 'grid grid-cols-3 gap-6' },
+                    h(StatCard, { label: 'المتاجر الجديدة', value: newMerchants.length, color: 'blue', icon: '🐣' }),
+                    h(StatCard, { label: 'المتاجر الخاملة', value: inactiveMerchants.length, color: 'orange', icon: '😴' }),
+                    h(StatCard, { label: 'المتاجر النشطة', value: 2659, color: 'green', icon: '✅' })
+                ),
+                h('div', { className: 'bg-white rounded-2xl shadow-lg p-6' },
+                    h('h2', { className: 'text-xl font-bold mb-4' }, 'المتاجر الجديدة'),
+                    h('div', { className: 'space-y-3' },
+                        newMerchants.slice(0, 10).map((m, i) => 
+                            h('div', {
+                                key: i,
+                                className: 'flex items-center justify-between p-3 bg-gray-50 rounded-xl'
+                            },
+                                h('div', null,
+                                    h('p', { className: 'font-bold' }, m.name || 'غير محدد'),
+                                    h('p', { className: 'text-sm text-gray-600' }, m.phone)
+                                ),
+                                h('span', { className: 'text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded' }, 'جديد')
+                            )
+                        )
+                    )
+                ),
+                h('div', { className: 'bg-white rounded-2xl shadow-lg p-6' },
+                    h('h2', { className: 'text-xl font-bold mb-4' }, 'المتاجر الخاملة'),
+                    h('div', { className: 'space-y-3' },
+                        inactiveMerchants.slice(0, 10).map((m, i) => 
+                            h('div', {
+                                key: i,
+                                className: 'flex items-center justify-between p-3 bg-gray-50 rounded-xl'
+                            },
+                                h('div', null,
+                                    h('p', { className: 'font-bold' }, m.name || 'غير محدد'),
+                                    h('p', { className: 'text-sm text-gray-600' }, m.phone)
+                                ),
+                                h('span', { className: 'text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded' }, 'خامل')
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        // Stat Card
+        function StatCard({ label, value, color, icon }) {
+            return h('div', { className: `bg-${color}-50 rounded-2xl p-6 text-center` },
+                h('div', { className: 'text-5xl mb-3' }, icon),
+                h('div', { className: `text-4xl font-bold text-${color}-600 mb-1` }, value),
+                h('div', { className: 'text-sm font-semibold text-gray-600' }, label)
+            );
+        }
+
+        // Mount
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(h(App));
+    </script>
+</body>
+</html>
