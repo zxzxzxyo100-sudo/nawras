@@ -7,32 +7,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
-            --primary: #0066cc;
-            --primary-dark: #004999;
-            --success: #00a86b;
-            --warning: #ff9500;
-            --danger: #ff3b30;
-            --frozen: #9333ea;
-            --restoring: #0891b2;
-            --bg-main: #f5f7fa;
-            --bg-card: #ffffff;
-            --text-primary: #1a1a1a;
-            --text-secondary: #6b7280;
+            --primary: #0066cc; --primary-dark: #004999;
+            --success: #00a86b; --warning: #ff9500; --danger: #ff3b30;
+            --frozen: #9333ea; --restoring: #0891b2;
+            --bg-main: #f5f7fa; --bg-card: #ffffff;
+            --text-primary: #1a1a1a; --text-secondary: #6b7280;
             --border: #e5e7eb;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
             --shadow-lg: 0 10px 30px rgba(0,0,0,0.15);
         }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg-main); color: var(--text-primary); line-height: 1.6; }
 
-        body {
-            font-family: 'Cairo', sans-serif;
-            background: var(--bg-main);
-            color: var(--text-primary);
-            line-height: 1.6;
-        }
-
+        /* Loading */
         .loading-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(135deg, #1a365d 0%, #2563eb 100%);
@@ -42,48 +30,40 @@
         .loading-screen.hidden { opacity: 0; pointer-events: none; }
         .loading-content { text-align: center; color: white; }
         .loading-spinner {
-            width: 60px; height: 60px;
-            border: 4px solid rgba(255,255,255,0.3);
+            width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.3);
             border-top-color: white; border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1.5rem;
+            animation: spin 1s linear infinite; margin: 0 auto 1.5rem;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { font-size: 1.25rem; font-weight: 600; }
 
         .container { display: flex; min-height: 100vh; }
 
-        /* Login Screen */
+        /* Login */
         .login-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(135deg, #1a365d 0%, #2563eb 100%);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 10001;
+            display: flex; align-items: center; justify-content: center; z-index: 10001;
         }
         .login-box {
             background: white; padding: 3rem; border-radius: 20px;
-            width: 400px; max-width: 90%; box-shadow: var(--shadow-lg);
-            text-align: center;
+            width: 400px; max-width: 90%; box-shadow: var(--shadow-lg); text-align: center;
         }
         .login-box h2 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary); }
         .login-box p { color: var(--text-secondary); margin-bottom: 2rem; }
         .role-btn {
-            display: block; width: 100%; padding: 1rem;
-            margin-bottom: 0.75rem; border: 2px solid var(--border);
-            border-radius: 12px; background: white; cursor: pointer;
-            font-family: 'Cairo', sans-serif; font-size: 1rem;
-            font-weight: 600; transition: all 0.3s ease;
-            text-align: center;
+            display: block; width: 100%; padding: 1rem; margin-bottom: 0.75rem;
+            border: 2px solid var(--border); border-radius: 12px; background: white;
+            cursor: pointer; font-family: 'Cairo', sans-serif; font-size: 1rem;
+            font-weight: 600; transition: all 0.3s ease; text-align: center;
         }
         .role-btn:hover { border-color: var(--primary); background: rgba(0,102,204,0.05); }
         .role-btn .role-desc { font-size: 0.75rem; color: var(--text-secondary); font-weight: 400; margin-top: 0.25rem; }
 
         /* Sidebar */
         .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #1a365d 0%, #2d3748 100%);
-            color: white; padding: 2rem 0;
-            box-shadow: var(--shadow-lg);
+            width: 280px; background: linear-gradient(180deg, #1a365d 0%, #2d3748 100%);
+            color: white; padding: 2rem 0; box-shadow: var(--shadow-lg);
             position: fixed; height: 100vh; overflow-y: auto;
         }
         .logo { text-align: center; padding: 0 1.5rem 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
@@ -95,38 +75,34 @@
         .logo p { font-size: 0.875rem; opacity: 0.7; margin-top: 0.25rem; }
         .nav-menu { padding: 1.5rem 0; }
         .nav-item {
-            padding: 0.875rem 1.5rem; cursor: pointer;
-            transition: all 0.3s ease; display: flex;
-            align-items: center; gap: 1rem; font-weight: 500;
+            padding: 0.875rem 1.5rem; cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; gap: 1rem; font-weight: 500;
             border-right: 3px solid transparent;
         }
         .nav-item:hover { background: rgba(255,255,255,0.1); }
         .nav-item.active { background: rgba(59,130,246,0.2); border-right-color: #3b82f6; }
         .nav-item .badge {
-            margin-right: auto; background: var(--danger);
-            padding: 0.25rem 0.625rem; border-radius: 12px;
-            font-size: 0.75rem; font-weight: 700;
+            margin-right: auto; background: var(--danger); padding: 0.25rem 0.625rem;
+            border-radius: 12px; font-size: 0.75rem; font-weight: 700;
         }
-        .nav-item.hidden-nav { display: none; }
         .nav-icon { font-size: 1.25rem; }
         .nav-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 0.75rem 1.5rem; }
-        .nav-section-label { padding: 0.5rem 1.5rem; font-size: 0.7rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; }
+        .nav-section-label { padding: 0.5rem 1.5rem; font-size: 0.7rem; opacity: 0.5; letter-spacing: 1px; }
         .logout-btn {
             margin: 1rem 1.5rem; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px; background: transparent; color: white;
-            cursor: pointer; font-family: 'Cairo', sans-serif; font-weight: 600;
-            text-align: center; transition: all 0.3s ease;
+            border-radius: 10px; background: transparent; color: white; cursor: pointer;
+            font-family: 'Cairo', sans-serif; font-weight: 600; text-align: center; transition: all 0.3s ease;
         }
         .logout-btn:hover { background: rgba(255,59,48,0.3); border-color: var(--danger); }
 
-        /* Main Content */
+        /* Main */
         .main-content { flex: 1; margin-right: 280px; padding: 2rem; }
         .header {
             background: white; padding: 1.5rem 2rem; border-radius: 16px;
             box-shadow: var(--shadow-sm); margin-bottom: 2rem;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .header-title h2 { font-size: 1.75rem; font-weight: 700; color: var(--text-primary); }
+        .header-title h2 { font-size: 1.75rem; font-weight: 700; }
         .header-title p { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; }
         .user-info { display: flex; align-items: center; gap: 1rem; }
         .user-avatar {
@@ -136,81 +112,59 @@
             color: white; font-weight: 700; font-size: 1.25rem;
         }
 
-        /* Stats Cards */
+        /* Stats */
         .stats-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 1.5rem; margin-bottom: 2rem;
         }
         .stat-card {
-            background: white; padding: 1.5rem; border-radius: 16px;
-            box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer;
+            background: white; padding: 1.5rem; border-radius: 16px; box-shadow: var(--shadow-sm);
+            position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer;
         }
         .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
         .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
-        .stat-card.incubating::before { background: var(--primary); }
-        .stat-card.success::before { background: var(--success); }
-        .stat-card.retention::before { background: var(--warning); }
-        .stat-card.frozen-stat::before { background: var(--frozen); }
-        .stat-card.restoring-stat::before { background: var(--restoring); }
-        .stat-card.conversion-stat::before { background: linear-gradient(90deg, var(--primary), var(--success)); }
-        .stat-card.satisfaction-stat::before { background: linear-gradient(90deg, #f59e0b, #10b981); }
+        .stat-card.c-incubating::before { background: var(--primary); }
+        .stat-card.c-success::before { background: var(--success); }
+        .stat-card.c-warning::before { background: var(--warning); }
+        .stat-card.c-frozen::before { background: var(--frozen); }
+        .stat-card.c-tickets::before { background: #e11d48; }
+        .stat-card.c-conversion::before { background: linear-gradient(90deg, var(--primary), var(--success)); }
+        .stat-card.c-satisfaction::before { background: linear-gradient(90deg, #f59e0b, #10b981); }
         .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .stat-title { font-size: 0.875rem; color: var(--text-secondary); font-weight: 600; }
-        .stat-icon {
-            width: 48px; height: 48px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
-        }
-        .stat-card.incubating .stat-icon { background: rgba(0,102,204,0.1); color: var(--primary); }
-        .stat-card.success .stat-icon { background: rgba(0,168,107,0.1); color: var(--success); }
-        .stat-card.retention .stat-icon { background: rgba(255,149,0,0.1); color: var(--warning); }
-        .stat-card.frozen-stat .stat-icon { background: rgba(147,51,234,0.1); color: var(--frozen); }
-        .stat-card.restoring-stat .stat-icon { background: rgba(8,145,178,0.1); color: var(--restoring); }
-        .stat-card.conversion-stat .stat-icon { background: rgba(0,102,204,0.1); color: var(--primary); }
-        .stat-card.satisfaction-stat .stat-icon { background: rgba(245,158,11,0.1); color: #f59e0b; }
+        .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
         .stat-value { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
         .stat-change { font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); }
-
-        /* Progress Bar */
-        .progress-bar-container { margin-top: 0.75rem; }
-        .progress-bar-bg { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+        .progress-bar-bg { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 0.75rem; }
         .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
         .progress-bar-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
         .progress-bar-fill.blue { background: linear-gradient(90deg, var(--primary), #60a5fa); }
 
-        /* Tasks Section */
+        /* Section */
         .tasks-section { background: white; padding: 2rem; border-radius: 16px; box-shadow: var(--shadow-sm); }
         .section-header {
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border);
         }
         .section-title { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
-        .task-filters { display: flex; gap: 0.75rem; }
-        .filter-btn, .btn {
-            padding: 0.625rem 1.25rem; border: 2px solid var(--border);
-            background: white; border-radius: 10px; cursor: pointer;
-            font-family: 'Cairo', sans-serif; font-weight: 600;
-            font-size: 0.875rem; transition: all 0.3s ease;
-        }
-        .filter-btn:hover { border-color: var(--primary); color: var(--primary); }
-        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         .task-list { display: flex; flex-direction: column; gap: 1rem; }
 
+        /* Cards */
         .task-card {
-            border: 2px solid var(--border); border-radius: 12px;
-            padding: 1.5rem; transition: all 0.3s ease;
+            border: 2px solid var(--border); border-radius: 12px; padding: 1.5rem; transition: all 0.3s ease;
         }
         .task-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
         .task-card.hot-card { border-right: 4px solid #d32f2f; }
         .task-card.golden-card { border-right: 4px solid #f9a825; }
         .task-card.frozen-card { border-right: 4px solid var(--frozen); background: rgba(147,51,234,0.02); }
-        .task-card.restoring-card { border-right: 4px solid var(--restoring); background: rgba(8,145,178,0.02); }
-
+        .task-card.restoring-card { border-right: 4px solid var(--restoring); }
+        .task-card.ticket-card { border-right: 4px solid #e11d48; }
         .task-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
         .task-info h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
         .task-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
         .meta-item { display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.875rem; }
 
+        /* Badges */
         .status-badge { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.875rem; font-weight: 700; white-space: nowrap; }
         .status-badge.new { background: rgba(0,102,204,0.1); color: var(--primary); }
         .status-badge.hot { background: rgba(255,59,48,0.15); color: #d32f2f; }
@@ -220,13 +174,15 @@
         .status-badge.frozen { background: rgba(147,51,234,0.1); color: var(--frozen); }
         .status-badge.restoring { background: rgba(8,145,178,0.1); color: var(--restoring); }
         .status-badge.graduated { background: rgba(0,168,107,0.15); color: var(--success); }
+        .status-badge.ticket-open { background: rgba(225,29,72,0.1); color: #e11d48; }
+        .status-badge.ticket-closed { background: rgba(0,168,107,0.1); color: var(--success); }
 
+        /* Sub-filters */
         .sub-filters { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
         .sub-filter-btn {
-            padding: 0.625rem 1.25rem; border: 2px solid var(--border);
-            background: white; border-radius: 10px; cursor: pointer;
-            font-family: 'Cairo', sans-serif; font-weight: 600;
-            font-size: 0.875rem; transition: all 0.3s ease;
+            padding: 0.625rem 1.25rem; border: 2px solid var(--border); background: white;
+            border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif;
+            font-weight: 600; font-size: 0.875rem; transition: all 0.3s ease;
             display: flex; align-items: center; gap: 0.5rem;
         }
         .sub-filter-btn:hover { border-color: var(--primary); color: var(--primary); }
@@ -235,46 +191,36 @@
         .sub-filter-btn.golden-filter.active { background: #f9a825; border-color: #f9a825; color: #333; }
         .sub-filter-count { background: rgba(255,255,255,0.3); padding: 0.1rem 0.5rem; border-radius: 8px; font-size: 0.75rem; }
 
+        /* Buttons */
+        .btn, .filter-btn {
+            padding: 0.625rem 1.25rem; border: 2px solid var(--border); background: white;
+            border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif;
+            font-weight: 600; font-size: 0.875rem; transition: all 0.3s ease;
+        }
         .task-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
         .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
         .btn-success { background: var(--success); color: white; border-color: var(--success); }
-        .btn-success:hover { background: #008c5a; transform: translateY(-2px); box-shadow: var(--shadow-md); }
-        .btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
-        .btn-danger:hover { background: #cc2f26; transform: translateY(-2px); }
+        .btn-success:hover { background: #008c5a; transform: translateY(-2px); }
         .btn-frozen { background: var(--frozen); color: white; border-color: var(--frozen); }
         .btn-frozen:hover { background: #7c22ce; transform: translateY(-2px); }
         .btn-restoring { background: var(--restoring); color: white; border-color: var(--restoring); }
         .btn-restoring:hover { background: #0e7490; transform: translateY(-2px); }
         .btn-outline { background: white; border: 2px solid var(--border); color: var(--text-primary); }
         .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-
         .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-secondary); }
         .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
 
-        /* Survey Styles */
-        .survey-section {
-            background: var(--bg-main); padding: 1.25rem; border-radius: 10px;
-            margin-top: 1rem; border: 1px solid var(--border);
-        }
+        /* Survey */
+        .survey-section { background: var(--bg-main); padding: 1.25rem; border-radius: 10px; margin-top: 1rem; border: 1px solid var(--border); }
         .survey-title { font-weight: 700; margin-bottom: 1rem; font-size: 0.95rem; }
-        .survey-question { margin-bottom: 1rem; }
-        .survey-question label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary); }
         .star-rating { display: flex; gap: 0.25rem; direction: ltr; }
-        .star-rating span {
-            font-size: 1.5rem; cursor: pointer; opacity: 0.3;
-            transition: all 0.2s ease; user-select: none;
-        }
+        .star-rating span { font-size: 1.5rem; cursor: pointer; opacity: 0.3; transition: all 0.2s ease; user-select: none; }
         .star-rating span.filled { opacity: 1; }
         .star-rating span:hover { transform: scale(1.2); }
-        .survey-avg { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem; font-weight: 600; }
-        .survey-saved { background: rgba(0,168,107,0.1); color: var(--success); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; margin-top: 0.75rem; text-align: center; }
 
-        /* Freeze Reason */
-        .freeze-reason {
-            background: rgba(147,51,234,0.05); border: 1px solid rgba(147,51,234,0.2);
-            padding: 1rem; border-radius: 8px; margin-top: 1rem;
-        }
+        /* Freeze */
+        .freeze-reason { background: rgba(147,51,234,0.05); border: 1px solid rgba(147,51,234,0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
         .freeze-reason strong { color: var(--frozen); }
 
         /* Modal */
@@ -282,64 +228,52 @@
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
             z-index: 1000; align-items: center; justify-content: center;
-            animation: fadeIn 0.3s ease;
         }
         .modal.active { display: flex; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content {
             background: white; padding: 2rem; border-radius: 20px;
             max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;
             box-shadow: var(--shadow-lg); animation: slideUp 0.3s ease;
         }
-        @keyframes slideUp {
-            from { transform: translateY(30px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .modal-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border);
-        }
+        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border); }
         .modal-header h3 { font-size: 1.5rem; font-weight: 700; }
-        .close-modal {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: var(--bg-main); border: none; cursor: pointer;
-            font-size: 1.25rem; transition: all 0.3s ease;
-        }
+        .close-modal { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-main); border: none; cursor: pointer; font-size: 1.25rem; transition: all 0.3s ease; }
         .close-modal:hover { background: var(--danger); color: white; }
         .form-group { margin-bottom: 1.5rem; }
         .form-label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
         .form-input, .form-textarea, .form-select {
-            width: 100%; padding: 0.875rem; border: 2px solid var(--border);
-            border-radius: 10px; font-family: 'Cairo', sans-serif;
-            font-size: 1rem; transition: all 0.3s ease;
+            width: 100%; padding: 0.875rem; border: 2px solid var(--border); border-radius: 10px;
+            font-family: 'Cairo', sans-serif; font-size: 1rem; transition: all 0.3s ease;
         }
-        .form-input:focus, .form-textarea:focus, .form-select:focus {
-            outline: none; border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(0,102,204,0.1);
-        }
+        .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(0,102,204,0.1); }
         .form-textarea { min-height: 120px; resize: vertical; }
 
         .notification {
             position: fixed; top: 2rem; left: 50%; transform: translateX(-50%);
             background: var(--success); color: white; padding: 1rem 2rem;
-            border-radius: 12px; box-shadow: var(--shadow-lg);
-            z-index: 10000; font-weight: 600; animation: slideDown 0.3s ease;
+            border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 10000;
+            font-weight: 600; animation: slideDown 0.3s ease;
         }
-        @keyframes slideDown {
-            from { transform: translate(-50%, -100%); opacity: 0; }
-            to { transform: translate(-50%, 0); opacity: 1; }
-        }
+        @keyframes slideDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+        /* Ticket table */
+        .tickets-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; }
+        .tickets-table th { background: var(--bg-main); padding: 0.75rem; text-align: right; font-weight: 700; border-bottom: 2px solid var(--border); }
+        .tickets-table td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+        .tickets-table tr:hover { background: rgba(0,102,204,0.03); }
 
         @media (max-width: 768px) {
-            .sidebar { width: 0; padding: 0; }
+            .sidebar { width: 0; padding: 0; overflow: hidden; }
             .main-content { margin-right: 0; padding: 1rem; }
             .stats-grid { grid-template-columns: 1fr; }
-            .login-box { padding: 2rem 1.5rem; }
+            .tickets-table { font-size: 0.75rem; }
+            .tickets-table th, .tickets-table td { padding: 0.5rem 0.25rem; }
         }
     </style>
 </head>
 <body>
-    <!-- Login Screen -->
+    <!-- Login -->
     <div class="login-screen" id="loginScreen">
         <div class="login-box">
             <h2>النورس</h2>
@@ -359,6 +293,7 @@
         </div>
     </div>
 
+    <!-- Loading -->
     <div class="loading-screen" id="loadingScreen" style="display:none;">
         <div class="loading-content">
             <div class="loading-spinner"></div>
@@ -366,45 +301,27 @@
         </div>
     </div>
 
+    <!-- App -->
     <div class="container" id="appContainer" style="display:none;">
         <aside class="sidebar">
             <div class="logo">
                 <h1>النورس</h1>
                 <p>نظام إدارة المتاجر</p>
             </div>
-
             <nav class="nav-menu">
-                <div class="nav-item active" data-view="dashboard">
-                    <span class="nav-icon">📊</span>
-                    <span>لوحة التحكم</span>
-                </div>
+                <div class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span>لوحة التحكم</span></div>
                 <div class="nav-divider"></div>
                 <div class="nav-section-label">الأقسام</div>
-                <div class="nav-item" data-view="incubating" id="nav-incubating">
-                    <span class="nav-icon">🎯</span>
-                    <span>قيد الاحتضان</span>
-                    <span class="badge" id="incubating-count">0</span>
-                </div>
-                <div class="nav-item" data-view="active" id="nav-active">
-                    <span class="nav-icon">⭐</span>
-                    <span>المتاجر النشطة</span>
-                    <span class="badge" id="active-count" style="background: var(--success);">0</span>
-                </div>
-                <div class="nav-item" data-view="inactive" id="nav-inactive">
-                    <span class="nav-icon">⚠️</span>
-                    <span>غير النشطة</span>
-                    <span class="badge" id="inactive-count" style="background: var(--warning);">0</span>
-                </div>
-                <div class="nav-item" data-view="frozen" id="nav-frozen">
-                    <span class="nav-icon">🧊</span>
-                    <span>مجمدة</span>
-                    <span class="badge" id="frozen-count" style="background: var(--frozen);">0</span>
-                </div>
-            </nav>
-
-            <div style="padding: 0 1.5rem; margin-top: auto;">
+                <div class="nav-item" data-view="incubating" id="nav-incubating"><span class="nav-icon">🎯</span><span>قيد الاحتضان</span><span class="badge" id="incubating-count">0</span></div>
+                <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
+                <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
+                <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
                 <div class="nav-divider"></div>
-                <div id="current-role-label" style="font-size: 0.75rem; opacity: 0.6; padding: 0.5rem 0; text-align: center;"></div>
+                <div class="nav-item" data-view="tickets" id="nav-tickets"><span class="nav-icon">🎫</span><span>التذاكر</span><span class="badge" id="tickets-count" style="background:#e11d48">0</span></div>
+            </nav>
+            <div style="padding:0 1.5rem;margin-top:1rem;">
+                <div class="nav-divider"></div>
+                <div id="current-role-label" style="font-size:0.75rem;opacity:0.6;padding:0.5rem 0;text-align:center;"></div>
                 <button class="logout-btn" onclick="logout()">تسجيل خروج</button>
             </div>
         </aside>
@@ -417,28 +334,19 @@
                 </div>
                 <div class="user-info">
                     <div>
-                        <div style="font-weight: 600;" id="user-role-display">المدير التنفيذي</div>
-                        <div style="font-size: 0.875rem; color: var(--text-secondary);">شركة النورس</div>
+                        <div style="font-weight:600;" id="user-role-display">المدير التنفيذي</div>
+                        <div style="font-size:0.875rem;color:var(--text-secondary);">شركة النورس</div>
                     </div>
                     <div class="user-avatar">ن</div>
                 </div>
             </div>
-
-            <!-- Dashboard View -->
-            <div id="dashboard-view">
-                <div class="stats-grid" id="stats-grid"></div>
-            </div>
-
-            <!-- Tasks View -->
-            <div id="tasks-view" style="display: none;">
+            <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
+            <div id="tasks-view" style="display:none;">
                 <div class="tasks-section">
                     <div class="section-header">
-                        <h2 class="section-title">
-                            <span id="section-icon">📊</span>
-                            <span id="section-title">قائمة المتاجر</span>
-                        </h2>
+                        <h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
                     </div>
-                    <div class="sub-filters" id="sub-filters" style="display: none;"></div>
+                    <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
                 </div>
             </div>
@@ -446,771 +354,522 @@
     </div>
 
     <!-- Note Modal -->
-    <div class="modal" id="call-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>تسجيل ملاحظة</h3>
-                <button class="close-modal" onclick="closeModal()">✕</button>
-            </div>
-            <form id="call-form">
-                <input type="hidden" id="store-id">
-                <div class="form-group">
-                    <label class="form-label">ملاحظة النورس</label>
-                    <textarea class="form-textarea" id="nawras-note" placeholder="اكتب ملاحظة عن هذا المتجر..." required></textarea>
-                </div>
-                <div class="task-actions">
-                    <button type="submit" class="btn btn-primary">حفظ الملاحظة</button>
-                    <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal" id="call-modal"><div class="modal-content">
+        <div class="modal-header"><h3>تسجيل ملاحظة</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+        <form id="call-form">
+            <input type="hidden" id="store-id">
+            <div class="form-group"><label class="form-label">ملاحظة النورس</label><textarea class="form-textarea" id="nawras-note" placeholder="اكتب ملاحظة..." required></textarea></div>
+            <div class="task-actions"><button type="submit" class="btn btn-primary">حفظ</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+        </form>
+    </div></div>
 
     <!-- Freeze Modal -->
-    <div class="modal" id="freeze-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>تجميد المتجر</h3>
-                <button class="close-modal" onclick="closeModal()">✕</button>
-            </div>
-            <form id="freeze-form">
-                <input type="hidden" id="freeze-store-id">
-                <div class="form-group">
-                    <label class="form-label">سبب التجميد (إلزامي)</label>
-                    <textarea class="form-textarea" id="freeze-reason" placeholder="اكتب سبب تجميد هذا المتجر..." required></textarea>
-                </div>
-                <div class="task-actions">
-                    <button type="submit" class="btn btn-frozen">تأكيد التجميد</button>
-                    <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="modal" id="freeze-modal"><div class="modal-content">
+        <div class="modal-header"><h3>تجميد المتجر</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+        <form id="freeze-form">
+            <input type="hidden" id="freeze-store-id">
+            <div class="form-group"><label class="form-label">سبب التجميد (إلزامي)</label><textarea class="form-textarea" id="freeze-reason" placeholder="اكتب سبب التجميد..." required></textarea></div>
+            <div class="task-actions"><button type="submit" class="btn btn-frozen">تأكيد التجميد</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+        </form>
+    </div></div>
 
     <!-- Survey Modal -->
-    <div class="modal" id="survey-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>استبيان رضا العميل</h3>
-                <button class="close-modal" onclick="closeModal()">✕</button>
-            </div>
-            <form id="survey-form">
-                <input type="hidden" id="survey-store-id">
-                <div id="survey-questions"></div>
-                <div class="task-actions">
-                    <button type="submit" class="btn btn-success">حفظ التقييم</button>
-                    <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
-                </div>
-            </form>
+    <div class="modal" id="survey-modal"><div class="modal-content">
+        <div class="modal-header"><h3>استبيان رضا العميل</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+        <form id="survey-form">
+            <input type="hidden" id="survey-store-id">
+            <div id="survey-questions"></div>
+            <div class="task-actions"><button type="submit" class="btn btn-success">حفظ التقييم</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+        </form>
+    </div></div>
+
+<script>
+// ==================== CONFIG ====================
+const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
+const API_ORIGIN = 'https://backoffice.nawris.algoriza.com/external-api';
+const PROXY = 'https://corsproxy.io/?url=';
+const INCUBATION_DAYS = 14;
+
+const SURVEY_QUESTIONS = [
+    'ما مدى رضاك عن سرعة التوصيل؟',
+    'ما مدى رضاك عن خدمة العملاء؟',
+    'ما مدى رضاك عن جودة التغليف؟',
+    'ما مدى رضاك عن سهولة استخدام النظام؟',
+    'ما مدى احتمالية توصيتك بالنورس لمتجر آخر؟'
+];
+
+const ROLES = {
+    active_manager: { label: 'مسؤول المتاجر النشطة', views: ['dashboard','active'] },
+    inactive_manager: { label: 'مسؤول المتاجر غير النشطة', views: ['dashboard','inactive'] },
+    executive: { label: 'المدير التنفيذي', views: ['dashboard','incubating','active','inactive','frozen','tickets'] }
+};
+
+// ==================== STATE ====================
+let allStores = [];
+let allTickets = [];
+let currentView = 'dashboard';
+let currentSubFilter = 'all';
+let currentRole = null;
+
+// ==================== API HELPERS ====================
+function proxyUrl(path, params) {
+    const qs = new URLSearchParams(params).toString();
+    const full = API_ORIGIN + path + (qs ? '?' + qs : '');
+    return PROXY + encodeURIComponent(full);
+}
+
+async function apiGet(path, params = {}) {
+    let allData = [], cursor = null, hasMore = true;
+    while (hasMore) {
+        const p = { ...params };
+        if (cursor) p.cursor = cursor;
+        const r = await fetch(proxyUrl(path, p), {
+            headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
+        });
+        if (!r.ok) throw new Error('API ' + r.status);
+        const d = await r.json();
+        if (d.data && Array.isArray(d.data)) allData = allData.concat(d.data);
+        cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
+        hasMore = !!cursor;
+    }
+    return allData;
+}
+
+async function apiPost(path, body) {
+    let allData = [], cursor = null, hasMore = true;
+    while (hasMore) {
+        const b = { ...body };
+        if (cursor) b.cursor = cursor;
+        const url = PROXY + encodeURIComponent(API_ORIGIN + path);
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-API-TOKEN': API_TOKEN },
+            body: JSON.stringify(b)
+        });
+        if (!r.ok) throw new Error('API ' + r.status);
+        const d = await r.json();
+        if (d.data && Array.isArray(d.data)) allData = allData.concat(d.data);
+        cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
+        hasMore = !!cursor;
+    }
+    return allData;
+}
+
+// ==================== AUTH ====================
+function loginAs(role) {
+    currentRole = role;
+    localStorage.setItem('nawras_role', role);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('loadingScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'flex';
+    applyRolePermissions();
+    initApp();
+}
+
+function logout() { localStorage.removeItem('nawras_role'); location.reload(); }
+
+function checkSavedLogin() {
+    const s = localStorage.getItem('nawras_role');
+    if (s && ROLES[s]) { loginAs(s); return true; }
+    return false;
+}
+
+function applyRolePermissions() {
+    const role = ROLES[currentRole];
+    document.getElementById('user-role-display').textContent = role.label;
+    document.getElementById('current-role-label').textContent = role.label;
+    ['incubating','active','inactive','frozen','tickets'].forEach(v => {
+        const el = document.getElementById('nav-' + v);
+        if (el) el.style.display = role.views.includes(v) ? 'flex' : 'none';
+    });
+}
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+    if (!checkSavedLogin()) document.getElementById('loginScreen').style.display = 'flex';
+});
+
+async function initApp() {
+    setupNavigation();
+    await loadData();
+    hideLoading();
+}
+
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const view = this.dataset.view;
+            if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
+            currentSubFilter = 'all';
+            switchView(view);
+        });
+    });
+}
+
+// ==================== LOAD DATA ====================
+async function loadData() {
+    try {
+        const since = new Date(); since.setDate(since.getDate() - 30);
+        const sinceDate = since.toISOString().split('T')[0];
+        const toDate = new Date().toISOString().split('T')[0];
+
+        const results = await Promise.all([
+            apiGet('/customers/new', { since: sinceDate }),
+            apiGet('/customers/inactive', { days: 10 }),
+            apiGet('/customers/orders-summary', { from: sinceDate, to: toDate }),
+            currentRole === 'executive' ? apiPost('/tickets/report', { from: sinceDate, to: toDate, date_type: 'created_at' }) : Promise.resolve([])
+        ]);
+
+        processStoresData(results[0], results[1], results[2]);
+        allTickets = results[3];
+        updateDashboard();
+        renderCurrentView();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('حدث خطأ في تحميل البيانات: ' + error.message, 'error');
+        hideLoading();
+    }
+}
+
+function processStoresData(newData, inactiveData, summaryData) {
+    allStores = [];
+
+    (newData || []).forEach(s => {
+        allStores.push({ ...s, category: 'incubating', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
+    });
+
+    (inactiveData || []).forEach(s => {
+        const ex = allStores.find(x => x.id === s.id);
+        if (ex) ex.category = 'inactive';
+        else allStores.push({ ...s, category: 'inactive', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
+    });
+
+    (summaryData || []).forEach(s => {
+        const ex = allStores.find(x => x.id === s.id);
+        if (ex) {
+            ex.total_shipments = s.total_shipments || ex.total_shipments;
+            if (ex.category === 'incubating' && s.total_shipments > 10) ex.category = 'active';
+        } else if (s.status === 'active') {
+            allStores.push({ ...s, category: 'active', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
+        }
+    });
+
+    allStores.forEach(s => {
+        const saved = localStorage.getItem('store_status_' + s.id);
+        if (saved) s.category = saved;
+    });
+}
+
+// ==================== LOCAL STORAGE ====================
+function getStored(type, id) {
+    const v = localStorage.getItem('store_' + type + '_' + id);
+    if (!v) return type === 'notes' ? [] : type === 'survey' ? null : '';
+    try { return JSON.parse(v); } catch { return v; }
+}
+
+function saveNote(id, note) {
+    const s = allStores.find(x => x.id === id); if (!s) return;
+    const t = new Date().toLocaleString('ar-EG');
+    if (!s.notes) s.notes = [];
+    s.notes.push('[' + t + '] ' + note);
+    localStorage.setItem('store_notes_' + id, JSON.stringify(s.notes));
+}
+
+function setStatus(id, status) {
+    const s = allStores.find(x => x.id === id);
+    if (s) { s.category = status; localStorage.setItem('store_status_' + id, status); }
+}
+
+// ==================== HELPERS ====================
+function getHeat(s) {
+    if (!s.registered_at) return 'normal';
+    const h = (new Date() - new Date(s.registered_at)) / 36e5;
+    return h <= 1 ? 'hot' : h <= 24 ? 'golden' : 'normal';
+}
+
+function getIncDays(s) {
+    return s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 864e5) : 0;
+}
+
+function getConversionRate() {
+    const grad = allStores.filter(s => localStorage.getItem('store_graduated_' + s.id) === 'true' || s.category === 'active').length;
+    return allStores.length > 0 ? Math.round(grad / allStores.length * 100) : 0;
+}
+
+function getSatisfactionRate() {
+    let t = 0, c = 0;
+    allStores.forEach(s => {
+        const sv = s.survey || getStored('survey', s.id);
+        if (sv && sv.answers) { t += sv.answers.reduce((a,b) => a+b, 0) / sv.answers.length; c++; }
+    });
+    return c > 0 ? (t / c).toFixed(1) : '0';
+}
+
+// ==================== DASHBOARD ====================
+function updateDashboard() {
+    const c = { incubating: 0, active: 0, inactive: 0, frozen: 0, restoring: 0 };
+    allStores.forEach(s => { if (c[s.category] !== undefined) c[s.category]++; });
+
+    document.getElementById('incubating-count').textContent = c.incubating;
+    document.getElementById('active-count').textContent = c.active;
+    document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
+    document.getElementById('frozen-count').textContent = c.frozen;
+    document.getElementById('tickets-count').textContent = allTickets.length;
+
+    const conv = getConversionRate(), sat = getSatisfactionRate();
+    const openTickets = allTickets.filter(t => t.status !== 'تم الإغلاق').length;
+    const grid = document.getElementById('stats-grid');
+    let h = '';
+
+    if (currentRole === 'executive') {
+        h = `
+        <div class="stat-card c-incubating" onclick="switchView('incubating')"><div class="stat-header"><span class="stat-title">قيد الاحتضان</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">${c.incubating}</div><div class="stat-change"><span>📅</span><span>متاجر جديدة</span></div></div>
+        <div class="stat-card c-success" onclick="switchView('active')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">${c.active}</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>
+        <div class="stat-card c-warning" onclick="switchView('inactive')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">${c.inactive}</div><div class="stat-change"><span>⏰</span><span>تحتاج متابعة ${c.restoring > 0 ? '('+c.restoring+' جاري الاستعادة)' : ''}</span></div></div>
+        <div class="stat-card c-frozen" onclick="switchView('frozen')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">${c.frozen}</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>
+        <div class="stat-card c-tickets" onclick="switchView('tickets')"><div class="stat-header"><span class="stat-title">التذاكر</span><div class="stat-icon" style="background:rgba(225,29,72,0.1);color:#e11d48">🎫</div></div><div class="stat-value">${allTickets.length}</div><div class="stat-change"><span>📨</span><span>${openTickets} مفتوحة</span></div></div>
+        <div class="stat-card c-conversion"><div class="stat-header"><span class="stat-title">معدل التحويل</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">${conv}%</div><div class="stat-change"><span>🎯</span><span>من الاحتضان إلى نشط</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:${conv}%"></div></div></div>
+        <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">${sat}/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${parseFloat(sat)/5*100}%"></div></div></div>`;
+    } else if (currentRole === 'active_manager') {
+        h = `
+        <div class="stat-card c-success" onclick="switchView('active')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">${c.active}</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>
+        <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">${sat}/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${parseFloat(sat)/5*100}%"></div></div></div>`;
+    } else {
+        h = `
+        <div class="stat-card c-warning" onclick="switchView('inactive')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">${c.inactive}</div><div class="stat-change"><span>⏰</span><span>تحتاج متابعة</span></div></div>
+        <div class="stat-card c-incubating"><div class="stat-header"><span class="stat-title">جاري الاستعادة</span><div class="stat-icon" style="background:rgba(8,145,178,0.1);color:var(--restoring)">🔄</div></div><div class="stat-value">${c.restoring}</div><div class="stat-change"><span>📦</span><span>بانتظار أول شحنة</span></div></div>`;
+    }
+    grid.innerHTML = h;
+}
+
+// ==================== VIEWS ====================
+function switchView(view) {
+    if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
+    currentView = view;
+    document.querySelectorAll('.nav-item').forEach(i => { i.classList.remove('active'); if (i.dataset.view === view) i.classList.add('active'); });
+    if (view === 'dashboard') {
+        document.getElementById('dashboard-view').style.display = 'block';
+        document.getElementById('tasks-view').style.display = 'none';
+        document.getElementById('page-title').textContent = 'لوحة التحكم';
+        document.getElementById('page-subtitle').textContent = 'نظرة شاملة على جميع المتاجر';
+        updateDashboard();
+    } else {
+        document.getElementById('dashboard-view').style.display = 'none';
+        document.getElementById('tasks-view').style.display = 'block';
+        renderCurrentView();
+    }
+}
+
+function renderCurrentView() {
+    if (currentView === 'dashboard') return;
+
+    const titles = {
+        incubating: { icon: '🎯', title: 'قيد الاحتضان', sub: 'تخرج بعد 14 يوم' },
+        active: { icon: '⭐', title: 'المتاجر النشطة', sub: 'تشحن بانتظام' },
+        inactive: { icon: '⚠️', title: 'غير النشطة', sub: 'تحتاج متابعة' },
+        frozen: { icon: '🧊', title: 'المجمدة', sub: 'تم تجميدها من المدير' },
+        tickets: { icon: '🎫', title: 'التذاكر', sub: 'تقارير الشكاوى والدعم' }
+    };
+
+    const cfg = titles[currentView]; if (!cfg) return;
+    document.getElementById('page-title').textContent = cfg.title;
+    document.getElementById('page-subtitle').textContent = cfg.sub;
+    document.getElementById('section-icon').textContent = cfg.icon;
+    document.getElementById('section-title').textContent = cfg.title;
+
+    const sf = document.getElementById('sub-filters');
+    const tl = document.getElementById('task-list');
+    tl.innerHTML = '';
+
+    // Tickets view
+    if (currentView === 'tickets') {
+        sf.style.display = 'none';
+        renderTickets(tl);
+        return;
+    }
+
+    // Sub-filters
+    if (currentView === 'incubating') {
+        const all = allStores.filter(s => s.category === 'incubating');
+        sf.style.display = 'flex';
+        sf.innerHTML = `
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${all.length}</span></button>
+            <button class="sub-filter-btn hot-filter ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sub-filter-count">${all.filter(s=>getHeat(s)==='hot').length}</span></button>
+            <button class="sub-filter-btn golden-filter ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sub-filter-count">${all.filter(s=>getHeat(s)==='golden').length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='ready'?'active':''}" onclick="setSubFilter('ready')">🎓 جاهزة للتخريج <span class="sub-filter-count">${all.filter(s=>getIncDays(s)>=INCUBATION_DAYS).length}</span></button>`;
+    } else if (currentView === 'inactive') {
+        const inact = allStores.filter(s => s.category === 'inactive');
+        const rest = allStores.filter(s => s.category === 'restoring');
+        sf.style.display = 'flex';
+        sf.innerHTML = `
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${inact.length+rest.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sub-filter-count">${inact.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sub-filter-count">${rest.length}</span></button>`;
+    } else { sf.style.display = 'none'; }
+
+    // Get stores
+    let stores;
+    if (currentView === 'inactive') {
+        if (currentSubFilter === 'inactive_only') stores = allStores.filter(s => s.category === 'inactive');
+        else if (currentSubFilter === 'restoring') stores = allStores.filter(s => s.category === 'restoring');
+        else stores = allStores.filter(s => s.category === 'inactive' || s.category === 'restoring');
+    } else {
+        stores = allStores.filter(s => s.category === currentView);
+    }
+
+    if (currentView === 'incubating') {
+        if (currentSubFilter === 'hot') stores = stores.filter(s => getHeat(s) === 'hot');
+        else if (currentSubFilter === 'golden') stores = stores.filter(s => getHeat(s) === 'golden');
+        else if (currentSubFilter === 'ready') stores = stores.filter(s => getIncDays(s) >= INCUBATION_DAYS);
+        stores.sort((a, b) => ({ hot: 0, golden: 1, normal: 2 })[getHeat(a)] - ({ hot: 0, golden: 1, normal: 2 })[getHeat(b)]);
+    }
+
+    if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
+    stores.forEach(s => tl.appendChild(createStoreCard(s)));
+}
+
+function setSubFilter(f) { currentSubFilter = f; renderCurrentView(); }
+
+// ==================== TICKETS VIEW ====================
+function renderTickets(container) {
+    if (!allTickets.length) { container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎫</div><h3>لا توجد تذاكر</h3></div>'; return; }
+
+    const open = allTickets.filter(t => t.status !== 'تم الإغلاق').length;
+    const closed = allTickets.length - open;
+    const avgRating = allTickets.filter(t => t.rating > 0);
+    const avg = avgRating.length > 0 ? (avgRating.reduce((s,t) => s + t.rating, 0) / avgRating.length).toFixed(1) : '-';
+
+    container.innerHTML = `
+        <div class="stats-grid" style="margin-bottom:1.5rem;">
+            <div class="stat-card c-tickets"><div class="stat-header"><span class="stat-title">إجمالي التذاكر</span><div class="stat-icon" style="background:rgba(225,29,72,0.1);color:#e11d48">🎫</div></div><div class="stat-value">${allTickets.length}</div></div>
+            <div class="stat-card c-warning"><div class="stat-header"><span class="stat-title">مفتوحة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">📨</div></div><div class="stat-value">${open}</div></div>
+            <div class="stat-card c-success"><div class="stat-header"><span class="stat-title">مغلقة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">✅</div></div><div class="stat-value">${closed}</div></div>
+            <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">متوسط التقييم</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">⭐</div></div><div class="stat-value">${avg}</div></div>
         </div>
-    </div>
-
-    <script>
-        // ========== CONFIG ==========
-        const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-        const API_ORIGIN = 'https://backoffice.nawris.algoriza.com/external-api';
-        const CORS_PROXY = 'https://corsproxy.io/?url=';
-        const API_BASE = CORS_PROXY + encodeURIComponent(API_ORIGIN);
-
-        const SURVEY_QUESTIONS = [
-            'ما مدى رضاك عن سرعة التوصيل؟',
-            'ما مدى رضاك عن خدمة العملاء؟',
-            'ما مدى رضاك عن جودة التغليف؟',
-            'ما مدى رضاك عن سهولة استخدام النظام؟',
-            'ما مدى احتمالية توصيتك بالنورس لمتجر آخر؟'
-        ];
-
-        const ROLES = {
-            active_manager: { label: 'مسؤول المتاجر النشطة', views: ['dashboard', 'active'] },
-            inactive_manager: { label: 'مسؤول المتاجر غير النشطة', views: ['dashboard', 'inactive'] },
-            executive: { label: 'المدير التنفيذي', views: ['dashboard', 'incubating', 'active', 'inactive', 'frozen'] }
-        };
-
-        const INCUBATION_DAYS = 14;
-
-        // ========== STATE ==========
-        let allStores = [];
-        let currentView = 'dashboard';
-        let currentSubFilter = 'all';
-        let currentRole = null;
-
-        // ========== AUTH ==========
-        function loginAs(role) {
-            currentRole = role;
-            localStorage.setItem('nawras_role', role);
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('loadingScreen').style.display = 'flex';
-            document.getElementById('appContainer').style.display = 'flex';
-            applyRolePermissions();
-            initApp();
-        }
-
-        function logout() {
-            localStorage.removeItem('nawras_role');
-            currentRole = null;
-            location.reload();
-        }
-
-        function checkSavedLogin() {
-            const saved = localStorage.getItem('nawras_role');
-            if (saved && ROLES[saved]) {
-                loginAs(saved);
-                return true;
-            }
-            return false;
-        }
-
-        function applyRolePermissions() {
-            const role = ROLES[currentRole];
-            document.getElementById('user-role-display').textContent = role.label;
-            document.getElementById('current-role-label').textContent = role.label;
-
-            const allNavViews = ['incubating', 'active', 'inactive', 'frozen'];
-            allNavViews.forEach(view => {
-                const nav = document.getElementById('nav-' + view);
-                if (nav) {
-                    nav.style.display = role.views.includes(view) ? 'flex' : 'none';
-                }
-            });
-        }
-
-        // ========== INIT ==========
-        async function initApp() {
-            setupNavigation();
-            await loadData();
-            hideLoading();
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            if (!checkSavedLogin()) {
-                document.getElementById('loginScreen').style.display = 'flex';
-            }
-        });
-
-        function setupNavigation() {
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const view = this.dataset.view;
-                    if (!ROLES[currentRole].views.includes(view) && view !== 'dashboard') return;
-                    currentSubFilter = 'all';
-                    switchView(view);
-                });
-            });
-        }
-
-        // ========== DATA ==========
-        function buildUrl(path, params) {
-            const fullUrl = API_ORIGIN + path + '?' + new URLSearchParams(params).toString();
-            return CORS_PROXY + encodeURIComponent(fullUrl);
-        }
-
-        async function loadData() {
-            try {
-                const since = new Date();
-                since.setDate(since.getDate() - 30);
-                const sinceDate = since.toISOString().split('T')[0];
-                const toDate = new Date().toISOString().split('T')[0];
-
-                const [newCustomers, inactiveCustomers, ordersSummary] = await Promise.all([
-                    fetchAllPages('/customers/new', { since: sinceDate }),
-                    fetchAllPages('/customers/inactive', { days: 10 }),
-                    fetchAllPages('/customers/orders-summary', { from: sinceDate, to: toDate })
-                ]);
-                processStoresData(newCustomers, inactiveCustomers, ordersSummary);
-                updateDashboard();
-                renderCurrentView();
-            } catch (error) {
-                console.error('Error loading data:', error);
-                showNotification('حدث خطأ في تحميل البيانات', 'error');
-            }
-        }
-
-        async function fetchAllPages(path, params) {
-            let allData = [];
-            let hasMore = true;
-            let cursor = null;
-
-            while (hasMore) {
-                const fetchParams = { ...params };
-                if (cursor) fetchParams.cursor = cursor;
-                const url = buildUrl(path, fetchParams);
-
-                const response = await fetch(url, {
-                    headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
-                });
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                const data = await response.json();
-                if (data.data && Array.isArray(data.data)) allData = allData.concat(data.data);
-                if (data.meta && data.meta.next_cursor) { cursor = data.meta.next_cursor; }
-                else { hasMore = false; }
-            }
-            return { success: true, data: allData, total: allData.length };
-        }
-
-        function processStoresData(newData, inactiveData, summaryData) {
-            allStores = [];
-
-            if (newData && newData.data) {
-                newData.data.forEach(store => {
-                    allStores.push({
-                        ...store,
-                        category: 'incubating',
-                        notes: getStoredNotes(store.id) || [],
-                        survey: getStoredSurvey(store.id),
-                        freeze_reason: getStoredFreezeReason(store.id)
-                    });
-                });
-            }
-
-            if (inactiveData && inactiveData.data) {
-                inactiveData.data.forEach(store => {
-                    const existing = allStores.find(s => s.id === store.id);
-                    if (existing) {
-                        existing.category = 'inactive';
-                    } else {
-                        allStores.push({
-                            ...store,
-                            category: 'inactive',
-                            notes: getStoredNotes(store.id) || [],
-                            survey: getStoredSurvey(store.id),
-                            freeze_reason: getStoredFreezeReason(store.id)
-                        });
-                    }
-                });
-            }
-
-            if (summaryData && summaryData.data) {
-                summaryData.data.forEach(store => {
-                    const existing = allStores.find(s => s.id === store.id);
-                    if (existing && existing.category === 'incubating' && store.total_shipments > 10) {
-                        existing.category = 'active';
-                        existing.total_shipments = store.total_shipments;
-                    } else if (!existing && store.status === 'active') {
-                        allStores.push({
-                            ...store,
-                            category: 'active',
-                            notes: getStoredNotes(store.id) || [],
-                            survey: getStoredSurvey(store.id),
-                            freeze_reason: getStoredFreezeReason(store.id)
-                        });
-                    } else if (existing) {
-                        existing.total_shipments = store.total_shipments || existing.total_shipments;
-                    }
-                });
-            }
-
-            // Apply saved status overrides from localStorage
-            allStores.forEach(store => {
-                const savedStatus = localStorage.getItem(`store_status_${store.id}`);
-                if (savedStatus) {
-                    store.category = savedStatus;
-                }
-            });
-        }
-
-        // ========== LOCAL STORAGE ==========
-        function getStoredNotes(id) {
-            const n = localStorage.getItem(`store_notes_${id}`);
-            return n ? JSON.parse(n) : [];
-        }
-
-        function getStoredSurvey(id) {
-            const s = localStorage.getItem(`store_survey_${id}`);
-            return s ? JSON.parse(s) : null;
-        }
-
-        function getStoredFreezeReason(id) {
-            return localStorage.getItem(`store_freeze_reason_${id}`) || '';
-        }
-
-        function saveNote(storeId, note) {
-            const store = allStores.find(s => s.id === storeId);
-            if (!store) return;
-            const timestamp = new Date().toLocaleString('ar-EG');
-            if (!store.notes) store.notes = [];
-            store.notes.push(`[${timestamp}] ${note}`);
-            localStorage.setItem(`store_notes_${storeId}`, JSON.stringify(store.notes));
-        }
-
-        function setStoreStatus(storeId, status) {
-            const store = allStores.find(s => s.id === storeId);
-            if (store) {
-                store.category = status;
-                localStorage.setItem(`store_status_${storeId}`, status);
-            }
-        }
-
-        // ========== HEAT LEVEL ==========
-        function getStoreHeatLevel(store) {
-            if (!store.registered_at) return 'normal';
-            const diffHours = (new Date() - new Date(store.registered_at)) / (1000 * 60 * 60);
-            if (diffHours <= 1) return 'hot';
-            if (diffHours <= 24) return 'golden';
-            return 'normal';
-        }
-
-        function getDaysInIncubation(store) {
-            if (!store.registered_at) return 0;
-            return Math.floor((new Date() - new Date(store.registered_at)) / (1000 * 60 * 60 * 24));
-        }
-
-        // ========== STATS & DASHBOARD ==========
-        function getConversionRate() {
-            const graduated = allStores.filter(s => {
-                const saved = localStorage.getItem(`store_graduated_${s.id}`);
-                return saved === 'true' || s.category === 'active';
-            }).length;
-            const totalEver = allStores.length;
-            return totalEver > 0 ? Math.round((graduated / totalEver) * 100) : 0;
-        }
-
-        function getSatisfactionRate() {
-            let total = 0, count = 0;
-            allStores.forEach(s => {
-                const survey = s.survey || getStoredSurvey(s.id);
-                if (survey && survey.answers) {
-                    const avg = survey.answers.reduce((a, b) => a + b, 0) / survey.answers.length;
-                    total += avg;
-                    count++;
-                }
-            });
-            return count > 0 ? (total / count).toFixed(1) : '0';
-        }
-
-        function updateDashboard() {
-            const counts = {
-                incubating: allStores.filter(s => s.category === 'incubating').length,
-                active: allStores.filter(s => s.category === 'active').length,
-                inactive: allStores.filter(s => s.category === 'inactive').length,
-                frozen: allStores.filter(s => s.category === 'frozen').length,
-                restoring: allStores.filter(s => s.category === 'restoring').length
-            };
-
-            // Update sidebar badges
-            document.getElementById('incubating-count').textContent = counts.incubating;
-            document.getElementById('active-count').textContent = counts.active;
-            document.getElementById('inactive-count').textContent = counts.inactive + counts.restoring;
-            document.getElementById('frozen-count').textContent = counts.frozen;
-
-            const convRate = getConversionRate();
-            const satRate = getSatisfactionRate();
-
-            const grid = document.getElementById('stats-grid');
-            let html = '';
-
-            if (currentRole === 'executive') {
-                html += `
-                    <div class="stat-card incubating" onclick="switchView('incubating')">
-                        <div class="stat-header"><span class="stat-title">قيد الاحتضان</span><div class="stat-icon">🎯</div></div>
-                        <div class="stat-value">${counts.incubating}</div>
-                        <div class="stat-change"><span>📅</span><span>متاجر جديدة تحت المتابعة</span></div>
-                    </div>
-                    <div class="stat-card success" onclick="switchView('active')">
-                        <div class="stat-header"><span class="stat-title">متاجر نشطة</span><div class="stat-icon">⭐</div></div>
-                        <div class="stat-value">${counts.active}</div>
-                        <div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div>
-                    </div>
-                    <div class="stat-card retention" onclick="switchView('inactive')">
-                        <div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon">⚠️</div></div>
-                        <div class="stat-value">${counts.inactive}</div>
-                        <div class="stat-change"><span>⏰</span><span>بدون شحنات مؤخراً ${counts.restoring > 0 ? '('+counts.restoring+' جاري الاستعادة)' : ''}</span></div>
-                    </div>
-                    <div class="stat-card frozen-stat" onclick="switchView('frozen')">
-                        <div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon">🧊</div></div>
-                        <div class="stat-value">${counts.frozen}</div>
-                        <div class="stat-change"><span>❄️</span><span>تم تجميدها من المدير</span></div>
-                    </div>
-                    <div class="stat-card conversion-stat">
-                        <div class="stat-header"><span class="stat-title">معدل التحويل</span><div class="stat-icon">📈</div></div>
-                        <div class="stat-value">${convRate}%</div>
-                        <div class="stat-change"><span>🎯</span><span>من الاحتضان إلى نشط</span></div>
-                        <div class="progress-bar-container"><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:${convRate}%"></div></div></div>
-                    </div>
-                    <div class="stat-card satisfaction-stat">
-                        <div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon">😊</div></div>
-                        <div class="stat-value">${satRate}/5</div>
-                        <div class="stat-change"><span>📋</span><span>متوسط نتائج الاستبيان</span></div>
-                        <div class="progress-bar-container"><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${(parseFloat(satRate)/5*100)}%"></div></div></div>
-                    </div>`;
-            } else if (currentRole === 'active_manager') {
-                html += `
-                    <div class="stat-card success" onclick="switchView('active')">
-                        <div class="stat-header"><span class="stat-title">متاجر نشطة</span><div class="stat-icon">⭐</div></div>
-                        <div class="stat-value">${counts.active}</div>
-                        <div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div>
-                    </div>
-                    <div class="stat-card satisfaction-stat">
-                        <div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon">😊</div></div>
-                        <div class="stat-value">${satRate}/5</div>
-                        <div class="stat-change"><span>📋</span><span>متوسط نتائج الاستبيان</span></div>
-                        <div class="progress-bar-container"><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${(parseFloat(satRate)/5*100)}%"></div></div></div>
-                    </div>`;
-            } else if (currentRole === 'inactive_manager') {
-                html += `
-                    <div class="stat-card retention" onclick="switchView('inactive')">
-                        <div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon">⚠️</div></div>
-                        <div class="stat-value">${counts.inactive}</div>
-                        <div class="stat-change"><span>⏰</span><span>بدون شحنات مؤخراً</span></div>
-                    </div>
-                    <div class="stat-card restoring-stat">
-                        <div class="stat-header"><span class="stat-title">جاري الاستعادة</span><div class="stat-icon">🔄</div></div>
-                        <div class="stat-value">${counts.restoring}</div>
-                        <div class="stat-change"><span>📦</span><span>بانتظار أول شحنة</span></div>
-                    </div>`;
-            }
-
-            grid.innerHTML = html;
-        }
-
-        // ========== VIEWS ==========
-        function switchView(view) {
-            if (!ROLES[currentRole].views.includes(view) && view !== 'dashboard') return;
-            currentView = view;
-
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.dataset.view === view) item.classList.add('active');
-            });
-
-            if (view === 'dashboard') {
-                document.getElementById('dashboard-view').style.display = 'block';
-                document.getElementById('tasks-view').style.display = 'none';
-                document.getElementById('page-title').textContent = 'لوحة التحكم';
-                document.getElementById('page-subtitle').textContent = 'نظرة شاملة على جميع المتاجر';
-                updateDashboard();
-            } else {
-                document.getElementById('dashboard-view').style.display = 'none';
-                document.getElementById('tasks-view').style.display = 'block';
-                renderCurrentView();
-            }
-        }
-
-        function renderCurrentView() {
-            if (currentView === 'dashboard') return;
-
-            const titles = {
-                incubating: { icon: '🎯', title: 'قيد الاحتضان', subtitle: 'المتاجر الجديدة تحت المتابعة (تخرج بعد 14 يوم)' },
-                active: { icon: '⭐', title: 'المتاجر النشطة', subtitle: 'العملاء الذين يشحنون بانتظام' },
-                inactive: { icon: '⚠️', title: 'المتاجر غير النشطة', subtitle: 'تحتاج متابعة واستعادة' },
-                frozen: { icon: '🧊', title: 'المتاجر المجمدة', subtitle: 'تم تجميدها من قبل المدير' }
-            };
-
-            const config = titles[currentView];
-            if (!config) return;
-
-            document.getElementById('page-title').textContent = config.title;
-            document.getElementById('page-subtitle').textContent = config.subtitle;
-            document.getElementById('section-icon').textContent = config.icon;
-            document.getElementById('section-title').textContent = config.title;
-
-            // Sub-filters for incubating view
-            const subFilters = document.getElementById('sub-filters');
-            if (currentView === 'incubating') {
-                const incStores = allStores.filter(s => s.category === 'incubating');
-                const hotCount = incStores.filter(s => getStoreHeatLevel(s) === 'hot').length;
-                const goldenCount = incStores.filter(s => getStoreHeatLevel(s) === 'golden').length;
-                const readyCount = incStores.filter(s => getDaysInIncubation(s) >= INCUBATION_DAYS).length;
-
-                subFilters.style.display = 'flex';
-                subFilters.innerHTML = `
-                    <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" data-subfilter="all" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${incStores.length}</span></button>
-                    <button class="sub-filter-btn hot-filter ${currentSubFilter==='hot'?'active':''}" data-subfilter="hot" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sub-filter-count">${hotCount}</span></button>
-                    <button class="sub-filter-btn golden-filter ${currentSubFilter==='golden'?'active':''}" data-subfilter="golden" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sub-filter-count">${goldenCount}</span></button>
-                    <button class="sub-filter-btn ${currentSubFilter==='ready'?'active':''}" data-subfilter="ready" onclick="setSubFilter('ready')">🎓 جاهزة للتخريج <span class="sub-filter-count">${readyCount}</span></button>
-                `;
-            } else if (currentView === 'inactive') {
-                const inactiveStores = allStores.filter(s => s.category === 'inactive');
-                const restoringStores = allStores.filter(s => s.category === 'restoring');
-                subFilters.style.display = 'flex';
-                subFilters.innerHTML = `
-                    <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${inactiveStores.length + restoringStores.length}</span></button>
-                    <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sub-filter-count">${inactiveStores.length}</span></button>
-                    <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sub-filter-count">${restoringStores.length}</span></button>
-                `;
-            } else {
-                subFilters.style.display = 'none';
-            }
-
-            const taskList = document.getElementById('task-list');
-            taskList.innerHTML = '';
-
-            let stores = [];
-            if (currentView === 'inactive') {
-                if (currentSubFilter === 'inactive_only') {
-                    stores = allStores.filter(s => s.category === 'inactive');
-                } else if (currentSubFilter === 'restoring') {
-                    stores = allStores.filter(s => s.category === 'restoring');
-                } else {
-                    stores = allStores.filter(s => s.category === 'inactive' || s.category === 'restoring');
-                }
-            } else {
-                stores = allStores.filter(s => s.category === currentView);
-            }
-
-            if (currentView === 'incubating') {
-                if (currentSubFilter === 'hot') stores = stores.filter(s => getStoreHeatLevel(s) === 'hot');
-                else if (currentSubFilter === 'golden') stores = stores.filter(s => getStoreHeatLevel(s) === 'golden');
-                else if (currentSubFilter === 'ready') stores = stores.filter(s => getDaysInIncubation(s) >= INCUBATION_DAYS);
-
-                stores.sort((a, b) => {
-                    const order = { hot: 0, golden: 1, normal: 2 };
-                    return order[getStoreHeatLevel(a)] - order[getStoreHeatLevel(b)];
-                });
-            }
-
-            if (stores.length === 0) {
-                taskList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر في هذا القسم</h3></div>';
-                return;
-            }
-
-            stores.forEach(store => taskList.appendChild(createStoreCard(store)));
-        }
-
-        function setSubFilter(f) {
-            currentSubFilter = f;
-            renderCurrentView();
-        }
-
-        // ========== STORE CARD ==========
-        function createStoreCard(store) {
-            const card = document.createElement('div');
-            const heatLevel = getStoreHeatLevel(store);
-            const daysInc = getDaysInIncubation(store);
-            card.className = 'task-card';
-
-            if (store.category === 'incubating' && heatLevel === 'hot') card.className += ' hot-card';
-            if (store.category === 'incubating' && heatLevel === 'golden') card.className += ' golden-card';
-            if (store.category === 'frozen') card.className += ' frozen-card';
-            if (store.category === 'restoring') card.className += ' restoring-card';
-
-            const lastShipment = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
-                ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG') : 'لا يوجد';
-            const registeredDate = store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-EG') : '-';
-
-            let statusBadge = '';
-            if (store.category === 'incubating') {
-                if (heatLevel === 'hot') statusBadge = '<span class="status-badge hot">🔥 ساخن - أقل من ساعة</span>';
-                else if (heatLevel === 'golden') statusBadge = '<span class="status-badge golden">🥇 ذهبي - أقل من 24 ساعة</span>';
-                else if (daysInc >= INCUBATION_DAYS) statusBadge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
-                else statusBadge = `<span class="status-badge new">قيد الاحتضان (${daysInc}/${INCUBATION_DAYS} يوم)</span>`;
-            } else if (store.category === 'active') {
-                statusBadge = '<span class="status-badge active">نشط</span>';
-            } else if (store.category === 'inactive') {
-                statusBadge = '<span class="status-badge warning">غير نشط</span>';
-            } else if (store.category === 'frozen') {
-                statusBadge = '<span class="status-badge frozen">🧊 مجمد</span>';
-            } else if (store.category === 'restoring') {
-                statusBadge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
-            }
-
-            let actionsHtml = `<button class="btn btn-primary" onclick="openNoteModal(${store.id})">📝 ملاحظة</button>`;
-
-            // Graduation button (incubating + 14 days + executive or incubating manager)
-            if (store.category === 'incubating' && daysInc >= INCUBATION_DAYS && currentRole === 'executive') {
-                actionsHtml += `<button class="btn btn-success" onclick="graduateStore(${store.id})">🎓 تخريج إلى نشط</button>`;
-            }
-
-            // Restore button (inactive manager or executive)
-            if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) {
-                actionsHtml += `<button class="btn btn-restoring" onclick="restoreStore(${store.id})">🔄 استعادة</button>`;
-            }
-
-            // Survey button (active stores, active_manager or executive)
-            if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) {
-                actionsHtml += `<button class="btn btn-success" onclick="openSurveyModal(${store.id})">📋 استبيان</button>`;
-            }
-
-            // Freeze button (executive only, not already frozen)
-            if (store.category !== 'frozen' && currentRole === 'executive') {
-                actionsHtml += `<button class="btn btn-frozen" onclick="openFreezeModal(${store.id})">🧊 تجميد</button>`;
-            }
-
-            // Unfreeze (executive only)
-            if (store.category === 'frozen' && currentRole === 'executive') {
-                actionsHtml += `<button class="btn btn-success" onclick="unfreezeStore(${store.id})">إلغاء التجميد</button>`;
-            }
-
-            // Show survey results if exists
-            let surveyHtml = '';
-            const survey = store.survey || getStoredSurvey(store.id);
-            if (survey && survey.answers && store.category === 'active') {
-                const avg = (survey.answers.reduce((a,b) => a+b, 0) / survey.answers.length).toFixed(1);
-                surveyHtml = `
-                    <div class="survey-section">
-                        <div class="survey-title">📋 نتائج الاستبيان (المتوسط: ${avg}/5)</div>
-                        ${SURVEY_QUESTIONS.map((q, i) => `
-                            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;font-size:0.85rem;">
-                                <span style="color:var(--text-secondary);">${q}</span>
-                                <span style="font-weight:700;color:var(--warning);">${'⭐'.repeat(survey.answers[i])}</span>
-                            </div>
-                        `).join('')}
-                    </div>`;
-            }
-
-            // Freeze reason
-            let freezeHtml = '';
-            if (store.category === 'frozen' && (store.freeze_reason || getStoredFreezeReason(store.id))) {
-                const reason = store.freeze_reason || getStoredFreezeReason(store.id);
-                freezeHtml = `<div class="freeze-reason"><strong>❄️ سبب التجميد:</strong> ${reason}</div>`;
-            }
-
-            card.innerHTML = `
-                <div class="task-header">
-                    <div class="task-info">
-                        <h3>${store.name || 'بدون اسم'}</h3>
-                        <div class="task-meta">
-                            <div class="meta-item">📱 ${store.phone || '-'}</div>
-                            <div class="meta-item">📍 ${store.city || '-'}</div>
-                            <div class="meta-item">📅 التسجيل: ${registeredDate}</div>
-                            <div class="meta-item">📦 آخر شحنة: ${lastShipment}</div>
-                            <div class="meta-item">📊 الطرود: ${store.total_shipments || 0}</div>
-                        </div>
-                    </div>
-                    ${statusBadge}
-                </div>
-                ${store.notes && store.notes.length > 0 ? `
-                    <div style="background: var(--bg-main); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                        <strong style="display: block; margin-bottom: 0.5rem;">📝 ملاحظات النورس:</strong>
-                        ${store.notes.map(n => `<div style="padding: 0.25rem 0; color: var(--text-secondary); font-size: 0.875rem;">• ${n}</div>`).join('')}
-                    </div>` : ''}
-                ${surveyHtml}
-                ${freezeHtml}
-                <div class="task-actions">${actionsHtml}</div>
-            `;
-
-            return card;
-        }
-
-        // ========== ACTIONS ==========
-        function graduateStore(storeId) {
-            setStoreStatus(storeId, 'active');
-            localStorage.setItem(`store_graduated_${storeId}`, 'true');
-            showNotification('🎓 تم تخريج المتجر إلى النشطة');
-            updateDashboard();
-            renderCurrentView();
-        }
-
-        function restoreStore(storeId) {
-            setStoreStatus(storeId, 'restoring');
-            showNotification('🔄 تم تحويل المتجر إلى "جاري الاستعادة" - سيصبح نشطاً عند أول شحنة');
-            updateDashboard();
-            renderCurrentView();
-        }
-
-        function unfreezeStore(storeId) {
-            setStoreStatus(storeId, 'incubating');
-            localStorage.removeItem(`store_freeze_reason_${storeId}`);
-            const store = allStores.find(s => s.id === storeId);
-            if (store) store.freeze_reason = '';
-            showNotification('تم إلغاء تجميد المتجر');
-            updateDashboard();
-            renderCurrentView();
-        }
-
-        // ========== MODALS ==========
-        function openNoteModal(storeId) {
-            document.getElementById('store-id').value = storeId;
-            document.getElementById('call-modal').classList.add('active');
-        }
-
-        function openFreezeModal(storeId) {
-            document.getElementById('freeze-store-id').value = storeId;
-            document.getElementById('freeze-modal').classList.add('active');
-        }
-
-        function openSurveyModal(storeId) {
-            document.getElementById('survey-store-id').value = storeId;
-            const container = document.getElementById('survey-questions');
-            const existing = getStoredSurvey(storeId);
-
-            container.innerHTML = SURVEY_QUESTIONS.map((q, i) => `
-                <div class="form-group">
-                    <label class="form-label">${i+1}. ${q}</label>
-                    <div class="star-rating" data-question="${i}">
-                        ${[1,2,3,4,5].map(star => `
-                            <span data-star="${star}" class="${existing && existing.answers[i] >= star ? 'filled' : ''}"
-                                onclick="rateStar(${i}, ${star})">⭐</span>
-                        `).join('')}
-                    </div>
-                </div>
-            `).join('');
-
-            document.getElementById('survey-modal').classList.add('active');
-        }
-
-        function rateStar(questionIdx, starVal) {
-            const container = document.querySelector(`.star-rating[data-question="${questionIdx}"]`);
-            container.querySelectorAll('span').forEach(s => {
-                s.classList.toggle('filled', parseInt(s.dataset.star) <= starVal);
-            });
-        }
-
-        function closeModal() {
-            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-            const callForm = document.getElementById('call-form');
-            const freezeForm = document.getElementById('freeze-form');
-            if (callForm) callForm.reset();
-            if (freezeForm) freezeForm.reset();
-        }
-
-        // Form Handlers
-        document.getElementById('call-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            saveNote(parseInt(document.getElementById('store-id').value), document.getElementById('nawras-note').value);
-            closeModal();
-            renderCurrentView();
-            showNotification('تم حفظ الملاحظة بنجاح');
-        });
-
-        document.getElementById('freeze-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const storeId = parseInt(document.getElementById('freeze-store-id').value);
-            const reason = document.getElementById('freeze-reason').value;
-            if (!reason.trim()) { showNotification('يجب كتابة سبب التجميد', 'error'); return; }
-            localStorage.setItem(`store_freeze_reason_${storeId}`, reason);
-            const store = allStores.find(s => s.id === storeId);
-            if (store) store.freeze_reason = reason;
-            setStoreStatus(storeId, 'frozen');
-            closeModal();
-            showNotification('🧊 تم تجميد المتجر');
-            updateDashboard();
-            renderCurrentView();
-        });
-
-        document.getElementById('survey-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const storeId = parseInt(document.getElementById('survey-store-id').value);
-            const answers = [];
-            SURVEY_QUESTIONS.forEach((_, i) => {
-                const filled = document.querySelectorAll(`.star-rating[data-question="${i}"] span.filled`);
-                answers.push(filled.length);
-            });
-            if (answers.some(a => a === 0)) { showNotification('يرجى تقييم جميع الأسئلة', 'error'); return; }
-            const survey = { answers, date: new Date().toISOString() };
-            localStorage.setItem(`store_survey_${storeId}`, JSON.stringify(survey));
-            const store = allStores.find(s => s.id === storeId);
-            if (store) store.survey = survey;
-            closeModal();
-            showNotification('تم حفظ الاستبيان بنجاح');
-            updateDashboard();
-            renderCurrentView();
-        });
-
-        // ========== UTILITIES ==========
-        function showNotification(message, type = 'success') {
-            const n = document.createElement('div');
-            n.className = 'notification';
-            if (type === 'error') n.style.background = 'var(--danger)';
-            n.textContent = message;
-            document.body.appendChild(n);
-            setTimeout(() => { n.style.animation = 'slideUp 0.3s ease'; setTimeout(() => n.remove(), 300); }, 3000);
-        }
-
-        function hideLoading() {
-            const ls = document.getElementById('loadingScreen');
-            ls.classList.add('hidden');
-            setTimeout(() => { ls.style.display = 'none'; }, 500);
-        }
-    </script>
+        <div style="overflow-x:auto;">
+        <table class="tickets-table">
+            <thead><tr>
+                <th>#</th><th>المنشئ</th><th>النوع</th><th>العنوان</th><th>الحالة</th><th>المسؤول</th><th>التقييم</th><th>وقت الحل</th><th>التاريخ</th>
+            </tr></thead>
+            <tbody>
+                ${allTickets.slice(0, 100).map(t => `<tr>
+                    <td>${t.ticket_code}</td>
+                    <td>${t.creator}</td>
+                    <td>${t.type || '-'}</td>
+                    <td>${t.complaint_title || '-'}</td>
+                    <td><span class="status-badge ${t.status === 'تم الإغلاق' ? 'ticket-closed' : 'ticket-open'}">${t.status}</span></td>
+                    <td>${t.assigned_user || '-'}</td>
+                    <td>${t.rating > 0 ? '⭐'.repeat(t.rating) : '-'}</td>
+                    <td>${t.solve_period || '-'}</td>
+                    <td>${new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+}
+
+// ==================== STORE CARD ====================
+function createStoreCard(store) {
+    const card = document.createElement('div');
+    const heat = getHeat(store), days = getIncDays(store);
+    card.className = 'task-card';
+    if (store.category === 'incubating' && heat === 'hot') card.className += ' hot-card';
+    if (store.category === 'incubating' && heat === 'golden') card.className += ' golden-card';
+    if (store.category === 'frozen') card.className += ' frozen-card';
+    if (store.category === 'restoring') card.className += ' restoring-card';
+
+    const lastShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG') : 'لا يوجد';
+    const regDate = store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-EG') : '-';
+
+    let badge = '';
+    if (store.category === 'incubating') {
+        if (heat === 'hot') badge = '<span class="status-badge hot">🔥 ساخن</span>';
+        else if (heat === 'golden') badge = '<span class="status-badge golden">🥇 ذهبي</span>';
+        else if (days >= INCUBATION_DAYS) badge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
+        else badge = '<span class="status-badge new">قيد الاحتضان (' + days + '/' + INCUBATION_DAYS + ')</span>';
+    } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
+    else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط</span>';
+    else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
+    else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
+
+    let actions = '<button class="btn btn-primary" onclick="openNoteModal(' + store.id + ')">📝 ملاحظة</button>';
+    if (store.category === 'incubating' && days >= INCUBATION_DAYS && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="graduateStore(' + store.id + ')">🎓 تخريج</button>';
+    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore(' + store.id + ')">🔄 استعادة</button>';
+    if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal(' + store.id + ')">📋 استبيان</button>';
+    if (store.category !== 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal(' + store.id + ')">🧊 تجميد</button>';
+    if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore(' + store.id + ')">إلغاء التجميد</button>';
+
+    let surveyHtml = '';
+    const survey = store.survey || getStored('survey', store.id);
+    if (survey && survey.answers && store.category === 'active') {
+        const avg = (survey.answers.reduce((a,b) => a+b, 0) / survey.answers.length).toFixed(1);
+        surveyHtml = '<div class="survey-section"><div class="survey-title">📋 الاستبيان (' + avg + '/5)</div>' +
+            SURVEY_QUESTIONS.map((q, i) => '<div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-size:0.85rem;"><span style="color:var(--text-secondary)">' + q + '</span><span style="font-weight:700;color:var(--warning)">' + '⭐'.repeat(survey.answers[i]) + '</span></div>').join('') + '</div>';
+    }
+
+    let freezeHtml = '';
+    const fr = store.freeze_reason || getStored('freeze', store.id);
+    if (store.category === 'frozen' && fr) freezeHtml = '<div class="freeze-reason"><strong>❄️ سبب التجميد:</strong> ' + fr + '</div>';
+
+    card.innerHTML = `
+        <div class="task-header"><div class="task-info"><h3>${store.name || 'بدون اسم'}</h3><div class="task-meta">
+            <div class="meta-item">📱 ${store.phone || '-'}</div><div class="meta-item">📍 ${store.city || '-'}</div>
+            <div class="meta-item">📅 ${regDate}</div><div class="meta-item">📦 آخر شحنة: ${lastShip}</div>
+            <div class="meta-item">📊 الطرود: ${store.total_shipments || 0}</div>
+        </div></div>${badge}</div>
+        ${store.notes && store.notes.length > 0 ? '<div style="background:var(--bg-main);padding:1rem;border-radius:8px;margin-top:1rem;"><strong>📝 ملاحظات:</strong>' + store.notes.map(n => '<div style="padding:0.25rem 0;color:var(--text-secondary);font-size:0.875rem">• ' + n + '</div>').join('') + '</div>' : ''}
+        ${surveyHtml}${freezeHtml}
+        <div class="task-actions">${actions}</div>`;
+    return card;
+}
+
+// ==================== ACTIONS ====================
+function graduateStore(id) { setStatus(id, 'active'); localStorage.setItem('store_graduated_' + id, 'true'); showNotification('🎓 تم التخريج'); updateDashboard(); renderCurrentView(); }
+function restoreStore(id) { setStatus(id, 'restoring'); showNotification('🔄 جاري الاستعادة - بانتظار أول شحنة'); updateDashboard(); renderCurrentView(); }
+function unfreezeStore(id) { setStatus(id, 'incubating'); localStorage.removeItem('store_freeze_reason_' + id); const s = allStores.find(x => x.id === id); if (s) s.freeze_reason = ''; showNotification('تم إلغاء التجميد'); updateDashboard(); renderCurrentView(); }
+
+// ==================== MODALS ====================
+function openNoteModal(id) { document.getElementById('store-id').value = id; document.getElementById('call-modal').classList.add('active'); }
+function openFreezeModal(id) { document.getElementById('freeze-store-id').value = id; document.getElementById('freeze-modal').classList.add('active'); }
+function openSurveyModal(id) {
+    document.getElementById('survey-store-id').value = id;
+    const c = document.getElementById('survey-questions');
+    const ex = getStored('survey', id);
+    c.innerHTML = SURVEY_QUESTIONS.map((q, i) => '<div class="form-group"><label class="form-label">' + (i+1) + '. ' + q + '</label><div class="star-rating" data-question="' + i + '">' +
+        [1,2,3,4,5].map(s => '<span data-star="' + s + '" class="' + (ex && ex.answers && ex.answers[i] >= s ? 'filled' : '') + '" onclick="rateStar(' + i + ',' + s + ')">⭐</span>').join('') + '</div></div>').join('');
+    document.getElementById('survey-modal').classList.add('active');
+}
+function rateStar(q, v) { document.querySelector('.star-rating[data-question="' + q + '"]').querySelectorAll('span').forEach(s => { s.classList.toggle('filled', parseInt(s.dataset.star) <= v); }); }
+function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+
+document.getElementById('call-form').addEventListener('submit', function(e) {
+    e.preventDefault(); saveNote(parseInt(document.getElementById('store-id').value), document.getElementById('nawras-note').value);
+    closeModal(); this.reset(); renderCurrentView(); showNotification('تم حفظ الملاحظة');
+});
+
+document.getElementById('freeze-form').addEventListener('submit', function(e) {
+    e.preventDefault(); const id = parseInt(document.getElementById('freeze-store-id').value), reason = document.getElementById('freeze-reason').value;
+    if (!reason.trim()) { showNotification('يجب كتابة سبب التجميد', 'error'); return; }
+    localStorage.setItem('store_freeze_' + id, reason); const s = allStores.find(x => x.id === id); if (s) s.freeze_reason = reason;
+    setStatus(id, 'frozen'); closeModal(); this.reset(); showNotification('🧊 تم التجميد'); updateDashboard(); renderCurrentView();
+});
+
+document.getElementById('survey-form').addEventListener('submit', function(e) {
+    e.preventDefault(); const id = parseInt(document.getElementById('survey-store-id').value);
+    const answers = []; SURVEY_QUESTIONS.forEach((_, i) => { answers.push(document.querySelectorAll('.star-rating[data-question="' + i + '"] span.filled').length); });
+    if (answers.some(a => a === 0)) { showNotification('يرجى تقييم جميع الأسئلة', 'error'); return; }
+    const sv = { answers, date: new Date().toISOString() };
+    localStorage.setItem('store_survey_' + id, JSON.stringify(sv)); const s = allStores.find(x => x.id === id); if (s) s.survey = sv;
+    closeModal(); showNotification('تم حفظ الاستبيان'); updateDashboard(); renderCurrentView();
+});
+
+function showNotification(msg, type = 'success') {
+    const n = document.createElement('div'); n.className = 'notification';
+    if (type === 'error') n.style.background = 'var(--danger)';
+    n.textContent = msg; document.body.appendChild(n);
+    setTimeout(() => { n.remove(); }, 3000);
+}
+
+function hideLoading() { const l = document.getElementById('loadingScreen'); l.classList.add('hidden'); setTimeout(() => l.style.display = 'none', 500); }
+</script>
 </body>
 </html>
