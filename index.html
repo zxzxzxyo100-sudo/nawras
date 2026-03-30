@@ -385,9 +385,6 @@
 
 <script>
 // ==================== CONFIG ====================
-const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-const API_ORIGIN = 'https://backoffice.nawris.algoriza.com/external-api';
-const PROXY = 'https://corsproxy.io/?url=';
 const INCUBATION_DAYS = 14;
 
 const SURVEY_QUESTIONS = [
@@ -412,47 +409,11 @@ let currentSubFilter = 'all';
 let currentRole = null;
 
 // ==================== API HELPERS ====================
-function proxyUrl(path, params) {
-    const qs = new URLSearchParams(params).toString();
-    const full = API_ORIGIN + path + (qs ? '?' + qs : '');
-    return PROXY + encodeURIComponent(full);
-}
-
-async function apiGet(path, params = {}) {
-    let allData = [], cursor = null, hasMore = true;
-    while (hasMore) {
-        const p = { ...params };
-        if (cursor) p.cursor = cursor;
-        const r = await fetch(proxyUrl(path, p), {
-            headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
-        });
-        if (!r.ok) throw new Error('API ' + r.status);
-        const d = await r.json();
-        if (d.data && Array.isArray(d.data)) allData = allData.concat(d.data);
-        cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
-        hasMore = !!cursor;
-    }
-    return allData;
-}
-
-async function apiPost(path, body) {
-    let allData = [], cursor = null, hasMore = true;
-    while (hasMore) {
-        const b = { ...body };
-        if (cursor) b.cursor = cursor;
-        const url = PROXY + encodeURIComponent(API_ORIGIN + path);
-        const r = await fetch(url, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-API-TOKEN': API_TOKEN },
-            body: JSON.stringify(b)
-        });
-        if (!r.ok) throw new Error('API ' + r.status);
-        const d = await r.json();
-        if (d.data && Array.isArray(d.data)) allData = allData.concat(d.data);
-        cursor = d.meta && d.meta.next_cursor ? d.meta.next_cursor : null;
-        hasMore = !!cursor;
-    }
-    return allData;
+async function apiGet(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('API ' + r.status);
+    const d = await r.json();
+    return d.data || [];
 }
 
 // ==================== AUTH ====================
@@ -514,10 +475,10 @@ async function loadData() {
         const toDate = new Date().toISOString().split('T')[0];
 
         const results = await Promise.all([
-            apiGet('/customers/new', { since: sinceDate }),
-            apiGet('/customers/inactive', { days: 10 }),
-            apiGet('/customers/orders-summary', { from: sinceDate, to: toDate }),
-            currentRole === 'executive' ? apiPost('/tickets/report', { from: sinceDate, to: toDate, date_type: 'created_at' }) : Promise.resolve([])
+            apiGet('/api/new-customers'),
+            apiGet('/api/inactive-customers'),
+            apiGet('/api/orders-summary'),
+            currentRole === 'executive' ? apiGet('/api/tickets-report') : Promise.resolve([])
         ]);
 
         processStoresData(results[0], results[1], results[2]);

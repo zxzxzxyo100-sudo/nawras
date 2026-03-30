@@ -1,80 +1,44 @@
-// Netlify/Vercel Serverless Function: /api/inactive-customers.js
+const https = require('https');
 
-const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
-const API_TOKEN = process.env.NAWRAS_API_TOKEN || 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-const API_BASE = 'https://backoffice.nawris.algoriza.com/external-api';
+const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
+const API_BASE = 'backoffice.nawris.algoriza.com';
 
-exports.handler = async (event, context) => {
-    // Enable CORS
-    const headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Content-Type': 'application/json'
-    };
+function httpsGet(path) {
+    return new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: API_BASE,
+            path: '/external-api' + path,
+            method: 'GET',
+            headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
+        }, res => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
 
-    if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers, body: '' };
-    }
+exports.handler = async (event) => {
+    const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
     try {
-        // Get days parameter (default: 10 days)
-        const days = parseInt(event.queryStringParameters?.days) || 10;
+        const days = parseInt((event.queryStringParameters || {}).days) || 10;
 
-        // Fetch all pages
-        let allData = [];
-        let cursor = null;
-        let hasMore = true;
-
+        let allData = [], cursor = null, hasMore = true;
         while (hasMore) {
-            const url = cursor 
-                ? `${API_BASE}/customers/inactive?days=${days}&cursor=${cursor}`
-                : `${API_BASE}/customers/inactive?days=${days}`;
-
-            const response = await fetch(url, {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-API-TOKEN': API_TOKEN
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`API returned ${response.status}`);
-            }
-
-            const data = await response.json();
-            
-            if (data.data && Array.isArray(data.data)) {
-                allData = allData.concat(data.data);
-            }
-
-            // Check if there's a next page
-            if (data.meta && data.meta.next_cursor) {
-                cursor = data.meta.next_cursor;
-            } else {
-                hasMore = false;
-            }
+            const path = cursor
+                ? `/customers/inactive?days=${days}&cursor=${cursor}`
+                : `/customers/inactive?days=${days}`;
+            const data = await httpsGet(path);
+            if (data.data && Array.isArray(data.data)) allData = allData.concat(data.data);
+            cursor = data.meta && data.meta.next_cursor ? data.meta.next_cursor : null;
+            hasMore = !!cursor;
         }
-
-        return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-                success: true,
-                data: allData,
-                total: allData.length
-            })
-        };
-
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, data: allData, total: allData.length }) };
     } catch (error) {
-        console.error('Error fetching inactive customers:', error);
-        return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ 
-                error: 'Failed to fetch data',
-                message: error.message 
-            })
-        };
+        return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
     }
 };
