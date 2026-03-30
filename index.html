@@ -411,16 +411,35 @@ let currentSubFilter = 'all';
 let currentRole = null;
 
 // ==================== API HELPERS ====================
+const PROXIES = [
+    url => 'https://corsproxy.io/?' + encodeURIComponent(url),
+    url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    url => url // direct (no proxy)
+];
+let activeProxy = 0;
+
 async function apiGet(path) {
     let allData = [], cursor = null, hasMore = true;
     while (hasMore) {
         const sep = path.includes('?') ? '&' : '?';
-        const url = API_ORIGIN + path + (cursor ? sep + 'cursor=' + cursor : '');
-        const r = await fetch(url, {
-            headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
-        });
-        if (!r.ok) throw new Error('API ' + r.status);
-        const d = await r.json();
+        const rawUrl = API_ORIGIN + path + (cursor ? sep + 'cursor=' + cursor : '');
+        let response = null, lastError = null;
+
+        // Try current proxy, fallback to others
+        for (let i = 0; i < PROXIES.length; i++) {
+            const idx = (activeProxy + i) % PROXIES.length;
+            const url = PROXIES[idx](rawUrl);
+            try {
+                response = await fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
+                });
+                if (response.ok) { activeProxy = idx; break; }
+                response = null;
+            } catch (e) { lastError = e; response = null; }
+        }
+
+        if (!response) throw lastError || new Error('All proxies failed');
+        const d = await response.json();
         if (d.data && Array.isArray(d.data)) allData = allData.concat(d.data);
         cursor = (d.meta && d.meta.next_cursor) ? d.meta.next_cursor : null;
         hasMore = !!cursor;
