@@ -477,12 +477,11 @@ async function loadData() {
         const results = await Promise.all([
             apiGet('/api/new-customers'),
             apiGet('/api/inactive-customers'),
-            apiGet('/api/orders-summary'),
-            currentRole === 'executive' ? apiGet('/api/tickets-report') : Promise.resolve([])
+            apiGet('/api/orders-summary')
         ]);
 
         processStoresData(results[0], results[1], results[2]);
-        allTickets = results[3];
+        allTickets = [];
         updateDashboard();
         renderCurrentView();
     } catch (error) {
