@@ -508,16 +508,9 @@
     <script>
         // ========== CONFIG ==========
         const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-        const API_BASE = 'https://backoffice.nawris.algoriza.com/external-api';
-        const USE_DIRECT_API = true; // true = GitHub Pages (direct), false = Netlify (proxy)
-        const API_CONFIG = {
-            BASE_URL: USE_DIRECT_API ? API_BASE : '/api',
-            ENDPOINTS: {
-                NEW_CUSTOMERS: USE_DIRECT_API ? '/customers/new' : '/new-customers',
-                INACTIVE_CUSTOMERS: USE_DIRECT_API ? '/customers/inactive' : '/inactive-customers',
-                ORDERS_SUMMARY: USE_DIRECT_API ? '/customers/orders-summary' : '/orders-summary'
-            }
-        };
+        const API_ORIGIN = 'https://backoffice.nawris.algoriza.com/external-api';
+        const CORS_PROXY = 'https://corsproxy.io/?url=';
+        const API_BASE = CORS_PROXY + encodeURIComponent(API_ORIGIN);
 
         const SURVEY_QUESTIONS = [
             'ما مدى رضاك عن سرعة التوصيل؟',
@@ -606,6 +599,11 @@
         }
 
         // ========== DATA ==========
+        function buildUrl(path, params) {
+            const fullUrl = API_ORIGIN + path + '?' + new URLSearchParams(params).toString();
+            return CORS_PROXY + encodeURIComponent(fullUrl);
+        }
+
         async function loadData() {
             try {
                 const since = new Date();
@@ -613,20 +611,10 @@
                 const sinceDate = since.toISOString().split('T')[0];
                 const toDate = new Date().toISOString().split('T')[0];
 
-                const newEndpoint = USE_DIRECT_API
-                    ? `${API_CONFIG.ENDPOINTS.NEW_CUSTOMERS}?since=${sinceDate}`
-                    : API_CONFIG.ENDPOINTS.NEW_CUSTOMERS;
-                const inactiveEndpoint = USE_DIRECT_API
-                    ? `${API_CONFIG.ENDPOINTS.INACTIVE_CUSTOMERS}?days=10`
-                    : API_CONFIG.ENDPOINTS.INACTIVE_CUSTOMERS;
-                const ordersEndpoint = USE_DIRECT_API
-                    ? `${API_CONFIG.ENDPOINTS.ORDERS_SUMMARY}?from=${sinceDate}&to=${toDate}`
-                    : API_CONFIG.ENDPOINTS.ORDERS_SUMMARY;
-
                 const [newCustomers, inactiveCustomers, ordersSummary] = await Promise.all([
-                    fetchAllPages(newEndpoint),
-                    fetchAllPages(inactiveEndpoint),
-                    fetchAllPages(ordersEndpoint)
+                    fetchAllPages('/customers/new', { since: sinceDate }),
+                    fetchAllPages('/customers/inactive', { days: 10 }),
+                    fetchAllPages('/customers/orders-summary', { from: sinceDate, to: toDate })
                 ]);
                 processStoresData(newCustomers, inactiveCustomers, ordersSummary);
                 updateDashboard();
@@ -637,25 +625,19 @@
             }
         }
 
-        async function fetchAllPages(endpoint) {
+        async function fetchAllPages(path, params) {
             let allData = [];
-            let url = `${API_CONFIG.BASE_URL}${endpoint}`;
-            const options = USE_DIRECT_API ? {
-                headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
-            } : {};
-
-            if (!USE_DIRECT_API) {
-                const response = await fetch(url, options);
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                return await response.json();
-            }
-
             let hasMore = true;
             let cursor = null;
+
             while (hasMore) {
-                const separator = url.includes('?') ? '&' : '?';
-                const fetchUrl = cursor ? `${url}${separator}cursor=${cursor}` : url;
-                const response = await fetch(fetchUrl, options);
+                const fetchParams = { ...params };
+                if (cursor) fetchParams.cursor = cursor;
+                const url = buildUrl(path, fetchParams);
+
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-API-TOKEN': API_TOKEN }
+                });
                 if (!response.ok) throw new Error(`API Error: ${response.status}`);
                 const data = await response.json();
                 if (data.data && Array.isArray(data.data)) allData = allData.concat(data.data);
