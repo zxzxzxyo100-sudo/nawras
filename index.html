@@ -390,9 +390,47 @@
         }
 
         .status-badge.new { background: rgba(0,102,204,0.1); color: var(--primary); }
+        .status-badge.hot { background: rgba(255,59,48,0.15); color: #d32f2f; }
+        .status-badge.golden { background: rgba(255,193,7,0.2); color: #f57f17; }
         .status-badge.active { background: rgba(0,168,107,0.1); color: var(--success); }
         .status-badge.warning { background: rgba(255,149,0,0.1); color: var(--warning); }
         .status-badge.critical { background: rgba(255,59,48,0.1); color: var(--danger); }
+
+        .task-card.hot-card { border-right: 4px solid #d32f2f; }
+        .task-card.golden-card { border-right: 4px solid #f9a825; }
+
+        .sub-filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .sub-filter-btn {
+            padding: 0.625rem 1.25rem;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sub-filter-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .sub-filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .sub-filter-btn.hot-filter.active { background: #d32f2f; border-color: #d32f2f; }
+        .sub-filter-btn.golden-filter.active { background: #f9a825; border-color: #f9a825; color: #333; }
+
+        .sub-filter-count {
+            background: rgba(255,255,255,0.3);
+            padding: 0.1rem 0.5rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+        }
 
         .task-actions {
             display: flex;
@@ -705,6 +743,11 @@
                             <span id="section-title">قائمة المتاجر</span>
                         </h2>
                     </div>
+                    <div class="sub-filters" id="sub-filters" style="display: none;">
+                        <button class="sub-filter-btn active" data-subfilter="all">الكل <span class="sub-filter-count" id="count-all">0</span></button>
+                        <button class="sub-filter-btn hot-filter" data-subfilter="hot">🔥 ساخنة <span class="sub-filter-count" id="count-hot">0</span></button>
+                        <button class="sub-filter-btn golden-filter" data-subfilter="golden">🥇 ذهبية <span class="sub-filter-count" id="count-golden">0</span></button>
+                    </div>
                     <div class="task-list" id="task-list"></div>
                 </div>
             </div>
@@ -746,6 +789,7 @@
         // Global State
         let allStores = [];
         let currentView = 'dashboard';
+        let currentSubFilter = 'all';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', async function() {
@@ -758,9 +802,29 @@
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.addEventListener('click', function() {
                     const view = this.dataset.view;
+                    currentSubFilter = 'all';
                     switchView(view);
                 });
             });
+
+            document.querySelectorAll('.sub-filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    currentSubFilter = this.dataset.subfilter;
+                    document.querySelectorAll('.sub-filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    renderCurrentView();
+                });
+            });
+        }
+
+        function getStoreHeatLevel(store) {
+            if (!store.registered_at) return 'normal';
+            const now = new Date();
+            const registered = new Date(store.registered_at);
+            const diffHours = (now - registered) / (1000 * 60 * 60);
+            if (diffHours <= 1) return 'hot';
+            if (diffHours <= 24) return 'golden';
+            return 'normal';
         }
 
         async function loadData() {
@@ -908,10 +972,39 @@
             document.getElementById('section-icon').textContent = config.icon;
             document.getElementById('section-title').textContent = config.title;
 
+            const subFilters = document.getElementById('sub-filters');
+            if (currentView === 'onboarding') {
+                subFilters.style.display = 'flex';
+                const onboardingStores = allStores.filter(s => s.category === 'onboarding');
+                const hotCount = onboardingStores.filter(s => getStoreHeatLevel(s) === 'hot').length;
+                const goldenCount = onboardingStores.filter(s => getStoreHeatLevel(s) === 'golden').length;
+                document.getElementById('count-all').textContent = onboardingStores.length;
+                document.getElementById('count-hot').textContent = hotCount;
+                document.getElementById('count-golden').textContent = goldenCount;
+
+                document.querySelectorAll('.sub-filter-btn').forEach(b => {
+                    b.classList.remove('active');
+                    if (b.dataset.subfilter === currentSubFilter) b.classList.add('active');
+                });
+            } else {
+                subFilters.style.display = 'none';
+            }
+
             const taskList = document.getElementById('task-list');
             taskList.innerHTML = '';
 
-            const stores = allStores.filter(s => s.category === currentView);
+            let stores = allStores.filter(s => s.category === currentView);
+
+            if (currentView === 'onboarding' && currentSubFilter !== 'all') {
+                stores = stores.filter(s => getStoreHeatLevel(s) === currentSubFilter);
+            }
+
+            if (currentView === 'onboarding') {
+                stores.sort((a, b) => {
+                    const order = { hot: 0, golden: 1, normal: 2 };
+                    return order[getStoreHeatLevel(a)] - order[getStoreHeatLevel(b)];
+                });
+            }
 
             if (stores.length === 0) {
                 taskList.innerHTML = `
@@ -931,9 +1024,12 @@
 
         function createStoreCard(store) {
             const card = document.createElement('div');
+            const heatLevel = getStoreHeatLevel(store);
             card.className = 'task-card';
+            if (store.category === 'onboarding' && heatLevel === 'hot') card.className += ' hot-card';
+            if (store.category === 'onboarding' && heatLevel === 'golden') card.className += ' golden-card';
 
-            const lastShipment = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' 
+            const lastShipment = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
                 ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG')
                 : 'لا يوجد';
 
@@ -941,7 +1037,13 @@
 
             let statusBadge = '';
             if (store.category === 'onboarding') {
-                statusBadge = '<span class="status-badge new">متجر جديد</span>';
+                if (heatLevel === 'hot') {
+                    statusBadge = '<span class="status-badge hot">🔥 ساخن - أقل من ساعة</span>';
+                } else if (heatLevel === 'golden') {
+                    statusBadge = '<span class="status-badge golden">🥇 ذهبي - أقل من 24 ساعة</span>';
+                } else {
+                    statusBadge = '<span class="status-badge new">متجر جديد</span>';
+                }
             } else if (store.category === 'active') {
                 statusBadge = '<span class="status-badge active">نشط</span>';
             } else {
