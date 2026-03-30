@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النورس CRM - نظام إدارة المتاجر</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        .dark { background-color: #111827; }
+        .dark body { background-color: #111827; color: #f9fafb; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script type="module">
+        import { createElement as h, useState, useEffect } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+
+        // Mock Data - سيتم استبداله بـ API لاحقاً
+        const mockTasks = [
+            {
+                id: 1,
+                merchant_id: 101,
+                merchant_name: 'جواهد',
+                phone: '0928996981',
+                task_type: 'day_0_immediate',
+                priority: 'critical',
+                status: 'pending',
+                current_state: 'onboarding',
+                registered_at: new Date().toISOString(),
+                script_template: 'أهلاً خوي جواهد، نورت النورس. نبي نتأكد إن حسابك جاهز وهل محتاج أي مساعدة تقنية لتبدأ أول شحنة؟',
+                minutes_since_registration: 45
+            },
+            {
+                id: 2,
+                merchant_id: 102,
+                merchant_name: 'Alta moda',
+                phone: '0919821184',
+                task_type: 'retention_call_1',
+                priority: 'high',
+                status: 'pending',
+                current_state: 'retention',
+                registered_at: new Date(Date.now() - 86400000 * 20).toISOString(),
+                last_shipment_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+                script_template: 'خوي Alta moda، معاك إدارة الجودة. لاحظنا توقف الشحن، هل فيه إشكالية فنية أو مالية نقدروا نحلوها ليك؟',
+                minutes_since_registration: null
+            },
+            {
+                id: 3,
+                merchant_id: 103,
+                merchant_name: 'الشويتر للجملة',
+                phone: '0917711047',
+                task_type: 'day_3_followup',
+                priority: 'normal',
+                status: 'pending',
+                current_state: 'onboarding',
+                registered_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+                first_shipment_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+                script_template: 'أهلاً خوي الشويتر للجملة، نتابعوا في شحناتك وحبينا نتأكدوا إن الخدمة تمام، وهل فيه أي ملاحظة نعدلوها ليك؟',
+                minutes_since_registration: null
+            }
+        ];
+
+        const mockStats = {
+            pending: 3,
+            completed: 0,
+            overdue: 0,
+            critical: 1
+        };
+
+        // Main App Component
+        function App() {
+            const [isDark, setIsDark] = useState(false);
+            const [tasks, setTasks] = useState(mockTasks);
+            const [stats, setStats] = useState(mockStats);
+            const [filter, setFilter] = useState('all');
+            const [showCallModal, setShowCallModal] = useState(null);
+
+            const toggleTheme = () => {
+                setIsDark(!isDark);
+                document.documentElement.classList.toggle('dark');
+            };
+
+            const filteredTasks = tasks.filter(task => {
+                if (filter === 'all') return true;
+                if (filter === 'pending') return task.status === 'pending';
+                if (filter === 'completed') return task.status === 'completed';
+                return true;
+            });
+
+            const completeTask = (taskId) => {
+                setTasks(tasks.map(t => 
+                    t.id === taskId ? { ...t, status: 'completed' } : t
+                ));
+                setStats({
+                    ...stats,
+                    pending: stats.pending - 1,
+                    completed: stats.completed + 1
+                });
+                setShowCallModal(null);
+            };
+
+            return h('div', { className: 'flex min-h-screen' },
+                // Sidebar
+                h(Sidebar, { isDark, toggleTheme }),
+                // Main Content
+                h(OfficerDashboard, { 
+                    tasks: filteredTasks, 
+                    stats, 
+                    filter, 
+                    setFilter,
+                    showCallModal,
+                    setShowCallModal,
+                    completeTask
+                })
+            );
+        }
+
+        // Sidebar Component
+        function Sidebar({ isDark, toggleTheme }) {
+            return h('aside', { 
+                className: 'w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col shadow-lg'
+            },
+                // Logo
+                h('div', { className: 'p-6 border-b border-gray-200 dark:border-gray-700' },
+                    h('div', { className: 'flex items-center gap-3' },
+                        h('div', { 
+                            className: 'w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg'
+                        }, '🦅'),
+                        h('div', null,
+                            h('h1', { className: 'text-2xl font-bold text-gray-900 dark:text-white' }, 'النورس'),
+                            h('p', { className: 'text-sm text-gray-500 dark:text-gray-400' }, 'نظام إدارة المتاجر')
+                        )
+                    )
+                ),
+                // Navigation
+                h('nav', { className: 'flex-1 p-4' },
+                    h('a', { 
+                        href: '#',
+                        className: 'flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm font-semibold'
+                    }, '🏠 لوحة التحكم')
+                ),
+                // Theme Toggle
+                h('div', { className: 'p-4 border-t border-gray-200 dark:border-gray-700' },
+                    h('button', {
+                        onClick: toggleTheme,
+                        className: 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all'
+                    },
+                        h('span', { className: 'text-2xl' }, isDark ? '☀️' : '🌙'),
+                        h('span', { className: 'font-semibold text-gray-700 dark:text-gray-300' }, 
+                            isDark ? 'الوضع النهاري' : 'الوضع الليلي'
+                        )
+                    )
+                )
+            );
+        }
+
+        // Officer Dashboard Component
+        function OfficerDashboard({ tasks, stats, filter, setFilter, showCallModal, setShowCallModal, completeTask }) {
+            return h('main', { className: 'flex-1 overflow-y-auto p-8' },
+                h('div', { className: 'max-w-7xl mx-auto' },
+                    // Header
+                    h('div', { className: 'mb-8' },
+                        h('h1', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-2' }, 'مهام اليوم'),
+                        h('p', { className: 'text-gray-600 dark:text-gray-400' }, 
+                            new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                        )
+                    ),
+                    // Stats Grid
+                    h(StatsGrid, { stats }),
+                    // Filters
+                    h('div', { className: 'flex gap-3 mb-6' },
+                        h('button', {
+                            onClick: () => setFilter('all'),
+                            className: `px-6 py-2 rounded-xl font-semibold transition-all ${
+                                filter === 'all' 
+                                    ? 'bg-blue-500 text-white shadow-lg' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`
+                        }, `الكل (${tasks.length})`),
+                        h('button', {
+                            onClick: () => setFilter('pending'),
+                            className: `px-6 py-2 rounded-xl font-semibold transition-all ${
+                                filter === 'pending' 
+                                    ? 'bg-blue-500 text-white shadow-lg' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`
+                        }, `معلقة (${stats.pending})`),
+                        h('button', {
+                            onClick: () => setFilter('completed'),
+                            className: `px-6 py-2 rounded-xl font-semibold transition-all ${
+                                filter === 'completed' 
+                                    ? 'bg-blue-500 text-white shadow-lg' 
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`
+                        }, `مكتملة (${stats.completed})`)
+                    ),
+                    // Tasks List
+                    h('div', { className: 'space-y-4' },
+                        tasks.map(task => h(TaskCard, { 
+                            key: task.id, 
+                            task, 
+                            onCallClick: () => setShowCallModal(task)
+                        }))
+                    ),
+                    // Call Modal
+                    showCallModal && h(CallModal, {
+                        task: showCallModal,
+                        onClose: () => setShowCallModal(null),
+                        onComplete: completeTask
+                    })
+                )
+            );
+        }
+
+        // Stats Grid Component
+        function StatsGrid({ stats }) {
+            const cards = [
+                { title: 'مهام معلقة', value: stats.pending, icon: '⏰', color: 'blue' },
+                { title: 'مهام مكتملة', value: stats.completed, icon: '✅', color: 'green' },
+                { title: 'مهام متأخرة', value: stats.overdue, icon: '⚠️', color: 'red' },
+                { title: 'مهام حرجة', value: stats.critical, icon: '🔥', color: 'yellow' }
+            ];
+
+            return h('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8' },
+                cards.map((card, i) => h('div', {
+                    key: i,
+                    className: `bg-${card.color}-50 dark:bg-${card.color}-900/20 rounded-2xl p-6 transition-all hover:shadow-xl hover:-translate-y-1`
+                },
+                    h('div', { className: 'text-4xl mb-3' }, card.icon),
+                    h('h3', { className: 'text-3xl font-bold text-gray-900 dark:text-white mb-1' }, card.value),
+                    h('p', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-400' }, card.title)
+                ))
+            );
+        }
+
+        // Task Card Component  
+        function TaskCard({ task, onCallClick }) {
+            const priorityColors = {
+                critical: 'border-red-500 bg-red-50 dark:bg-red-900/10',
+                high: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
+                normal: 'border-blue-500 bg-blue-50 dark:bg-blue-900/10'
+            };
+
+            const priorityLabels = {
+                critical: 'حرج',
+                high: 'عالي',
+                normal: 'عادي'
+            };
+
+            const taskTypeLabels = {
+                day_0_immediate: 'يوم 0 - مكالمة فورية',
+                day_3_followup: 'يوم 3 - متابعة',
+                retention_call_1: 'استعادة - محاولة 1'
+            };
+
+            const openWhatsApp = () => {
+                const waPhone = task.phone.replace(/^0/, '966');
+                const message = encodeURIComponent(`مرحباً ${task.merchant_name}، معك من شركة النورس للشحن`);
+                window.open(`https://wa.me/${waPhone}?text=${message}`, '_blank');
+            };
+
+            return h('div', {
+                className: `border-r-4 rounded-2xl p-6 shadow-lg transition-all hover:shadow-xl ${priorityColors[task.priority]}`
+            },
+                // Header
+                h('div', { className: 'flex items-start justify-between mb-4' },
+                    h('div', { className: 'flex-1' },
+                        h('div', { className: 'flex items-center gap-3 mb-2' },
+                            h('h3', { className: 'text-xl font-bold text-gray-900 dark:text-white' }, task.merchant_name),
+                            h('span', { 
+                                className: `px-3 py-1 rounded-full text-xs font-bold bg-${task.priority === 'critical' ? 'red' : task.priority === 'high' ? 'orange' : 'blue'}-500 text-white`
+                            }, priorityLabels[task.priority])
+                        ),
+                        h('p', { className: 'text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1' }, 
+                            taskTypeLabels[task.task_type]
+                        ),
+                        h('div', { className: 'flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400' },
+                            h('span', null, `📱 ${task.phone}`),
+                            task.registered_at && h('span', null, 
+                                `📅 ${new Date(task.registered_at).toLocaleDateString('ar-SA')}`
+                            )
+                        )
+                    ),
+                    task.status === 'completed' && h('div', { 
+                        className: 'flex items-center gap-2 text-green-600 dark:text-green-400'
+                    },
+                        h('span', { className: 'text-2xl' }, '✅'),
+                        h('span', { className: 'font-semibold' }, 'مكتملة')
+                    )
+                ),
+                // 30-min violation
+                task.minutes_since_registration > 30 && h('div', {
+                    className: 'mb-4 p-3 bg-red-100 dark:bg-red-900/30 border-r-4 border-red-500 rounded-lg'
+                },
+                    h('p', { className: 'text-red-800 dark:text-red-300 font-bold' },
+                        `⏰ تنبيه: تجاوز ${task.minutes_since_registration} دقيقة من التسجيل (الحد 30 دقيقة)`
+                    )
+                ),
+                // Script
+                task.script_template && h('div', {
+                    className: 'mb-4 p-4 bg-white/50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600'
+                },
+                    h('p', { className: 'text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2' }, '📝 السكريبت المقترح:'),
+                    h('p', { className: 'text-gray-800 dark:text-gray-200 leading-relaxed' }, task.script_template)
+                ),
+                // Actions
+                task.status === 'pending' && h('div', { className: 'flex gap-3' },
+                    h('button', {
+                        onClick: onCallClick,
+                        className: 'flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl'
+                    }, '📞 إجراء المكالمة'),
+                    h('button', {
+                        onClick: openWhatsApp,
+                        className: 'flex items-center justify-center gap-2 bg-green-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-600 transition-all shadow-lg hover:shadow-xl'
+                    }, '💬 واتساب')
+                )
+            );
+        }
+
+        // Call Modal Component
+        function CallModal({ task, onClose, onComplete }) {
+            const [formData, setFormData] = useState({
+                callOutcome: '',
+                nawrasNote: ''
+            });
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                
+                if (!formData.nawrasNote.trim() || formData.nawrasNote.trim().length < 10) {
+                    setError('ملاحظة النورس يجب أن تكون 10 أحرف على الأقل!');
+                    return;
+                }
+
+                onComplete(task.id);
+            };
+
+            return h('div', {
+                className: 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm'
+            },
+                h('div', {
+                    className: 'bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4'
+                },
+                    // Header
+                    h('div', {
+                        className: 'sticky top-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex items-center justify-between'
+                    },
+                        h('div', null,
+                            h('h2', { className: 'text-2xl font-bold' }, 'تسجيل مكالمة'),
+                            h('p', { className: 'text-blue-100 text-sm mt-1' }, task.merchant_name)
+                        ),
+                        h('button', {
+                            onClick: onClose,
+                            className: 'w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors text-2xl'
+                        }, '✖')
+                    ),
+                    // Form
+                    h('form', { onSubmit: handleSubmit, className: 'p-6 space-y-6' },
+                        error && h('div', {
+                            className: 'p-4 bg-red-100 dark:bg-red-900/30 border-r-4 border-red-500 rounded-lg'
+                        },
+                            h('p', { className: 'text-red-800 dark:text-red-300 font-semibold' }, error)
+                        ),
+                        // Call Outcome
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2' }, 
+                                'نتيجة المكالمة *'
+                            ),
+                            h('select', {
+                                value: formData.callOutcome,
+                                onChange: (e) => setFormData({ ...formData, callOutcome: e.target.value }),
+                                required: true,
+                                className: 'w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                            },
+                                h('option', { value: '' }, 'اختر النتيجة'),
+                                h('option', { value: 'answered' }, 'تم الرد'),
+                                h('option', { value: 'no_answer' }, 'لم يرد'),
+                                h('option', { value: 'busy' }, 'مشغول')
+                            )
+                        ),
+                        // Nawras Note
+                        h('div', null,
+                            h('label', { className: 'block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2' }, 
+                                'ملاحظة النورس * (إلزامي)'
+                            ),
+                            h('textarea', {
+                                value: formData.nawrasNote,
+                                onChange: (e) => setFormData({ ...formData, nawrasNote: e.target.value }),
+                                required: true,
+                                rows: 5,
+                                placeholder: 'اكتب ملاحظة تفصيلية عن المكالمة...',
+                                className: 'w-full px-4 py-3 border-2 border-blue-300 dark:border-blue-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none'
+                            }),
+                            h('p', { className: 'mt-2 text-sm text-gray-600 dark:text-gray-400' },
+                                `💡 مهم: هذه الملاحظة ستبقى مع ملف التاجر للأبد (${formData.nawrasNote.length} / 10 أحرف كحد أدنى)`
+                            )
+                        ),
+                        // Actions
+                        h('div', { className: 'flex gap-3 pt-4' },
+                            h('button', {
+                                type: 'submit',
+                                className: 'flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl'
+                            }, '💾 حفظ المكالمة'),
+                            h('button', {
+                                type: 'button',
+                                onClick: onClose,
+                                className: 'px-6 py-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all'
+                            }, 'إلغاء')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Mount App
+        const root = createRoot(document.getElementById('app'));
+        root.render(h(App));
+    </script>
+</body>
+</html>
