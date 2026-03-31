@@ -10,9 +10,8 @@
         :root {
             --primary: #0066cc; --primary-dark: #004999;
             --success: #00a86b; --warning: #ff9500; --danger: #ff3b30;
-            --frozen: #9333ea; --restoring: #0891b2;
-            --bg-main: #f5f7fa; --bg-card: #ffffff;
-            --text-primary: #1a1a1a; --text-secondary: #6b7280;
+            --frozen: #9333ea; --restoring: #0891b2; --golden: #d97706; --hot: #dc2626;
+            --bg-main: #f5f7fa; --text-primary: #1a1a1a; --text-secondary: #6b7280;
             --border: #e5e7eb;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
             --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
@@ -20,304 +19,184 @@
         }
         body { font-family: 'Cairo', sans-serif; background: var(--bg-main); color: var(--text-primary); line-height: 1.6; }
 
-        /* Loading */
-        .loading-screen {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, #1a365d 0%, #2563eb 100%);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 9999; transition: opacity 0.5s ease;
-        }
-        .loading-screen.hidden { opacity: 0; pointer-events: none; }
-        .loading-content { text-align: center; color: white; }
-        .loading-spinner {
-            width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.3);
-            border-top-color: white; border-radius: 50%;
-            animation: spin 1s linear infinite; margin: 0 auto 1.5rem;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text { font-size: 1.25rem; font-weight: 600; }
+        .loading-screen { position: fixed; top:0;left:0;right:0;bottom:0; background: linear-gradient(135deg, #1a365d, #2563eb); display:flex;align-items:center;justify-content:center; z-index:9999; transition: opacity 0.5s; }
+        .loading-screen.hidden { opacity:0; pointer-events:none; }
+        .loading-content { text-align:center; color:white; }
+        .loading-spinner { width:60px;height:60px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1.5rem; }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .loading-text { font-size:1.25rem;font-weight:600; }
+        .container { display:flex;min-height:100vh; }
 
-        .container { display: flex; min-height: 100vh; }
+        .login-screen { position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#1a365d,#2563eb);display:flex;align-items:center;justify-content:center;z-index:10001; }
+        .login-box { background:white;padding:3rem;border-radius:20px;width:420px;max-width:90%;box-shadow:var(--shadow-lg);text-align:center; }
+        .login-box h2 { font-size:2rem;margin-bottom:0.5rem;color:var(--primary); }
+        .login-box p { color:var(--text-secondary);margin-bottom:2rem; }
+        .role-btn { display:block;width:100%;padding:1rem;margin-bottom:0.75rem;border:2px solid var(--border);border-radius:12px;background:white;cursor:pointer;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:600;transition:all 0.3s;text-align:center; }
+        .role-btn:hover { border-color:var(--primary);background:rgba(0,102,204,0.05); }
+        .role-btn .role-desc { font-size:0.75rem;color:var(--text-secondary);font-weight:400;margin-top:0.25rem; }
 
-        /* Login */
-        .login-screen {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, #1a365d 0%, #2563eb 100%);
-            display: flex; align-items: center; justify-content: center; z-index: 10001;
-        }
-        .login-box {
-            background: white; padding: 3rem; border-radius: 20px;
-            width: 400px; max-width: 90%; box-shadow: var(--shadow-lg); text-align: center;
-        }
-        .login-box h2 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--primary); }
-        .login-box p { color: var(--text-secondary); margin-bottom: 2rem; }
-        .role-btn {
-            display: block; width: 100%; padding: 1rem; margin-bottom: 0.75rem;
-            border: 2px solid var(--border); border-radius: 12px; background: white;
-            cursor: pointer; font-family: 'Cairo', sans-serif; font-size: 1rem;
-            font-weight: 600; transition: all 0.3s ease; text-align: center;
-        }
-        .role-btn:hover { border-color: var(--primary); background: rgba(0,102,204,0.05); }
-        .role-btn .role-desc { font-size: 0.75rem; color: var(--text-secondary); font-weight: 400; margin-top: 0.25rem; }
+        .sidebar { width:280px;background:linear-gradient(180deg,#1a365d,#2d3748);color:white;padding:2rem 0;box-shadow:var(--shadow-lg);position:fixed;height:100vh;overflow-y:auto; }
+        .logo { text-align:center;padding:0 1.5rem 2rem;border-bottom:1px solid rgba(255,255,255,0.1); }
+        .logo h1 { font-size:2rem;font-weight:800;background:linear-gradient(135deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+        .logo p { font-size:0.875rem;opacity:0.7;margin-top:0.25rem; }
+        .nav-menu { padding:1.5rem 0; }
+        .nav-item { padding:0.875rem 1.5rem;cursor:pointer;transition:all 0.3s;display:flex;align-items:center;gap:1rem;font-weight:500;border-right:3px solid transparent; }
+        .nav-item:hover { background:rgba(255,255,255,0.1); }
+        .nav-item.active { background:rgba(59,130,246,0.2);border-right-color:#3b82f6; }
+        .nav-item .badge { margin-right:auto;background:var(--danger);padding:0.25rem 0.625rem;border-radius:12px;font-size:0.75rem;font-weight:700; }
+        .nav-icon { font-size:1.25rem; }
+        .nav-divider { border-top:1px solid rgba(255,255,255,0.1);margin:0.75rem 1.5rem; }
+        .nav-section-label { padding:0.5rem 1.5rem;font-size:0.7rem;opacity:0.5;letter-spacing:1px; }
+        .logout-btn { margin:1rem 1.5rem;padding:0.75rem;border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:transparent;color:white;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:600;text-align:center;transition:all 0.3s; }
+        .logout-btn:hover { background:rgba(255,59,48,0.3);border-color:var(--danger); }
 
-        /* Sidebar */
-        .sidebar {
-            width: 280px; background: linear-gradient(180deg, #1a365d 0%, #2d3748 100%);
-            color: white; padding: 2rem 0; box-shadow: var(--shadow-lg);
-            position: fixed; height: 100vh; overflow-y: auto;
-        }
-        .logo { text-align: center; padding: 0 1.5rem 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .logo h1 {
-            font-size: 2rem; font-weight: 800;
-            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .logo p { font-size: 0.875rem; opacity: 0.7; margin-top: 0.25rem; }
-        .nav-menu { padding: 1.5rem 0; }
-        .nav-item {
-            padding: 0.875rem 1.5rem; cursor: pointer; transition: all 0.3s ease;
-            display: flex; align-items: center; gap: 1rem; font-weight: 500;
-            border-right: 3px solid transparent;
-        }
-        .nav-item:hover { background: rgba(255,255,255,0.1); }
-        .nav-item.active { background: rgba(59,130,246,0.2); border-right-color: #3b82f6; }
-        .nav-item .badge {
-            margin-right: auto; background: var(--danger); padding: 0.25rem 0.625rem;
-            border-radius: 12px; font-size: 0.75rem; font-weight: 700;
-        }
-        .nav-icon { font-size: 1.25rem; }
-        .nav-divider { border-top: 1px solid rgba(255,255,255,0.1); margin: 0.75rem 1.5rem; }
-        .nav-section-label { padding: 0.5rem 1.5rem; font-size: 0.7rem; opacity: 0.5; letter-spacing: 1px; }
-        .logout-btn {
-            margin: 1rem 1.5rem; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px; background: transparent; color: white; cursor: pointer;
-            font-family: 'Cairo', sans-serif; font-weight: 600; text-align: center; transition: all 0.3s ease;
-        }
-        .logout-btn:hover { background: rgba(255,59,48,0.3); border-color: var(--danger); }
+        .main-content { flex:1;margin-right:280px;padding:2rem; }
+        .header { background:white;padding:1.5rem 2rem;border-radius:16px;box-shadow:var(--shadow-sm);margin-bottom:2rem;display:flex;justify-content:space-between;align-items:center; }
+        .header-title h2 { font-size:1.75rem;font-weight:700; }
+        .header-title p { color:var(--text-secondary);font-size:0.875rem;margin-top:0.25rem; }
+        .user-info { display:flex;align-items:center;gap:1rem; }
+        .user-avatar { width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1.25rem; }
 
-        /* Main */
-        .main-content { flex: 1; margin-right: 280px; padding: 2rem; }
-        .header {
-            background: white; padding: 1.5rem 2rem; border-radius: 16px;
-            box-shadow: var(--shadow-sm); margin-bottom: 2rem;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .header-title h2 { font-size: 1.75rem; font-weight: 700; }
-        .header-title p { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem; }
-        .user-info { display: flex; align-items: center; gap: 1rem; }
-        .user-avatar {
-            width: 48px; height: 48px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: 700; font-size: 1.25rem;
-        }
+        .stats-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;margin-bottom:2rem; }
+        .stat-card { background:white;padding:1.5rem;border-radius:16px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;transition:transform 0.3s,box-shadow 0.3s;cursor:pointer; }
+        .stat-card:hover { transform:translateY(-4px);box-shadow:var(--shadow-md); }
+        .stat-card::before { content:'';position:absolute;top:0;left:0;right:0;height:4px; }
+        .stat-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem; }
+        .stat-title { font-size:0.875rem;color:var(--text-secondary);font-weight:600; }
+        .stat-icon { width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem; }
+        .stat-value { font-size:2.5rem;font-weight:800;margin-bottom:0.5rem; }
+        .stat-change { font-size:0.875rem;display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary); }
+        .progress-bar-bg { height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:0.75rem; }
+        .progress-bar-fill { height:100%;border-radius:4px;transition:width 1s; }
+        .progress-bar-fill.green { background:linear-gradient(90deg,#10b981,#34d399); }
+        .progress-bar-fill.blue { background:linear-gradient(90deg,var(--primary),#60a5fa); }
 
-        /* Stats */
-        .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.5rem; margin-bottom: 2rem;
-        }
-        .stat-card {
-            background: white; padding: 1.5rem; border-radius: 16px; box-shadow: var(--shadow-sm);
-            position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer;
-        }
-        .stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
-        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
-        .stat-card.c-incubating::before { background: var(--primary); }
-        .stat-card.c-success::before { background: var(--success); }
-        .stat-card.c-warning::before { background: var(--warning); }
-        .stat-card.c-frozen::before { background: var(--frozen); }
-        .stat-card.c-tickets::before { background: #e11d48; }
-        .stat-card.c-conversion::before { background: linear-gradient(90deg, var(--primary), var(--success)); }
-        .stat-card.c-satisfaction::before { background: linear-gradient(90deg, #f59e0b, #10b981); }
-        .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .stat-title { font-size: 0.875rem; color: var(--text-secondary); font-weight: 600; }
-        .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-        .stat-value { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
-        .stat-change { font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); }
-        .progress-bar-bg { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 0.75rem; }
-        .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
-        .progress-bar-fill.green { background: linear-gradient(90deg, #10b981, #34d399); }
-        .progress-bar-fill.blue { background: linear-gradient(90deg, var(--primary), #60a5fa); }
+        .tasks-section { background:white;padding:2rem;border-radius:16px;box-shadow:var(--shadow-sm); }
+        .section-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid var(--border); }
+        .section-title { font-size:1.5rem;font-weight:700;display:flex;align-items:center;gap:0.75rem; }
+        .task-list { display:flex;flex-direction:column;gap:1rem; }
 
-        /* Section */
-        .tasks-section { background: white; padding: 2rem; border-radius: 16px; box-shadow: var(--shadow-sm); }
-        .section-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border);
-        }
-        .section-title { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
-        .task-list { display: flex; flex-direction: column; gap: 1rem; }
+        .task-card { border:2px solid var(--border);border-radius:12px;padding:1.5rem;transition:all 0.3s; }
+        .task-card:hover { border-color:var(--primary);box-shadow:var(--shadow-md); }
+        .task-card.golden-card { border-right:4px solid var(--golden);background:rgba(217,119,6,0.03); }
+        .task-card.hot-card { border-right:4px solid var(--hot);background:rgba(220,38,38,0.02); }
+        .task-card.frozen-card { border-right:4px solid var(--frozen);background:rgba(147,51,234,0.02); }
+        .task-card.restoring-card { border-right:4px solid var(--restoring); }
+        .task-card.day3-card { border-right:4px solid #8b5cf6; }
+        .task-card.day10-card { border-right:4px solid #06b6d4; }
+        .task-card.grad-card { border-right:4px solid var(--success); }
+        .task-header { display:flex;justify-content:space-between;align-items:start;margin-bottom:1rem; }
+        .task-info h3 { font-size:1.15rem;font-weight:700;margin-bottom:0.5rem; }
+        .task-meta { display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.5rem; }
+        .meta-item { display:flex;align-items:center;gap:0.4rem;color:var(--text-secondary);font-size:0.8rem; }
 
-        /* Cards */
-        .task-card {
-            border: 2px solid var(--border); border-radius: 12px; padding: 1.5rem; transition: all 0.3s ease;
-        }
-        .task-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
-        .task-card.hot-card { border-right: 4px solid #d32f2f; }
-        .task-card.golden-card { border-right: 4px solid #f9a825; }
-        .task-card.frozen-card { border-right: 4px solid var(--frozen); background: rgba(147,51,234,0.02); }
-        .task-card.restoring-card { border-right: 4px solid var(--restoring); }
-        .task-card.ticket-card { border-right: 4px solid #e11d48; }
-        .task-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
-        .task-info h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .task-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
-        .meta-item { display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.875rem; }
+        .status-badge { padding:0.4rem 0.875rem;border-radius:20px;font-size:0.8rem;font-weight:700;white-space:nowrap; }
+        .status-badge.golden { background:rgba(217,119,6,0.12);color:var(--golden); }
+        .status-badge.hot { background:rgba(220,38,38,0.1);color:var(--hot); }
+        .status-badge.day0 { background:rgba(0,102,204,0.1);color:var(--primary); }
+        .status-badge.day3 { background:rgba(139,92,246,0.1);color:#8b5cf6; }
+        .status-badge.day10 { background:rgba(6,182,212,0.1);color:#06b6d4; }
+        .status-badge.graduated { background:rgba(0,168,107,0.15);color:var(--success); }
+        .status-badge.active { background:rgba(0,168,107,0.1);color:var(--success); }
+        .status-badge.warning { background:rgba(255,149,0,0.1);color:var(--warning); }
+        .status-badge.frozen { background:rgba(147,51,234,0.1);color:var(--frozen); }
+        .status-badge.restoring { background:rgba(8,145,178,0.1);color:var(--restoring); }
+        .status-badge.failed48 { background:rgba(255,59,48,0.1);color:var(--danger); }
 
-        /* Badges */
-        .status-badge { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.875rem; font-weight: 700; white-space: nowrap; }
-        .status-badge.new { background: rgba(0,102,204,0.1); color: var(--primary); }
-        .status-badge.hot { background: rgba(255,59,48,0.15); color: #d32f2f; }
-        .status-badge.golden { background: rgba(255,193,7,0.2); color: #f57f17; }
-        .status-badge.active { background: rgba(0,168,107,0.1); color: var(--success); }
-        .status-badge.warning { background: rgba(255,149,0,0.1); color: var(--warning); }
-        .status-badge.frozen { background: rgba(147,51,234,0.1); color: var(--frozen); }
-        .status-badge.restoring { background: rgba(8,145,178,0.1); color: var(--restoring); }
-        .status-badge.graduated { background: rgba(0,168,107,0.15); color: var(--success); }
-        .status-badge.ticket-open { background: rgba(225,29,72,0.1); color: #e11d48; }
-        .status-badge.ticket-closed { background: rgba(0,168,107,0.1); color: var(--success); }
+        .sub-filters { display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap; }
+        .sub-filter-btn { padding:0.5rem 1rem;border:2px solid var(--border);background:white;border-radius:10px;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:600;font-size:0.8rem;transition:all 0.3s;display:flex;align-items:center;gap:0.5rem; }
+        .sub-filter-btn:hover { border-color:var(--primary);color:var(--primary); }
+        .sub-filter-btn.active { background:var(--primary);color:white;border-color:var(--primary); }
+        .sub-filter-btn.golden-f.active { background:var(--golden);border-color:var(--golden); }
+        .sub-filter-btn.hot-f.active { background:var(--hot);border-color:var(--hot); }
+        .sf-count { background:rgba(255,255,255,0.3);padding:0.1rem 0.5rem;border-radius:8px;font-size:0.7rem; }
 
-        /* Sub-filters */
-        .sub-filters { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-        .sub-filter-btn {
-            padding: 0.625rem 1.25rem; border: 2px solid var(--border); background: white;
-            border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif;
-            font-weight: 600; font-size: 0.875rem; transition: all 0.3s ease;
-            display: flex; align-items: center; gap: 0.5rem;
-        }
-        .sub-filter-btn:hover { border-color: var(--primary); color: var(--primary); }
-        .sub-filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .sub-filter-btn.hot-filter.active { background: #d32f2f; border-color: #d32f2f; }
-        .sub-filter-btn.golden-filter.active { background: #f9a825; border-color: #f9a825; color: #333; }
-        .sub-filter-count { background: rgba(255,255,255,0.3); padding: 0.1rem 0.5rem; border-radius: 8px; font-size: 0.75rem; }
+        .btn { padding:0.5rem 1rem;border:2px solid var(--border);background:white;border-radius:10px;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:600;font-size:0.8rem;transition:all 0.3s; }
+        .task-actions { display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap; }
+        .btn-primary { background:var(--primary);color:white;border-color:var(--primary); }
+        .btn-primary:hover { background:var(--primary-dark);transform:translateY(-2px); }
+        .btn-success { background:var(--success);color:white;border-color:var(--success); }
+        .btn-success:hover { background:#008c5a;transform:translateY(-2px); }
+        .btn-frozen { background:var(--frozen);color:white;border-color:var(--frozen); }
+        .btn-frozen:hover { background:#7c22ce;transform:translateY(-2px); }
+        .btn-restoring { background:var(--restoring);color:white;border-color:var(--restoring); }
+        .btn-restoring:hover { background:#0e7490;transform:translateY(-2px); }
+        .btn-whatsapp { background:#25d366;color:white;border-color:#25d366; }
+        .btn-whatsapp:hover { background:#1fb855;transform:translateY(-2px); }
+        .btn-called { background:#8b5cf6;color:white;border-color:#8b5cf6; }
+        .btn-called:hover { background:#7c3aed;transform:translateY(-2px); }
+        .btn-outline { background:white;border:2px solid var(--border);color:var(--text-primary); }
+        .btn-outline:hover { border-color:var(--primary);color:var(--primary); }
+        .empty-state { text-align:center;padding:4rem 2rem;color:var(--text-secondary); }
+        .empty-state-icon { font-size:4rem;margin-bottom:1rem;opacity:0.5; }
 
-        /* Buttons */
-        .btn, .filter-btn {
-            padding: 0.625rem 1.25rem; border: 2px solid var(--border); background: white;
-            border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif;
-            font-weight: 600; font-size: 0.875rem; transition: all 0.3s ease;
-        }
-        .task-actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
-        .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-2px); }
-        .btn-success { background: var(--success); color: white; border-color: var(--success); }
-        .btn-success:hover { background: #008c5a; transform: translateY(-2px); }
-        .btn-frozen { background: var(--frozen); color: white; border-color: var(--frozen); }
-        .btn-frozen:hover { background: #7c22ce; transform: translateY(-2px); }
-        .btn-restoring { background: var(--restoring); color: white; border-color: var(--restoring); }
-        .btn-restoring:hover { background: #0e7490; transform: translateY(-2px); }
-        .btn-outline { background: white; border: 2px solid var(--border); color: var(--text-primary); }
-        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-        .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-secondary); }
-        .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
+        .survey-section { background:var(--bg-main);padding:1.25rem;border-radius:10px;margin-top:1rem;border:1px solid var(--border); }
+        .survey-title { font-weight:700;margin-bottom:1rem;font-size:0.95rem; }
+        .star-rating { display:flex;gap:0.25rem;direction:ltr; }
+        .star-rating span { font-size:1.5rem;cursor:pointer;opacity:0.3;transition:all 0.2s;user-select:none; }
+        .star-rating span.filled { opacity:1; }
 
-        /* Survey */
-        .survey-section { background: var(--bg-main); padding: 1.25rem; border-radius: 10px; margin-top: 1rem; border: 1px solid var(--border); }
-        .survey-title { font-weight: 700; margin-bottom: 1rem; font-size: 0.95rem; }
-        .star-rating { display: flex; gap: 0.25rem; direction: ltr; }
-        .star-rating span { font-size: 1.5rem; cursor: pointer; opacity: 0.3; transition: all 0.2s ease; user-select: none; }
-        .star-rating span.filled { opacity: 1; }
-        .star-rating span:hover { transform: scale(1.2); }
+        .freeze-reason { background:rgba(147,51,234,0.05);border:1px solid rgba(147,51,234,0.2);padding:1rem;border-radius:8px;margin-top:1rem; }
+        .freeze-reason strong { color:var(--frozen); }
 
-        /* Freeze */
-        .freeze-reason { background: rgba(147,51,234,0.05); border: 1px solid rgba(147,51,234,0.2); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
-        .freeze-reason strong { color: var(--frozen); }
+        .timeline { margin-top:1rem;padding:0.75rem;background:var(--bg-main);border-radius:8px;border:1px solid var(--border); }
+        .timeline-title { font-weight:700;font-size:0.85rem;margin-bottom:0.5rem; }
+        .timeline-step { display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.8rem; }
+        .timeline-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+        .timeline-dot.done { background:var(--success); }
+        .timeline-dot.current { background:var(--primary);box-shadow:0 0 0 3px rgba(0,102,204,0.3); }
+        .timeline-dot.pending { background:var(--border); }
+        .timeline-dot.failed { background:var(--danger); }
 
-        /* Modal */
-        .modal {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-            z-index: 1000; align-items: center; justify-content: center;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: white; padding: 2rem; border-radius: 20px;
-            max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;
-            box-shadow: var(--shadow-lg); animation: slideUp 0.3s ease;
-        }
-        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border); }
-        .modal-header h3 { font-size: 1.5rem; font-weight: 700; }
-        .close-modal { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-main); border: none; cursor: pointer; font-size: 1.25rem; transition: all 0.3s ease; }
-        .close-modal:hover { background: var(--danger); color: white; }
-        .form-group { margin-bottom: 1.5rem; }
-        .form-label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
-        .form-input, .form-textarea, .form-select {
-            width: 100%; padding: 0.875rem; border: 2px solid var(--border); border-radius: 10px;
-            font-family: 'Cairo', sans-serif; font-size: 1rem; transition: all 0.3s ease;
-        }
-        .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(0,102,204,0.1); }
-        .form-textarea { min-height: 120px; resize: vertical; }
+        .modal { display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center; }
+        .modal.active { display:flex; }
+        .modal-content { background:white;padding:2rem;border-radius:20px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp 0.3s ease; }
+        @keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+        .modal-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid var(--border); }
+        .modal-header h3 { font-size:1.5rem;font-weight:700; }
+        .close-modal { width:36px;height:36px;border-radius:50%;background:var(--bg-main);border:none;cursor:pointer;font-size:1.25rem;transition:all 0.3s; }
+        .close-modal:hover { background:var(--danger);color:white; }
+        .form-group { margin-bottom:1.5rem; }
+        .form-label { display:block;font-weight:600;margin-bottom:0.5rem; }
+        .form-textarea { width:100%;padding:0.875rem;border:2px solid var(--border);border-radius:10px;font-family:'Cairo',sans-serif;font-size:1rem;transition:all 0.3s;min-height:100px;resize:vertical; }
+        .form-textarea:focus { outline:none;border-color:var(--primary);box-shadow:0 0 0 4px rgba(0,102,204,0.1); }
 
-        .notification {
-            position: fixed; top: 2rem; left: 50%; transform: translateX(-50%);
-            background: var(--success); color: white; padding: 1rem 2rem;
-            border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 10000;
-            font-weight: 600; animation: slideDown 0.3s ease;
-        }
-        @keyframes slideDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .notification { position:fixed;top:2rem;left:50%;transform:translateX(-50%);background:var(--success);color:white;padding:1rem 2rem;border-radius:12px;box-shadow:var(--shadow-lg);z-index:10000;font-weight:600; }
 
-        /* Ticket table */
-        .tickets-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.85rem; }
-        .tickets-table th { background: var(--bg-main); padding: 0.75rem; text-align: right; font-weight: 700; border-bottom: 2px solid var(--border); }
-        .tickets-table td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
-        .tickets-table tr:hover { background: rgba(0,102,204,0.03); }
-
-        @media (max-width: 768px) {
-            .sidebar { width: 0; padding: 0; overflow: hidden; }
-            .main-content { margin-right: 0; padding: 1rem; }
-            .stats-grid { grid-template-columns: 1fr; }
-            .tickets-table { font-size: 0.75rem; }
-            .tickets-table th, .tickets-table td { padding: 0.5rem 0.25rem; }
+        @media(max-width:768px) {
+            .sidebar { width:0;padding:0;overflow:hidden; }
+            .main-content { margin-right:0;padding:1rem; }
+            .stats-grid { grid-template-columns:1fr; }
         }
     </style>
 </head>
 <body>
-    <!-- Login -->
     <div class="login-screen" id="loginScreen">
         <div class="login-box">
             <h2>النورس</h2>
             <p>اختر صلاحيتك للدخول</p>
-            <button class="role-btn" onclick="loginAs('active_manager')">
-                مسؤول المتاجر النشطة
-                <div class="role-desc">عرض المتاجر النشطة والاستبيان</div>
-            </button>
-            <button class="role-btn" onclick="loginAs('inactive_manager')">
-                مسؤول المتاجر غير النشطة
-                <div class="role-desc">عرض المتاجر غير النشطة وزر الاستعادة</div>
-            </button>
-            <button class="role-btn" onclick="loginAs('executive')">
-                المدير التنفيذي / مدير المبيعات
-                <div class="role-desc">عرض الجميع مع صلاحيات كاملة</div>
-            </button>
+            <button class="role-btn" onclick="loginAs('incubation_manager')">مسؤول المتاجر الجديدة<div class="role-desc">إدارة مسار الاحتضان والمكالمات</div></button>
+            <button class="role-btn" onclick="loginAs('active_manager')">مسؤول المتاجر النشطة<div class="role-desc">عرض المتاجر النشطة والاستبيان</div></button>
+            <button class="role-btn" onclick="loginAs('inactive_manager')">مسؤول الاستعادة<div class="role-desc">المتاجر غير النشطة وزر الاستعادة</div></button>
+            <button class="role-btn" onclick="loginAs('executive')">المدير التنفيذي<div class="role-desc">عرض الجميع مع صلاحيات كاملة</div></button>
         </div>
     </div>
 
-    <!-- Loading -->
     <div class="loading-screen" id="loadingScreen" style="display:none;">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <div class="loading-text">جاري تحميل البيانات...</div>
-        </div>
+        <div class="loading-content"><div class="loading-spinner"></div><div class="loading-text">جاري تحميل البيانات...</div></div>
     </div>
 
-    <!-- App -->
     <div class="container" id="appContainer" style="display:none;">
         <aside class="sidebar">
-            <div class="logo">
-                <h1>النورس</h1>
-                <p>نظام إدارة المتاجر</p>
-            </div>
+            <div class="logo"><h1>النورس</h1><p>نظام إدارة المتاجر</p></div>
             <nav class="nav-menu">
                 <div class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span>لوحة التحكم</span></div>
                 <div class="nav-divider"></div>
                 <div class="nav-section-label">الأقسام</div>
-                <div class="nav-item" data-view="incubating" id="nav-incubating"><span class="nav-icon">🎯</span><span>قيد الاحتضان</span><span class="badge" id="incubating-count">0</span></div>
+                <div class="nav-item" data-view="incubating" id="nav-incubating"><span class="nav-icon">🎯</span><span>مسار الاحتضان</span><span class="badge" id="incubating-count">0</span></div>
                 <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
                 <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
                 <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
-                <div class="nav-divider"></div>
-                <div class="nav-item" data-view="tickets" id="nav-tickets"><span class="nav-icon">🎫</span><span>التذاكر</span><span class="badge" id="tickets-count" style="background:#e11d48">0</span></div>
             </nav>
             <div style="padding:0 1.5rem;margin-top:1rem;">
                 <div class="nav-divider"></div>
@@ -328,24 +207,16 @@
 
         <main class="main-content">
             <div class="header">
-                <div class="header-title">
-                    <h2 id="page-title">لوحة التحكم</h2>
-                    <p id="page-subtitle">نظرة شاملة على جميع المتاجر</p>
-                </div>
+                <div class="header-title"><h2 id="page-title">لوحة التحكم</h2><p id="page-subtitle">نظرة شاملة</p></div>
                 <div class="user-info">
-                    <div>
-                        <div style="font-weight:600;" id="user-role-display">المدير التنفيذي</div>
-                        <div style="font-size:0.875rem;color:var(--text-secondary);">شركة النورس</div>
-                    </div>
+                    <div><div style="font-weight:600" id="user-role-display"></div><div style="font-size:0.875rem;color:var(--text-secondary)">شركة النورس</div></div>
                     <div class="user-avatar">ن</div>
                 </div>
             </div>
             <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
             <div id="tasks-view" style="display:none;">
                 <div class="tasks-section">
-                    <div class="section-header">
-                        <h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
-                    </div>
+                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2></div>
                     <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
                 </div>
@@ -353,13 +224,14 @@
         </main>
     </div>
 
-    <!-- Note Modal -->
+    <!-- Call Modal (تم الاتصال + ملاحظة إلزامية) -->
     <div class="modal" id="call-modal"><div class="modal-content">
-        <div class="modal-header"><h3>تسجيل ملاحظة</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+        <div class="modal-header"><h3 id="call-modal-title">تم الاتصال</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
         <form id="call-form">
-            <input type="hidden" id="store-id">
-            <div class="form-group"><label class="form-label">ملاحظة النورس</label><textarea class="form-textarea" id="nawras-note" placeholder="اكتب ملاحظة..." required></textarea></div>
-            <div class="task-actions"><button type="submit" class="btn btn-primary">حفظ</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+            <input type="hidden" id="call-store-id">
+            <input type="hidden" id="call-type">
+            <div class="form-group"><label class="form-label">ملاحظة النورس (إلزامية)</label><textarea class="form-textarea" id="call-note" placeholder="اكتب ملاحظة عن المكالمة..." required></textarea></div>
+            <div class="task-actions"><button type="submit" class="btn btn-called">تأكيد - تم الاتصال</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
         </form>
     </div></div>
 
@@ -368,7 +240,7 @@
         <div class="modal-header"><h3>تجميد المتجر</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
         <form id="freeze-form">
             <input type="hidden" id="freeze-store-id">
-            <div class="form-group"><label class="form-label">سبب التجميد (إلزامي)</label><textarea class="form-textarea" id="freeze-reason" placeholder="اكتب سبب التجميد..." required></textarea></div>
+            <div class="form-group"><label class="form-label">سبب التجميد (إلزامي)</label><textarea class="form-textarea" id="freeze-reason" placeholder="سبب التجميد..." required></textarea></div>
             <div class="task-actions"><button type="submit" class="btn btn-frozen">تأكيد التجميد</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
         </form>
     </div></div>
@@ -384,33 +256,21 @@
     </div></div>
 
 <script>
-// ==================== CONFIG ====================
-const API_TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-const API_ORIGIN = 'https://backoffice.nawris.algoriza.com/external-api';
+// ===================== CONFIG =====================
 const INCUBATION_DAYS = 14;
-
-const SURVEY_QUESTIONS = [
-    'ما مدى رضاك عن سرعة التوصيل؟',
-    'ما مدى رضاك عن خدمة العملاء؟',
-    'ما مدى رضاك عن جودة التغليف؟',
-    'ما مدى رضاك عن سهولة استخدام النظام؟',
-    'ما مدى احتمالية توصيتك بالنورس لمتجر آخر؟'
-];
+const SURVEY_QUESTIONS = ['ما مدى رضاك عن سرعة التوصيل؟','ما مدى رضاك عن خدمة العملاء؟','ما مدى رضاك عن جودة التغليف؟','ما مدى رضاك عن سهولة النظام؟','ما مدى احتمالية توصيتك بالنورس؟'];
 
 const ROLES = {
-    active_manager: { label: 'مسؤول المتاجر النشطة', views: ['dashboard','active'] },
-    inactive_manager: { label: 'مسؤول المتاجر غير النشطة', views: ['dashboard','inactive'] },
-    executive: { label: 'المدير التنفيذي', views: ['dashboard','incubating','active','inactive','frozen','tickets'] }
+    incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
+    active_manager: { label:'مسؤول المتاجر النشطة', views:['dashboard','active'] },
+    inactive_manager: { label:'مسؤول الاستعادة', views:['dashboard','inactive'] },
+    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen'] }
 };
 
-// ==================== STATE ====================
-let allStores = [];
-let allTickets = [];
-let currentView = 'dashboard';
-let currentSubFilter = 'all';
-let currentRole = null;
+// ===================== STATE =====================
+let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null;
 
-// ==================== API HELPERS ====================
+// ===================== API =====================
 async function apiGet(url) {
     const r = await fetch(url);
     if (!r.ok) throw new Error('API ' + r.status);
@@ -418,91 +278,80 @@ async function apiGet(url) {
     return d.data || [];
 }
 
-// ==================== AUTH ====================
+// ===================== AUTH =====================
 function loginAs(role) {
     currentRole = role;
     localStorage.setItem('nawras_role', role);
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('loadingScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'flex';
-    applyRolePermissions();
-    initApp();
+    applyRolePermissions(); initApp();
 }
-
 function logout() { localStorage.removeItem('nawras_role'); location.reload(); }
-
-function checkSavedLogin() {
-    const s = localStorage.getItem('nawras_role');
-    if (s && ROLES[s]) { loginAs(s); return true; }
-    return false;
-}
-
+function checkSavedLogin() { const s = localStorage.getItem('nawras_role'); if (s && ROLES[s]) { loginAs(s); return true; } return false; }
 function applyRolePermissions() {
     const role = ROLES[currentRole];
     document.getElementById('user-role-display').textContent = role.label;
     document.getElementById('current-role-label').textContent = role.label;
-    ['incubating','active','inactive','frozen','tickets'].forEach(v => {
+    ['incubating','active','inactive','frozen'].forEach(v => {
         const el = document.getElementById('nav-' + v);
         if (el) el.style.display = role.views.includes(v) ? 'flex' : 'none';
     });
 }
 
-// ==================== INIT ====================
-document.addEventListener('DOMContentLoaded', () => {
-    if (!checkSavedLogin()) document.getElementById('loginScreen').style.display = 'flex';
-});
-
-async function initApp() {
-    setupNavigation();
-    await loadData();
-    hideLoading();
-}
-
+// ===================== INIT =====================
+document.addEventListener('DOMContentLoaded', () => { if (!checkSavedLogin()) document.getElementById('loginScreen').style.display = 'flex'; });
+async function initApp() { setupNavigation(); await loadData(); hideLoading(); }
 function setupNavigation() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', function() {
-            const view = this.dataset.view;
-            if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
-            currentSubFilter = 'all';
-            switchView(view);
+            const v = this.dataset.view;
+            if (v !== 'dashboard' && !ROLES[currentRole].views.includes(v)) return;
+            currentSubFilter = 'all'; switchView(v);
         });
     });
 }
 
-// ==================== LOAD DATA ====================
+// ===================== LOAD DATA =====================
 async function loadData() {
     try {
-        const since = new Date(); since.setDate(since.getDate() - 30);
-        const sinceDate = since.toISOString().split('T')[0];
-        const toDate = new Date().toISOString().split('T')[0];
-
         const results = await Promise.all([
             apiGet('/api/new-customers'),
             apiGet('/api/inactive-customers'),
             apiGet('/api/orders-summary')
         ]);
-
         processStoresData(results[0], results[1], results[2]);
-        allTickets = [];
-        updateDashboard();
-        renderCurrentView();
+        runStateMachine();
+        updateDashboard(); renderCurrentView();
     } catch (error) {
         console.error('Error:', error);
-        showNotification('حدث خطأ في تحميل البيانات: ' + error.message, 'error');
+        showNotification('خطأ في تحميل البيانات: ' + error.message, 'error');
         hideLoading();
     }
 }
 
 function processStoresData(newData, inactiveData, summaryData) {
     allStores = [];
+    const summaryMap = {};
+    (summaryData || []).forEach(s => { summaryMap[s.id] = s; });
 
     (newData || []).forEach(s => {
-        allStores.push({ ...s, category: 'incubating', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
+        const summary = summaryMap[s.id];
+        allStores.push({
+            ...s,
+            category: 'incubating',
+            total_shipments: summary ? summary.total_shipments : (s.total_shipments || 0),
+            shipments_in_range: summary ? summary.shipments_in_range : 0,
+            first_shipment_date: s.last_shipment_date && s.last_shipment_date !== 'لا يوجد' ? s.last_shipment_date : null,
+            notes: getStored('notes', s.id) || [],
+            survey: getStored('survey', s.id),
+            freeze_reason: getStored('freeze', s.id) || ''
+        });
     });
 
     (inactiveData || []).forEach(s => {
         const ex = allStores.find(x => x.id === s.id);
-        if (ex) ex.category = 'inactive';
+        if (ex) { ex.inactive_flag = true; }
         else allStores.push({ ...s, category: 'inactive', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
     });
 
@@ -510,31 +359,101 @@ function processStoresData(newData, inactiveData, summaryData) {
         const ex = allStores.find(x => x.id === s.id);
         if (ex) {
             ex.total_shipments = s.total_shipments || ex.total_shipments;
-            if (ex.category === 'incubating' && s.total_shipments > 10) ex.category = 'active';
-        } else if (s.status === 'active') {
+            ex.shipments_in_range = s.shipments_in_range || 0;
+            if (!ex.first_shipment_date && s.last_shipment_date && s.last_shipment_date !== 'لا يوجد') ex.first_shipment_date = s.last_shipment_date;
+        } else if (s.status === 'active' && s.total_shipments > 0) {
             allStores.push({ ...s, category: 'active', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
         }
     });
 
+    // Apply saved overrides
     allStores.forEach(s => {
         const saved = localStorage.getItem('store_status_' + s.id);
         if (saved) s.category = saved;
     });
 }
 
-// ==================== LOCAL STORAGE ====================
+// ===================== STATE MACHINE =====================
+function runStateMachine() {
+    const now = new Date();
+    allStores.forEach(store => {
+        if (store.category !== 'incubating') return;
+        const override = localStorage.getItem('store_status_' + store.id);
+        if (override && override !== 'incubating') return;
+
+        const regDate = store.registered_at ? new Date(store.registered_at) : null;
+        if (!regDate) return;
+
+        const hoursSinceReg = (now - regDate) / 36e5;
+        const daysSinceReg = hoursSinceReg / 24;
+        const hasShipped = store.total_shipments > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد');
+        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
+        const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
+
+        // Rule 2: 48-hour test - failed
+        if (hoursSinceReg > 48 && !hasShipped) {
+            store.category = 'inactive';
+            store.state_reason = 'failed_48h';
+            return;
+        }
+
+        // Rule 4: Conflict prevention - stopped shipping 14+ days
+        if (hasShipped && daysSinceLastShip >= 14) {
+            store.category = 'inactive';
+            store.state_reason = 'stopped_shipping';
+            return;
+        }
+
+        // Determine incubation task
+        const callLog = getStored('calllog', store.id) || {};
+        if (!callLog.day0) {
+            store.incubation_task = 'day0';
+        } else if (hoursSinceReg >= 48 && hasShipped && !callLog.day3 && daysSinceReg >= 3) {
+            store.incubation_task = 'day3';
+        } else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10) {
+            store.incubation_task = 'day10';
+        } else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
+            store.incubation_task = 'graduation';
+        } else {
+            store.incubation_task = 'waiting';
+        }
+    });
+}
+
+function getHeatLevel(store) {
+    if (!store.registered_at) return 'normal';
+    const h = (new Date() - new Date(store.registered_at)) / 36e5;
+    if (h <= 1) return 'golden';
+    if (h <= 24) return 'hot';
+    return 'normal';
+}
+
+function getDaysSinceReg(store) {
+    return store.registered_at ? Math.floor((new Date() - new Date(store.registered_at)) / 864e5) : 0;
+}
+
+function getHoursSinceReg(store) {
+    return store.registered_at ? (new Date() - new Date(store.registered_at)) / 36e5 : 0;
+}
+
+// ===================== STORAGE =====================
 function getStored(type, id) {
     const v = localStorage.getItem('store_' + type + '_' + id);
-    if (!v) return type === 'notes' ? [] : type === 'survey' ? null : '';
+    if (!v) return type === 'notes' ? [] : type === 'survey' ? null : type === 'calllog' ? {} : '';
     try { return JSON.parse(v); } catch { return v; }
 }
 
-function saveNote(id, note) {
-    const s = allStores.find(x => x.id === id); if (!s) return;
+function logCall(storeId, callType, note) {
+    const log = getStored('calllog', storeId) || {};
+    log[callType] = { date: new Date().toISOString(), note: note };
+    localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
+    // Also save to notes
+    const s = allStores.find(x => x.id === storeId); if (!s) return;
     const t = new Date().toLocaleString('ar-EG');
+    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', general:'ملاحظة' };
     if (!s.notes) s.notes = [];
-    s.notes.push('[' + t + '] ' + note);
-    localStorage.setItem('store_notes_' + id, JSON.stringify(s.notes));
+    s.notes.push('[' + t + '] [' + (labels[callType]||callType) + '] ' + note);
+    localStorage.setItem('store_notes_' + storeId, JSON.stringify(s.notes));
 }
 
 function setStatus(id, status) {
@@ -542,69 +461,45 @@ function setStatus(id, status) {
     if (s) { s.category = status; localStorage.setItem('store_status_' + id, status); }
 }
 
-// ==================== HELPERS ====================
-function getHeat(s) {
-    if (!s.registered_at) return 'normal';
-    const h = (new Date() - new Date(s.registered_at)) / 36e5;
-    return h <= 1 ? 'hot' : h <= 24 ? 'golden' : 'normal';
-}
-
-function getIncDays(s) {
-    return s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 864e5) : 0;
-}
-
-function getConversionRate() {
-    const grad = allStores.filter(s => localStorage.getItem('store_graduated_' + s.id) === 'true' || s.category === 'active').length;
-    return allStores.length > 0 ? Math.round(grad / allStores.length * 100) : 0;
-}
-
-function getSatisfactionRate() {
-    let t = 0, c = 0;
-    allStores.forEach(s => {
-        const sv = s.survey || getStored('survey', s.id);
-        if (sv && sv.answers) { t += sv.answers.reduce((a,b) => a+b, 0) / sv.answers.length; c++; }
-    });
-    return c > 0 ? (t / c).toFixed(1) : '0';
-}
-
-// ==================== DASHBOARD ====================
+// ===================== DASHBOARD =====================
 function updateDashboard() {
-    const c = { incubating: 0, active: 0, inactive: 0, frozen: 0, restoring: 0 };
+    const c = { incubating:0, active:0, inactive:0, frozen:0, restoring:0 };
     allStores.forEach(s => { if (c[s.category] !== undefined) c[s.category]++; });
+
+    // Count tasks due today for incubation
+    const tasksDue = allStores.filter(s => s.category === 'incubating' && s.incubation_task && s.incubation_task !== 'waiting').length;
 
     document.getElementById('incubating-count').textContent = c.incubating;
     document.getElementById('active-count').textContent = c.active;
     document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
     document.getElementById('frozen-count').textContent = c.frozen;
-    document.getElementById('tickets-count').textContent = allTickets.length;
 
-    const conv = getConversionRate(), sat = getSatisfactionRate();
-    const openTickets = allTickets.filter(t => t.status !== 'تم الإغلاق').length;
+    const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
+    let sat = '0'; let tc = 0, tt = 0;
+    allStores.forEach(s => { const sv = s.survey || getStored('survey', s.id); if (sv && sv.answers) { tt += sv.answers.reduce((a,b)=>a+b,0)/sv.answers.length; tc++; } });
+    if (tc > 0) sat = (tt/tc).toFixed(1);
+
     const grid = document.getElementById('stats-grid');
     let h = '';
 
+    if (currentRole === 'executive' || currentRole === 'incubation_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+c.incubating+'</div><div class="stat-change"><span>📋</span><span>'+tasksDue+' مهمة مطلوبة اليوم</span></div></div>';
+    }
+    if (currentRole === 'executive' || currentRole === 'active_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+c.active+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
+    }
+    if (currentRole === 'executive' || currentRole === 'inactive_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+c.inactive+'</div><div class="stat-change"><span>⏰</span><span>تحتاج استعادة</span></div></div>';
+    }
     if (currentRole === 'executive') {
-        h = `
-        <div class="stat-card c-incubating" onclick="switchView('incubating')"><div class="stat-header"><span class="stat-title">قيد الاحتضان</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">${c.incubating}</div><div class="stat-change"><span>📅</span><span>متاجر جديدة</span></div></div>
-        <div class="stat-card c-success" onclick="switchView('active')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">${c.active}</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>
-        <div class="stat-card c-warning" onclick="switchView('inactive')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">${c.inactive}</div><div class="stat-change"><span>⏰</span><span>تحتاج متابعة ${c.restoring > 0 ? '('+c.restoring+' جاري الاستعادة)' : ''}</span></div></div>
-        <div class="stat-card c-frozen" onclick="switchView('frozen')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">${c.frozen}</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>
-        <div class="stat-card c-tickets" onclick="switchView('tickets')"><div class="stat-header"><span class="stat-title">التذاكر</span><div class="stat-icon" style="background:rgba(225,29,72,0.1);color:#e11d48">🎫</div></div><div class="stat-value">${allTickets.length}</div><div class="stat-change"><span>📨</span><span>${openTickets} مفتوحة</span></div></div>
-        <div class="stat-card c-conversion"><div class="stat-header"><span class="stat-title">معدل التحويل</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">${conv}%</div><div class="stat-change"><span>🎯</span><span>من الاحتضان إلى نشط</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:${conv}%"></div></div></div>
-        <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">${sat}/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${parseFloat(sat)/5*100}%"></div></div></div>`;
-    } else if (currentRole === 'active_manager') {
-        h = `
-        <div class="stat-card c-success" onclick="switchView('active')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">${c.active}</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>
-        <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">${sat}/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:${parseFloat(sat)/5*100}%"></div></div></div>`;
-    } else {
-        h = `
-        <div class="stat-card c-warning" onclick="switchView('inactive')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">${c.inactive}</div><div class="stat-change"><span>⏰</span><span>تحتاج متابعة</span></div></div>
-        <div class="stat-card c-incubating"><div class="stat-header"><span class="stat-title">جاري الاستعادة</span><div class="stat-icon" style="background:rgba(8,145,178,0.1);color:var(--restoring)">🔄</div></div><div class="stat-value">${c.restoring}</div><div class="stat-change"><span>📦</span><span>بانتظار أول شحنة</span></div></div>`;
+        h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+c.frozen+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">معدل التحويل</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>احتضان → نشط</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid #f59e0b"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">'+sat+'/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+parseFloat(sat)/5*100+'%"></div></div></div>';
     }
     grid.innerHTML = h;
 }
 
-// ==================== VIEWS ====================
+// ===================== VIEWS =====================
 function switchView(view) {
     if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
     currentView = view;
@@ -613,7 +508,7 @@ function switchView(view) {
         document.getElementById('dashboard-view').style.display = 'block';
         document.getElementById('tasks-view').style.display = 'none';
         document.getElementById('page-title').textContent = 'لوحة التحكم';
-        document.getElementById('page-subtitle').textContent = 'نظرة شاملة على جميع المتاجر';
+        document.getElementById('page-subtitle').textContent = 'نظرة شاملة';
         updateDashboard();
     } else {
         document.getElementById('dashboard-view').style.display = 'none';
@@ -624,15 +519,12 @@ function switchView(view) {
 
 function renderCurrentView() {
     if (currentView === 'dashboard') return;
-
     const titles = {
-        incubating: { icon: '🎯', title: 'قيد الاحتضان', sub: 'تخرج بعد 14 يوم' },
-        active: { icon: '⭐', title: 'المتاجر النشطة', sub: 'تشحن بانتظام' },
-        inactive: { icon: '⚠️', title: 'غير النشطة', sub: 'تحتاج متابعة' },
-        frozen: { icon: '🧊', title: 'المجمدة', sub: 'تم تجميدها من المدير' },
-        tickets: { icon: '🎫', title: 'التذاكر', sub: 'تقارير الشكاوى والدعم' }
+        incubating: { icon:'🎯', title:'مسار الاحتضان', sub:'القائمة النظيفة - المهام المطلوبة اليوم' },
+        active: { icon:'⭐', title:'المتاجر النشطة', sub:'تشحن بانتظام' },
+        inactive: { icon:'⚠️', title:'غير النشطة', sub:'تحتاج استعادة' },
+        frozen: { icon:'🧊', title:'المجمدة', sub:'تم تجميدها' }
     };
-
     const cfg = titles[currentView]; if (!cfg) return;
     document.getElementById('page-title').textContent = cfg.title;
     document.getElementById('page-subtitle').textContent = cfg.sub;
@@ -643,195 +535,265 @@ function renderCurrentView() {
     const tl = document.getElementById('task-list');
     tl.innerHTML = '';
 
-    // Tickets view
-    if (currentView === 'tickets') {
-        sf.style.display = 'none';
-        renderTickets(tl);
-        return;
-    }
-
-    // Sub-filters
     if (currentView === 'incubating') {
         const all = allStores.filter(s => s.category === 'incubating');
+        const due = all.filter(s => s.incubation_task && s.incubation_task !== 'waiting');
+        const golden = all.filter(s => getHeatLevel(s) === 'golden');
+        const hot = all.filter(s => getHeatLevel(s) === 'hot');
+        const day0 = all.filter(s => s.incubation_task === 'day0');
+        const day3 = all.filter(s => s.incubation_task === 'day3');
+        const day10 = all.filter(s => s.incubation_task === 'day10');
+        const grad = all.filter(s => s.incubation_task === 'graduation');
+
         sf.style.display = 'flex';
         sf.innerHTML = `
-            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${all.length}</span></button>
-            <button class="sub-filter-btn hot-filter ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sub-filter-count">${all.filter(s=>getHeat(s)==='hot').length}</span></button>
-            <button class="sub-filter-btn golden-filter ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sub-filter-count">${all.filter(s=>getHeat(s)==='golden').length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='ready'?'active':''}" onclick="setSubFilter('ready')">🎓 جاهزة للتخريج <span class="sub-filter-count">${all.filter(s=>getIncDays(s)>=INCUBATION_DAYS).length}</span></button>`;
+            <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام اليوم <span class="sf-count">${due.length}</span></button>
+            <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
+            <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${all.length}</span></button>`;
+
+        let stores = all;
+        if (currentSubFilter === 'due') stores = due;
+        else if (currentSubFilter === 'golden') stores = golden;
+        else if (currentSubFilter === 'hot') stores = hot;
+        else if (currentSubFilter === 'day0') stores = day0;
+        else if (currentSubFilter === 'day3') stores = day3;
+        else if (currentSubFilter === 'day10') stores = day10;
+        else if (currentSubFilter === 'graduation') stores = grad;
+
+        // Default to "due" on first load
+        if (currentSubFilter === 'all' && currentRole === 'incubation_manager') {
+            // Show all but sort due first
+            stores.sort((a,b) => {
+                const order = {day0:0,day3:1,day10:2,graduation:3,waiting:4};
+                return (order[a.incubation_task]||5) - (order[b.incubation_task]||5);
+            });
+        }
+
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد مهام</h3></div>'; return; }
+        stores.forEach(s => tl.appendChild(createStoreCard(s)));
+
     } else if (currentView === 'inactive') {
         const inact = allStores.filter(s => s.category === 'inactive');
         const rest = allStores.filter(s => s.category === 'restoring');
         sf.style.display = 'flex';
         sf.innerHTML = `
-            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sub-filter-count">${inact.length+rest.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sub-filter-count">${inact.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sub-filter-count">${rest.length}</span></button>`;
-    } else { sf.style.display = 'none'; }
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${inact.length+rest.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sf-count">${inact.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>`;
+        let stores;
+        if (currentSubFilter === 'inactive_only') stores = inact;
+        else if (currentSubFilter === 'restoring') stores = rest;
+        else stores = [...inact, ...rest];
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
+        stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
-    // Get stores
-    let stores;
-    if (currentView === 'inactive') {
-        if (currentSubFilter === 'inactive_only') stores = allStores.filter(s => s.category === 'inactive');
-        else if (currentSubFilter === 'restoring') stores = allStores.filter(s => s.category === 'restoring');
-        else stores = allStores.filter(s => s.category === 'inactive' || s.category === 'restoring');
     } else {
-        stores = allStores.filter(s => s.category === currentView);
+        sf.style.display = 'none';
+        const stores = allStores.filter(s => s.category === currentView);
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
+        stores.forEach(s => tl.appendChild(createStoreCard(s)));
     }
-
-    if (currentView === 'incubating') {
-        if (currentSubFilter === 'hot') stores = stores.filter(s => getHeat(s) === 'hot');
-        else if (currentSubFilter === 'golden') stores = stores.filter(s => getHeat(s) === 'golden');
-        else if (currentSubFilter === 'ready') stores = stores.filter(s => getIncDays(s) >= INCUBATION_DAYS);
-        stores.sort((a, b) => ({ hot: 0, golden: 1, normal: 2 })[getHeat(a)] - ({ hot: 0, golden: 1, normal: 2 })[getHeat(b)]);
-    }
-
-    if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
-    stores.forEach(s => tl.appendChild(createStoreCard(s)));
 }
 
 function setSubFilter(f) { currentSubFilter = f; renderCurrentView(); }
 
-// ==================== TICKETS VIEW ====================
-function renderTickets(container) {
-    if (!allTickets.length) { container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎫</div><h3>لا توجد تذاكر</h3></div>'; return; }
-
-    const open = allTickets.filter(t => t.status !== 'تم الإغلاق').length;
-    const closed = allTickets.length - open;
-    const avgRating = allTickets.filter(t => t.rating > 0);
-    const avg = avgRating.length > 0 ? (avgRating.reduce((s,t) => s + t.rating, 0) / avgRating.length).toFixed(1) : '-';
-
-    container.innerHTML = `
-        <div class="stats-grid" style="margin-bottom:1.5rem;">
-            <div class="stat-card c-tickets"><div class="stat-header"><span class="stat-title">إجمالي التذاكر</span><div class="stat-icon" style="background:rgba(225,29,72,0.1);color:#e11d48">🎫</div></div><div class="stat-value">${allTickets.length}</div></div>
-            <div class="stat-card c-warning"><div class="stat-header"><span class="stat-title">مفتوحة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">📨</div></div><div class="stat-value">${open}</div></div>
-            <div class="stat-card c-success"><div class="stat-header"><span class="stat-title">مغلقة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">✅</div></div><div class="stat-value">${closed}</div></div>
-            <div class="stat-card c-satisfaction"><div class="stat-header"><span class="stat-title">متوسط التقييم</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">⭐</div></div><div class="stat-value">${avg}</div></div>
-        </div>
-        <div style="overflow-x:auto;">
-        <table class="tickets-table">
-            <thead><tr>
-                <th>#</th><th>المنشئ</th><th>النوع</th><th>العنوان</th><th>الحالة</th><th>المسؤول</th><th>التقييم</th><th>وقت الحل</th><th>التاريخ</th>
-            </tr></thead>
-            <tbody>
-                ${allTickets.slice(0, 100).map(t => `<tr>
-                    <td>${t.ticket_code}</td>
-                    <td>${t.creator}</td>
-                    <td>${t.type || '-'}</td>
-                    <td>${t.complaint_title || '-'}</td>
-                    <td><span class="status-badge ${t.status === 'تم الإغلاق' ? 'ticket-closed' : 'ticket-open'}">${t.status}</span></td>
-                    <td>${t.assigned_user || '-'}</td>
-                    <td>${t.rating > 0 ? '⭐'.repeat(t.rating) : '-'}</td>
-                    <td>${t.solve_period || '-'}</td>
-                    <td>${new Date(t.created_at).toLocaleDateString('ar-EG')}</td>
-                </tr>`).join('')}
-            </tbody>
-        </table></div>`;
-}
-
-// ==================== STORE CARD ====================
+// ===================== STORE CARD =====================
 function createStoreCard(store) {
     const card = document.createElement('div');
-    const heat = getHeat(store), days = getIncDays(store);
+    const heat = getHeatLevel(store), days = getDaysSinceReg(store), hours = getHoursSinceReg(store);
+    const hasShipped = store.total_shipments > 0;
     card.className = 'task-card';
-    if (store.category === 'incubating' && heat === 'hot') card.className += ' hot-card';
-    if (store.category === 'incubating' && heat === 'golden') card.className += ' golden-card';
+
+    // Card border color based on task
+    if (store.category === 'incubating') {
+        if (heat === 'golden') card.className += ' golden-card';
+        else if (heat === 'hot') card.className += ' hot-card';
+        else if (store.incubation_task === 'day3') card.className += ' day3-card';
+        else if (store.incubation_task === 'day10') card.className += ' day10-card';
+        else if (store.incubation_task === 'graduation') card.className += ' grad-card';
+    }
     if (store.category === 'frozen') card.className += ' frozen-card';
     if (store.category === 'restoring') card.className += ' restoring-card';
 
     const lastShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG') : 'لا يوجد';
     const regDate = store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-EG') : '-';
+    const phone = store.phone || '';
+    const waPhone = phone.replace(/^0/, '218');
 
+    // Badge
     let badge = '';
     if (store.category === 'incubating') {
-        if (heat === 'hot') badge = '<span class="status-badge hot">🔥 ساخن</span>';
-        else if (heat === 'golden') badge = '<span class="status-badge golden">🥇 ذهبي</span>';
-        else if (days >= INCUBATION_DAYS) badge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
-        else badge = '<span class="status-badge new">قيد الاحتضان (' + days + '/' + INCUBATION_DAYS + ')</span>';
+        if (store.incubation_task === 'day0' && heat === 'golden') badge = '<span class="status-badge golden">🥇 ذهبي - أقل من ساعة</span>';
+        else if (store.incubation_task === 'day0' && heat === 'hot') badge = '<span class="status-badge hot">🔥 ساخن - أقل من 24 ساعة</span>';
+        else if (store.incubation_task === 'day0') badge = '<span class="status-badge day0">📞 مكالمة ترحيبية</span>';
+        else if (store.incubation_task === 'day3') badge = '<span class="status-badge day3">📞 متابعة يوم 3</span>';
+        else if (store.incubation_task === 'day10') badge = '<span class="status-badge day10">📞 تقييم يوم 10</span>';
+        else if (store.incubation_task === 'graduation') badge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
+        else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
-    else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط</span>';
+    else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن خلال 48 ساعة' : '') + '</span>';
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
     else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
 
-    let actions = '<button class="btn btn-primary" onclick="openNoteModal(' + store.id + ')">📝 ملاحظة</button>';
-    if (store.category === 'incubating' && days >= INCUBATION_DAYS && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="graduateStore(' + store.id + ')">🎓 تخريج</button>';
-    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore(' + store.id + ')">🔄 استعادة</button>';
-    if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal(' + store.id + ')">📋 استبيان</button>';
-    if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal(' + store.id + ')">🧊 تجميد</button>';
-    if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore(' + store.id + ')">إلغاء التجميد</button>';
+    // Actions
+    let actions = '';
 
+    // WhatsApp button
+    if (phone) actions += '<a href="https://wa.me/'+waPhone+'" target="_blank" class="btn btn-whatsapp">واتساب</a>';
+
+    if (store.category === 'incubating') {
+        if (store.incubation_task === 'day0') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day0\')">📞 تم الاتصال - ترحيب</button>';
+        else if (store.incubation_task === 'day3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day3\')">📞 تم الاتصال - يوم 3</button>';
+        else if (store.incubation_task === 'day10') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day10\')">📞 تم الاتصال - يوم 10</button>';
+        else if (store.incubation_task === 'graduation' && (currentRole === 'executive' || currentRole === 'incubation_manager')) actions += '<button class="btn btn-success" onclick="graduateStore('+store.id+')">🎓 تخريج إلى نشط</button>';
+    }
+
+    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore('+store.id+')">🔄 استعادة</button>';
+    if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
+    if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
+    if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
+
+    actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📝 ملاحظة</button>';
+
+    // Timeline for incubating stores
+    let timelineHtml = '';
+    if (store.category === 'incubating') {
+        const cl = getStored('calllog', store.id) || {};
+        const steps = [
+            { label:'يوم 0 - ترحيب', key:'day0' },
+            { label:'48 ساعة - شحنة أولى', key:'48h', auto:true },
+            { label:'يوم 3 - متابعة', key:'day3' },
+            { label:'يوم 10 - تقييم', key:'day10' },
+            { label:'يوم 14 - تخريج', key:'graduation' }
+        ];
+        timelineHtml = '<div class="timeline"><div class="timeline-title">📋 مسار الاحتضان</div>';
+        steps.forEach(step => {
+            let dotClass = 'pending';
+            if (step.key === '48h') {
+                dotClass = hasShipped ? 'done' : (hours > 48 ? 'failed' : 'pending');
+            } else if (cl[step.key]) dotClass = 'done';
+            else if (store.incubation_task === step.key) dotClass = 'current';
+            else if (step.key === 'graduation' && store.incubation_task === 'graduation') dotClass = 'current';
+            let statusText = '';
+            if (dotClass === 'done') statusText = ' ✓';
+            else if (dotClass === 'failed') statusText = ' ✗ لم يشحن';
+            else if (dotClass === 'current') statusText = ' ← مطلوب';
+            timelineHtml += '<div class="timeline-step"><div class="timeline-dot '+dotClass+'"></div><span>'+step.label+statusText+'</span></div>';
+        });
+        timelineHtml += '</div>';
+    }
+
+    // Notes
+    let notesHtml = '';
+    if (store.notes && store.notes.length > 0) {
+        notesHtml = '<div style="background:var(--bg-main);padding:0.75rem;border-radius:8px;margin-top:0.75rem;max-height:150px;overflow-y:auto;"><strong style="font-size:0.8rem">📝 ملاحظات:</strong>' +
+            store.notes.slice(-3).map(n => '<div style="padding:0.2rem 0;color:var(--text-secondary);font-size:0.8rem">• '+n+'</div>').join('') +
+            (store.notes.length > 3 ? '<div style="font-size:0.75rem;color:var(--primary);margin-top:0.25rem">+' + (store.notes.length-3) + ' ملاحظات أخرى</div>' : '') + '</div>';
+    }
+
+    // Survey
     let surveyHtml = '';
     const survey = store.survey || getStored('survey', store.id);
     if (survey && survey.answers && store.category === 'active') {
-        const avg = (survey.answers.reduce((a,b) => a+b, 0) / survey.answers.length).toFixed(1);
-        surveyHtml = '<div class="survey-section"><div class="survey-title">📋 الاستبيان (' + avg + '/5)</div>' +
-            SURVEY_QUESTIONS.map((q, i) => '<div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-size:0.85rem;"><span style="color:var(--text-secondary)">' + q + '</span><span style="font-weight:700;color:var(--warning)">' + '⭐'.repeat(survey.answers[i]) + '</span></div>').join('') + '</div>';
+        const avg = (survey.answers.reduce((a,b)=>a+b,0)/survey.answers.length).toFixed(1);
+        surveyHtml = '<div class="survey-section"><div class="survey-title">📋 الاستبيان ('+avg+'/5)</div>'+SURVEY_QUESTIONS.map((q,i)=>'<div style="display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.8rem"><span style="color:var(--text-secondary)">'+q+'</span><span style="font-weight:700;color:var(--warning)">'+'⭐'.repeat(survey.answers[i])+'</span></div>').join('')+'</div>';
     }
 
+    // Freeze reason
     let freezeHtml = '';
     const fr = store.freeze_reason || getStored('freeze', store.id);
-    if (store.category === 'frozen' && fr) freezeHtml = '<div class="freeze-reason"><strong>❄️ سبب التجميد:</strong> ' + fr + '</div>';
+    if (store.category === 'frozen' && fr) freezeHtml = '<div class="freeze-reason"><strong>❄️ سبب التجميد:</strong> '+fr+'</div>';
 
     card.innerHTML = `
-        <div class="task-header"><div class="task-info"><h3>${store.name || 'بدون اسم'}</h3><div class="task-meta">
-            <div class="meta-item">🔢 كود: ${store.id}</div><div class="meta-item">📱 ${store.phone || '-'}</div><div class="meta-item">📍 ${store.city || '-'}</div>
-            <div class="meta-item">📅 ${regDate}</div><div class="meta-item">📦 آخر شحنة: ${lastShip}</div>
-            <div class="meta-item">📊 الطرود: ${store.total_shipments || 0}</div>
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}</h3><div class="task-meta">
+            <div class="meta-item">🔢 ${store.id}</div>
+            <div class="meta-item">📱 ${phone||'-'}</div>
+            <div class="meta-item">📍 ${store.city||'-'}</div>
+            <div class="meta-item">📅 ${regDate}</div>
+            <div class="meta-item">📦 شحنات: ${store.total_shipments||0}</div>
+            <div class="meta-item">🚚 آخر شحنة: ${lastShip}</div>
         </div></div>${badge}</div>
-        ${store.notes && store.notes.length > 0 ? '<div style="background:var(--bg-main);padding:1rem;border-radius:8px;margin-top:1rem;"><strong>📝 ملاحظات:</strong>' + store.notes.map(n => '<div style="padding:0.25rem 0;color:var(--text-secondary);font-size:0.875rem">• ' + n + '</div>').join('') + '</div>' : ''}
-        ${surveyHtml}${freezeHtml}
+        ${timelineHtml}${notesHtml}${surveyHtml}${freezeHtml}
         <div class="task-actions">${actions}</div>`;
     return card;
 }
 
-// ==================== ACTIONS ====================
-function graduateStore(id) { setStatus(id, 'active'); localStorage.setItem('store_graduated_' + id, 'true'); showNotification('🎓 تم التخريج'); updateDashboard(); renderCurrentView(); }
-function restoreStore(id) { setStatus(id, 'restoring'); showNotification('🔄 جاري الاستعادة - بانتظار أول شحنة'); updateDashboard(); renderCurrentView(); }
-function unfreezeStore(id) { setStatus(id, 'incubating'); localStorage.removeItem('store_freeze_reason_' + id); const s = allStores.find(x => x.id === id); if (s) s.freeze_reason = ''; showNotification('تم إلغاء التجميد'); updateDashboard(); renderCurrentView(); }
+// ===================== ACTIONS =====================
+function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function restoreStore(id) { setStatus(id,'restoring'); showNotification('🔄 جاري الاستعادة'); updateDashboard(); renderCurrentView(); }
+function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem('store_freeze_reason_'+id); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
-// ==================== MODALS ====================
-function openNoteModal(id) { document.getElementById('store-id').value = id; document.getElementById('call-modal').classList.add('active'); }
+// ===================== MODALS =====================
+function openCallModal(id, type) {
+    document.getElementById('call-store-id').value = id;
+    document.getElementById('call-type').value = type;
+    const labels = { day0:'تم الاتصال - مكالمة ترحيبية', day3:'تم الاتصال - متابعة يوم 3', day10:'تم الاتصال - تقييم يوم 10', general:'إضافة ملاحظة' };
+    document.getElementById('call-modal-title').textContent = labels[type] || 'ملاحظة';
+    document.getElementById('call-modal').classList.add('active');
+}
+
 function openFreezeModal(id) { document.getElementById('freeze-store-id').value = id; document.getElementById('freeze-modal').classList.add('active'); }
+
 function openSurveyModal(id) {
     document.getElementById('survey-store-id').value = id;
     const c = document.getElementById('survey-questions');
     const ex = getStored('survey', id);
-    c.innerHTML = SURVEY_QUESTIONS.map((q, i) => '<div class="form-group"><label class="form-label">' + (i+1) + '. ' + q + '</label><div class="star-rating" data-question="' + i + '">' +
-        [1,2,3,4,5].map(s => '<span data-star="' + s + '" class="' + (ex && ex.answers && ex.answers[i] >= s ? 'filled' : '') + '" onclick="rateStar(' + i + ',' + s + ')">⭐</span>').join('') + '</div></div>').join('');
+    c.innerHTML = SURVEY_QUESTIONS.map((q,i) => '<div class="form-group"><label class="form-label">'+(i+1)+'. '+q+'</label><div class="star-rating" data-question="'+i+'">'+
+        [1,2,3,4,5].map(s => '<span data-star="'+s+'" class="'+(ex&&ex.answers&&ex.answers[i]>=s?'filled':'')+'" onclick="rateStar('+i+','+s+')">⭐</span>').join('')+'</div></div>').join('');
     document.getElementById('survey-modal').classList.add('active');
 }
-function rateStar(q, v) { document.querySelector('.star-rating[data-question="' + q + '"]').querySelectorAll('span').forEach(s => { s.classList.toggle('filled', parseInt(s.dataset.star) <= v); }); }
+
+function rateStar(q,v) { document.querySelector('.star-rating[data-question="'+q+'"]').querySelectorAll('span').forEach(s => { s.classList.toggle('filled', parseInt(s.dataset.star)<=v); }); }
 function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
 
+// Form handlers
 document.getElementById('call-form').addEventListener('submit', function(e) {
-    e.preventDefault(); saveNote(parseInt(document.getElementById('store-id').value), document.getElementById('nawras-note').value);
-    closeModal(); this.reset(); renderCurrentView(); showNotification('تم حفظ الملاحظة');
+    e.preventDefault();
+    const id = parseInt(document.getElementById('call-store-id').value);
+    const type = document.getElementById('call-type').value;
+    const note = document.getElementById('call-note').value;
+    if (!note.trim()) { showNotification('ملاحظة النورس إلزامية!', 'error'); return; }
+    logCall(id, type, note);
+    closeModal(); this.reset();
+    runStateMachine(); updateDashboard(); renderCurrentView();
+    showNotification('✅ تم تسجيل المكالمة');
 });
 
 document.getElementById('freeze-form').addEventListener('submit', function(e) {
-    e.preventDefault(); const id = parseInt(document.getElementById('freeze-store-id').value), reason = document.getElementById('freeze-reason').value;
-    if (!reason.trim()) { showNotification('يجب كتابة سبب التجميد', 'error'); return; }
-    localStorage.setItem('store_freeze_' + id, reason); const s = allStores.find(x => x.id === id); if (s) s.freeze_reason = reason;
-    setStatus(id, 'frozen'); closeModal(); this.reset(); showNotification('🧊 تم التجميد'); updateDashboard(); renderCurrentView();
+    e.preventDefault();
+    const id = parseInt(document.getElementById('freeze-store-id').value);
+    const reason = document.getElementById('freeze-reason').value;
+    if (!reason.trim()) { showNotification('سبب التجميد إلزامي','error'); return; }
+    localStorage.setItem('store_freeze_'+id, reason);
+    const s = allStores.find(x=>x.id===id); if(s) s.freeze_reason=reason;
+    setStatus(id,'frozen'); closeModal(); this.reset();
+    showNotification('🧊 تم التجميد'); updateDashboard(); renderCurrentView();
 });
 
 document.getElementById('survey-form').addEventListener('submit', function(e) {
-    e.preventDefault(); const id = parseInt(document.getElementById('survey-store-id').value);
-    const answers = []; SURVEY_QUESTIONS.forEach((_, i) => { answers.push(document.querySelectorAll('.star-rating[data-question="' + i + '"] span.filled').length); });
-    if (answers.some(a => a === 0)) { showNotification('يرجى تقييم جميع الأسئلة', 'error'); return; }
+    e.preventDefault();
+    const id = parseInt(document.getElementById('survey-store-id').value);
+    const answers = []; SURVEY_QUESTIONS.forEach((_,i) => { answers.push(document.querySelectorAll('.star-rating[data-question="'+i+'"] span.filled').length); });
+    if (answers.some(a=>a===0)) { showNotification('يرجى تقييم جميع الأسئلة','error'); return; }
     const sv = { answers, date: new Date().toISOString() };
-    localStorage.setItem('store_survey_' + id, JSON.stringify(sv)); const s = allStores.find(x => x.id === id); if (s) s.survey = sv;
+    localStorage.setItem('store_survey_'+id, JSON.stringify(sv));
+    const s = allStores.find(x=>x.id===id); if(s) s.survey=sv;
     closeModal(); showNotification('تم حفظ الاستبيان'); updateDashboard(); renderCurrentView();
 });
 
-function showNotification(msg, type = 'success') {
+// ===================== UTILS =====================
+function showNotification(msg, type='success') {
     const n = document.createElement('div'); n.className = 'notification';
-    if (type === 'error') n.style.background = 'var(--danger)';
+    if (type==='error') n.style.background='var(--danger)';
     n.textContent = msg; document.body.appendChild(n);
-    setTimeout(() => { n.remove(); }, 3000);
+    setTimeout(()=>n.remove(), 3000);
 }
-
-function hideLoading() { const l = document.getElementById('loadingScreen'); l.classList.add('hidden'); setTimeout(() => l.style.display = 'none', 500); }
+function hideLoading() { const l=document.getElementById('loadingScreen');l.classList.add('hidden');setTimeout(()=>l.style.display='none',500); }
 </script>
 </body>
 </html>

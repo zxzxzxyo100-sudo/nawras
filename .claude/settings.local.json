@@ -6,7 +6,12 @@
       "Bash(curl -s -m 10 'https://api.codetabs.com/v1/proxy?quest=https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-01' -H 'X-API-TOKEN: f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703')",
       "Bash(curl -sL -m 10 'https://api.codetabs.com/v1/proxy/?quest=https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-01')",
       "Bash(curl -s -m 10 'https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-01&api_token=f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703' -H 'Accept: application/json')",
-      "Bash(curl -s -m 10 'https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-01&token=f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703' -H 'Accept: application/json')"
+      "Bash(curl -s -m 10 'https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-01&token=f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703' -H 'Accept: application/json')",
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(vercel login:*)",
+      "Bash(vercel --prod --yes)",
+      "WebFetch(domain:16-sigma-fawn.vercel.app)"
     ]
   }
 }
