@@ -18,7 +18,8 @@
       "Bash(sshpass:*)",
       "WebFetch(domain:nawras-ly.com)",
       "WebFetch(domain:187.124.60.3)",
-      "WebFetch(domain:paleturquoise-mole-971022.hostingersite.com)"
+      "WebFetch(domain:paleturquoise-mole-971022.hostingersite.com)",
+      "Bash(curl -s 'https://paleturquoise-mole-971022.hostingersite.com/api-php/store-actions.php?action=get_states')"
     ]
   }
 }
