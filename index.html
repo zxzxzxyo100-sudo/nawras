@@ -649,6 +649,8 @@ function renderCurrentView() {
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else if (currentView === 'inactive') {
+        const neverShipped = allStores.filter(s => s.category === 'inactive' && s.state_reason === 'failed_48h');
+        const stoppedShipping = allStores.filter(s => s.category === 'inactive' && s.state_reason !== 'failed_48h');
         const inact = allStores.filter(s => s.category === 'inactive');
         const rest = allStores.filter(s => s.category === 'restoring');
         const recovered = allStores.filter(s => s.category === 'recovered');
@@ -656,12 +658,15 @@ function renderCurrentView() {
         sf.style.display = 'flex';
         sf.innerHTML = `
             <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${inact.length+rest.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sf-count">${inact.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='never_shipped'?'active':''}" onclick="setSubFilter('never_shipped')">🚫 لم تشحن <span class="sf-count">${neverShipped.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='stopped_shipping'?'active':''}" onclick="setSubFilter('stopped_shipping')">📦 شحنت وتوقفت <span class="sf-count">${stoppedShipping.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📞 مكالمات مستحقة <span class="sf-count">${dueCalls.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>`;
         let stores;
-        if (currentSubFilter === 'inactive_only') stores = inact;
+        if (currentSubFilter === 'never_shipped') stores = neverShipped;
+        else if (currentSubFilter === 'stopped_shipping') stores = stoppedShipping;
+        else if (currentSubFilter === 'inactive_only') stores = inact;
         else if (currentSubFilter === 'restoring') stores = rest;
         else if (currentSubFilter === 'due_recovery') stores = dueCalls;
         else if (currentSubFilter === 'recovered') stores = recovered;
@@ -718,7 +723,10 @@ function createStoreCard(store) {
         }
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
-    else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن خلال 48 ساعة' : '') + '</span>';
+    else if (store.category === 'inactive') {
+        if (store.state_reason === 'failed_48h') badge = '<span class="status-badge failed48">🚫 لم تشحن - 48 ساعة</span>';
+        else badge = '<span class="status-badge warning">📦 شحنت وتوقفت</span>';
+    }
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
     else if (store.category === 'restoring') {
         if (store.recovery_task === 'rcall1') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة - مكالمة 1 مستحقة</span>';
