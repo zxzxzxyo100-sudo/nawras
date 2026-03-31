@@ -934,8 +934,10 @@ function renderCurrentView() {
     }
 }
 
-function renderUsersView(container) {
-    const users = getUsers();
+async function renderUsersView(container) {
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">جاري التحميل...</div>';
+    const result = await fetch(AUTH_API + '?action=list_users').then(r => r.json());
+    const users = result.data || [];
     const roleLabels = { incubation_manager:'مسؤول الاحتضان', active_manager:'مسؤول النشطة', inactive_manager:'مسؤول الاستعادة', executive:'المدير التنفيذي' };
 
     let html = '<button class="btn btn-success" onclick="openAddUserModal()" style="margin-bottom:1.5rem">+ إضافة مستخدم جديد</button>';
@@ -1157,49 +1159,37 @@ function openEditUserModal(id) {
     document.getElementById('user-modal').classList.add('active');
 }
 
-function deleteUser(id) {
+async function deleteUser(id) {
     if (id === 1) { showNotification('لا يمكن حذف المدير الرئيسي', 'error'); return; }
     if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
-    const users = getUsers().filter(u => u.id !== id);
-    saveUsers(users);
+    await dbPost(AUTH_API + '?action=delete_user', { id });
     showNotification('تم حذف المستخدم');
     renderCurrentView();
 }
 
-document.getElementById('user-form').addEventListener('submit', function(e) {
+document.getElementById('user-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const editId = document.getElementById('edit-user-id').value;
     const username = document.getElementById('new-username').value.trim();
     const fullname = document.getElementById('new-fullname').value.trim();
     const password = document.getElementById('new-password').value;
     const role = document.getElementById('new-role').value;
-    const users = getUsers();
 
     if (editId) {
-        // Edit existing
-        const u = users.find(x => x.id === parseInt(editId));
-        if (!u) return;
-        if (users.find(x => x.username === username && x.id !== u.id)) { showNotification('اسم المستخدم موجود مسبقاً', 'error'); return; }
-        u.username = username;
-        u.fullname = fullname;
-        if (password) u.password = password;
-        u.role = role;
-        // Update session if editing self
-        if (currentUser && currentUser.id === u.id) {
-            currentUser = u;
-            localStorage.setItem('nawras_session', JSON.stringify({ id: u.id, username: u.username, role: u.role, fullname: u.fullname }));
-            currentRole = u.role;
+        const result = await dbPost(AUTH_API + '?action=update_user', { id: parseInt(editId), username, fullname, password, role });
+        if (!result.success) { showNotification(result.error || 'خطأ في التعديل', 'error'); return; }
+        if (currentUser && currentUser.id === parseInt(editId)) {
+            currentUser = { ...currentUser, username, fullname, role };
+            localStorage.setItem('nawras_session', JSON.stringify(currentUser));
+            currentRole = role;
             applyRolePermissions();
         }
     } else {
-        // Add new
-        if (users.find(x => x.username === username)) { showNotification('اسم المستخدم موجود مسبقاً', 'error'); return; }
         if (!password) { showNotification('كلمة المرور مطلوبة', 'error'); return; }
-        const newId = Math.max(...users.map(u => u.id), 0) + 1;
-        users.push({ id: newId, username, fullname, password, role });
+        const result = await dbPost(AUTH_API + '?action=add_user', { username, fullname, password, role });
+        if (!result.success) { showNotification(result.error || 'خطأ في الإضافة', 'error'); return; }
     }
 
-    saveUsers(users);
     closeModal(); this.reset();
     showNotification(editId ? 'تم تعديل المستخدم' : 'تم إضافة المستخدم');
     renderCurrentView();
