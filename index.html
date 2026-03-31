@@ -414,9 +414,15 @@ function runStateMachine() {
             return;
         }
 
-        // Rule 4: Determine incubation task (only for stores still in incubation < 14 days)
+        // Rule 4: Determine incubation task with 2-hour cooldown
         const callLog = getStored('calllog', store.id) || {};
-        if (!callLog.day0) {
+
+        // Check if last call was less than 2 hours ago (cooldown)
+        const lastCallTime = getLastCallTime(callLog);
+        if (lastCallTime && (now - new Date(lastCallTime)) < 2 * 36e5) {
+            store.incubation_task = 'cooldown';
+            store.cooldown_until = new Date(new Date(lastCallTime).getTime() + 2 * 36e5);
+        } else if (!callLog.day0) {
             store.incubation_task = 'day0';
         } else if (hoursSinceReg >= 48 && hasShipped && !callLog.day3 && daysSinceReg >= 3) {
             store.incubation_task = 'day3';
@@ -429,6 +435,35 @@ function runStateMachine() {
         }
     });
 
+    // ===== RECOVERY STATE MACHINE: 3 calls every 10 days =====
+    allStores.forEach(store => {
+        if (store.category !== 'restoring') return;
+        const rcLog = getStored('recoverycalls', store.id) || {};
+        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
+        const restoreDate = localStorage.getItem('store_restore_date_' + store.id);
+
+        // Auto-confirm: if shipped after restore started → recovered
+        if (restoreDate && lastShipDate && lastShipDate > new Date(restoreDate)) {
+            store.category = 'recovered';
+            localStorage.setItem('store_status_' + store.id, 'recovered');
+            store.recovery_task = null;
+            return;
+        }
+
+        // Determine which recovery call is due
+        if (!rcLog.rcall1) {
+            store.recovery_task = 'rcall1';
+        } else if (!rcLog.rcall2) {
+            const daysSince1 = (now - new Date(rcLog.rcall1.date)) / 864e5;
+            store.recovery_task = daysSince1 >= 10 ? 'rcall2' : 'rcall_waiting';
+        } else if (!rcLog.rcall3) {
+            const daysSince2 = (now - new Date(rcLog.rcall2.date)) / 864e5;
+            store.recovery_task = daysSince2 >= 10 ? 'rcall3' : 'rcall_waiting';
+        } else {
+            store.recovery_task = 'rcall_done';
+        }
+    });
+
     // ===== COLD FILTER: 60-day rule for inactive stores =====
     allStores.forEach(store => {
         if (store.category !== 'inactive') return;
@@ -438,6 +473,14 @@ function runStateMachine() {
             store.category = 'cold';
         }
     });
+}
+
+function getLastCallTime(callLog) {
+    let latest = null;
+    Object.values(callLog).forEach(c => {
+        if (c && c.date && (!latest || new Date(c.date) > new Date(latest))) latest = c.date;
+    });
+    return latest;
 }
 
 function getHeatLevel(store) {
@@ -459,18 +502,23 @@ function getHoursSinceReg(store) {
 // ===================== STORAGE =====================
 function getStored(type, id) {
     const v = localStorage.getItem('store_' + type + '_' + id);
-    if (!v) return type === 'notes' ? [] : type === 'survey' ? null : type === 'calllog' ? {} : '';
+    if (!v) return type === 'notes' ? [] : type === 'survey' ? null : (type === 'calllog' || type === 'recoverycalls') ? {} : '';
     try { return JSON.parse(v); } catch { return v; }
 }
 
 function logCall(storeId, callType, note) {
-    const log = getStored('calllog', storeId) || {};
-    log[callType] = { date: new Date().toISOString(), note: note };
-    localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
-    // Also save to notes
+    if (callType.startsWith('rcall')) {
+        const rcLog = getStored('recoverycalls', storeId) || {};
+        rcLog[callType] = { date: new Date().toISOString(), note: note };
+        localStorage.setItem('store_recoverycalls_' + storeId, JSON.stringify(rcLog));
+    } else {
+        const log = getStored('calllog', storeId) || {};
+        log[callType] = { date: new Date().toISOString(), note: note };
+        localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
+    }
     const s = allStores.find(x => x.id === storeId); if (!s) return;
     const t = new Date().toLocaleString('ar-EG');
-    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', general:'ملاحظة' };
+    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'ملاحظة' };
     if (!s.notes) s.notes = [];
     s.notes.push('[' + t + '] [' + (labels[callType]||callType) + '] ' + note);
     localStorage.setItem('store_notes_' + storeId, JSON.stringify(s.notes));
@@ -603,14 +651,20 @@ function renderCurrentView() {
     } else if (currentView === 'inactive') {
         const inact = allStores.filter(s => s.category === 'inactive');
         const rest = allStores.filter(s => s.category === 'restoring');
+        const recovered = allStores.filter(s => s.category === 'recovered');
+        const dueCalls = rest.filter(s => s.recovery_task && s.recovery_task !== 'rcall_waiting' && s.recovery_task !== 'rcall_done');
         sf.style.display = 'flex';
         sf.innerHTML = `
             <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${inact.length+rest.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sf-count">${inact.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>`;
+            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📞 مكالمات مستحقة <span class="sf-count">${dueCalls.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>`;
         let stores;
         if (currentSubFilter === 'inactive_only') stores = inact;
         else if (currentSubFilter === 'restoring') stores = rest;
+        else if (currentSubFilter === 'due_recovery') stores = dueCalls;
+        else if (currentSubFilter === 'recovered') stores = recovered;
         else stores = [...inact, ...rest];
         if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
@@ -658,11 +712,28 @@ function createStoreCard(store) {
         else if (store.incubation_task === 'day3') badge = '<span class="status-badge day3">📞 متابعة يوم 3</span>';
         else if (store.incubation_task === 'day10') badge = '<span class="status-badge day10">📞 تقييم يوم 10</span>';
         else if (store.incubation_task === 'graduation') badge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
+        else if (store.incubation_task === 'cooldown') {
+            const mins = Math.ceil((store.cooldown_until - new Date()) / 60000);
+            badge = '<span class="status-badge day0">⏳ يعود بعد '+mins+' دقيقة</span>';
+        }
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
     else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن خلال 48 ساعة' : '') + '</span>';
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
-    else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
+    else if (store.category === 'restoring') {
+        if (store.recovery_task === 'rcall1') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة - مكالمة 1 مستحقة</span>';
+        else if (store.recovery_task === 'rcall2') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة - مكالمة 2 مستحقة</span>';
+        else if (store.recovery_task === 'rcall3') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة - مكالمة 3 (أخيرة)</span>';
+        else if (store.recovery_task === 'rcall_waiting') {
+            const rcl = getStored('recoverycalls', store.id) || {};
+            const lastRC = rcl.rcall3 ? rcl.rcall3.date : rcl.rcall2 ? rcl.rcall2.date : rcl.rcall1 ? rcl.rcall1.date : null;
+            const daysLeft = lastRC ? Math.max(0, 10 - Math.floor((new Date() - new Date(lastRC)) / 864e5)) : '?';
+            badge = '<span class="status-badge restoring">⏳ المكالمة التالية بعد '+daysLeft+' أيام</span>';
+        }
+        else if (store.recovery_task === 'rcall_done') badge = '<span class="status-badge restoring">🔄 3 مكالمات تمت - بانتظار شحنة</span>';
+        else badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
+    }
+    else if (store.category === 'recovered') badge = '<span class="status-badge active">✅ تمت الاستعادة - عاد للشحن</span>';
     else if (store.category === 'cold') {
         const ls = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
         const dys = ls ? Math.floor((new Date() - ls) / 864e5) : '?';
@@ -682,7 +753,14 @@ function createStoreCard(store) {
         else if (store.incubation_task === 'graduation' && (currentRole === 'executive' || currentRole === 'incubation_manager')) actions += '<button class="btn btn-success" onclick="graduateStore('+store.id+')">🎓 تخريج إلى نشط</button>';
     }
 
-    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore('+store.id+')">🔄 استعادة</button>';
+    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) {
+        actions += '<button class="btn btn-restoring" onclick="restoreStore('+store.id+')">🤝 بدء استعادة</button>';
+    }
+    if (store.category === 'restoring' && (currentRole === 'inactive_manager' || currentRole === 'executive')) {
+        if (store.recovery_task === 'rcall1') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall1\')">📞 تم الاتصال - مكالمة 1</button>';
+        else if (store.recovery_task === 'rcall2') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall2\')">📞 تم الاتصال - مكالمة 2</button>';
+        else if (store.recovery_task === 'rcall3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall3\')">📞 تم الاتصال - مكالمة 3</button>';
+    }
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
     if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
@@ -754,7 +832,7 @@ function createStoreCard(store) {
 
 // ===================== ACTIONS =====================
 function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
-function restoreStore(id) { setStatus(id,'restoring'); showNotification('🔄 جاري الاستعادة'); updateDashboard(); renderCurrentView(); }
+function restoreStore(id) { setStatus(id,'restoring'); localStorage.setItem('store_restore_date_'+id, new Date().toISOString()); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem('store_freeze_reason_'+id); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
 // ===================== MODALS =====================
