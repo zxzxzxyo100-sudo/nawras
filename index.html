@@ -202,6 +202,8 @@
             <div style="padding:0 1.5rem;margin-top:1rem;">
                 <div class="nav-divider"></div>
                 <div id="current-role-label" style="font-size:0.75rem;opacity:0.6;padding:0.5rem 0;text-align:center;"></div>
+                <button class="logout-btn" onclick="exportData()" style="background:rgba(0,102,204,0.2);border-color:rgba(0,102,204,0.3);margin-bottom:0.5rem;">📥 تصدير البيانات</button>
+                <label class="logout-btn" style="background:rgba(0,168,107,0.2);border-color:rgba(0,168,107,0.3);margin-bottom:0.5rem;display:block;">📤 استيراد البيانات<input type="file" accept=".json" onchange="importData(event)" style="display:none;"></label>
                 <button class="logout-btn" onclick="logout()">تسجيل خروج</button>
             </div>
         </aside>
@@ -812,6 +814,47 @@ document.getElementById('survey-form').addEventListener('submit', function(e) {
     const s = allStores.find(x=>x.id===id); if(s) s.survey=sv;
     closeModal(); showNotification('تم حفظ الاستبيان'); updateDashboard(); renderCurrentView();
 });
+
+// ===================== EXPORT / IMPORT =====================
+function exportData() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('store_') || key.startsWith('nawras_')) {
+            data[key] = localStorage.getItem(key);
+        }
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nawras_backup_' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('📥 تم تصدير البيانات - ' + Object.keys(data).length + ' سجل');
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            let count = 0;
+            Object.keys(data).forEach(key => {
+                localStorage.setItem(key, data[key]);
+                count++;
+            });
+            showNotification('📤 تم استيراد ' + count + ' سجل - جاري إعادة التحميل...');
+            setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+            showNotification('خطأ في ملف الاستيراد', 'error');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
 
 // ===================== UTILS =====================
 function showNotification(msg, type='success') {
