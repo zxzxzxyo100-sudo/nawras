@@ -390,21 +390,28 @@ function runStateMachine() {
         const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
         const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
 
-        // Rule 2: 48-hour test - failed
+        // Rule 1: Auto-graduate - 14+ days since registration AND actively shipping
+        if (daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip < 14) {
+            store.category = 'active';
+            store.state_reason = 'auto_graduated';
+            return;
+        }
+
+        // Rule 2: 48-hour test - failed (registered > 48h ago, never shipped)
         if (hoursSinceReg > 48 && !hasShipped) {
             store.category = 'inactive';
             store.state_reason = 'failed_48h';
             return;
         }
 
-        // Rule 4: Conflict prevention - stopped shipping 14+ days
+        // Rule 3: Conflict prevention - stopped shipping 14+ days during incubation
         if (hasShipped && daysSinceLastShip >= 14) {
             store.category = 'inactive';
             store.state_reason = 'stopped_shipping';
             return;
         }
 
-        // Determine incubation task
+        // Rule 4: Determine incubation task (only for stores still in incubation < 14 days)
         const callLog = getStored('calllog', store.id) || {};
         if (!callLog.day0) {
             store.incubation_task = 'day0';
