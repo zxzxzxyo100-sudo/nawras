@@ -454,6 +454,10 @@ function setupNavigation() {
 async function loadData() {
     try {
         await loadDBState();
+        // Auto-check recovery in background (non-blocking)
+        fetch('/api-php/check-recovery.php').then(r=>r.json()).then(d=>{
+            if(d.recovered>0){ showNotification('تم استعادة '+d.recovered+' متجر تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=2024-01-01'),
             apiGet('/api-php/inactive-customers.php'),
