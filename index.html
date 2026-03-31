@@ -302,6 +302,15 @@
         </form>
     </div></div>
 
+    <!-- Audit Log Modal -->
+    <div class="modal" id="audit-modal"><div class="modal-content" style="max-width:700px;">
+        <div class="modal-header" style="background:var(--bg-sidebar);margin:-2rem -2rem 1.5rem;padding:1.5rem 2rem;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:none;">
+            <h3 style="color:white">📜 سجل العمليات</h3><button class="close-modal" onclick="closeModal()" style="background:rgba(255,255,255,0.2);color:white">✕</button>
+        </div>
+        <div id="audit-store-name" style="text-align:center;font-weight:700;font-size:1.1rem;margin-bottom:1rem;color:var(--primary)"></div>
+        <div id="audit-log-content" style="max-height:60vh;overflow-y:auto;"></div>
+    </div></div>
+
 <script>
 // ===================== CONFIG =====================
 const INCUBATION_DAYS = 14;
@@ -338,6 +347,9 @@ function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(
 let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null;
 
 // ===================== API =====================
+const DB_API = '/api-php/store-actions.php';
+const AUTH_API = '/api-php/auth.php';
+
 async function apiGet(url) {
     const r = await fetch(url);
     if (!r.ok) throw new Error('API ' + r.status);
@@ -345,22 +357,48 @@ async function apiGet(url) {
     return d.data || [];
 }
 
-// ===================== AUTH =====================
-function handleLogin(e) {
+async function dbPost(url, data) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    return await r.json();
+}
+
+// DB state caches
+let dbStates = {};
+let dbCallLogs = {};
+let dbRecoveryCalls = {};
+let dbSurveys = {};
+
+async function loadDBState() {
+    const [states, calls, rcalls, surveys] = await Promise.all([
+        fetch(DB_API + '?action=get_states').then(r => r.json()),
+        fetch(DB_API + '?action=get_all_calllogs').then(r => r.json()),
+        fetch(DB_API + '?action=get_all_recovery_calls').then(r => r.json()),
+        fetch(DB_API + '?action=get_surveys').then(r => r.json())
+    ]);
+    // Index by store_id
+    dbStates = {};
+    (states.data || []).forEach(s => { dbStates[s.store_id] = s; });
+    dbCallLogs = calls.data || {};
+    dbRecoveryCalls = rcalls.data || {};
+    // Surveys indexed by store_id
+    dbSurveys = {};
+    (surveys.data || []).forEach(s => { dbSurveys[s.store_id] = s; });
+}
+
+// ===================== AUTH (MySQL) =====================
+async function handleLogin(e) {
     e.preventDefault();
-    initUsers();
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
-    const users = getUsers();
-    const user = users.find(u => u.username === username && u.password === password);
-    if (!user) {
+    const result = await dbPost(AUTH_API + '?action=login', { username, password });
+    if (!result.success) {
         document.getElementById('login-error').style.display = 'block';
-        document.getElementById('login-error').textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        document.getElementById('login-error').textContent = result.error || 'بيانات الدخول غير صحيحة';
         return;
     }
-    currentUser = user;
-    currentRole = user.role;
-    localStorage.setItem('nawras_session', JSON.stringify({ id: user.id, username: user.username, role: user.role, fullname: user.fullname }));
+    currentUser = result.user;
+    currentRole = result.user.role;
+    localStorage.setItem('nawras_session', JSON.stringify(result.user));
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('loadingScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'flex';
@@ -370,16 +408,13 @@ function handleLogin(e) {
 function logout() { localStorage.removeItem('nawras_session'); location.reload(); }
 
 function checkSavedLogin() {
-    initUsers();
     const session = localStorage.getItem('nawras_session');
     if (!session) return false;
     try {
         const s = JSON.parse(session);
-        const users = getUsers();
-        const user = users.find(u => u.id === s.id && u.username === s.username);
-        if (user && ROLES[user.role]) {
-            currentUser = user;
-            currentRole = user.role;
+        if (s && s.id && ROLES[s.role]) {
+            currentUser = s;
+            currentRole = s.role;
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('loadingScreen').style.display = 'flex';
             document.getElementById('appContainer').style.display = 'flex';
@@ -418,6 +453,7 @@ function setupNavigation() {
 // ===================== LOAD DATA =====================
 async function loadData() {
     try {
+        await loadDBState();
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=2024-01-01'),
             apiGet('/api-php/inactive-customers.php'),
@@ -469,10 +505,19 @@ function processStoresData(newData, inactiveData, summaryData) {
         }
     });
 
-    // Apply saved overrides
+    // Apply saved overrides from DATABASE
     allStores.forEach(s => {
-        const saved = localStorage.getItem('store_status_' + s.id);
-        if (saved) s.category = saved;
+        const dbState = dbStates[s.id];
+        if (dbState) {
+            s.category = dbState.category;
+            if (dbState.freeze_reason) s.freeze_reason = dbState.freeze_reason;
+            if (dbState.state_reason) s.state_reason = dbState.state_reason;
+        }
+        // Apply survey from DB
+        const sv = dbSurveys[s.id];
+        if (sv) {
+            s.survey = { answers: [parseInt(sv.q1_delivery),parseInt(sv.q2_collection),parseInt(sv.q3_support),parseInt(sv.q4_app),parseInt(sv.q5_payments),parseInt(sv.q6_returns)], suggestions: sv.suggestions, by: sv.performed_by, date: sv.created_at };
+        }
     });
 }
 
@@ -515,7 +560,7 @@ function runStateMachine() {
         }
 
         // Rule 4: Determine incubation task with 2-hour cooldown
-        const callLog = getStored('calllog', store.id) || {};
+        const callLog = dbCallLogs[store.id] || getStored('calllog', store.id) || {};
 
         // Check if last call was less than 2 hours ago (cooldown)
         const lastCallTime = getLastCallTime(callLog);
@@ -609,32 +654,42 @@ function getStored(type, id) {
 }
 
 function logCall(storeId, callType, note) {
-    if (callType.startsWith('rcall')) {
-        const rcLog = getStored('recoverycalls', storeId) || {};
-        rcLog[callType] = { date: new Date().toISOString(), note: note };
-        localStorage.setItem('store_recoverycalls_' + storeId, JSON.stringify(rcLog));
-    } else {
-        const log = getStored('calllog', storeId) || {};
-        log[callType] = { date: new Date().toISOString(), note: note };
-        localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
+    const s = allStores.find(x => x.id === storeId);
+    // Save to DATABASE
+    dbPost(DB_API + '?action=log_call', {
+        store_id: storeId,
+        store_name: s ? s.name : '',
+        call_type: callType,
+        note: note,
+        user: currentUser ? currentUser.fullname : '',
+        user_role: currentRole
+    });
+    // Update local cache
+    if (!dbCallLogs[storeId]) dbCallLogs[storeId] = {};
+    dbCallLogs[storeId][callType] = new Date().toISOString();
+    // Update notes locally
+    if (s) {
+        const t = new Date().toLocaleString('ar-EG');
+        const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'اتصال' };
+        if (!s.notes) s.notes = [];
+        s.notes.push('['+t+'] ['+currentUser.fullname+'] ['+(labels[callType]||callType)+'] '+note);
     }
-    const s = allStores.find(x => x.id === storeId); if (!s) return;
-    const t = new Date().toLocaleString('ar-EG');
-    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'اتصال' };
-    if (!s.notes) s.notes = [];
-    s.notes.push('[' + t + '] [' + (labels[callType]||callType) + '] ' + note);
-    localStorage.setItem('store_notes_' + storeId, JSON.stringify(s.notes));
-
-    // Track daily calls for reports
-    const today = new Date().toISOString().split('T')[0];
-    const dailyLog = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
-    dailyLog.push({ storeId, storeName: s.name, callType, role: currentRole, userName: currentUser ? currentUser.fullname : 'غير معروف', userId: currentUser ? currentUser.id : 0, time: new Date().toISOString() });
-    localStorage.setItem('daily_calls_' + today, JSON.stringify(dailyLog));
 }
 
-function setStatus(id, status) {
+function setStatus(id, status, extraData) {
     const s = allStores.find(x => x.id === id);
-    if (s) { s.category = status; localStorage.setItem('store_status_' + id, status); }
+    const oldStatus = s ? s.category : '';
+    if (s) { s.category = status; }
+    // Save to database
+    dbPost(DB_API + '?action=set_status', {
+        store_id: id, category: status, store_name: s ? s.name : '',
+        state_reason: (extraData && extraData.reason) || '',
+        freeze_reason: (extraData && extraData.freeze_reason) || '',
+        old_status: oldStatus,
+        user: currentUser ? currentUser.fullname : '',
+        user_role: currentRole
+    });
+    dbStates[id] = { store_id: id, category: status };
 }
 
 // ===================== DASHBOARD =====================
@@ -1006,6 +1061,7 @@ function createStoreCard(store) {
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
     actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📞 اتصال</button>';
+    actions += '<button class="btn btn-outline" onclick="showAuditLog('+store.id+')">📜 سجل العمليات</button>';
 
     // Timeline for incubating stores
     let timelineHtml = '';
@@ -1150,8 +1206,8 @@ document.getElementById('user-form').addEventListener('submit', function(e) {
 });
 
 function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
-function restoreStore(id) { setStatus(id,'restoring'); localStorage.setItem('store_restore_date_'+id, new Date().toISOString()); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
-function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem('store_freeze_reason_'+id); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function unfreezeStore(id) { setStatus(id,'incubating',{reason:'إلغاء تجميد'}); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
 // ===================== MODALS =====================
 function openCallModal(id, type) {
@@ -1180,6 +1236,40 @@ function openSurveyModal(id) {
     document.getElementById('survey-modal').classList.add('active');
 }
 
+async function showAuditLog(storeId) {
+    const store = allStores.find(x => x.id === storeId);
+    document.getElementById('audit-store-name').textContent = store ? store.name + ' (كود: ' + storeId + ')' : 'متجر ' + storeId;
+    document.getElementById('audit-log-content').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">جاري التحميل...</div>';
+    document.getElementById('audit-modal').classList.add('active');
+
+    const result = await fetch(DB_API + '?action=get_audit_logs&store_id=' + storeId).then(r => r.json());
+    const logs = result.data || [];
+
+    if (!logs.length) {
+        document.getElementById('audit-log-content').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">لا توجد عمليات مسجلة</div>';
+        return;
+    }
+
+    let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+    logs.forEach(log => {
+        const date = new Date(log.created_at).toLocaleString('ar-EG');
+        const statusColors = { 'تجميد':'var(--frozen)','استعادة':'var(--restoring)','نشط':'var(--success)','تخريج':'var(--success)','ترحيبية':'var(--primary)','متابعة':'#8b5cf6','تقييم':'#06b6d4','اتصال':'var(--primary)','استبيان':'var(--warning)' };
+        let color = 'var(--text-secondary)';
+        Object.keys(statusColors).forEach(k => { if (log.action_type.includes(k)) color = statusColors[k]; });
+
+        html += '<div style="padding:0.75rem;background:var(--bg-main);border-radius:10px;border-right:3px solid '+color+'">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">';
+        html += '<strong style="color:'+color+';font-size:0.85rem">'+log.action_type+'</strong>';
+        html += '<span style="font-size:0.7rem;color:var(--text-secondary)">'+date+'</span></div>';
+        if (log.action_detail) html += '<div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.25rem">'+log.action_detail+'</div>';
+        html += '<div style="font-size:0.7rem;color:var(--text-secondary)">بواسطة: <strong>'+log.performed_by+'</strong>';
+        if (log.old_status && log.new_status) html += ' | '+log.old_status+' → '+log.new_status;
+        html += '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('audit-log-content').innerHTML = html;
+}
+
 function rateStar(q,v) { document.querySelector('.star-rating[data-question="'+q+'"]').querySelectorAll('span').forEach(s => { s.classList.toggle('filled', parseInt(s.dataset.star)<=v); }); }
 function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
 
@@ -1201,9 +1291,8 @@ document.getElementById('freeze-form').addEventListener('submit', function(e) {
     const id = parseInt(document.getElementById('freeze-store-id').value);
     const reason = document.getElementById('freeze-reason').value;
     if (!reason.trim()) { showNotification('سبب التجميد إلزامي','error'); return; }
-    localStorage.setItem('store_freeze_'+id, reason);
     const s = allStores.find(x=>x.id===id); if(s) s.freeze_reason=reason;
-    setStatus(id,'frozen'); closeModal(); this.reset();
+    setStatus(id,'frozen',{freeze_reason:reason}); closeModal(); this.reset();
     showNotification('🧊 تم التجميد'); updateDashboard(); renderCurrentView();
 });
 
@@ -1214,15 +1303,12 @@ document.getElementById('survey-form').addEventListener('submit', function(e) {
     if (answers.some(a=>a===0)) { showNotification('يرجى تقييم جميع الأسئلة','error'); return; }
     const suggestions = document.getElementById('survey-suggestions').value.trim();
     const sv = { answers, labels: SURVEY_LABELS, suggestions, date: new Date().toISOString(), by: currentUser ? currentUser.fullname : '' };
-    localStorage.setItem('store_survey_'+id, JSON.stringify(sv));
     const s = allStores.find(x=>x.id===id); if(s) s.survey=sv;
-    // Save suggestions to notes if provided
-    if (suggestions && s) {
-        const t = new Date().toLocaleString('ar-EG');
-        if (!s.notes) s.notes = [];
-        s.notes.push('['+t+'] [مقترحات الاستبيان] '+suggestions);
-        localStorage.setItem('store_notes_'+id, JSON.stringify(s.notes));
-    }
+    // Save to DATABASE
+    dbPost(DB_API + '?action=save_survey', {
+        store_id: id, answers, suggestions, store_name: s ? s.name : '',
+        user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
     closeModal(); showNotification('تم حفظ الاستبيان'); updateDashboard(); renderCurrentView();
 });
 
