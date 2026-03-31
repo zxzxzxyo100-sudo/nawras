@@ -13,7 +13,12 @@
       "Bash(vercel --prod --yes)",
       "WebFetch(domain:16-sigma-fawn.vercel.app)",
       "Bash(curl -s 'https://backoffice.nawris.algoriza.com/external-api/customers/new?since=2026-03-30' -H 'Accept: application/json' -H 'X-API-TOKEN: f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703')",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(ssh:*)",
+      "Bash(sshpass:*)",
+      "WebFetch(domain:nawras-ly.com)",
+      "WebFetch(domain:187.124.60.3)",
+      "WebFetch(domain:paleturquoise-mole-971022.hostingersite.com)"
     ]
   }
 }
