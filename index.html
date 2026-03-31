@@ -272,19 +272,37 @@
     </div></div>
 
     <!-- Survey Modal -->
-    <div class="modal" id="survey-modal"><div class="modal-content">
-        <div class="modal-header"><h3>استبيان رضا العميل</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+    <div class="modal" id="survey-modal"><div class="modal-content" style="max-width:700px;">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1a365d,#2563eb);margin:-2rem -2rem 1.5rem;padding:1.5rem 2rem;border-radius:20px 20px 0 0;border-bottom:none;">
+            <h3 style="color:white">📋 استبيان رضا العميل</h3><button class="close-modal" onclick="closeModal()" style="background:rgba(255,255,255,0.2);color:white">✕</button>
+        </div>
+        <div id="survey-store-name" style="text-align:center;font-weight:700;font-size:1.1rem;margin-bottom:1.5rem;color:var(--primary)"></div>
         <form id="survey-form">
             <input type="hidden" id="survey-store-id">
             <div id="survey-questions"></div>
-            <div class="task-actions"><button type="submit" class="btn btn-success">حفظ التقييم</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+            <div class="form-group" style="margin-top:1.5rem;padding-top:1rem;border-top:2px solid var(--border);">
+                <label class="form-label">💬 مقترحات أو ملاحظات إضافية من المتجر (اختياري)</label>
+                <textarea class="form-textarea" id="survey-suggestions" placeholder="اكتب أي مقترحات أو ملاحظات إضافية ذكرها التاجر..." style="min-height:80px;"></textarea>
+            </div>
+            <div class="task-actions" style="justify-content:center;padding-top:1rem;">
+                <button type="submit" class="btn btn-success" style="padding:0.75rem 2rem;font-size:1rem;">حفظ التقييم</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal()" style="padding:0.75rem 2rem;">إلغاء</button>
+            </div>
         </form>
     </div></div>
 
 <script>
 // ===================== CONFIG =====================
 const INCUBATION_DAYS = 14;
-const SURVEY_QUESTIONS = ['ما مدى رضاك عن سرعة التوصيل؟','ما مدى رضاك عن خدمة العملاء؟','ما مدى رضاك عن جودة التغليف؟','ما مدى رضاك عن سهولة النظام؟','ما مدى احتمالية توصيتك بالنورس؟'];
+const SURVEY_QUESTIONS = [
+    'بالنسبة لسرعة وصول الشحنات لزبائنك من وقت ما تطلع من عندك لعند ما توصلهم، قديش تقيمنا من خمسة؟',
+    'وبالنسبة لخدمة التجميع والتزام المندوب في جية الاستلام من محلك أو مخزنك، قديش تقيمنا من خمسة؟',
+    'لما تتواصل مع خدمة العملاء بخصوص أي إشكالية، سواء مكالمات أو تذاكر دعم، قديش تقيم سرعة الرد وحل المشكلة؟',
+    'بخصوص تطبيق النورس ومنظومة التتبع، هل تحس فيهم سهولة ووضوح في إضافة طلباتك ومراقبتها؟',
+    'بخصوص انتظام التسويات المالية واستلامك لفلوسك ومستحقاتك في مواعيدها المحددة، قديش تقيمنا من خمسة؟',
+    'وبالنسبة لسلامة المرجوعات وحالة البضاعة اللي تردلك للمحل، هل توصلك سليمة وبحالة ممتازة؟'
+];
+const SURVEY_LABELS = ['سرعة التوصيل','خدمة التجميع','الدعم الفني','المنظومة','التسويات المالية','سلامة المرجوعات'];
 
 const ROLES = {
     incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
@@ -1019,7 +1037,10 @@ function createStoreCard(store) {
     const survey = store.survey || getStored('survey', store.id);
     if (survey && survey.answers && store.category === 'active') {
         const avg = (survey.answers.reduce((a,b)=>a+b,0)/survey.answers.length).toFixed(1);
-        surveyHtml = '<div class="survey-section"><div class="survey-title">📋 الاستبيان ('+avg+'/5)</div>'+SURVEY_QUESTIONS.map((q,i)=>'<div style="display:flex;justify-content:space-between;padding:0.2rem 0;font-size:0.8rem"><span style="color:var(--text-secondary)">'+q+'</span><span style="font-weight:700;color:var(--warning)">'+'⭐'.repeat(survey.answers[i])+'</span></div>').join('')+'</div>';
+        const labels = survey.labels || SURVEY_LABELS;
+        surveyHtml = '<div class="survey-section"><div class="survey-title">📋 الاستبيان ('+avg+'/5)' + (survey.by ? ' - بواسطة: '+survey.by : '') + '</div>' +
+            survey.answers.map((a,i) => '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;font-size:0.8rem;border-bottom:1px solid var(--border)"><span style="color:var(--text-secondary);font-weight:600">'+(labels[i]||'سؤال '+(i+1))+'</span><span style="font-weight:700;color:var(--warning)">'+'⭐'.repeat(a)+' <span style="color:var(--text-secondary);font-size:0.75rem">('+a+'/5)</span></span></div>').join('') +
+            (survey.suggestions ? '<div style="margin-top:0.75rem;padding:0.75rem;background:rgba(0,102,204,0.05);border-radius:6px;font-size:0.8rem"><strong style="color:var(--primary)">💬 مقترحات:</strong> '+survey.suggestions+'</div>' : '') + '</div>';
     }
 
     // Freeze reason
@@ -1136,8 +1157,15 @@ function openSurveyModal(id) {
     document.getElementById('survey-store-id').value = id;
     const c = document.getElementById('survey-questions');
     const ex = getStored('survey', id);
-    c.innerHTML = SURVEY_QUESTIONS.map((q,i) => '<div class="form-group"><label class="form-label">'+(i+1)+'. '+q+'</label><div class="star-rating" data-question="'+i+'">'+
-        [1,2,3,4,5].map(s => '<span data-star="'+s+'" class="'+(ex&&ex.answers&&ex.answers[i]>=s?'filled':'')+'" onclick="rateStar('+i+','+s+')">⭐</span>').join('')+'</div></div>').join('');
+    const store = allStores.find(x => x.id === id);
+    document.getElementById('survey-store-name').textContent = store ? store.name : '';
+    document.getElementById('survey-suggestions').value = (ex && ex.suggestions) || '';
+    c.innerHTML = SURVEY_QUESTIONS.map((q,i) =>
+        '<div style="background:var(--bg-main);padding:1rem;border-radius:10px;margin-bottom:0.75rem;border:1px solid var(--border);">' +
+        '<div style="font-size:0.75rem;font-weight:700;color:var(--primary);margin-bottom:0.25rem;">'+SURVEY_LABELS[i]+'</div>' +
+        '<div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem;line-height:1.6;">'+q+'</div>' +
+        '<div class="star-rating" data-question="'+i+'" style="justify-content:center;">'+
+        [1,2,3,4,5].map(s => '<span data-star="'+s+'" class="'+(ex&&ex.answers&&ex.answers[i]>=s?'filled':'')+'" onclick="rateStar('+i+','+s+')" style="font-size:2rem;padding:0 0.15rem;">⭐</span>').join('')+'</div></div>').join('');
     document.getElementById('survey-modal').classList.add('active');
 }
 
@@ -1173,9 +1201,17 @@ document.getElementById('survey-form').addEventListener('submit', function(e) {
     const id = parseInt(document.getElementById('survey-store-id').value);
     const answers = []; SURVEY_QUESTIONS.forEach((_,i) => { answers.push(document.querySelectorAll('.star-rating[data-question="'+i+'"] span.filled').length); });
     if (answers.some(a=>a===0)) { showNotification('يرجى تقييم جميع الأسئلة','error'); return; }
-    const sv = { answers, date: new Date().toISOString() };
+    const suggestions = document.getElementById('survey-suggestions').value.trim();
+    const sv = { answers, labels: SURVEY_LABELS, suggestions, date: new Date().toISOString(), by: currentUser ? currentUser.fullname : '' };
     localStorage.setItem('store_survey_'+id, JSON.stringify(sv));
     const s = allStores.find(x=>x.id===id); if(s) s.survey=sv;
+    // Save suggestions to notes if provided
+    if (suggestions && s) {
+        const t = new Date().toLocaleString('ar-EG');
+        if (!s.notes) s.notes = [];
+        s.notes.push('['+t+'] [مقترحات الاستبيان] '+suggestions);
+        localStorage.setItem('store_notes_'+id, JSON.stringify(s.notes));
+    }
     closeModal(); showNotification('تم حفظ الاستبيان'); updateDashboard(); renderCurrentView();
 });
 
