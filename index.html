@@ -197,6 +197,7 @@
                 <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
                 <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
                 <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
+                <div class="nav-item" data-view="cold" id="nav-cold"><span class="nav-icon">🥶</span><span>باردة +60 يوم</span><span class="badge" id="cold-count" style="background:#94a3b8">0</span></div>
             </nav>
             <div style="padding:0 1.5rem;margin-top:1rem;">
                 <div class="nav-divider"></div>
@@ -264,7 +265,7 @@ const ROLES = {
     incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
     active_manager: { label:'مسؤول المتاجر النشطة', views:['dashboard','active'] },
     inactive_manager: { label:'مسؤول الاستعادة', views:['dashboard','inactive'] },
-    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen'] }
+    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen','cold'] }
 };
 
 // ===================== STATE =====================
@@ -293,7 +294,7 @@ function applyRolePermissions() {
     const role = ROLES[currentRole];
     document.getElementById('user-role-display').textContent = role.label;
     document.getElementById('current-role-label').textContent = role.label;
-    ['incubating','active','inactive','frozen'].forEach(v => {
+    ['incubating','active','inactive','frozen','cold'].forEach(v => {
         const el = document.getElementById('nav-' + v);
         if (el) el.style.display = role.views.includes(v) ? 'flex' : 'none';
     });
@@ -425,6 +426,16 @@ function runStateMachine() {
             store.incubation_task = 'waiting';
         }
     });
+
+    // ===== COLD FILTER: 60-day rule for inactive stores =====
+    allStores.forEach(store => {
+        if (store.category !== 'inactive') return;
+        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
+        const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
+        if (daysSinceLastShip >= 60) {
+            store.category = 'cold';
+        }
+    });
 }
 
 function getHeatLevel(store) {
@@ -480,6 +491,8 @@ function updateDashboard() {
     document.getElementById('active-count').textContent = c.active;
     document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
     document.getElementById('frozen-count').textContent = c.frozen;
+    const coldCount = allStores.filter(s => s.category === 'cold').length;
+    document.getElementById('cold-count').textContent = coldCount;
 
     const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
     let sat = '0'; let tc = 0, tt = 0;
@@ -529,8 +542,9 @@ function renderCurrentView() {
     const titles = {
         incubating: { icon:'🎯', title:'مسار الاحتضان', sub:'القائمة النظيفة - المهام المطلوبة اليوم' },
         active: { icon:'⭐', title:'المتاجر النشطة', sub:'تشحن بانتظام' },
-        inactive: { icon:'⚠️', title:'غير النشطة', sub:'تحتاج استعادة' },
-        frozen: { icon:'🧊', title:'المجمدة', sub:'تم تجميدها' }
+        inactive: { icon:'⚠️', title:'غير النشطة', sub:'توقفت أقل من 60 يوم - فرص عودتها عالية' },
+        frozen: { icon:'🧊', title:'المجمدة', sub:'تم تجميدها' },
+        cold: { icon:'🥶', title:'المتاجر الباردة', sub:'توقفت 60+ يوم - قائمة التسويق العام' }
     };
     const cfg = titles[currentView]; if (!cfg) return;
     document.getElementById('page-title').textContent = cfg.title;
@@ -626,6 +640,7 @@ function createStoreCard(store) {
     }
     if (store.category === 'frozen') card.className += ' frozen-card';
     if (store.category === 'restoring') card.className += ' restoring-card';
+    if (store.category === 'cold') card.className += ' frozen-card';
 
     const lastShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG') : 'لا يوجد';
     const regDate = store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-EG') : '-';
@@ -646,6 +661,11 @@ function createStoreCard(store) {
     else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن خلال 48 ساعة' : '') + '</span>';
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
     else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
+    else if (store.category === 'cold') {
+        const ls = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
+        const dys = ls ? Math.floor((new Date() - ls) / 864e5) : '?';
+        badge = '<span class="status-badge frozen">🥶 باردة - '+dys+' يوم بدون شحن</span>';
+    }
 
     // Actions
     let actions = '';
