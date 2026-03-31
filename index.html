@@ -520,10 +520,16 @@ function logCall(storeId, callType, note) {
     }
     const s = allStores.find(x => x.id === storeId); if (!s) return;
     const t = new Date().toLocaleString('ar-EG');
-    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'ملاحظة' };
+    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'اتصال' };
     if (!s.notes) s.notes = [];
     s.notes.push('[' + t + '] [' + (labels[callType]||callType) + '] ' + note);
     localStorage.setItem('store_notes_' + storeId, JSON.stringify(s.notes));
+
+    // Track daily calls for reports
+    const today = new Date().toISOString().split('T')[0];
+    const dailyLog = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
+    dailyLog.push({ storeId, storeName: s.name, callType, role: currentRole, time: new Date().toISOString() });
+    localStorage.setItem('daily_calls_' + today, JSON.stringify(dailyLog));
 }
 
 function setStatus(id, status) {
@@ -551,6 +557,31 @@ function updateDashboard() {
     allStores.forEach(s => { const sv = s.survey || getStored('survey', s.id); if (sv && sv.answers) { tt += sv.answers.reduce((a,b)=>a+b,0)/sv.answers.length; tc++; } });
     if (tc > 0) sat = (tt/tc).toFixed(1);
 
+    // Daily reports
+    const today = new Date().toISOString().split('T')[0];
+    const todayCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
+    const todayTotal = todayCalls.length;
+    const todayByRole = {
+        incubation_manager: todayCalls.filter(c => c.role === 'incubation_manager').length,
+        inactive_manager: todayCalls.filter(c => c.role === 'inactive_manager').length,
+        active_manager: todayCalls.filter(c => c.role === 'active_manager').length,
+        executive: todayCalls.filter(c => c.role === 'executive').length
+    };
+
+    // Recovery stats
+    const recovered = allStores.filter(s => s.category === 'recovered').length;
+    const restoring = allStores.filter(s => s.category === 'restoring').length;
+    const totalRecoveryAttempts = restoring + recovered;
+    const recoveryRate = totalRecoveryAttempts > 0 ? Math.round(recovered / totalRecoveryAttempts * 100) : 0;
+
+    // 7-day call history
+    let weekCalls = 0;
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const dk = d.toISOString().split('T')[0];
+        weekCalls += JSON.parse(localStorage.getItem('daily_calls_' + dk) || '[]').length;
+    }
+
     const grid = document.getElementById('stats-grid');
     let h = '';
 
@@ -565,9 +596,33 @@ function updateDashboard() {
     }
     if (currentRole === 'executive') {
         h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+c.frozen+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
-        h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">معدل التحويل</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>احتضان → نشط</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
-        h += '<div class="stat-card" style="border-top:4px solid #f59e0b"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">'+sat+'/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+parseFloat(sat)/5*100+'%"></div></div></div>';
     }
+
+    // === DAILY REPORT CARDS ===
+    // Today's calls - visible to everyone
+    h += '<div class="stat-card" style="border-top:4px solid #8b5cf6"><div class="stat-header"><span class="stat-title">اتصالات اليوم</span><div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6">📞</div></div><div class="stat-value">'+todayTotal+'</div><div class="stat-change"><span>📅</span><span>هذا الأسبوع: '+weekCalls+'</span></div></div>';
+
+    // Conversion rate - incubation manager & executive
+    if (currentRole === 'executive' || currentRole === 'incubation_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">نسبة التحويل (احتضان → نشط)</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>'+c.active+' نشط من '+allStores.length+' متجر</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
+    }
+
+    // Recovery rate - inactive manager & executive
+    if (currentRole === 'executive' || currentRole === 'inactive_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid #059669"><div class="stat-header"><span class="stat-title">نسبة الاستعادة (شحنة فعلية)</span><div class="stat-icon" style="background:rgba(5,150,105,0.1);color:#059669">🔄</div></div><div class="stat-value">'+recoveryRate+'%</div><div class="stat-change"><span>✅</span><span>'+recovered+' مستعاد من '+totalRecoveryAttempts+' محاولة</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+recoveryRate+'%"></div></div></div>';
+    }
+
+    // Executive: per-role breakdown
+    if (currentRole === 'executive') {
+        h += '<div class="stat-card" style="border-top:4px solid #f59e0b"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">'+sat+'/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+parseFloat(sat)/5*100+'%"></div></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid #6366f1"><div class="stat-header"><span class="stat-title">تقرير الموظفين اليوم</span><div class="stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1">👥</div></div><div style="margin-top:0.5rem;font-size:0.85rem;">';
+        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول الاحتضان</span><strong>'+todayByRole.incubation_manager+' اتصال</strong></div>';
+        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول الاستعادة</span><strong>'+todayByRole.inactive_manager+' اتصال</strong></div>';
+        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول النشطة</span><strong>'+todayByRole.active_manager+' اتصال</strong></div>';
+        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0"><span>المدير التنفيذي</span><strong>'+todayByRole.executive+' اتصال</strong></div>';
+        h += '</div></div>';
+    }
+
     grid.innerHTML = h;
 }
 
@@ -775,7 +830,7 @@ function createStoreCard(store) {
     if ((store.category === 'inactive' || store.category === 'cold') && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
-    actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📝 ملاحظة</button>';
+    actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📞 اتصال</button>';
 
     // Timeline for incubating stores
     let timelineHtml = '';
@@ -849,8 +904,8 @@ function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem
 function openCallModal(id, type) {
     document.getElementById('call-store-id').value = id;
     document.getElementById('call-type').value = type;
-    const labels = { day0:'تم الاتصال - مكالمة ترحيبية', day3:'تم الاتصال - متابعة يوم 3', day10:'تم الاتصال - تقييم يوم 10', general:'إضافة ملاحظة' };
-    document.getElementById('call-modal-title').textContent = labels[type] || 'ملاحظة';
+    const labels = { day0:'تم الاتصال - مكالمة ترحيبية', day3:'تم الاتصال - متابعة يوم 3', day10:'تم الاتصال - تقييم يوم 10', rcall1:'استعادة - مكالمة 1', rcall2:'استعادة - مكالمة 2', rcall3:'استعادة - مكالمة 3', general:'تسجيل اتصال' };
+    document.getElementById('call-modal-title').textContent = labels[type] || 'تسجيل اتصال';
     document.getElementById('call-modal').classList.add('active');
 }
 
