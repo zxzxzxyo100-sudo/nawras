@@ -1,0 +1,13 @@
+DirectoryIndex index.html
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+</IfModule>
+
+# PHP settings
+<IfModule mod_php.c>
+    php_value max_execution_time 120
+    php_value memory_limit 256M
+</IfModule>
