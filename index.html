@@ -82,11 +82,6 @@
         .task-card.hot-card { border-right:4px solid var(--hot);background:rgba(220,38,38,0.02); }
         .task-card.frozen-card { border-right:4px solid var(--frozen);background:rgba(147,51,234,0.02); }
         .task-card.restoring-card { border-right:4px solid var(--restoring); }
-        .task-card.recovered-card { border-right:4px solid #059669;background:rgba(5,150,105,0.03); }
-        .task-card.cold-card { border-right:4px solid #94a3b8;background:rgba(148,163,184,0.03); }
-        .task-card.rcall1-card { border-right:4px solid var(--warning); }
-        .task-card.rcall2-card { border-right:4px solid #f97316; }
-        .task-card.rcall3-card { border-right:4px solid var(--danger); }
         .task-card.day3-card { border-right:4px solid #8b5cf6; }
         .task-card.day10-card { border-right:4px solid #06b6d4; }
         .task-card.grad-card { border-right:4px solid var(--success); }
@@ -106,11 +101,6 @@
         .status-badge.warning { background:rgba(255,149,0,0.1);color:var(--warning); }
         .status-badge.frozen { background:rgba(147,51,234,0.1);color:var(--frozen); }
         .status-badge.restoring { background:rgba(8,145,178,0.1);color:var(--restoring); }
-        .status-badge.recovered { background:rgba(5,150,105,0.15);color:#059669; }
-        .status-badge.cold { background:rgba(148,163,184,0.15);color:#64748b; }
-        .status-badge.rcall1 { background:rgba(255,149,0,0.1);color:var(--warning); }
-        .status-badge.rcall2 { background:rgba(249,115,22,0.1);color:#f97316; }
-        .status-badge.rcall3 { background:rgba(255,59,48,0.1);color:var(--danger); }
         .status-badge.failed48 { background:rgba(255,59,48,0.1);color:var(--danger); }
 
         .sub-filters { display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap; }
@@ -437,57 +427,6 @@ function runStateMachine() {
     });
 }
 
-    // ===== RECOVERY STATE MACHINE =====
-    allStores.forEach(store => {
-        if (store.category !== 'inactive' && store.category !== 'restoring' && store.category !== 'recovered') return;
-        const override = localStorage.getItem('store_status_' + store.id);
-
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
-
-        // Rule 1: 60-day cold archive - auto move to "cold" (marketing list)
-        if (store.category === 'inactive' && daysSinceLastShip >= 60) {
-            store.category = 'cold';
-            store.recovery_task = null;
-            return;
-        }
-
-        // Rule 4: Auto-confirm recovery - if restoring store shipped, mark as recovered
-        if (store.category === 'restoring') {
-            const restoreDate = localStorage.getItem('store_restore_date_' + store.id);
-            if (restoreDate) {
-                const shipAfterRestore = lastShipDate && new Date(lastShipDate) > new Date(restoreDate);
-                if (shipAfterRestore) {
-                    store.category = 'recovered';
-                    localStorage.setItem('store_status_' + store.id, 'recovered');
-                    store.recovery_task = null;
-                    return;
-                }
-            }
-        }
-
-        // Rule 2: Recovery call cycle (3 calls, 10 days apart)
-        if (store.category === 'inactive' && override !== 'restoring') {
-            const rcLog = getStored('recoverycalls', store.id) || {};
-            if (!rcLog.call1) {
-                store.recovery_task = 'call1';
-            } else if (rcLog.call1 && !rcLog.call2) {
-                const daysSinceCall1 = (now - new Date(rcLog.call1.date)) / 864e5;
-                store.recovery_task = daysSinceCall1 >= 10 ? 'call2' : 'waiting';
-            } else if (rcLog.call2 && !rcLog.call3) {
-                const daysSinceCall2 = (now - new Date(rcLog.call2.date)) / 864e5;
-                store.recovery_task = daysSinceCall2 >= 10 ? 'call3' : 'waiting';
-            } else {
-                store.recovery_task = 'exhausted';
-            }
-        }
-
-        if (store.category === 'restoring') {
-            store.recovery_task = 'awaiting_shipment';
-        }
-    });
-}
-
 function getHeatLevel(store) {
     if (!store.registered_at) return 'normal';
     const h = (new Date() - new Date(store.registered_at)) / 36e5;
@@ -512,19 +451,13 @@ function getStored(type, id) {
 }
 
 function logCall(storeId, callType, note) {
-    // Recovery calls
-    if (callType.startsWith('call')) {
-        const rcLog = getStored('recoverycalls', storeId) || {};
-        rcLog[callType] = { date: new Date().toISOString(), note: note };
-        localStorage.setItem('store_recoverycalls_' + storeId, JSON.stringify(rcLog));
-    } else {
-        const log = getStored('calllog', storeId) || {};
-        log[callType] = { date: new Date().toISOString(), note: note };
-        localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
-    }
+    const log = getStored('calllog', storeId) || {};
+    log[callType] = { date: new Date().toISOString(), note: note };
+    localStorage.setItem('store_calllog_' + storeId, JSON.stringify(log));
+    // Also save to notes
     const s = allStores.find(x => x.id === storeId); if (!s) return;
     const t = new Date().toLocaleString('ar-EG');
-    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', call1:'استعادة - مكالمة 1', call2:'استعادة - مكالمة 2', call3:'استعادة - مكالمة 3', general:'ملاحظة' };
+    const labels = { day0:'مكالمة ترحيبية', day3:'متابعة يوم 3', day10:'تقييم يوم 10', general:'ملاحظة' };
     if (!s.notes) s.notes = [];
     s.notes.push('[' + t + '] [' + (labels[callType]||callType) + '] ' + note);
     localStorage.setItem('store_notes_' + storeId, JSON.stringify(s.notes));
@@ -545,9 +478,7 @@ function updateDashboard() {
 
     document.getElementById('incubating-count').textContent = c.incubating;
     document.getElementById('active-count').textContent = c.active;
-    const recoveredCount = allStores.filter(s => s.category === 'recovered').length;
-    const coldCount = allStores.filter(s => s.category === 'cold').length;
-    document.getElementById('inactive-count').textContent = c.inactive + c.restoring + recoveredCount;
+    document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
     document.getElementById('frozen-count').textContent = c.frozen;
 
     const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
@@ -565,16 +496,7 @@ function updateDashboard() {
         h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+c.active+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
     }
     if (currentRole === 'executive' || currentRole === 'inactive_manager') {
-        const recovered = allStores.filter(s => s.category === 'recovered').length;
-        const restoring = allStores.filter(s => s.category === 'restoring').length;
-        const cold = allStores.filter(s => s.category === 'cold').length;
-        const totalAttempted = restoring + recovered + allStores.filter(s => s.category === 'inactive' && s.recovery_task === 'exhausted').length;
-        const recRate = totalAttempted > 0 ? Math.round(recovered / totalAttempted * 100) : 0;
-
-        h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+c.inactive+'</div><div class="stat-change"><span>⏰</span><span>'+restoring+' جاري الاستعادة | '+recovered+' مستعادة</span></div></div>';
-        if (currentRole === 'inactive_manager') {
-            h += '<div class="stat-card" style="border-top:4px solid #059669"><div class="stat-header"><span class="stat-title">معدل نجاح الاستعادة</span><div class="stat-icon" style="background:rgba(5,150,105,0.1);color:#059669">📈</div></div><div class="stat-value">'+recRate+'%</div><div class="stat-change"><span>✅</span><span>بناءً على الشحنات الفعلية</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+recRate+'%"></div></div></div>';
-        }
+        h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+c.inactive+'</div><div class="stat-change"><span>⏰</span><span>تحتاج استعادة</span></div></div>';
     }
     if (currentRole === 'executive') {
         h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+c.frozen+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
@@ -663,47 +585,18 @@ function renderCurrentView() {
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else if (currentView === 'inactive') {
-        const inact = allStores.filter(s => s.category === 'inactive' && s.recovery_task !== 'exhausted');
+        const inact = allStores.filter(s => s.category === 'inactive');
         const rest = allStores.filter(s => s.category === 'restoring');
-        const recovered = allStores.filter(s => s.category === 'recovered');
-        const cold = allStores.filter(s => s.category === 'cold');
-        const dueCalls = inact.filter(s => s.recovery_task && s.recovery_task !== 'waiting' && s.recovery_task !== 'exhausted');
-        const exhausted = allStores.filter(s => s.category === 'inactive' && s.recovery_task === 'exhausted');
-
-        // Recovery success rate
-        const totalAttempted = rest.length + recovered.length + exhausted.length;
-        const successRate = totalAttempted > 0 ? Math.round(recovered.length / totalAttempted * 100) : 0;
-
         sf.style.display = 'flex';
         sf.innerHTML = `
-            <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📋 مهام اليوم <span class="sf-count">${dueCalls.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">غير نشطة <span class="sf-count">${inact.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ مستعادة <span class="sf-count">${recovered.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='cold'?'active':''}" onclick="setSubFilter('cold')">❄️ باردة +60 يوم <span class="sf-count">${cold.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='exhausted'?'active':''}" onclick="setSubFilter('exhausted')">🚫 استنفدت المحاولات <span class="sf-count">${exhausted.length}</span></button>`;
-
-        // Stats row for recovery manager
-        if (currentRole === 'inactive_manager' || currentRole === 'executive') {
-            const statsRow = document.createElement('div');
-            statsRow.className = 'stats-grid';
-            statsRow.style.marginBottom = '1.5rem';
-            statsRow.innerHTML = `
-                <div class="stat-card" style="border-top:3px solid var(--restoring);padding:1rem"><div class="stat-header"><span class="stat-title">جاري الاستعادة</span><div class="stat-icon" style="background:rgba(8,145,178,0.1);color:var(--restoring);width:36px;height:36px;font-size:1.2rem">🔄</div></div><div class="stat-value" style="font-size:2rem">${rest.length}</div></div>
-                <div class="stat-card" style="border-top:3px solid #059669;padding:1rem"><div class="stat-header"><span class="stat-title">عادت فعلياً (شحنت)</span><div class="stat-icon" style="background:rgba(5,150,105,0.1);color:#059669;width:36px;height:36px;font-size:1.2rem">✅</div></div><div class="stat-value" style="font-size:2rem">${recovered.length}</div></div>
-                <div class="stat-card" style="border-top:3px solid var(--primary);padding:1rem"><div class="stat-header"><span class="stat-title">معدل نجاح الاستعادة</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary);width:36px;height:36px;font-size:1.2rem">📈</div></div><div class="stat-value" style="font-size:2rem">${successRate}%</div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:${successRate}%"></div></div></div>`;
-            tl.before(statsRow);
-        }
-
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${inact.length+rest.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='inactive_only'?'active':''}" onclick="setSubFilter('inactive_only')">غير نشطة <span class="sf-count">${inact.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>`;
         let stores;
-        if (currentSubFilter === 'due_recovery') stores = dueCalls;
+        if (currentSubFilter === 'inactive_only') stores = inact;
         else if (currentSubFilter === 'restoring') stores = rest;
-        else if (currentSubFilter === 'recovered') stores = recovered;
-        else if (currentSubFilter === 'cold') stores = cold;
-        else if (currentSubFilter === 'exhausted') stores = exhausted;
-        else stores = inact;
-
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر في هذا القسم</h3></div>'; return; }
+        else stores = [...inact, ...rest];
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else {
@@ -733,11 +626,6 @@ function createStoreCard(store) {
     }
     if (store.category === 'frozen') card.className += ' frozen-card';
     if (store.category === 'restoring') card.className += ' restoring-card';
-    if (store.category === 'recovered') card.className += ' recovered-card';
-    if (store.category === 'cold') card.className += ' cold-card';
-    if (store.category === 'inactive' && store.recovery_task === 'call1') card.className += ' rcall1-card';
-    if (store.category === 'inactive' && store.recovery_task === 'call2') card.className += ' rcall2-card';
-    if (store.category === 'inactive' && store.recovery_task === 'call3') card.className += ' rcall3-card';
 
     const lastShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-EG') : 'لا يوجد';
     const regDate = store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-EG') : '-';
@@ -755,18 +643,9 @@ function createStoreCard(store) {
         else if (store.incubation_task === 'graduation') badge = '<span class="status-badge graduated">🎓 جاهز للتخريج</span>';
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
-    else if (store.category === 'inactive') {
-        if (store.recovery_task === 'call1') badge = '<span class="status-badge rcall1">📞 المكالمة الأولى</span>';
-        else if (store.recovery_task === 'call2') badge = '<span class="status-badge rcall2">📞 المكالمة الثانية</span>';
-        else if (store.recovery_task === 'call3') badge = '<span class="status-badge rcall3">📞 المكالمة الثالثة (أخيرة)</span>';
-        else if (store.recovery_task === 'exhausted') badge = '<span class="status-badge cold">🚫 استنفدت المحاولات</span>';
-        else if (store.recovery_task === 'waiting') badge = '<span class="status-badge warning">⏳ بانتظار موعد المكالمة التالية</span>';
-        else badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن 48 ساعة' : '') + '</span>';
-    }
+    else if (store.category === 'inactive') badge = '<span class="status-badge warning">غير نشط' + (store.state_reason === 'failed_48h' ? ' - لم يشحن خلال 48 ساعة' : '') + '</span>';
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
-    else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة - بانتظار شحنة</span>';
-    else if (store.category === 'recovered') badge = '<span class="status-badge recovered">✅ تمت الاستعادة بنجاح</span>';
-    else if (store.category === 'cold') badge = '<span class="status-badge cold">❄️ باردة - +60 يوم</span>';
+    else if (store.category === 'restoring') badge = '<span class="status-badge restoring">🔄 جاري الاستعادة</span>';
 
     // Actions
     let actions = '';
@@ -781,12 +660,7 @@ function createStoreCard(store) {
         else if (store.incubation_task === 'graduation' && (currentRole === 'executive' || currentRole === 'incubation_manager')) actions += '<button class="btn btn-success" onclick="graduateStore('+store.id+')">🎓 تخريج إلى نشط</button>';
     }
 
-    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) {
-        if (store.recovery_task === 'call1') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'call1\')">📞 تم الاتصال - المكالمة 1</button>';
-        else if (store.recovery_task === 'call2') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'call2\')">📞 تم الاتصال - المكالمة 2</button>';
-        else if (store.recovery_task === 'call3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'call3\')">📞 تم الاتصال - المكالمة 3</button>';
-        actions += '<button class="btn btn-restoring" onclick="restoreStore('+store.id+')">🤝 وعد بالعودة</button>';
-    }
+    if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) actions += '<button class="btn btn-restoring" onclick="restoreStore('+store.id+')">🔄 استعادة</button>';
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
     if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
@@ -817,33 +691,6 @@ function createStoreCard(store) {
             else if (dotClass === 'failed') statusText = ' ✗ لم يشحن';
             else if (dotClass === 'current') statusText = ' ← مطلوب';
             timelineHtml += '<div class="timeline-step"><div class="timeline-dot '+dotClass+'"></div><span>'+step.label+statusText+'</span></div>';
-        });
-        timelineHtml += '</div>';
-    }
-
-    // Recovery timeline
-    if (store.category === 'inactive' || store.category === 'restoring' || store.category === 'recovered') {
-        const rcl = getStored('recoverycalls', store.id) || {};
-        const lastShipD = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        const daysSinceShip = lastShipD ? Math.floor((new Date() - lastShipD) / 864e5) : '?';
-        const rSteps = [
-            { label:'المكالمة 1 - فورية', key:'call1' },
-            { label:'المكالمة 2 - بعد 10 أيام', key:'call2' },
-            { label:'المكالمة 3 - بعد 10 أيام', key:'call3' },
-            { label:'وعد بالعودة', key:'promise' },
-            { label:'شحنة فعلية = استعادة ناجحة', key:'shipped' }
-        ];
-        timelineHtml = '<div class="timeline"><div class="timeline-title">🔄 مسار الاستعادة (آخر شحنة: قبل '+daysSinceShip+' يوم)</div>';
-        rSteps.forEach(step => {
-            let dotClass = 'pending';
-            if (step.key === 'promise') dotClass = store.category === 'restoring' || store.category === 'recovered' ? 'done' : 'pending';
-            else if (step.key === 'shipped') dotClass = store.category === 'recovered' ? 'done' : 'pending';
-            else if (rcl[step.key]) dotClass = 'done';
-            else if (store.recovery_task === step.key) dotClass = 'current';
-            let st = '';
-            if (dotClass === 'done') st = ' ✓';
-            else if (dotClass === 'current') st = ' ← مطلوب';
-            timelineHtml += '<div class="timeline-step"><div class="timeline-dot '+dotClass+'"></div><span>'+step.label+st+'</span></div>';
         });
         timelineHtml += '</div>';
     }
@@ -885,7 +732,7 @@ function createStoreCard(store) {
 
 // ===================== ACTIONS =====================
 function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
-function restoreStore(id) { setStatus(id,'restoring'); localStorage.setItem('store_restore_date_'+id, new Date().toISOString()); showNotification('🔄 تم التواصل/وعد بالعودة - بانتظار أول شحنة'); updateDashboard(); renderCurrentView(); }
+function restoreStore(id) { setStatus(id,'restoring'); showNotification('🔄 جاري الاستعادة'); updateDashboard(); renderCurrentView(); }
 function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem('store_freeze_reason_'+id); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
 // ===================== MODALS =====================
