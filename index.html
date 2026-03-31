@@ -174,11 +174,14 @@
     <div class="login-screen" id="loginScreen">
         <div class="login-box">
             <h2>النورس</h2>
-            <p>اختر صلاحيتك للدخول</p>
-            <button class="role-btn" onclick="loginAs('incubation_manager')">مسؤول المتاجر الجديدة<div class="role-desc">إدارة مسار الاحتضان والمكالمات</div></button>
-            <button class="role-btn" onclick="loginAs('active_manager')">مسؤول المتاجر النشطة<div class="role-desc">عرض المتاجر النشطة والاستبيان</div></button>
-            <button class="role-btn" onclick="loginAs('inactive_manager')">مسؤول الاستعادة<div class="role-desc">المتاجر غير النشطة وزر الاستعادة</div></button>
-            <button class="role-btn" onclick="loginAs('executive')">المدير التنفيذي<div class="role-desc">عرض الجميع مع صلاحيات كاملة</div></button>
+            <p>تسجيل الدخول</p>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group"><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="login-username" placeholder="اسم المستخدم" required></div>
+                <div class="form-group"><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="password" id="login-password" placeholder="كلمة المرور" required></div>
+                <button type="submit" class="role-btn" style="background:var(--primary);color:white;border-color:var(--primary)">دخول</button>
+            </form>
+            <div id="login-error" style="color:var(--danger);font-size:0.85rem;margin-top:1rem;display:none;"></div>
+            <div style="margin-top:1.5rem;font-size:0.75rem;color:var(--text-secondary)">الحساب الافتراضي: admin / admin123</div>
         </div>
     </div>
 
@@ -198,6 +201,8 @@
                 <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
                 <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
                 <div class="nav-item" data-view="cold" id="nav-cold"><span class="nav-icon">🥶</span><span>باردة +60 يوم</span><span class="badge" id="cold-count" style="background:#94a3b8">0</span></div>
+                <div class="nav-divider"></div>
+                <div class="nav-item" data-view="users" id="nav-users"><span class="nav-icon">👥</span><span>إدارة المستخدمين</span></div>
             </nav>
             <div style="padding:0 1.5rem;margin-top:1rem;">
                 <div class="nav-divider"></div>
@@ -212,8 +217,8 @@
             <div class="header">
                 <div class="header-title"><h2 id="page-title">لوحة التحكم</h2><p id="page-subtitle">نظرة شاملة</p></div>
                 <div class="user-info">
-                    <div><div style="font-weight:600" id="user-role-display"></div><div style="font-size:0.875rem;color:var(--text-secondary)">شركة النورس</div></div>
-                    <div class="user-avatar">ن</div>
+                    <div><div style="font-weight:600" id="user-name-display"></div><div style="font-size:0.875rem;color:var(--text-secondary)" id="user-role-display"></div></div>
+                    <div class="user-avatar" id="user-avatar-letter">ن</div>
                 </div>
             </div>
             <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
@@ -248,6 +253,24 @@
         </form>
     </div></div>
 
+    <!-- Add User Modal -->
+    <div class="modal" id="user-modal"><div class="modal-content">
+        <div class="modal-header"><h3 id="user-modal-title">إضافة مستخدم</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
+        <form id="user-form">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-group"><label class="form-label">اسم المستخدم (للدخول)</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="new-username" placeholder="username" required></div>
+            <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="new-fullname" placeholder="الاسم الكامل" required></div>
+            <div class="form-group"><label class="form-label">كلمة المرور</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="password" id="new-password" placeholder="كلمة المرور" required></div>
+            <div class="form-group"><label class="form-label">الصلاحية</label><select class="form-textarea" style="min-height:auto;padding:0.75rem" id="new-role">
+                <option value="incubation_manager">مسؤول المتاجر الجديدة</option>
+                <option value="active_manager">مسؤول المتاجر النشطة</option>
+                <option value="inactive_manager">مسؤول الاستعادة</option>
+                <option value="executive">المدير التنفيذي</option>
+            </select></div>
+            <div class="task-actions"><button type="submit" class="btn btn-success">حفظ</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+        </form>
+    </div></div>
+
     <!-- Survey Modal -->
     <div class="modal" id="survey-modal"><div class="modal-content">
         <div class="modal-header"><h3>استبيان رضا العميل</h3><button class="close-modal" onclick="closeModal()">✕</button></div>
@@ -267,11 +290,23 @@ const ROLES = {
     incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
     active_manager: { label:'مسؤول المتاجر النشطة', views:['dashboard','active'] },
     inactive_manager: { label:'مسؤول الاستعادة', views:['dashboard','inactive'] },
-    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen','cold'] }
+    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen','cold','users'] }
 };
 
+// Default admin user
+function initUsers() {
+    if (!localStorage.getItem('nawras_users')) {
+        const defaultUsers = [
+            { id: 1, username: 'admin', fullname: 'المدير التنفيذي', password: 'admin123', role: 'executive' }
+        ];
+        localStorage.setItem('nawras_users', JSON.stringify(defaultUsers));
+    }
+}
+function getUsers() { return JSON.parse(localStorage.getItem('nawras_users') || '[]'); }
+function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(users)); }
+
 // ===================== STATE =====================
-let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null;
+let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null;
 
 // ===================== API =====================
 async function apiGet(url) {
@@ -282,21 +317,57 @@ async function apiGet(url) {
 }
 
 // ===================== AUTH =====================
-function loginAs(role) {
-    currentRole = role;
-    localStorage.setItem('nawras_role', role);
+function handleLogin(e) {
+    e.preventDefault();
+    initUsers();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    const users = getUsers();
+    const user = users.find(u => u.username === username && u.password === password);
+    if (!user) {
+        document.getElementById('login-error').style.display = 'block';
+        document.getElementById('login-error').textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+        return;
+    }
+    currentUser = user;
+    currentRole = user.role;
+    localStorage.setItem('nawras_session', JSON.stringify({ id: user.id, username: user.username, role: user.role, fullname: user.fullname }));
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('loadingScreen').style.display = 'flex';
     document.getElementById('appContainer').style.display = 'flex';
     applyRolePermissions(); initApp();
 }
-function logout() { localStorage.removeItem('nawras_role'); location.reload(); }
-function checkSavedLogin() { const s = localStorage.getItem('nawras_role'); if (s && ROLES[s]) { loginAs(s); return true; } return false; }
+
+function logout() { localStorage.removeItem('nawras_session'); location.reload(); }
+
+function checkSavedLogin() {
+    initUsers();
+    const session = localStorage.getItem('nawras_session');
+    if (!session) return false;
+    try {
+        const s = JSON.parse(session);
+        const users = getUsers();
+        const user = users.find(u => u.id === s.id && u.username === s.username);
+        if (user && ROLES[user.role]) {
+            currentUser = user;
+            currentRole = user.role;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('loadingScreen').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'flex';
+            applyRolePermissions(); initApp();
+            return true;
+        }
+    } catch(e) {}
+    return false;
+}
+
 function applyRolePermissions() {
     const role = ROLES[currentRole];
     document.getElementById('user-role-display').textContent = role.label;
-    document.getElementById('current-role-label').textContent = role.label;
-    ['incubating','active','inactive','frozen','cold'].forEach(v => {
+    document.getElementById('current-role-label').textContent = currentUser ? currentUser.fullname : role.label;
+    document.getElementById('user-name-display').textContent = currentUser ? currentUser.fullname : '';
+    document.getElementById('user-avatar-letter').textContent = currentUser ? currentUser.fullname.charAt(0) : 'ن';
+    ['incubating','active','inactive','frozen','cold','users'].forEach(v => {
         const el = document.getElementById('nav-' + v);
         if (el) el.style.display = role.views.includes(v) ? 'flex' : 'none';
     });
@@ -528,7 +599,7 @@ function logCall(storeId, callType, note) {
     // Track daily calls for reports
     const today = new Date().toISOString().split('T')[0];
     const dailyLog = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
-    dailyLog.push({ storeId, storeName: s.name, callType, role: currentRole, time: new Date().toISOString() });
+    dailyLog.push({ storeId, storeName: s.name, callType, role: currentRole, userName: currentUser ? currentUser.fullname : 'غير معروف', userId: currentUser ? currentUser.id : 0, time: new Date().toISOString() });
     localStorage.setItem('daily_calls_' + today, JSON.stringify(dailyLog));
 }
 
@@ -615,11 +686,46 @@ function updateDashboard() {
     // Executive: per-role breakdown
     if (currentRole === 'executive') {
         h += '<div class="stat-card" style="border-top:4px solid #f59e0b"><div class="stat-header"><span class="stat-title">رضا العملاء</span><div class="stat-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">😊</div></div><div class="stat-value">'+sat+'/5</div><div class="stat-change"><span>📋</span><span>متوسط الاستبيان</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:'+parseFloat(sat)/5*100+'%"></div></div></div>';
+        // Per-employee report by name
+        const byEmployee = {};
+        todayCalls.forEach(c => {
+            const name = c.userName || 'غير معروف';
+            if (!byEmployee[name]) byEmployee[name] = 0;
+            byEmployee[name]++;
+        });
         h += '<div class="stat-card" style="border-top:4px solid #6366f1"><div class="stat-header"><span class="stat-title">تقرير الموظفين اليوم</span><div class="stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1">👥</div></div><div style="margin-top:0.5rem;font-size:0.85rem;">';
-        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول الاحتضان</span><strong>'+todayByRole.incubation_manager+' اتصال</strong></div>';
-        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول الاستعادة</span><strong>'+todayByRole.inactive_manager+' اتصال</strong></div>';
-        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border)"><span>مسؤول النشطة</span><strong>'+todayByRole.active_manager+' اتصال</strong></div>';
-        h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0"><span>المدير التنفيذي</span><strong>'+todayByRole.executive+' اتصال</strong></div>';
+        const empNames = Object.keys(byEmployee);
+        if (empNames.length === 0) {
+            h += '<div style="padding:0.5rem 0;color:var(--text-secondary)">لا توجد اتصالات اليوم</div>';
+        } else {
+            empNames.forEach((name, i) => {
+                h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;'+(i<empNames.length-1?'border-bottom:1px solid var(--border)':'')+'"><span>'+name+'</span><strong>'+byEmployee[name]+' اتصال</strong></div>';
+            });
+        }
+        h += '</div></div>';
+
+        // Monthly report
+        const monthCalls = {};
+        const now2 = new Date();
+        for (let i = 0; i < 30; i++) {
+            const d = new Date(now2); d.setDate(d.getDate() - i);
+            const dk = d.toISOString().split('T')[0];
+            const dayCalls = JSON.parse(localStorage.getItem('daily_calls_' + dk) || '[]');
+            dayCalls.forEach(c => {
+                const name = c.userName || 'غير معروف';
+                if (!monthCalls[name]) monthCalls[name] = 0;
+                monthCalls[name]++;
+            });
+        }
+        h += '<div class="stat-card" style="border-top:4px solid #0ea5e9"><div class="stat-header"><span class="stat-title">التقرير الشهري (30 يوم)</span><div class="stat-icon" style="background:rgba(14,165,233,0.1);color:#0ea5e9">📊</div></div><div style="margin-top:0.5rem;font-size:0.85rem;">';
+        const mNames = Object.keys(monthCalls).sort((a,b) => monthCalls[b] - monthCalls[a]);
+        if (mNames.length === 0) {
+            h += '<div style="padding:0.5rem 0;color:var(--text-secondary)">لا توجد بيانات</div>';
+        } else {
+            mNames.forEach((name, i) => {
+                h += '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;'+(i<mNames.length-1?'border-bottom:1px solid var(--border)':'')+'"><span>'+name+'</span><strong>'+monthCalls[name]+' اتصال</strong></div>';
+            });
+        }
         h += '</div></div>';
     }
 
@@ -651,7 +757,8 @@ function renderCurrentView() {
         active: { icon:'⭐', title:'المتاجر النشطة', sub:'تشحن بانتظام' },
         inactive: { icon:'⚠️', title:'غير النشطة', sub:'توقفت أقل من 60 يوم - فرص عودتها عالية' },
         frozen: { icon:'🧊', title:'المجمدة', sub:'تم تجميدها' },
-        cold: { icon:'🥶', title:'المتاجر الباردة', sub:'توقفت 60+ يوم - قائمة التسويق العام' }
+        cold: { icon:'🥶', title:'المتاجر الباردة', sub:'توقفت 60+ يوم - قائمة التسويق العام' },
+        users: { icon:'👥', title:'إدارة المستخدمين', sub:'إضافة وتعديل وحذف المستخدمين' }
     };
     const cfg = titles[currentView]; if (!cfg) return;
     document.getElementById('page-title').textContent = cfg.title;
@@ -731,12 +838,51 @@ function renderCurrentView() {
         if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
+    } else if (currentView === 'users') {
+        sf.style.display = 'none';
+        renderUsersView(tl);
+
     } else {
         sf.style.display = 'none';
         const stores = allStores.filter(s => s.category === currentView);
         if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
     }
+}
+
+function renderUsersView(container) {
+    const users = getUsers();
+    const roleLabels = { incubation_manager:'مسؤول الاحتضان', active_manager:'مسؤول النشطة', inactive_manager:'مسؤول الاستعادة', executive:'المدير التنفيذي' };
+
+    let html = '<button class="btn btn-success" onclick="openAddUserModal()" style="margin-bottom:1.5rem">+ إضافة مستخدم جديد</button>';
+
+    users.forEach(u => {
+        // Monthly calls for this user
+        let mCalls = 0;
+        for (let i = 0; i < 30; i++) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const dk = d.toISOString().split('T')[0];
+            const dayCalls = JSON.parse(localStorage.getItem('daily_calls_' + dk) || '[]');
+            mCalls += dayCalls.filter(c => c.userId === u.id || c.userName === u.fullname).length;
+        }
+        // Today calls
+        const today = new Date().toISOString().split('T')[0];
+        const tCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]').filter(c => c.userId === u.id || c.userName === u.fullname).length;
+
+        html += '<div class="task-card" style="border-right:4px solid #6366f1">';
+        html += '<div class="task-header"><div class="task-info"><h3>'+u.fullname+'</h3><div class="task-meta">';
+        html += '<div class="meta-item">👤 '+u.username+'</div>';
+        html += '<div class="meta-item">🔑 '+roleLabels[u.role]+'</div>';
+        html += '<div class="meta-item">📞 اليوم: '+tCalls+' اتصال</div>';
+        html += '<div class="meta-item">📊 الشهر: '+mCalls+' اتصال</div>';
+        html += '</div></div><span class="status-badge active">'+roleLabels[u.role]+'</span></div>';
+        html += '<div class="task-actions">';
+        html += '<button class="btn btn-primary" onclick="openEditUserModal('+u.id+')">✏️ تعديل</button>';
+        if (u.id !== 1) html += '<button class="btn btn-frozen" onclick="deleteUser('+u.id+')">🗑️ حذف</button>';
+        html += '</div></div>';
+    });
+
+    container.innerHTML = html;
 }
 
 function setSubFilter(f) { currentSubFilter = f; renderCurrentView(); }
@@ -896,6 +1042,81 @@ function createStoreCard(store) {
 }
 
 // ===================== ACTIONS =====================
+// ===================== USER MANAGEMENT =====================
+function openAddUserModal() {
+    document.getElementById('user-modal-title').textContent = 'إضافة مستخدم جديد';
+    document.getElementById('edit-user-id').value = '';
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-fullname').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-password').required = true;
+    document.getElementById('new-role').value = 'incubation_manager';
+    document.getElementById('user-modal').classList.add('active');
+}
+
+function openEditUserModal(id) {
+    const users = getUsers();
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('user-modal-title').textContent = 'تعديل مستخدم: ' + u.fullname;
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('new-username').value = u.username;
+    document.getElementById('new-fullname').value = u.fullname;
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-password').required = false;
+    document.getElementById('new-password').placeholder = 'اتركه فارغاً لعدم التغيير';
+    document.getElementById('new-role').value = u.role;
+    document.getElementById('user-modal').classList.add('active');
+}
+
+function deleteUser(id) {
+    if (id === 1) { showNotification('لا يمكن حذف المدير الرئيسي', 'error'); return; }
+    if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+    const users = getUsers().filter(u => u.id !== id);
+    saveUsers(users);
+    showNotification('تم حذف المستخدم');
+    renderCurrentView();
+}
+
+document.getElementById('user-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const editId = document.getElementById('edit-user-id').value;
+    const username = document.getElementById('new-username').value.trim();
+    const fullname = document.getElementById('new-fullname').value.trim();
+    const password = document.getElementById('new-password').value;
+    const role = document.getElementById('new-role').value;
+    const users = getUsers();
+
+    if (editId) {
+        // Edit existing
+        const u = users.find(x => x.id === parseInt(editId));
+        if (!u) return;
+        if (users.find(x => x.username === username && x.id !== u.id)) { showNotification('اسم المستخدم موجود مسبقاً', 'error'); return; }
+        u.username = username;
+        u.fullname = fullname;
+        if (password) u.password = password;
+        u.role = role;
+        // Update session if editing self
+        if (currentUser && currentUser.id === u.id) {
+            currentUser = u;
+            localStorage.setItem('nawras_session', JSON.stringify({ id: u.id, username: u.username, role: u.role, fullname: u.fullname }));
+            currentRole = u.role;
+            applyRolePermissions();
+        }
+    } else {
+        // Add new
+        if (users.find(x => x.username === username)) { showNotification('اسم المستخدم موجود مسبقاً', 'error'); return; }
+        if (!password) { showNotification('كلمة المرور مطلوبة', 'error'); return; }
+        const newId = Math.max(...users.map(u => u.id), 0) + 1;
+        users.push({ id: newId, username, fullname, password, role });
+    }
+
+    saveUsers(users);
+    closeModal(); this.reset();
+    showNotification(editId ? 'تم تعديل المستخدم' : 'تم إضافة المستخدم');
+    renderCurrentView();
+});
+
 function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 function restoreStore(id) { setStatus(id,'restoring'); localStorage.setItem('store_restore_date_'+id, new Date().toISOString()); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 function unfreezeStore(id) { setStatus(id,'incubating'); localStorage.removeItem('store_freeze_reason_'+id); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
