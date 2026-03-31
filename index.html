@@ -772,7 +772,7 @@ function createStoreCard(store) {
         else if (store.recovery_task === 'rcall3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall3\')">📞 تم الاتصال - مكالمة 3</button>';
     }
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
-    if (store.category === 'inactive' && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
+    if ((store.category === 'inactive' || store.category === 'cold') && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
     actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📝 ملاحظة</button>';
