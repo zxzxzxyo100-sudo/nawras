@@ -24,10 +24,8 @@ module.exports = async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     try {
-        const to = new Date().toISOString().split('T')[0];
-        const from = new Date();
-        from.setDate(from.getDate() - 30);
-        const fromDate = from.toISOString().split('T')[0];
+        const to = (req.query && req.query.to) || new Date().toISOString().split('T')[0];
+        const fromDate = (req.query && req.query.from) || '2024-01-01';
 
         let all = [], cursor = null, more = true;
         while (more) {

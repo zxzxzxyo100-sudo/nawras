@@ -390,9 +390,9 @@ function setupNavigation() {
 async function loadData() {
     try {
         const results = await Promise.all([
-            apiGet('/api/new-customers'),
+            apiGet('/api/new-customers?since=2024-01-01'),
             apiGet('/api/inactive-customers'),
-            apiGet('/api/orders-summary')
+            apiGet('/api/orders-summary?from=2024-01-01&to=' + new Date().toISOString().split('T')[0])
         ]);
         processStoresData(results[0], results[1], results[2]);
         runStateMachine();
