@@ -131,40 +131,8 @@
         .btn-whatsapp:hover { background:#1fb855;transform:translateY(-2px); }
         .btn-called { background:#8b5cf6;color:white;border-color:#8b5cf6; }
         .btn-called:hover { background:#7c3aed;transform:translateY(-2px); }
-        .btn-unreachable { background:#f97316;color:white;border-color:#f97316; }
-        .btn-unreachable:hover { background:#ea580c;transform:translateY(-2px); }
         .btn-outline { background:white;border:2px solid var(--border);color:var(--text-primary); }
         .btn-outline:hover { border-color:var(--primary);color:var(--primary); }
-        /* ===== INCUBATION STATS BAR ===== */
-        .incubation-stats { display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap; }
-        .inc-stat-card { flex:1;min-width:180px;padding:1rem 1.25rem;border-radius:14px;display:flex;align-items:center;gap:1rem;border:2px solid var(--border);background:white;transition:all 0.3s; }
-        .inc-stat-card .inc-stat-num { font-size:2rem;font-weight:800;line-height:1; }
-        .inc-stat-card .inc-stat-label { font-size:0.8rem;font-weight:600;color:var(--text-secondary); }
-        .inc-stat-card.completed { border-color:var(--success);background:rgba(5,150,105,0.04); }
-        .inc-stat-card.completed .inc-stat-num { color:var(--success); }
-        .inc-stat-card.remaining { border-color:var(--primary);background:rgba(37,99,235,0.04); }
-        .inc-stat-card.remaining .inc-stat-num { color:var(--primary); }
-        .inc-stat-card.total { border-color:var(--warning);background:rgba(217,119,6,0.04); }
-        .inc-stat-card.total .inc-stat-num { color:var(--warning); }
-
-        /* ===== ALL DONE CELEBRATION ===== */
-        .all-done-screen { display:none;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;animation:celebrateIn 0.6s cubic-bezier(0.4,0,0.2,1); }
-        .all-done-screen.visible { display:flex; }
-        .all-done-icon { font-size:6rem;margin-bottom:1.5rem;animation:bounce 1s infinite; }
-        .all-done-title { font-size:2rem;font-weight:800;color:var(--success);margin-bottom:0.75rem; }
-        .all-done-subtitle { font-size:1.1rem;color:var(--text-secondary);max-width:500px;line-height:1.8; }
-        .all-done-badge { margin-top:2rem;padding:0.75rem 2rem;background:linear-gradient(135deg,var(--success),#34d399);color:white;border-radius:50px;font-weight:700;font-size:1rem;box-shadow:0 4px 15px rgba(5,150,105,0.3); }
-        @keyframes celebrateIn { from{opacity:0;transform:scale(0.8)} to{opacity:1;transform:scale(1)} }
-        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-15px)} }
-
-        /* ===== SEARCH ===== */
-        .search-box { position:relative;display:flex;align-items:center; }
-        .search-box input { padding:0.6rem 2.5rem 0.6rem 1rem;border:2px solid var(--border);border-radius:12px;font-family:'Cairo',sans-serif;font-size:0.85rem;font-weight:600;width:280px;outline:none;transition:all 0.2s;background:var(--bg-main); }
-        .search-box input:focus { border-color:var(--primary);background:white;box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
-        .search-box input::placeholder { color:var(--text-secondary);font-weight:500; }
-        .search-box #search-clear { position:absolute;left:8px;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--text-secondary);padding:0.25rem;border-radius:50%;transition:all 0.2s; }
-        .search-box #search-clear:hover { color:var(--danger);background:rgba(220,38,38,0.1); }
-
         .empty-state { text-align:center;padding:4rem 2rem;color:var(--text-secondary); }
         .empty-state-icon { font-size:4rem;margin-bottom:1rem;opacity:0.5; }
 
@@ -282,16 +250,7 @@
             <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
             <div id="tasks-view" style="display:none;">
                 <div class="tasks-section">
-                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
-                        <div class="search-box"><input type="text" id="store-search" placeholder="🔍 بحث بكود المتجر أو اسمه..." oninput="handleSearch(this.value)"><button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button></div>
-                    </div>
-                    <div class="incubation-stats" id="incubation-stats" style="display:none;"></div>
-                    <div class="all-done-screen" id="all-done-screen">
-                        <div class="all-done-icon">🏆</div>
-                        <div class="all-done-title">عمل رائع يا بطل!</div>
-                        <div class="all-done-subtitle">لقد أتممت جميع مهامك لهذا اليوم بنجاح في شركة النورس.<br>استمتع بوقتك، نراك غداً بإذن الله.</div>
-                        <div class="all-done-badge">جميع المهام مكتملة ✓</div>
-                    </div>
+                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2></div>
                     <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
                     <div class="pagination-wrapper" id="pagination-wrapper" style="display:none;">
@@ -415,7 +374,7 @@ function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(
 
 // ===================== STATE =====================
 let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null, cachedUsers = [];
-let currentPage = 1, rowsPerPage = 50, searchQuery = '';
+let currentPage = 1, rowsPerPage = 50;
 
 // ===================== API =====================
 const DB_API = '/api-php/store-actions.php';
@@ -428,24 +387,9 @@ async function apiGet(url) {
     return d.data || [];
 }
 
-async function dbPost(url, data, timeout) {
-    timeout = timeout || 15000;
-    try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeout);
-        const r = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-            signal: controller.signal
-        });
-        clearTimeout(timer);
-        const text = await r.text();
-        try { return JSON.parse(text); } catch { return { success: false, error: 'استجابة غير صالحة من السيرفر: ' + text.substring(0, 200) }; }
-    } catch (e) {
-        if (e.name === 'AbortError') return { success: false, error: 'انتهت مهلة الاتصال بالسيرفر - حاول مرة أخرى' };
-        return { success: false, error: 'خطأ في الاتصال: ' + e.message };
-    }
+async function dbPost(url, data) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    return await r.json();
 }
 
 // DB state caches
@@ -456,79 +400,43 @@ let dbSurveys = {};
 let dbIncubation = {};
 
 async function loadDBState() {
-    // تقسيم الاستدعاءات لتخفيف الحمل على السيرفر
-    const safeFetch = (url) => {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 15000);
-        return fetch(url, { signal: ctrl.signal }).then(r => { clearTimeout(t); return r.text(); }).then(t => { try { return JSON.parse(t); } catch { return { data: [] }; } }).catch(() => ({ data: [] }));
-    };
-
-    const [states, calls] = await Promise.all([
-        safeFetch(DB_API + '?action=get_states'),
-        safeFetch(DB_API + '?action=get_all_calllogs')
+    const [states, calls, rcalls, surveys, incubation] = await Promise.all([
+        fetch(DB_API + '?action=get_states').then(r => r.json()),
+        fetch(DB_API + '?action=get_all_calllogs').then(r => r.json()),
+        fetch(DB_API + '?action=get_all_recovery_calls').then(r => r.json()),
+        fetch(DB_API + '?action=get_surveys').then(r => r.json()),
+        fetch(DB_API + '?action=get_incubation_data').then(r => r.json()).catch(() => ({ data: {} }))
     ]);
-    const [rcalls, surveys, incubation] = await Promise.all([
-        safeFetch(DB_API + '?action=get_all_recovery_calls'),
-        safeFetch(DB_API + '?action=get_surveys'),
-        safeFetch(DB_API + '?action=get_incubation_data')
-    ]);
-
+    // Index by store_id
     dbStates = {};
     (states.data || []).forEach(s => { dbStates[s.store_id] = s; });
     dbCallLogs = calls.data || {};
     dbRecoveryCalls = rcalls.data || {};
+    // Surveys indexed by store_id
     dbSurveys = {};
-    (Array.isArray(surveys.data) ? surveys.data : []).forEach(s => { dbSurveys[s.store_id] = s; });
-    dbIncubation = (typeof incubation.data === 'object' && !Array.isArray(incubation.data)) ? incubation.data : {};
+    (surveys.data || []).forEach(s => { dbSurveys[s.store_id] = s; });
+    // بيانات الاحتضان
+    dbIncubation = incubation.data || {};
 }
 
 // ===================== AUTH (MySQL) =====================
 async function handleLogin(e) {
     e.preventDefault();
-    const errEl = document.getElementById('login-error');
-    const submitBtn = document.querySelector('#login-form button[type="submit"]') || e.submitter;
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
-
-    // إخفاء خطأ سابق
-    errEl.style.display = 'none';
-
-    if (!username || !password) {
-        errEl.style.display = 'block';
-        errEl.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور';
+    const result = await dbPost(AUTH_API + '?action=login', { username, password });
+    if (!result.success) {
+        document.getElementById('login-error').style.display = 'block';
+        document.getElementById('login-error').textContent = result.error || 'بيانات الدخول غير صحيحة';
         return;
     }
-
-    // حالة التحميل
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'جاري الدخول...'; }
-
-    try {
-        const result = await dbPost(AUTH_API + '?action=login', { username, password }, 20000);
-
-        if (!result || !result.success) {
-            errEl.style.display = 'block';
-            errEl.textContent = (result && result.error) ? result.error : 'بيانات الدخول غير صحيحة أو السيرفر لا يستجيب';
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
-            return;
-        }
-        if (!result.user || !result.user.id || !result.user.role) {
-            errEl.style.display = 'block';
-            errEl.textContent = 'خطأ في بيانات المستخدم من السيرفر';
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
-            return;
-        }
-        currentUser = result.user;
-        currentRole = result.user.role;
-        localStorage.setItem('nawras_session', JSON.stringify(result.user));
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('loadingScreen').style.display = 'flex';
-        document.getElementById('appContainer').style.display = 'flex';
-        applyRolePermissions(); initApp();
-    } catch (err) {
-        errEl.style.display = 'block';
-        errEl.textContent = 'خطأ غير متوقع: ' + err.message;
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
-    }
+    currentUser = result.user;
+    currentRole = result.user.role;
+    localStorage.setItem('nawras_session', JSON.stringify(result.user));
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('loadingScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'flex';
+    applyRolePermissions(); initApp();
 }
 
 function logout() { localStorage.removeItem('nawras_session'); location.reload(); }
@@ -580,19 +488,18 @@ function setupNavigation() {
 async function loadData() {
     try {
         await loadDBState();
-        // فحوصات خلفية مؤجلة (بعد 5 ثواني لتخفيف الحمل على السيرفر)
-        setTimeout(async () => {
-            try {
-                let needRefresh = false;
-                const r1 = await fetch('/api-php/check-recovery.php').then(r=>r.json()).catch(()=>({}));
-                if (r1.recovered > 0) { showNotification('تم استعادة '+r1.recovered+' متجر تلقائياً'); needRefresh = true; }
-                const r2 = await fetch(DB_API+'?action=check_graduation').then(r=>r.json()).catch(()=>({}));
-                if (r2.moved_to_graduation > 0) { showNotification('🎓 '+r2.moved_to_graduation+' متجر جاهز للتخريج'); needRefresh = true; }
-                const r3 = await fetch(DB_API+'?action=check_pending_schedules').then(r=>r.json()).catch(()=>({}));
-                if (r3.scheduled > 0) { showNotification('📅 '+r3.scheduled+' متجر تم جدولته تلقائياً'); needRefresh = true; }
-                if (needRefresh) { await loadDBState(); runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }
-            } catch(e) {}
-        }, 5000);
+        // Auto-check recovery in background (non-blocking)
+        fetch('/api-php/check-recovery.php').then(r=>r.json()).then(d=>{
+            if(d.recovered>0){ showNotification('تم استعادة '+d.recovered+' متجر تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
+        // فحص التخريج التلقائي (14 يوم)
+        fetch(DB_API + '?action=check_graduation').then(r=>r.json()).then(d=>{
+            if(d.moved_to_graduation>0){ showNotification('🎓 '+d.moved_to_graduation+' متجر جاهز للتخريج'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
+        // فحص الجدولة المعلقة: متاجر اتصلنا بها day0 لكن لم تكن شحنت والآن شحنت
+        fetch(DB_API + '?action=check_pending_schedules').then(r=>r.json()).then(d=>{
+            if(d.scheduled>0){ showNotification('📅 '+d.scheduled+' متجر تم جدولة مكالماته تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
         const sinceDate = new Date(Date.now() - 90*864e5).toISOString().split('T')[0];
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=' + sinceDate),
@@ -681,11 +588,6 @@ function processStoresData(newData, inactiveData, summaryData) {
                 })
             }).catch(()=>{});
         }
-        // تحميل حالة متعذر الوصول من DB
-        const dbState = dbStates[s.id];
-        if (dbState && dbState.state_reason === 'unreachable') {
-            s.unreachable = true;
-        }
     });
 }
 
@@ -714,19 +616,9 @@ function runStateMachine() {
         }
 
         // Rule 2: 48-hour test - failed (registered > 48h ago, never shipped)
-        // نقل آلي من الاحتضان إلى غير نشطة مع تسجيل في DB
         if (hoursSinceReg > 48 && !hasShipped) {
             store.category = 'inactive';
             store.state_reason = 'failed_48h';
-            // تسجيل في قاعدة البيانات إذا لم يُسجّل مسبقاً
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'inactive') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'inactive', store_name: store.name || '',
-                    state_reason: 'failed_48h', old_status: 'incubating',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'inactive' };
-            }
             return;
         }
 
@@ -742,12 +634,6 @@ function runStateMachine() {
         const today = new Date().toISOString().split('T')[0];
         const nextCallDate = store.next_call_date || null;
         const dbStage = store.incubation_stage || null;
-
-        // أولوية قصوى: إذا المتجر مجدول محلياً (بعد اتصال فوري) لا نتجاوزه
-        if (store.incubation_task === 'scheduled_waiting' && nextCallDate && nextCallDate > today) {
-            store.scheduled_date = nextCallDate;
-            return; // محمي - لا نعيد حسابه
-        }
 
         // Check if last call was less than 2 hours ago (cooldown)
         const lastCallTime = getLastCallTime(callLog);
@@ -881,20 +767,6 @@ function logCall(storeId, callType, note) {
     // Update local cache
     if (!dbCallLogs[storeId]) dbCallLogs[storeId] = {};
     dbCallLogs[storeId][callType] = new Date().toISOString();
-
-    // ===== ضمان next_call_date + تحديث incubation_stage محلياً =====
-    if (s && ['day0','day3','day10'].includes(callType)) {
-        const regD = regDate ? new Date(regDate) : new Date();
-        let nextDate, nextStage;
-        if (callType === 'day0') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 3); nextStage = 'day3'; }
-        else if (callType === 'day3') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 10); nextStage = 'day10'; }
-        else if (callType === 'day10') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 14); nextStage = 'graduation_ready'; }
-        s.next_call_date = nextDate.toISOString().split('T')[0];
-        s.incubation_stage = nextStage;
-        s.incubation_task = 'scheduled_waiting';
-        s.scheduled_date = s.next_call_date;
-    }
-
     // Update notes locally
     if (s) {
         const t = new Date().toLocaleString('ar-EG');
@@ -1050,11 +922,6 @@ function switchView(view) {
     if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
     currentView = view;
     currentPage = 1;
-    searchQuery = '';
-    const si = document.getElementById('store-search');
-    if (si) { si.value = ''; }
-    const sc = document.getElementById('search-clear');
-    if (sc) { sc.style.display = 'none'; }
     document.querySelectorAll('.nav-item').forEach(i => { i.classList.remove('active'); if (i.dataset.view === view) i.classList.add('active'); });
     if (view === 'dashboard') {
         document.getElementById('dashboard-view').style.display = 'block';
@@ -1072,11 +939,6 @@ function switchView(view) {
 
 function renderCurrentView() {
     if (currentView === 'dashboard') return;
-    // إخفاء عناصر الاحتضان عند التبديل لقسم آخر
-    if (currentView !== 'incubating') {
-        document.getElementById('incubation-stats').style.display = 'none';
-        document.getElementById('all-done-screen').classList.remove('visible');
-    }
     const titles = {
         incubating: { icon:'🎯', title:'مسار الاحتضان الذكي', sub:'جدولة تلقائية - المكالمات المطلوبة اليوم بناءً على تاريخ التسجيل' },
         active: { icon:'⭐', title:'المتاجر النشطة', sub:'تشحن بانتظام' },
@@ -1098,120 +960,51 @@ function renderCurrentView() {
     if (currentView === 'incubating') {
         const all = allStores.filter(s => s.category === 'incubating');
         const today = new Date().toISOString().split('T')[0];
-        const isManager = currentRole === 'executive';
-
-        // ===== دالة التحقق من الشحن =====
-        function storeHasShipped(s) {
-            if (parseInt(s.total_shipments) > 0) return true;
-            if (s.first_shipment_date && s.first_shipment_date !== 'لا يوجد') return true;
-            if (s.last_shipment_date && s.last_shipment_date !== 'لا يوجد') return true;
-            if (s.shipments_in_range > 0) return true;
-            if (s.first_shipped_date_db) return true;
-            return false;
-        }
-        const notShipped = all.filter(s => !storeHasShipped(s));
-        const hasShippedStores = all.filter(s => storeHasShipped(s));
-
-        // ===== المهام المستحقة اليوم =====
-        const actionable = all.filter(s =>
-            s.incubation_task === 'day0' ||
-            s.incubation_task === 'day3' ||
-            s.incubation_task === 'day10' ||
-            s.incubation_task === 'graduation'
-        );
-
-        const todayCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
-        const completedToday = todayCalls.filter(c => ['day0','day3','day10','graduation'].includes(c.type) && c.role === currentRole).length;
-        const totalToday = actionable.length + completedToday;
-        const remainingToday = actionable.length;
-
+        // مهام اليوم المجدولة: فقط المتاجر التي حان موعد مكالمتها اليوم أو قبل اليوم
+        const scheduledToday = all.filter(s => s.next_call_date && s.next_call_date <= today && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting');
+        const due = all.filter(s => s.incubation_task && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting' && s.incubation_task !== 'cooldown');
+        const golden = all.filter(s => getHeatLevel(s) === 'golden');
+        const hot = all.filter(s => getHeatLevel(s) === 'hot');
+        const day0 = all.filter(s => s.incubation_task === 'day0');
+        const day3 = all.filter(s => s.incubation_task === 'day3');
+        const day10 = all.filter(s => s.incubation_task === 'day10');
         const grad = all.filter(s => s.incubation_task === 'graduation');
-        const over14days = all.filter(s => getDaysSinceReg(s) >= 14);
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
-        const unreachable = all.filter(s => s.unreachable);
-
-        // ===== عدّادات =====
-        const statsBar = document.getElementById('incubation-stats');
-        const doneScreen = document.getElementById('all-done-screen');
-        statsBar.style.display = 'flex';
-
-        if (isManager) {
-            statsBar.innerHTML = `
-                <div class="inc-stat-card" style="border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" style="color:#6366f1;">${all.length}</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--danger);background:rgba(220,38,38,0.04);"><div><div class="inc-stat-num" style="color:var(--danger);">${notShipped.length}</div><div class="inc-stat-label">لم تشحن</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.04);"><div><div class="inc-stat-num" style="color:var(--success);">${hasShippedStores.length}</div><div class="inc-stat-label">بدأت الشحن</div></div></div>
-                <div class="inc-stat-card" style="border-color:#f59e0b;background:rgba(245,158,11,0.06);"><div><div class="inc-stat-num" style="color:#f59e0b;">${over14days.length}</div><div class="inc-stat-label">14+ يوم (تخريج)</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة</div></div></div>
-                <div class="inc-stat-card" style="border-color:#f97316;background:rgba(249,115,22,0.04);"><div><div class="inc-stat-num" style="color:#f97316;">${unreachable.length}</div><div class="inc-stat-label">متعذرة الوصول</div></div></div>`;
-        } else {
-            statsBar.innerHTML = `
-                <div class="inc-stat-card completed"><div><div class="inc-stat-num">${completedToday}</div><div class="inc-stat-label">مكتملة اليوم</div></div></div>
-                <div class="inc-stat-card remaining"><div><div class="inc-stat-num">${remainingToday}</div><div class="inc-stat-label">متبقية اليوم</div></div></div>
-                <div class="inc-stat-card total"><div><div class="inc-stat-num">${totalToday}</div><div class="inc-stat-label">إجمالي اليوم</div></div></div>`;
-        }
-
-        // ===== رسالة الإنجاز (الموظف فقط) =====
-        if (!isManager && remainingToday === 0 && completedToday > 0 && !searchQuery) {
-            doneScreen.classList.add('visible');
-            sf.style.display = 'none';
-            tl.innerHTML = '';
-            renderPagination(0);
-            return;
-        } else {
-            doneScreen.classList.remove('visible');
-        }
 
         sf.style.display = 'flex';
+        sf.innerHTML = `
+            <button class="sub-filter-btn ${currentSubFilter==='scheduled_today'?'active':''}" onclick="setSubFilter('scheduled_today')" style="background:${currentSubFilter==='scheduled_today'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='scheduled_today'?'':'var(--success)'}">📅 مهام اليوم المجدولة <span class="sf-count">${scheduledToday.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام مستحقة <span class="sf-count">${due.length}</span></button>
+            <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
+            <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 قائمة التخريج <span class="sf-count">${grad.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة (قادمة) <span class="sf-count">${scheduledWaiting.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${all.length}</span></button>`;
 
-        if (isManager) {
-            // ===== واجهة المدير =====
-            sf.innerHTML = `
-                <button class="sub-filter-btn ${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('not_shipped')" style="background:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'rgba(220,38,38,0.06)'};border-color:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'var(--danger)'}">🚫 لم تشحن <span class="sf-count">${notShipped.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='has_shipped'?'active':''}" onclick="setSubFilter('has_shipped')" style="background:${currentSubFilter==='has_shipped'?'':'rgba(5,150,105,0.06)'};border-color:${currentSubFilter==='has_shipped'?'':'var(--success)'}">📦 بدأت الشحن <span class="sf-count">${hasShippedStores.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مستحقة <span class="sf-count">${actionable.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='over14'?'active':''}" onclick="setSubFilter('over14')" style="background:${currentSubFilter==='over14'?'':'rgba(245,158,11,0.06)'};border-color:${currentSubFilter==='over14'?'':'#f59e0b'}">🎓 14+ يوم (تخريج) <span class="sf-count">${over14days.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')" style="background:${currentSubFilter==='scheduled_waiting'?'':'rgba(217,119,6,0.06)'};border-color:${currentSubFilter==='scheduled_waiting'?'':'var(--warning)'}">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='unreachable'?'active':''}" onclick="setSubFilter('unreachable')" style="background:${currentSubFilter==='unreachable'?'':'rgba(249,115,22,0.06)'};border-color:${currentSubFilter==='unreachable'?'':'#f97316'}">📵 متعذرة الوصول <span class="sf-count">${unreachable.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 الكل <span class="sf-count">${all.length}</span></button>`;
-        } else {
-            // ===== واجهة الموظف: نظيفة - بدون فلاتر =====
-            sf.style.display = 'none';
+        let stores = all;
+        if (currentSubFilter === 'scheduled_today') stores = scheduledToday;
+        else if (currentSubFilter === 'due') stores = due;
+        else if (currentSubFilter === 'golden') stores = golden;
+        else if (currentSubFilter === 'hot') stores = hot;
+        else if (currentSubFilter === 'day0') stores = day0;
+        else if (currentSubFilter === 'day3') stores = day3;
+        else if (currentSubFilter === 'day10') stores = day10;
+        else if (currentSubFilter === 'graduation') stores = grad;
+        else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
+
+        // Default to "due" on first load
+        if (currentSubFilter === 'all' && currentRole === 'incubation_manager') {
+            // Show all but sort due first
+            stores.sort((a,b) => {
+                const order = {day0:0,day3:1,day10:2,graduation:3,scheduled_waiting:4,waiting:5};
+                return (order[a.incubation_task]||6) - (order[b.incubation_task]||6);
+            });
         }
 
-        let stores;
-        if (isManager) {
-            if (currentSubFilter === 'not_shipped' || currentSubFilter === 'all') stores = notShipped;
-            else if (currentSubFilter === 'has_shipped') stores = hasShippedStores;
-            else if (currentSubFilter === 'all_stores') stores = all;
-            else if (currentSubFilter === 'due') stores = actionable;
-            else if (currentSubFilter === 'graduation') stores = grad;
-            else if (currentSubFilter === 'over14') stores = over14days;
-            else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
-            else if (currentSubFilter === 'unreachable') stores = unreachable;
-            else stores = notShipped;
-        } else {
-            // الموظف: فقط المهام المستحقة اليوم
-            stores = actionable;
-        }
-
-        // ===== ترتيب ذكي: ذهبي > ساخن > نوع المهمة > الأقدم =====
-        stores.sort((a, b) => {
-            const heatOrder = { golden: 0, hot: 1, normal: 2 };
-            const hA = heatOrder[getHeatLevel(a)] ?? 2;
-            const hB = heatOrder[getHeatLevel(b)] ?? 2;
-            if (hA !== hB) return hA - hB;
-            const taskOrder = { day0: 0, day3: 1, day10: 2, graduation: 3, scheduled_waiting: 4, waiting: 5 };
-            const tA = taskOrder[a.incubation_task] ?? 5;
-            const tB = taskOrder[b.incubation_task] ?? 5;
-            if (tA !== tB) return tA - tB;
-            const rA = a.registered_at ? new Date(a.registered_at).getTime() : Infinity;
-            const rB = b.registered_at ? new Date(b.registered_at).getTime() : Infinity;
-            return rA - rB;
-        });
-
-        stores = filterBySearch(stores);
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد مهام مستحقة حالياً')+'</h3></div>'; renderPagination(0); return; }
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد مهام</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
@@ -1240,8 +1033,7 @@ function renderCurrentView() {
             <button class="sub-filter-btn ${currentSubFilter==='stopped_shipping'?'active':''}" onclick="setSubFilter('stopped_shipping')">📦 شحنت وتوقفت <span class="sf-count">${stoppedShipping.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📞 مكالمات مستحقة <span class="sf-count">${dueCalls.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>
-            ${currentRole==='executive'?'<button class="sub-filter-btn '+(currentSubFilter==='unreachable_inactive'?'active':'')+'" onclick="setSubFilter(\'unreachable_inactive\')" style="background:'+(currentSubFilter==='unreachable_inactive'?'':'rgba(249,115,22,0.06)')+';border-color:'+(currentSubFilter==='unreachable_inactive'?'':'#f97316')+'">📵 متعذرة الوصول <span class="sf-count">'+[...inact,...rest].filter(s=>s.unreachable).length+'</span></button>':''}`;
+            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>`;
         let stores;
         if (currentSubFilter === 'hot_inactive') stores = hotInactive;
         else if (currentSubFilter === 'never_shipped') stores = neverShipped;
@@ -1250,10 +1042,8 @@ function renderCurrentView() {
         else if (currentSubFilter === 'restoring') stores = rest;
         else if (currentSubFilter === 'due_recovery') stores = dueCalls;
         else if (currentSubFilter === 'recovered') stores = recovered;
-        else if (currentSubFilter === 'unreachable_inactive') stores = [...inact,...rest].filter(s => s.unreachable);
         else stores = [...inact, ...rest];
-        stores = filterBySearch(stores);
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد متاجر')+'</h3></div>'; renderPagination(0); return; }
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
@@ -1264,9 +1054,8 @@ function renderCurrentView() {
 
     } else {
         sf.style.display = 'none';
-        let stores = allStores.filter(s => s.category === currentView);
-        stores = filterBySearch(stores);
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد متاجر')+'</h3></div>'; renderPagination(0); return; }
+        const stores = allStores.filter(s => s.category === currentView);
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
     }
@@ -1312,30 +1101,6 @@ async function renderUsersView(container) {
 
 function setSubFilter(f) { currentSubFilter = f; currentPage = 1; renderCurrentView(); }
 
-function handleSearch(val) {
-    searchQuery = val.trim().toLowerCase();
-    currentPage = 1;
-    document.getElementById('search-clear').style.display = searchQuery ? 'block' : 'none';
-    renderCurrentView();
-}
-
-function clearSearch() {
-    searchQuery = '';
-    document.getElementById('store-search').value = '';
-    document.getElementById('search-clear').style.display = 'none';
-    currentPage = 1;
-    renderCurrentView();
-}
-
-function filterBySearch(stores) {
-    if (!searchQuery) return stores;
-    return stores.filter(s => {
-        const id = String(s.id || '').toLowerCase();
-        const name = (s.name || '').toLowerCase();
-        return id.includes(searchQuery) || name.includes(searchQuery);
-    });
-}
-
 // ===================== STORE CARD =====================
 function createStoreCard(store) {
     const card = document.createElement('div');
@@ -1374,12 +1139,10 @@ function createStoreCard(store) {
             badge = '<span class="status-badge day0">⏳ يعود بعد '+mins+' دقيقة</span>';
         }
         else if (store.incubation_task === 'scheduled_waiting') {
-            const schedDate = store.scheduled_date ? new Date(store.scheduled_date) : null;
-            const schedDateStr = schedDate ? schedDate.toLocaleDateString('ar-EG') : '?';
-            const daysUntil = schedDate ? Math.max(0, Math.ceil((schedDate - new Date()) / 864e5)) : '?';
+            const schedDate = store.scheduled_date ? new Date(store.scheduled_date).toLocaleDateString('ar-EG') : '?';
             const stageLabels = { day3:'المكالمة الثانية', day10:'المكالمة الثالثة', graduation_ready:'التخريج' };
             const stageLabel = stageLabels[store.incubation_stage] || 'المرحلة التالية';
-            badge = '<span class="status-badge day0">📅 '+stageLabel+' - مستحقة بعد <strong>'+daysUntil+'</strong> يوم ('+schedDateStr+')</span>';
+            badge = '<span class="status-badge day0">📅 '+stageLabel+' مجدولة: '+schedDate+'</span>';
         }
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
@@ -1437,19 +1200,10 @@ function createStoreCard(store) {
         else if (store.recovery_task === 'rcall2') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall2\')">📞 تم الاتصال - مكالمة 2</button>';
         else if (store.recovery_task === 'rcall3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall3\')">📞 تم الاتصال - مكالمة 3</button>';
     }
-    if (store.category === 'restoring' && (currentRole === 'executive' || currentRole === 'inactive_manager')) {
-        actions += '<button class="btn btn-frozen" onclick="cancelRestore('+store.id+')">❌ إلغاء الاستعادة</button>';
-    }
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
-    if ((store.category === 'inactive' || store.category === 'cold') && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
-    if (store.category === 'frozen' && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
+    if ((store.category === 'inactive' || store.category === 'cold') && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
+    if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
-    // زر متعذر الوصول (كل الصلاحيات) - لا يظهر إذا المتجر معلق فعلاً
-    if (!store.unreachable) {
-        actions += '<button class="btn btn-unreachable" onclick="markUnreachable('+store.id+')">📵 متعذر الوصول</button>';
-    } else {
-        actions += '<button class="btn btn-success" onclick="markReachable('+store.id+')" style="font-size:0.75rem;">✅ تم الوصول</button>';
-    }
     actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📞 اتصال</button>';
     // Audit log icon moved to card header
 
@@ -1516,7 +1270,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">📵 معلق</span>':''}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}${store.incubation_task==='scheduled_waiting'&&store.scheduled_date?(function(){const d=Math.max(0,Math.ceil((new Date(store.scheduled_date)-new Date())/864e5));const stgL={day3:'المكالمة الثانية',day10:'المكالمة الثالثة',graduation_ready:'التخريج'};const stg=stgL[store.incubation_stage]||'التالية';return' <span style="background:rgba(37,99,235,0.1);color:var(--primary);padding:0.15rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">⏳ '+stg+' بعد '+d+' يوم</span>';})():''}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
@@ -1614,49 +1368,6 @@ function graduateStore(id) {
     runStateMachine(); updateDashboard(); renderCurrentView();
 }
 function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
-function markUnreachable(id) {
-    const s = allStores.find(x => x.id === id);
-    if (!s) return;
-    s.unreachable = true;
-    // حفظ في call_logs
-    dbPost(DB_API + '?action=log_call', {
-        store_id: id, store_name: s.name || '', call_type: 'unreachable',
-        note: 'متعذر الوصول للعميل', user: currentUser ? currentUser.fullname : '', user_role: currentRole
-    });
-    // حفظ الحالة في store_states (DB) كـ state_reason
-    dbPost(DB_API + '?action=set_status', {
-        store_id: id, category: s.category, store_name: s.name || '',
-        state_reason: 'unreachable', old_status: s.category,
-        user: currentUser ? currentUser.fullname : '', user_role: currentRole
-    });
-    showNotification('📵 تم تسجيل المتجر كمتعذر الوصول');
-    renderCurrentView();
-}
-
-function markReachable(id) {
-    const s = allStores.find(x => x.id === id);
-    if (!s) return;
-    s.unreachable = false;
-    dbPost(DB_API + '?action=log_call', {
-        store_id: id, store_name: s.name || '', call_type: 'reachable',
-        note: 'تم الوصول للعميل بعد تعذر سابق', user: currentUser ? currentUser.fullname : '', user_role: currentRole
-    });
-    // إزالة الحالة من store_states
-    dbPost(DB_API + '?action=set_status', {
-        store_id: id, category: s.category, store_name: s.name || '',
-        state_reason: '', old_status: s.category,
-        user: currentUser ? currentUser.fullname : '', user_role: currentRole
-    });
-    showNotification('✅ تم إلغاء حالة متعذر الوصول');
-    renderCurrentView();
-}
-
-function cancelRestore(id) {
-    if (!confirm('هل أنت متأكد من إلغاء الاستعادة وإعادة المتجر لغير النشطة؟')) return;
-    setStatus(id, 'inactive', { reason: 'إلغاء استعادة' });
-    showNotification('❌ تم إلغاء الاستعادة');
-    runStateMachine(); updateDashboard(); renderCurrentView();
-}
 function unfreezeStore(id) { setStatus(id,'incubating',{reason:'إلغاء تجميد'}); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
 // ===================== MODALS =====================
@@ -1740,39 +1451,27 @@ document.getElementById('call-form').addEventListener('submit', async function(e
 
     closeModal(); this.reset();
 
-    // ===== اختفاء فوري: إزالة المتجر من القائمة مباشرة =====
+    // إعادة تحميل بيانات الاحتضان لالتقاط الجدولة التلقائية
     if (['day0','day3','day10'].includes(type)) {
-        // تحديث المتجر محلياً فوراً ليختفي من المهام المستحقة
+        await loadDBState();
+        // تحديث المتجر المحلي ببيانات الاحتضان الجديدة
         const store = allStores.find(x => x.id === id);
-        if (store) {
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = new Date(Date.now() + 3*864e5).toISOString().split('T')[0];
+        const inc = dbIncubation[id];
+        if (store && inc) {
+            store.incubation_stage = inc.incubation_stage;
+            store.next_call_date = inc.next_call_date;
         }
     }
 
-    // تحديث الشاشة فوراً (AJAX - بدون إعادة تحميل)
     runStateMachine(); updateDashboard(); renderCurrentView();
 
     // رسالة مخصصة حسب نوع المكالمة
     const msgs = {
-        day0: '✅ تم تسجيل المكالمة الترحيبية - المكالمة التالية بعد 3 أيام',
+        day0: '✅ تم تسجيل المكالمة الترحيبية - سيتم جدولة المكالمة التالية تلقائياً',
         day3: '✅ تم تسجيل متابعة يوم 3 - المكالمة الثالثة مجدولة تلقائياً',
         day10: '✅ تم تسجيل تقييم يوم 10 - المتجر بانتظار التخريج',
     };
     showNotification(msgs[type] || '✅ تم تسجيل المكالمة');
-
-    // إعادة تحميل بيانات الاحتضان في الخلفية (مزامنة مع DB)
-    if (['day0','day3','day10'].includes(type)) {
-        loadDBState().then(() => {
-            const store2 = allStores.find(x => x.id === id);
-            const inc = dbIncubation[id];
-            if (store2 && inc) {
-                store2.incubation_stage = inc.incubation_stage;
-                store2.next_call_date = inc.next_call_date;
-            }
-            runStateMachine(); updateDashboard(); renderCurrentView();
-        });
-    }
 });
 
 document.getElementById('freeze-form').addEventListener('submit', function(e) {
