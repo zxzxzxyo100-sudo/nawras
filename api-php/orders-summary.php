@@ -1,7 +1,6 @@
 <?php
-// حماية من Out of Memory
-ini_set('memory_limit', '96M');
-ini_set('max_execution_time', '30');
+ini_set('memory_limit', '64M');
+ini_set('max_execution_time', '15');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -12,50 +11,35 @@ $BASE = 'https://backoffice.nawris.algoriza.com/external-api';
 $from = isset($_GET['from']) ? $_GET['from'] : date('Y-m-d', strtotime('-30 days'));
 $to = isset($_GET['to']) ? $_GET['to'] : date('Y-m-d');
 
-// API الخارجي يقبل 31 يوم كحد أقصى — نجلب على دفعات شهرية
+// ضمان عدم تجاوز 31 يوم (حد API الخارجي)
+$diff = (strtotime($to) - strtotime($from)) / 86400;
+if ($diff > 31) $from = date('Y-m-d', strtotime('-30 days'));
+
 $allData = [];
-$storeMap = []; // لمنع التكرار وحفظ أحدث بيانات
-$startDate = new DateTime($from);
-$endDate = new DateTime($to);
+$cursor = null;
+$maxPages = 10;
+$page = 0;
 
-while ($startDate < $endDate) {
-    $chunkEnd = clone $startDate;
-    $chunkEnd->modify('+30 days');
-    if ($chunkEnd > $endDate) $chunkEnd = clone $endDate;
+do {
+    $url = $BASE . '/customers/orders-summary?from=' . $from . '&to=' . $to;
+    if ($cursor) $url .= '&cursor=' . $cursor;
 
-    $url = $BASE . '/customers/orders-summary?from=' . $startDate->format('Y-m-d') . '&to=' . $chunkEnd->format('Y-m-d');
-    $cursor = null;
-    $maxPages = 10;
-    $page = 0;
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'X-API-TOKEN: ' . $TOKEN]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    $response = curl_exec($ch);
+    curl_close($ch);
 
-    do {
-        $fetchUrl = $cursor ? $url . '&cursor=' . $cursor : $url;
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $fetchUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'X-API-TOKEN: ' . $TOKEN]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-        $response = curl_exec($ch);
-        curl_close($ch);
+    $data = json_decode($response, true);
+    if (isset($data['data']) && is_array($data['data'])) {
+        $allData = array_merge($allData, $data['data']);
+    }
 
-        $data = json_decode($response, true);
-        if (isset($data['data']) && is_array($data['data'])) {
-            foreach ($data['data'] as $store) {
-                $sid = $store['id'];
-                // نحتفظ بأحدث بيانات لكل متجر
-                if (!isset($storeMap[$sid]) || ($store['total_shipments'] ?? 0) > ($storeMap[$sid]['total_shipments'] ?? 0)) {
-                    $storeMap[$sid] = $store;
-                }
-            }
-        }
+    $cursor = isset($data['meta']['next_cursor']) ? $data['meta']['next_cursor'] : null;
+    $page++;
+} while ($cursor && $page < $maxPages);
 
-        $cursor = isset($data['meta']['next_cursor']) ? $data['meta']['next_cursor'] : null;
-        $page++;
-    } while ($cursor && $page < $maxPages);
-
-    $startDate->modify('+30 days');
-}
-
-$allData = array_values($storeMap);
 echo json_encode(['success' => true, 'data' => $allData, 'total' => count($allData)], JSON_UNESCAPED_UNICODE);

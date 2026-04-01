@@ -532,7 +532,7 @@ async function loadData() {
         fetch(DB_API + '?action=check_pending_schedules').then(r=>r.json()).then(d=>{
             if(d.scheduled>0){ showNotification('📅 '+d.scheduled+' متجر تم جدولة مكالماته تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
         }).catch(()=>{});
-        const sinceDate = new Date(Date.now() - 365*864e5).toISOString().split('T')[0];
+        const sinceDate = new Date(Date.now() - 30*864e5).toISOString().split('T')[0];
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=' + sinceDate),
             apiGet('/api-php/inactive-customers.php'),
