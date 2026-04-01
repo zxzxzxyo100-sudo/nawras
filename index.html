@@ -286,7 +286,8 @@
                     <div class="incubation-stats" id="incubation-stats" style="display:none;">
                         <div class="inc-stat-card completed"><div><div class="inc-stat-num" id="inc-completed-count">0</div><div class="inc-stat-label">مهام مكتملة اليوم</div></div></div>
                         <div class="inc-stat-card remaining"><div><div class="inc-stat-num" id="inc-remaining-count">0</div><div class="inc-stat-label">مهام متبقية اليوم</div></div></div>
-                        <div class="inc-stat-card total"><div><div class="inc-stat-num" id="inc-total-count">0</div><div class="inc-stat-label">إجمالي مهام اليوم</div></div></div>
+                        <div class="inc-stat-card total" id="inc-total-card"><div><div class="inc-stat-num" id="inc-total-count">0</div><div class="inc-stat-label" id="inc-total-label">إجمالي مهام اليوم</div></div></div>
+                        <div class="inc-stat-card" id="inc-monitor-card" style="display:none;border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" id="inc-all-incubating" style="color:#6366f1;">0</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
                     </div>
                     <div class="all-done-screen" id="all-done-screen">
                         <div class="all-done-icon">🏆</div>
@@ -658,9 +659,19 @@ function runStateMachine() {
         }
 
         // Rule 2: 48-hour test - failed (registered > 48h ago, never shipped)
+        // نقل آلي من الاحتضان إلى غير نشطة مع تسجيل في DB
         if (hoursSinceReg > 48 && !hasShipped) {
             store.category = 'inactive';
             store.state_reason = 'failed_48h';
+            // تسجيل في قاعدة البيانات إذا لم يُسجّل مسبقاً
+            if (!dbStates[store.id] || dbStates[store.id].category !== 'inactive') {
+                dbPost(DB_API + '?action=set_status', {
+                    store_id: store.id, category: 'inactive', store_name: store.name || '',
+                    state_reason: 'failed_48h', old_status: 'incubating',
+                    user: 'النظام', user_role: 'system'
+                });
+                dbStates[store.id] = { store_id: store.id, category: 'inactive' };
+            }
             return;
         }
 
@@ -809,6 +820,19 @@ function logCall(storeId, callType, note) {
     // Update local cache
     if (!dbCallLogs[storeId]) dbCallLogs[storeId] = {};
     dbCallLogs[storeId][callType] = new Date().toISOString();
+
+    // ===== ضمان next_call_date: لا يُقبل اتصال بدون جدولة تلقائية =====
+    if (s && ['day0','day3','day10'].includes(callType)) {
+        const regD = regDate ? new Date(regDate) : new Date();
+        let nextDate;
+        if (callType === 'day0') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 3); }
+        else if (callType === 'day3') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 10); }
+        else if (callType === 'day10') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 14); }
+        s.next_call_date = nextDate.toISOString().split('T')[0];
+        s.incubation_task = 'scheduled_waiting';
+        s.scheduled_date = s.next_call_date;
+    }
+
     // Update notes locally
     if (s) {
         const t = new Date().toLocaleString('ar-EG');
@@ -1012,8 +1036,9 @@ function renderCurrentView() {
     if (currentView === 'incubating') {
         const all = allStores.filter(s => s.category === 'incubating');
         const today = new Date().toISOString().split('T')[0];
+        const isManager = currentRole === 'executive';
 
-        // ===== المهام المستحقة فقط: next_call_date <= اليوم أو day0 (بدون جدولة) =====
+        // ===== المهام المستحقة (الموظف): next_call_date <= اليوم أو day0 =====
         const actionable = all.filter(s =>
             s.incubation_task === 'day0' ||
             s.incubation_task === 'day3' ||
@@ -1021,13 +1046,13 @@ function renderCurrentView() {
             s.incubation_task === 'graduation'
         );
 
-        // حساب المكتملة اليوم من call_logs
+        // حساب المكتملة اليوم
         const todayCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
         const completedToday = todayCalls.filter(c => ['day0','day3','day10','graduation'].includes(c.type) && c.role === currentRole).length;
         const totalToday = actionable.length + completedToday;
         const remainingToday = actionable.length;
 
-        // الفلاتر الفرعية
+        // الفلاتر
         const golden = actionable.filter(s => getHeatLevel(s) === 'golden');
         const hot = actionable.filter(s => getHeatLevel(s) === 'hot');
         const day0 = all.filter(s => s.incubation_task === 'day0');
@@ -1035,6 +1060,7 @@ function renderCurrentView() {
         const day10 = all.filter(s => s.incubation_task === 'day10');
         const grad = all.filter(s => s.incubation_task === 'graduation');
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
+        const waiting = all.filter(s => s.incubation_task === 'waiting' || s.incubation_task === 'cooldown');
 
         // ===== عدّادات الإنجاز =====
         const statsBar = document.getElementById('incubation-stats');
@@ -1044,8 +1070,17 @@ function renderCurrentView() {
         document.getElementById('inc-remaining-count').textContent = remainingToday;
         document.getElementById('inc-total-count').textContent = totalToday;
 
-        // ===== رسالة الإنجاز عند اكتمال جميع المهام =====
-        if (remainingToday === 0 && completedToday > 0 && !searchQuery) {
+        // ===== عداد المراقبة (المدير فقط): إجمالي قيد الاحتضان =====
+        const monitorCard = document.getElementById('inc-monitor-card');
+        if (isManager) {
+            monitorCard.style.display = 'block';
+            document.getElementById('inc-all-incubating').textContent = all.length;
+        } else {
+            monitorCard.style.display = 'none';
+        }
+
+        // ===== رسالة الإنجاز (الموظف فقط) =====
+        if (!isManager && remainingToday === 0 && completedToday > 0 && !searchQuery) {
             doneScreen.classList.add('visible');
             sf.style.display = 'none';
             tl.innerHTML = '';
@@ -1055,8 +1090,9 @@ function renderCurrentView() {
             doneScreen.classList.remove('visible');
         }
 
+        // ===== الفلاتر: المدير يرى فلاتر إضافية =====
         sf.style.display = 'flex';
-        sf.innerHTML = `
+        let filtersHtml = `
             <button class="sub-filter-btn ${currentSubFilter==='due'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('due')" style="background:${currentSubFilter==='due'||currentSubFilter==='all'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='due'||currentSubFilter==='all'?'':'var(--success)'}">📋 مهام اليوم <span class="sf-count">${actionable.length}</span></button>
             <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
             <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
@@ -1065,6 +1101,13 @@ function renderCurrentView() {
             <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 قائمة التخريج <span class="sf-count">${grad.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة (قادمة) <span class="sf-count">${scheduledWaiting.length}</span></button>`;
+        // المدير يرى فلاتر إضافية: الكل + بانتظار
+        if (isManager) {
+            filtersHtml += `
+            <button class="sub-filter-btn ${currentSubFilter==='waiting_all'?'active':''}" onclick="setSubFilter('waiting_all')">⏸️ بانتظار <span class="sf-count">${waiting.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 كل المتاجر <span class="sf-count">${all.length}</span></button>`;
+        }
+        sf.innerHTML = filtersHtml;
 
         let stores;
         if (currentSubFilter === 'golden') stores = golden;
@@ -1074,20 +1117,20 @@ function renderCurrentView() {
         else if (currentSubFilter === 'day10') stores = day10;
         else if (currentSubFilter === 'graduation') stores = grad;
         else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
+        else if (currentSubFilter === 'waiting_all' && isManager) stores = waiting;
+        else if (currentSubFilter === 'all_stores' && isManager) stores = all;
         else stores = actionable; // الافتراضي: المهام المستحقة فقط
 
-        // ===== ترتيب ذكي: ذهبي > ساخن > الأقدم =====
+        // ===== ترتيب ذكي: ذهبي > ساخن > نوع المهمة > الأقدم =====
         stores.sort((a, b) => {
             const heatOrder = { golden: 0, hot: 1, normal: 2 };
             const hA = heatOrder[getHeatLevel(a)] ?? 2;
             const hB = heatOrder[getHeatLevel(b)] ?? 2;
             if (hA !== hB) return hA - hB;
-            // ثم حسب نوع المهمة
             const taskOrder = { day0: 0, day3: 1, day10: 2, graduation: 3, scheduled_waiting: 4, waiting: 5 };
             const tA = taskOrder[a.incubation_task] ?? 5;
             const tB = taskOrder[b.incubation_task] ?? 5;
             if (tA !== tB) return tA - tB;
-            // ثم الأقدم تسجيلاً أولاً
             const rA = a.registered_at ? new Date(a.registered_at).getTime() : Infinity;
             const rB = b.registered_at ? new Date(b.registered_at).getTime() : Infinity;
             return rA - rB;
