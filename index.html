@@ -874,7 +874,7 @@ function updateDashboard() {
     document.getElementById('frozen-count').textContent = frozen.length;
     document.getElementById('cold-count').textContent = cold.length;
 
-    const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
+    const conv = allStores.length > 0 ? Math.round(active.length / allStores.length * 100) : 0;
     let sat = '0'; let tc = 0, tt = 0;
     allStores.forEach(s => { const sv = s.survey || getStored('survey', s.id); if (sv && sv.answers) { tt += sv.answers.reduce((a,b)=>a+b,0)/sv.answers.length; tc++; } });
     if (tc > 0) sat = (tt/tc).toFixed(1);
@@ -926,7 +926,7 @@ function updateDashboard() {
 
     // Conversion rate - incubation manager & executive
     if (currentRole === 'executive' || currentRole === 'incubation_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">نسبة التحويل (احتضان → نشط)</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>'+c.active+' نشط من '+allStores.length+' متجر</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">نسبة التحويل (احتضان → نشط)</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>'+active.length+' نشط من '+allStores.length+' متجر</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
     }
 
     // Recovery rate - inactive manager & executive
