@@ -689,6 +689,12 @@ function runStateMachine() {
         const nextCallDate = store.next_call_date || null;
         const dbStage = store.incubation_stage || null;
 
+        // أولوية قصوى: إذا المتجر مجدول محلياً (بعد اتصال فوري) لا نتجاوزه
+        if (store.incubation_task === 'scheduled_waiting' && nextCallDate && nextCallDate > today) {
+            store.scheduled_date = nextCallDate;
+            return; // محمي - لا نعيد حسابه
+        }
+
         // Check if last call was less than 2 hours ago (cooldown)
         const lastCallTime = getLastCallTime(callLog);
         if (lastCallTime && (now - new Date(lastCallTime)) < 2 * 36e5) {
@@ -822,14 +828,15 @@ function logCall(storeId, callType, note) {
     if (!dbCallLogs[storeId]) dbCallLogs[storeId] = {};
     dbCallLogs[storeId][callType] = new Date().toISOString();
 
-    // ===== ضمان next_call_date: لا يُقبل اتصال بدون جدولة تلقائية =====
+    // ===== ضمان next_call_date + تحديث incubation_stage محلياً =====
     if (s && ['day0','day3','day10'].includes(callType)) {
         const regD = regDate ? new Date(regDate) : new Date();
-        let nextDate;
-        if (callType === 'day0') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 3); }
-        else if (callType === 'day3') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 10); }
-        else if (callType === 'day10') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 14); }
+        let nextDate, nextStage;
+        if (callType === 'day0') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 3); nextStage = 'day3'; }
+        else if (callType === 'day3') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 10); nextStage = 'day10'; }
+        else if (callType === 'day10') { nextDate = new Date(regD); nextDate.setDate(nextDate.getDate() + 14); nextStage = 'graduation_ready'; }
         s.next_call_date = nextDate.toISOString().split('T')[0];
+        s.incubation_stage = nextStage;
         s.incubation_task = 'scheduled_waiting';
         s.scheduled_date = s.next_call_date;
     }
@@ -1455,7 +1462,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">📵 معلق</span>':''}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">📵 معلق</span>':''}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}${store.incubation_task==='scheduled_waiting'&&store.scheduled_date?(function(){const d=Math.max(0,Math.ceil((new Date(store.scheduled_date)-new Date())/864e5));const stgL={day3:'المكالمة الثانية',day10:'المكالمة الثالثة',graduation_ready:'التخريج'};const stg=stgL[store.incubation_stage]||'التالية';return' <span style="background:rgba(37,99,235,0.1);color:var(--primary);padding:0.15rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">⏳ '+stg+' بعد '+d+' يوم</span>';})():''}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
