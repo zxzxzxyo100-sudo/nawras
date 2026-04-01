@@ -370,12 +370,17 @@ elseif ($action === 'update_incubation') {
 
 // ========== الحصول على بيانات الاحتضان (GET INCUBATION DATA) ==========
 elseif ($action === 'get_incubation_data') {
-    $stmt = $pdo->query("SELECT store_id, registration_date, first_shipped_date, incubation_stage, next_call_date, graduated_at FROM store_states WHERE category = 'incubating' OR incubation_stage IS NOT NULL");
-    $result = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $result[$row['store_id']] = $row;
+    try {
+        $stmt = $pdo->query("SELECT store_id, registration_date, first_shipped_date, incubation_stage, next_call_date, graduated_at FROM store_states WHERE category = 'incubating' OR incubation_stage IS NOT NULL");
+        $result = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $result[$row['store_id']] = $row;
+        }
+        jsonResponse(['success' => true, 'data' => $result]);
+    } catch (Exception $e) {
+        // الأعمدة الجديدة لم تُضاف بعد - يرجى فتح setup-db.php أولاً
+        jsonResponse(['success' => true, 'data' => []]);
     }
-    jsonResponse(['success' => true, 'data' => $result]);
 }
 
 else { jsonResponse(['error' => 'Unknown action'], 400); }

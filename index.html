@@ -377,7 +377,7 @@ async function loadDBState() {
         fetch(DB_API + '?action=get_all_calllogs').then(r => r.json()),
         fetch(DB_API + '?action=get_all_recovery_calls').then(r => r.json()),
         fetch(DB_API + '?action=get_surveys').then(r => r.json()),
-        fetch(DB_API + '?action=get_incubation_data').then(r => r.json())
+        fetch(DB_API + '?action=get_incubation_data').then(r => r.json()).catch(() => ({ data: {} }))
     ]);
     // Index by store_id
     dbStates = {};
