@@ -1039,8 +1039,17 @@ function renderCurrentView() {
         const isManager = currentRole === 'executive';
 
         // ===== تبويبات المدير: لم تشحن / بدأت الشحن =====
-        const notShipped = all.filter(s => !s.total_shipments || s.total_shipments == 0);
-        const hasShippedStores = all.filter(s => s.total_shipments > 0);
+        // تحقق دقيق: نعتبر المتجر "شحن" إذا total_shipments > 0 أو لديه تاريخ شحنة فعلي
+        function storeHasShipped(s) {
+            if (parseInt(s.total_shipments) > 0) return true;
+            if (s.first_shipment_date && s.first_shipment_date !== 'لا يوجد') return true;
+            if (s.last_shipment_date && s.last_shipment_date !== 'لا يوجد') return true;
+            if (s.shipments_in_range > 0) return true;
+            if (s.first_shipped_date_db) return true;
+            return false;
+        }
+        const notShipped = all.filter(s => !storeHasShipped(s));
+        const hasShippedStores = all.filter(s => storeHasShipped(s));
 
         // ===== المهام المستحقة (الموظف): next_call_date <= اليوم أو day0 =====
         const actionable = all.filter(s =>
