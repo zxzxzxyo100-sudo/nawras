@@ -136,6 +136,19 @@
         .empty-state { text-align:center;padding:4rem 2rem;color:var(--text-secondary); }
         .empty-state-icon { font-size:4rem;margin-bottom:1rem;opacity:0.5; }
 
+        /* ===== PAGINATION ===== */
+        .pagination-wrapper { display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;padding:1rem 0;border-top:2px solid var(--border);flex-wrap:wrap;gap:1rem; }
+        .pagination-controls { display:flex;align-items:center;gap:0.5rem; }
+        .pagination-controls .page-btn { min-width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:2px solid var(--border);background:white;border-radius:10px;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:700;font-size:0.85rem;color:var(--text-primary);transition:all 0.2s; }
+        .pagination-controls .page-btn:hover:not(.disabled):not(.active) { border-color:var(--primary);color:var(--primary);background:var(--primary-light); }
+        .pagination-controls .page-btn.active { background:var(--primary);color:white;border-color:var(--primary); }
+        .pagination-controls .page-btn.disabled { opacity:0.4;cursor:not-allowed; }
+        .pagination-controls .page-dots { padding:0 0.25rem;color:var(--text-secondary);font-weight:700;user-select:none; }
+        .pagination-info { display:flex;align-items:center;gap:1rem;color:var(--text-secondary);font-size:0.85rem;font-weight:600; }
+        .pagination-info .rows-select { padding:0.4rem 0.75rem;border:2px solid var(--border);border-radius:10px;font-family:'Cairo',sans-serif;font-weight:700;font-size:0.85rem;background:white;cursor:pointer;color:var(--text-primary);transition:all 0.2s;outline:none; }
+        .pagination-info .rows-select:hover, .pagination-info .rows-select:focus { border-color:var(--primary); }
+        .pagination-summary { font-size:0.8rem;color:var(--text-secondary);font-weight:600; }
+
         .survey-section { background:var(--bg-main);padding:1.25rem;border-radius:10px;margin-top:1rem;border:1px solid var(--border); }
         .survey-title { font-weight:700;margin-bottom:1rem;font-size:0.95rem; }
         .star-rating { display:flex;gap:0.25rem;direction:ltr; }
@@ -240,6 +253,20 @@
                     <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2></div>
                     <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
+                    <div class="pagination-wrapper" id="pagination-wrapper" style="display:none;">
+                        <div class="pagination-info">
+                            <span>عرض</span>
+                            <select class="rows-select" id="rows-per-page" onchange="changeRowsPerPage(this.value)">
+                                <option value="25">25</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="250">250</option>
+                            </select>
+                            <span>سجل</span>
+                            <span class="pagination-summary" id="pagination-summary"></span>
+                        </div>
+                        <div class="pagination-controls" id="pagination-controls"></div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -347,6 +374,7 @@ function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(
 
 // ===================== STATE =====================
 let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null, cachedUsers = [];
+let currentPage = 1, rowsPerPage = 50;
 
 // ===================== API =====================
 const DB_API = '/api-php/store-actions.php';
@@ -892,10 +920,12 @@ function updateDashboard() {
 function switchView(view) {
     if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
     currentView = view;
+    currentPage = 1;
     document.querySelectorAll('.nav-item').forEach(i => { i.classList.remove('active'); if (i.dataset.view === view) i.classList.add('active'); });
     if (view === 'dashboard') {
         document.getElementById('dashboard-view').style.display = 'block';
         document.getElementById('tasks-view').style.display = 'none';
+        document.getElementById('pagination-wrapper').style.display = 'none';
         document.getElementById('page-title').textContent = 'لوحة التحكم';
         document.getElementById('page-subtitle').textContent = 'نظرة شاملة';
         updateDashboard();
@@ -973,8 +1003,9 @@ function renderCurrentView() {
             });
         }
 
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد مهام</h3></div>'; return; }
-        stores.forEach(s => tl.appendChild(createStoreCard(s)));
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد مهام</h3></div>'; renderPagination(0); return; }
+        renderPagination(stores.length);
+        paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else if (currentView === 'inactive') {
         const now = new Date();
@@ -1011,18 +1042,21 @@ function renderCurrentView() {
         else if (currentSubFilter === 'due_recovery') stores = dueCalls;
         else if (currentSubFilter === 'recovered') stores = recovered;
         else stores = [...inact, ...rest];
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
-        stores.forEach(s => tl.appendChild(createStoreCard(s)));
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
+        renderPagination(stores.length);
+        paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else if (currentView === 'users') {
         sf.style.display = 'none';
+        renderPagination(0);
         renderUsersView(tl);
 
     } else {
         sf.style.display = 'none';
         const stores = allStores.filter(s => s.category === currentView);
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; return; }
-        stores.forEach(s => tl.appendChild(createStoreCard(s)));
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
+        renderPagination(stores.length);
+        paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
     }
 }
 
@@ -1064,7 +1098,7 @@ async function renderUsersView(container) {
     container.innerHTML = html;
 }
 
-function setSubFilter(f) { currentSubFilter = f; renderCurrentView(); }
+function setSubFilter(f) { currentSubFilter = f; currentPage = 1; renderCurrentView(); }
 
 // ===================== STORE CARD =====================
 function createStoreCard(store) {
@@ -1507,6 +1541,71 @@ function importData(event) {
 }
 
 // ===================== UTILS =====================
+// ===================== PAGINATION =====================
+function changeRowsPerPage(val) {
+    rowsPerPage = parseInt(val);
+    currentPage = 1;
+    renderCurrentView();
+}
+
+function goToPage(page) {
+    currentPage = page;
+    renderCurrentView();
+    // Scroll to top of tasks section
+    document.getElementById('tasks-view').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function renderPagination(totalItems) {
+    const wrapper = document.getElementById('pagination-wrapper');
+    const controls = document.getElementById('pagination-controls');
+    const summary = document.getElementById('pagination-summary');
+
+    if (totalItems <= rowsPerPage) {
+        wrapper.style.display = 'none';
+        return;
+    }
+
+    wrapper.style.display = 'flex';
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const from = (currentPage - 1) * rowsPerPage + 1;
+    const to = Math.min(currentPage * rowsPerPage, totalItems);
+    summary.textContent = 'عرض ' + from + ' - ' + to + ' من ' + totalItems;
+
+    let h = '';
+    // زر السابق
+    h += '<button class="page-btn' + (currentPage === 1 ? ' disabled' : '') + '" onclick="' + (currentPage > 1 ? 'goToPage('+(currentPage-1)+')' : '') + '">السابق</button>';
+
+    // أرقام الصفحات
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+    if (startPage > 1) {
+        h += '<button class="page-btn" onclick="goToPage(1)">1</button>';
+        if (startPage > 2) h += '<span class="page-dots">...</span>';
+    }
+    for (let i = startPage; i <= endPage; i++) {
+        h += '<button class="page-btn' + (i === currentPage ? ' active' : '') + '" onclick="goToPage('+i+')">'+i+'</button>';
+    }
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) h += '<span class="page-dots">...</span>';
+        h += '<button class="page-btn" onclick="goToPage('+totalPages+')">'+totalPages+'</button>';
+    }
+
+    // زر التالي
+    h += '<button class="page-btn' + (currentPage === totalPages ? ' disabled' : '') + '" onclick="' + (currentPage < totalPages ? 'goToPage('+(currentPage+1)+')' : '') + '">التالي</button>';
+
+    controls.innerHTML = h;
+}
+
+function paginateStores(stores) {
+    const start = (currentPage - 1) * rowsPerPage;
+    return stores.slice(start, start + rowsPerPage);
+}
+
 function showNotification(msg, type='success') {
     const n = document.createElement('div'); n.className = 'notification';
     if (type==='error') n.style.background='var(--danger)';
