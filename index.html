@@ -532,22 +532,19 @@ async function loadData() {
 
         if (!apiResult.success) throw new Error('فشل في جلب البيانات');
 
-        // بناء allStores من التصنيف الجاهز
+        // بناء allStores من التصنيف الجاهز (3 فئات بسيطة)
         allStores = [];
         const cats = apiResult.data;
         (cats.incubating || []).forEach(s => { s.category = 'incubating'; allStores.push(s); });
         (cats.active || []).forEach(s => { s.category = 'active'; allStores.push(s); });
-        (cats.inactive_hot || []).forEach(s => { s.category = 'inactive'; s.inactive_type = 'hot'; allStores.push(s); });
-        (cats.cold || []).forEach(s => { s.category = 'cold'; allStores.push(s); });
-        (cats.never_shipped || []).forEach(s => { s.category = 'inactive'; s.state_reason = 'failed_48h'; allStores.push(s); });
+        (cats.inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
 
-        // تطبيق DB overrides
+        // تطبيق DB overrides (تجميد، استعادة، متعذر الوصول)
         allStores.forEach(s => {
             const db = dbStates[s.id];
             if (db) {
                 if (['frozen','restoring','recovered'].includes(db.category)) s.category = db.category;
                 if (db.freeze_reason) s.freeze_reason = db.freeze_reason;
-                if (db.state_reason) s.state_reason = db.state_reason;
                 if (db.state_reason === 'unreachable') s.unreachable = true;
             }
             const sv = dbSurveys[s.id];
@@ -556,9 +553,11 @@ async function loadData() {
             if (inc) { s.incubation_stage = inc.incubation_stage; s.next_call_date = inc.next_call_date; }
         });
 
+        // مهام الاحتضان
         runStateMachine();
         updateDashboard(); renderCurrentView();
-        showNotification('تم تحميل ' + apiResult.counts.total + ' متجر (نشط: ' + apiResult.counts.active + ' | احتضان: ' + apiResult.counts.incubating + ' | خامل: ' + (apiResult.counts.inactive_hot + apiResult.counts.never_shipped) + ' | بارد: ' + apiResult.counts.cold + ')');
+        const c = apiResult.counts;
+        showNotification('تم تحميل ' + c.total + ' متجر | نشط: ' + c.active + ' | احتضان: ' + c.incubating + ' | غير نشط: ' + c.inactive);
 
         // فحوصات خلفية مؤجلة
         setTimeout(() => {
