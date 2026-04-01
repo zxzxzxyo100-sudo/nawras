@@ -1038,6 +1038,10 @@ function renderCurrentView() {
         const today = new Date().toISOString().split('T')[0];
         const isManager = currentRole === 'executive';
 
+        // ===== تبويبات المدير: لم تشحن / بدأت الشحن =====
+        const notShipped = all.filter(s => !s.total_shipments || s.total_shipments == 0);
+        const hasShippedStores = all.filter(s => s.total_shipments > 0);
+
         // ===== المهام المستحقة (الموظف): next_call_date <= اليوم أو day0 =====
         const actionable = all.filter(s =>
             s.incubation_task === 'day0' ||
@@ -1052,7 +1056,7 @@ function renderCurrentView() {
         const totalToday = actionable.length + completedToday;
         const remainingToday = actionable.length;
 
-        // الفلاتر
+        // الفلاتر (الموظف)
         const golden = actionable.filter(s => getHeatLevel(s) === 'golden');
         const hot = actionable.filter(s => getHeatLevel(s) === 'hot');
         const day0 = all.filter(s => s.incubation_task === 'day0');
@@ -1060,7 +1064,6 @@ function renderCurrentView() {
         const day10 = all.filter(s => s.incubation_task === 'day10');
         const grad = all.filter(s => s.incubation_task === 'graduation');
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
-        const waiting = all.filter(s => s.incubation_task === 'waiting' || s.incubation_task === 'cooldown');
 
         // ===== عدّادات الإنجاز =====
         const statsBar = document.getElementById('incubation-stats');
@@ -1070,7 +1073,7 @@ function renderCurrentView() {
         document.getElementById('inc-remaining-count').textContent = remainingToday;
         document.getElementById('inc-total-count').textContent = totalToday;
 
-        // ===== عداد المراقبة (المدير فقط): إجمالي قيد الاحتضان =====
+        // ===== عداد المراقبة (المدير): إجمالي قيد الاحتضان =====
         const monitorCard = document.getElementById('inc-monitor-card');
         if (isManager) {
             monitorCard.style.display = 'block';
@@ -1090,36 +1093,43 @@ function renderCurrentView() {
             doneScreen.classList.remove('visible');
         }
 
-        // ===== الفلاتر: المدير يرى فلاتر إضافية =====
         sf.style.display = 'flex';
-        let filtersHtml = `
-            <button class="sub-filter-btn ${currentSubFilter==='due'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('due')" style="background:${currentSubFilter==='due'||currentSubFilter==='all'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='due'||currentSubFilter==='all'?'':'var(--success)'}">📋 مهام اليوم <span class="sf-count">${actionable.length}</span></button>
-            <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
-            <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 قائمة التخريج <span class="sf-count">${grad.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة (قادمة) <span class="sf-count">${scheduledWaiting.length}</span></button>`;
-        // المدير يرى فلاتر إضافية: الكل + بانتظار
+
         if (isManager) {
-            filtersHtml += `
-            <button class="sub-filter-btn ${currentSubFilter==='waiting_all'?'active':''}" onclick="setSubFilter('waiting_all')">⏸️ بانتظار <span class="sf-count">${waiting.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 كل المتاجر <span class="sf-count">${all.length}</span></button>`;
+            // ===== واجهة المدير: تبويبان رئيسيان + فلاتر فرعية =====
+            sf.innerHTML = `
+                <button class="sub-filter-btn ${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('not_shipped')" style="background:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'rgba(220,38,38,0.06)'};border-color:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'var(--danger)'}">🚫 لم تشحن <span class="sf-count">${notShipped.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='has_shipped'?'active':''}" onclick="setSubFilter('has_shipped')" style="background:${currentSubFilter==='has_shipped'?'':'rgba(5,150,105,0.06)'};border-color:${currentSubFilter==='has_shipped'?'':'var(--success)'}">📦 بدأت الشحن <span class="sf-count">${hasShippedStores.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام مستحقة <span class="sf-count">${actionable.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 الكل <span class="sf-count">${all.length}</span></button>`;
+        } else {
+            // ===== واجهة الموظف: مهام اليوم المستحقة فقط =====
+            sf.innerHTML = `
+                <button class="sub-filter-btn ${currentSubFilter==='due'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('due')" style="background:${currentSubFilter==='due'||currentSubFilter==='all'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='due'||currentSubFilter==='all'?'':'var(--success)'}">📋 مهام اليوم <span class="sf-count">${actionable.length}</span></button>
+                <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
+                <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>`;
         }
-        sf.innerHTML = filtersHtml;
 
         let stores;
-        if (currentSubFilter === 'golden') stores = golden;
+        if (currentSubFilter === 'not_shipped' && isManager) stores = notShipped;
+        else if (currentSubFilter === 'has_shipped' && isManager) stores = hasShippedStores;
+        else if (currentSubFilter === 'all_stores' && isManager) stores = all;
+        else if (currentSubFilter === 'golden') stores = golden;
         else if (currentSubFilter === 'hot') stores = hot;
         else if (currentSubFilter === 'day0') stores = day0;
         else if (currentSubFilter === 'day3') stores = day3;
         else if (currentSubFilter === 'day10') stores = day10;
         else if (currentSubFilter === 'graduation') stores = grad;
         else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
-        else if (currentSubFilter === 'waiting_all' && isManager) stores = waiting;
-        else if (currentSubFilter === 'all_stores' && isManager) stores = all;
-        else stores = actionable; // الافتراضي: المهام المستحقة فقط
+        else if (isManager) stores = notShipped; // المدير: الافتراضي = لم تشحن
+        else stores = actionable; // الموظف: الافتراضي = المهام المستحقة
 
         // ===== ترتيب ذكي: ذهبي > ساخن > نوع المهمة > الأقدم =====
         stores.sort((a, b) => {
