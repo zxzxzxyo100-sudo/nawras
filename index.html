@@ -429,8 +429,13 @@ async function apiGet(url) {
 }
 
 async function dbPost(url, data) {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    return await r.json();
+    try {
+        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        const text = await r.text();
+        try { return JSON.parse(text); } catch { return { success: false, error: 'استجابة غير صالحة من السيرفر' }; }
+    } catch (e) {
+        return { success: false, error: 'خطأ في الاتصال بالسيرفر: ' + e.message };
+    }
 }
 
 // DB state caches
@@ -463,12 +468,34 @@ async function loadDBState() {
 // ===================== AUTH (MySQL) =====================
 async function handleLogin(e) {
     e.preventDefault();
+    const errEl = document.getElementById('login-error');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
+    if (!username || !password) {
+        errEl.style.display = 'block';
+        errEl.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور';
+        return;
+    }
+    // إظهار حالة التحميل
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'جاري الدخول...';
+    errEl.style.display = 'none';
+
     const result = await dbPost(AUTH_API + '?action=login', { username, password });
+
     if (!result.success) {
-        document.getElementById('login-error').style.display = 'block';
-        document.getElementById('login-error').textContent = result.error || 'بيانات الدخول غير صحيحة';
+        errEl.style.display = 'block';
+        errEl.textContent = result.error || 'بيانات الدخول غير صحيحة';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'دخول';
+        return;
+    }
+    if (!result.user || !result.user.id || !result.user.role) {
+        errEl.style.display = 'block';
+        errEl.textContent = 'خطأ في بيانات المستخدم من السيرفر';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'دخول';
         return;
     }
     currentUser = result.user;
