@@ -579,7 +579,8 @@ function processStoresData(newData, inactiveData, summaryData) {
             ex.total_shipments = s.total_shipments || ex.total_shipments;
             ex.shipments_in_range = s.shipments_in_range || 0;
             if (!ex.first_shipment_date && s.last_shipment_date && s.last_shipment_date !== 'لا يوجد') ex.first_shipment_date = s.last_shipment_date;
-        } else if (s.status === 'active' && s.total_shipments > 0) {
+        } else if (s.status === 'active' && s.total_shipments > 0 && dbStates[s.id] && dbStates[s.id].category === 'active') {
+            // فقط المتاجر المسجلة في DB كنشطة (تخرجت فعلاً)
             allStores.push({ ...s, category: 'active', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
         }
     });
