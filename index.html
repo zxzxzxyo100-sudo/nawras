@@ -133,6 +133,18 @@
         .btn-called:hover { background:#7c3aed;transform:translateY(-2px); }
         .btn-outline { background:white;border:2px solid var(--border);color:var(--text-primary); }
         .btn-outline:hover { border-color:var(--primary);color:var(--primary); }
+        /* ===== SUB-STATUS BADGES ===== */
+        .sub-badge { display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:700;white-space:nowrap; }
+        .sub-badge.golden { background:rgba(217,119,6,0.12);color:var(--golden); }
+        .sub-badge.hot { background:rgba(220,38,38,0.1);color:var(--hot); }
+        .sub-badge.not-shipped { background:rgba(148,163,184,0.15);color:#64748b; }
+        .sub-badge.shipped { background:rgba(5,150,105,0.1);color:var(--success); }
+        .sub-badge.unreachable { background:rgba(249,115,22,0.12);color:#f97316; }
+        .sub-badge.cold { background:rgba(148,163,184,0.12);color:#475569; }
+        .sub-badge.frozen { background:rgba(147,51,234,0.1);color:var(--frozen); }
+        .sub-badge.graduated { background:rgba(5,150,105,0.12);color:var(--success); }
+        .sub-badge.scheduled { background:rgba(37,99,235,0.1);color:var(--primary); }
+
         .empty-state { text-align:center;padding:4rem 2rem;color:var(--text-secondary); }
         .empty-state-icon { font-size:4rem;margin-bottom:1rem;opacity:0.5; }
 
@@ -221,9 +233,11 @@
             <nav class="nav-menu">
                 <div class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span>لوحة التحكم</span></div>
                 <div class="nav-divider"></div>
-                <div class="nav-section-label">الأقسام</div>
+                <div class="nav-section-label">العملاء</div>
                 <div class="nav-item" data-view="incubating" id="nav-incubating"><span class="nav-icon">🎯</span><span>مسار الاحتضان</span><span class="badge" id="incubating-count">0</span></div>
-                <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
+                <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>المتاجر النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
+                <div class="nav-divider"></div>
+                <div class="nav-section-label">الاستعادة</div>
                 <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
                 <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
                 <div class="nav-item" data-view="cold" id="nav-cold"><span class="nav-icon">🥶</span><span>باردة +60 يوم</span><span class="badge" id="cold-count" style="background:#94a3b8">0</span></div>
@@ -250,7 +264,12 @@
             <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
             <div id="tasks-view" style="display:none;">
                 <div class="tasks-section">
-                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2></div>
+                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
+                        <div style="display:flex;gap:0.5rem;align-items:center;">
+                            <div class="search-box" id="search-box-container"><input type="text" id="store-search" placeholder="🔍 بحث بكود أو اسم..." oninput="handleSearch(this.value)"><button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button></div>
+                            <button class="btn btn-success" id="add-store-btn" onclick="openAddStoreModal()" style="display:none;white-space:nowrap;">+ إضافة متجر</button>
+                        </div>
+                    </div>
                     <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
                     <div class="pagination-wrapper" id="pagination-wrapper" style="display:none;">
@@ -280,6 +299,19 @@
             <input type="hidden" id="call-type">
             <div class="form-group"><label class="form-label">ملاحظة النورس (إلزامية)</label><textarea class="form-textarea" id="call-note" placeholder="اكتب ملاحظة عن المكالمة..." required></textarea></div>
             <div class="task-actions"><button type="submit" class="btn btn-called">تأكيد - تم الاتصال</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
+        </form>
+    </div></div>
+
+    <!-- Add Store Modal -->
+    <div class="modal" id="add-store-modal"><div class="modal-content">
+        <div class="modal-header" style="background:linear-gradient(135deg,#059669,#10b981);margin:-2rem -2rem 1.5rem;padding:1.5rem 2rem;border-radius:20px 20px 0 0;border-bottom:none;">
+            <h3 style="color:white">+ إضافة متجر جديد</h3><button class="close-modal" onclick="closeModal()" style="background:rgba(255,255,255,0.2);color:white">✕</button>
+        </div>
+        <form id="add-store-form">
+            <div class="form-group"><label class="form-label">اسم المتجر</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="new-store-name" placeholder="اسم المتجر" required></div>
+            <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="new-store-phone" placeholder="09XXXXXXXX" required></div>
+            <div class="form-group"><label class="form-label">المدينة</label><input class="form-textarea" style="min-height:auto;padding:0.75rem" type="text" id="new-store-city" placeholder="المدينة"></div>
+            <div class="task-actions" style="justify-content:center;"><button type="submit" class="btn btn-success" style="padding:0.75rem 2rem;">إضافة للاحتضان</button><button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button></div>
         </form>
     </div></div>
 
@@ -354,7 +386,7 @@ const SURVEY_QUESTIONS = [
 const SURVEY_LABELS = ['سرعة التوصيل','خدمة التجميع','الدعم الفني','المنظومة','التسويات المالية','سلامة المرجوعات'];
 
 const ROLES = {
-    incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
+    incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating','active'] },
     active_manager: { label:'مسؤول المتاجر النشطة', views:['dashboard','active'] },
     inactive_manager: { label:'مسؤول الاستعادة', views:['dashboard','inactive'] },
     executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen','cold','users'] }
@@ -753,6 +785,33 @@ function getLastCallTime(callLog) {
     return latest;
 }
 
+function getSubBadge(store) {
+    if (store.unreachable) return '<span class="sub-badge unreachable">📵 تعذر الوصول</span>';
+    const heat = getHeatLevel(store);
+    if (store.category === 'incubating') {
+        if (heat === 'golden') return '<span class="sub-badge golden">🥇 ذهبي</span>';
+        if (heat === 'hot') return '<span class="sub-badge hot">🔥 ساخن</span>';
+        const shipped = store.total_shipments > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد');
+        if (!shipped) return '<span class="sub-badge not-shipped">📭 لم يشحن</span>';
+        if (store.incubation_task === 'graduation') return '<span class="sub-badge graduated">🎓 جاهز للتخريج</span>';
+        if (store.incubation_task === 'scheduled_waiting') {
+            const d = store.scheduled_date ? Math.max(0, Math.ceil((new Date(store.scheduled_date) - new Date()) / 864e5)) : '?';
+            return '<span class="sub-badge scheduled">⏳ مجدول بعد '+d+' يوم</span>';
+        }
+        return '<span class="sub-badge shipped">📦 يشحن</span>';
+    }
+    if (store.category === 'active') return '<span class="sub-badge shipped">✅ نشط</span>';
+    if (store.category === 'frozen') return '<span class="sub-badge frozen">🧊 مجمد</span>';
+    if (store.category === 'cold') return '<span class="sub-badge cold">🥶 بارد</span>';
+    if (store.category === 'restoring') return '<span class="sub-badge hot">🔄 جاري الاستعادة</span>';
+    if (store.category === 'recovered') return '<span class="sub-badge graduated">✅ تمت الاستعادة</span>';
+    if (store.category === 'inactive') {
+        if (store.state_reason === 'failed_48h') return '<span class="sub-badge not-shipped">🚫 لم يشحن 48h</span>';
+        return '<span class="sub-badge cold">📦 توقف عن الشحن</span>';
+    }
+    return '';
+}
+
 function getHeatLevel(store) {
     if (!store.registered_at) return 'normal';
     const h = (new Date() - new Date(store.registered_at)) / 36e5;
@@ -979,6 +1038,10 @@ function renderCurrentView() {
     document.getElementById('page-subtitle').textContent = cfg.sub;
     document.getElementById('section-icon').textContent = cfg.icon;
     document.getElementById('section-title').textContent = cfg.title;
+
+    // إظهار زر "إضافة متجر" في صفحات العملاء فقط
+    const addBtn = document.getElementById('add-store-btn');
+    if (addBtn) addBtn.style.display = ['incubating','active'].includes(currentView) ? 'block' : 'none';
 
     const sf = document.getElementById('sub-filters');
     const tl = document.getElementById('task-list');
@@ -1304,7 +1367,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;">📵 معلق</span>':''}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'} ${getSubBadge(store)}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
@@ -1426,6 +1489,51 @@ function markReachable(id) {
 }
 
 // ===================== MODALS =====================
+function openAddStoreModal() {
+    document.getElementById('new-store-name').value = '';
+    document.getElementById('new-store-phone').value = '';
+    document.getElementById('new-store-city').value = '';
+    document.getElementById('add-store-modal').classList.add('active');
+}
+
+document.getElementById('add-store-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const name = document.getElementById('new-store-name').value.trim();
+    const phone = document.getElementById('new-store-phone').value.trim();
+    const city = document.getElementById('new-store-city').value.trim();
+    if (!name || !phone) { showNotification('الاسم ورقم الهاتف مطلوبان', 'error'); return; }
+
+    // إنشاء ID مؤقت فريد
+    const tempId = Date.now();
+    const newStore = {
+        id: tempId, name, phone, city: city || '',
+        category: 'incubating', registered_at: new Date().toISOString(),
+        total_shipments: 0, first_shipment_date: null, last_shipment_date: null,
+        notes: [], incubation_task: 'day0'
+    };
+
+    // إضافة للقائمة المحلية
+    allStores.push(newStore);
+
+    // حفظ في DB
+    dbPost(DB_API + '?action=set_status', {
+        store_id: tempId, category: 'incubating', store_name: name,
+        state_reason: 'manual_add', old_status: '',
+        user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
+
+    // سجل العمليات
+    dbPost(DB_API + '?action=log_call', {
+        store_id: tempId, store_name: name, call_type: 'manual_add',
+        note: 'إضافة متجر يدوياً - هاتف: ' + phone + (city ? ' - مدينة: ' + city : ''),
+        user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
+
+    closeModal(); this.reset();
+    showNotification('✅ تم إضافة المتجر "' + name + '" لمسار الاحتضان');
+    runStateMachine(); updateDashboard(); renderCurrentView();
+});
+
 function openCallModal(id, type) {
     document.getElementById('call-store-id').value = id;
     document.getElementById('call-type').value = type;
