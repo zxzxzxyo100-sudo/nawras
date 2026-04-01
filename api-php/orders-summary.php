@@ -1,6 +1,6 @@
 <?php
-ini_set('memory_limit', '128M');
-ini_set('max_execution_time', '45');
+ini_set('memory_limit', '256M');
+ini_set('max_execution_time', '120');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -57,7 +57,7 @@ foreach ($periods as $period) {
 
         $cursor = isset($data['meta']['next_cursor']) ? $data['meta']['next_cursor'] : null;
         $page++;
-    } while ($cursor && $page < 20);
+    } while ($cursor && $page < 60);
 }
 
 $allData = array_values($storeMap);

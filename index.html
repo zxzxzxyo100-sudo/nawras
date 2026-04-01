@@ -413,7 +413,10 @@ const DB_API = '/api-php/store-actions.php';
 const AUTH_API = '/api-php/auth.php';
 
 async function apiGet(url) {
-    const r = await fetch(url);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 120000); // دقيقتين timeout
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
     if (!r.ok) throw new Error('API ' + r.status);
     const d = await r.json();
     return d.data || [];
