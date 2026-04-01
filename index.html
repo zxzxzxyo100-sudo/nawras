@@ -131,6 +131,8 @@
         .btn-whatsapp:hover { background:#1fb855;transform:translateY(-2px); }
         .btn-called { background:#8b5cf6;color:white;border-color:#8b5cf6; }
         .btn-called:hover { background:#7c3aed;transform:translateY(-2px); }
+        .btn-unreachable { background:#f97316;color:white;border-color:#f97316; }
+        .btn-unreachable:hover { background:#ea580c;transform:translateY(-2px); }
         .btn-outline { background:white;border:2px solid var(--border);color:var(--text-primary); }
         .btn-outline:hover { border-color:var(--primary);color:var(--primary); }
         /* ===== INCUBATION STATS BAR ===== */
@@ -626,6 +628,10 @@ function processStoresData(newData, inactiveData, summaryData) {
                 })
             }).catch(()=>{});
         }
+        // تحميل حالة متعذر الوصول
+        if (localStorage.getItem('store_unreachable_' + s.id)) {
+            s.unreachable = true;
+        }
     });
 }
 
@@ -1059,9 +1065,9 @@ function renderCurrentView() {
         const remainingToday = actionable.length;
 
         const grad = all.filter(s => s.incubation_task === 'graduation');
-        // المتاجر التي مر عليها 14+ يوم وما زالت في الاحتضان (لم تتخرج تلقائياً)
         const over14days = all.filter(s => getDaysSinceReg(s) >= 14);
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
+        const unreachable = all.filter(s => s.unreachable);
 
         // ===== عدّادات =====
         const statsBar = document.getElementById('incubation-stats');
@@ -1075,7 +1081,8 @@ function renderCurrentView() {
                 <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.04);"><div><div class="inc-stat-num" style="color:var(--success);">${hasShippedStores.length}</div><div class="inc-stat-label">بدأت الشحن</div></div></div>
                 <div class="inc-stat-card" style="border-color:#f59e0b;background:rgba(245,158,11,0.06);"><div><div class="inc-stat-num" style="color:#f59e0b;">${over14days.length}</div><div class="inc-stat-label">14+ يوم (تخريج)</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة</div></div></div>`;
+                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة</div></div></div>
+                <div class="inc-stat-card" style="border-color:#f97316;background:rgba(249,115,22,0.04);"><div><div class="inc-stat-num" style="color:#f97316;">${unreachable.length}</div><div class="inc-stat-label">متعذرة الوصول</div></div></div>`;
         } else {
             statsBar.innerHTML = `
                 <div class="inc-stat-card completed"><div><div class="inc-stat-num">${completedToday}</div><div class="inc-stat-label">مكتملة اليوم</div></div></div>
@@ -1104,6 +1111,7 @@ function renderCurrentView() {
                 <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مستحقة <span class="sf-count">${actionable.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='over14'?'active':''}" onclick="setSubFilter('over14')" style="background:${currentSubFilter==='over14'?'':'rgba(245,158,11,0.06)'};border-color:${currentSubFilter==='over14'?'':'#f59e0b'}">🎓 14+ يوم (تخريج) <span class="sf-count">${over14days.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')" style="background:${currentSubFilter==='scheduled_waiting'?'':'rgba(217,119,6,0.06)'};border-color:${currentSubFilter==='scheduled_waiting'?'':'var(--warning)'}">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='unreachable'?'active':''}" onclick="setSubFilter('unreachable')" style="background:${currentSubFilter==='unreachable'?'':'rgba(249,115,22,0.06)'};border-color:${currentSubFilter==='unreachable'?'':'#f97316'}">📵 متعذرة الوصول <span class="sf-count">${unreachable.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 الكل <span class="sf-count">${all.length}</span></button>`;
         } else {
             // ===== واجهة الموظف: نظيفة - بدون فلاتر =====
@@ -1119,6 +1127,7 @@ function renderCurrentView() {
             else if (currentSubFilter === 'graduation') stores = grad;
             else if (currentSubFilter === 'over14') stores = over14days;
             else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
+            else if (currentSubFilter === 'unreachable') stores = unreachable;
             else stores = notShipped;
         } else {
             // الموظف: فقط المهام المستحقة اليوم
@@ -1170,7 +1179,8 @@ function renderCurrentView() {
             <button class="sub-filter-btn ${currentSubFilter==='stopped_shipping'?'active':''}" onclick="setSubFilter('stopped_shipping')">📦 شحنت وتوقفت <span class="sf-count">${stoppedShipping.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='restoring'?'active':''}" onclick="setSubFilter('restoring')">🔄 جاري الاستعادة <span class="sf-count">${rest.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📞 مكالمات مستحقة <span class="sf-count">${dueCalls.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>`;
+            <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>
+            ${currentRole==='executive'?'<button class="sub-filter-btn '+(currentSubFilter==='unreachable_inactive'?'active':'')+'" onclick="setSubFilter(\'unreachable_inactive\')" style="background:'+(currentSubFilter==='unreachable_inactive'?'':'rgba(249,115,22,0.06)')+';border-color:'+(currentSubFilter==='unreachable_inactive'?'':'#f97316')+'">📵 متعذرة الوصول <span class="sf-count">'+[...inact,...rest].filter(s=>s.unreachable).length+'</span></button>':''}`;
         let stores;
         if (currentSubFilter === 'hot_inactive') stores = hotInactive;
         else if (currentSubFilter === 'never_shipped') stores = neverShipped;
@@ -1179,6 +1189,7 @@ function renderCurrentView() {
         else if (currentSubFilter === 'restoring') stores = rest;
         else if (currentSubFilter === 'due_recovery') stores = dueCalls;
         else if (currentSubFilter === 'recovered') stores = recovered;
+        else if (currentSubFilter === 'unreachable_inactive') stores = [...inact,...rest].filter(s => s.unreachable);
         else stores = [...inact, ...rest];
         stores = filterBySearch(stores);
         if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد متاجر')+'</h3></div>'; renderPagination(0); return; }
@@ -1372,6 +1383,12 @@ function createStoreCard(store) {
     if ((store.category === 'inactive' || store.category === 'cold') && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
+    // زر متعذر الوصول (كل الصلاحيات) - لا يظهر إذا المتجر معلق فعلاً
+    if (!store.unreachable) {
+        actions += '<button class="btn btn-unreachable" onclick="markUnreachable('+store.id+')">📵 متعذر الوصول</button>';
+    } else {
+        actions += '<button class="btn btn-success" onclick="markReachable('+store.id+')" style="font-size:0.75rem;">✅ تم الوصول</button>';
+    }
     actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📞 اتصال</button>';
     // Audit log icon moved to card header
 
@@ -1438,7 +1455,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">📵 معلق</span>':''}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
@@ -1536,6 +1553,34 @@ function graduateStore(id) {
     runStateMachine(); updateDashboard(); renderCurrentView();
 }
 function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function markUnreachable(id) {
+    const s = allStores.find(x => x.id === id);
+    if (!s) return;
+    s.unreachable = true;
+    // حفظ في DB
+    dbPost(DB_API + '?action=log_call', {
+        store_id: id, store_name: s.name || '', call_type: 'unreachable',
+        note: 'متعذر الوصول للعميل', user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
+    // حفظ الحالة محلياً
+    localStorage.setItem('store_unreachable_' + id, 'true');
+    showNotification('📵 تم تسجيل المتجر كمتعذر الوصول');
+    renderCurrentView();
+}
+
+function markReachable(id) {
+    const s = allStores.find(x => x.id === id);
+    if (!s) return;
+    s.unreachable = false;
+    dbPost(DB_API + '?action=log_call', {
+        store_id: id, store_name: s.name || '', call_type: 'reachable',
+        note: 'تم الوصول للعميل بعد تعذر سابق', user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
+    localStorage.removeItem('store_unreachable_' + id);
+    showNotification('✅ تم إلغاء حالة متعذر الوصول');
+    renderCurrentView();
+}
+
 function cancelRestore(id) {
     if (!confirm('هل أنت متأكد من إلغاء الاستعادة وإعادة المتجر لغير النشطة؟')) return;
     setStatus(id, 'inactive', { reason: 'إلغاء استعادة' });
