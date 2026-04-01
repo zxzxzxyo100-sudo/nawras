@@ -7,7 +7,7 @@ $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 // ========== GET STORE STATES ==========
 if ($action === 'get_states') {
-    $stmt = $pdo->query("SELECT * FROM store_states");
+    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 

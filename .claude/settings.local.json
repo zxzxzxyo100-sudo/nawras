@@ -19,7 +19,18 @@
       "WebFetch(domain:nawras-ly.com)",
       "WebFetch(domain:187.124.60.3)",
       "WebFetch(domain:paleturquoise-mole-971022.hostingersite.com)",
-      "Bash(curl -s 'https://paleturquoise-mole-971022.hostingersite.com/api-php/store-actions.php?action=get_states')"
+      "Bash(curl -s 'https://paleturquoise-mole-971022.hostingersite.com/api-php/store-actions.php?action=get_states')",
+      "Bash(find C:UsersOnyxDesktop16react-crmsrc -type f -name *.js -o -name *.jsx)",
+      "Bash(php -l api-php/setup-db.php)",
+      "Bash(php -l api-php/store-actions.php)",
+      "Bash(node:*)",
+      "Bash(nslookup nawras-ly.com)",
+      "Bash(curl -v --max-time 10 --connect-timeout 5 https://nawras-ly.com/)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl -sI --max-time 10 \"https://zxzxzxyo100-sudo.github.io/nawras/\")",
+      "Bash(curl -sI --max-time 10 \"https://nawras.vercel.app/\")"
     ]
   }
 }

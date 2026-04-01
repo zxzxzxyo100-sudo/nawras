@@ -1,6 +1,8 @@
 <?php
-// Auto-recovery checker
-// Checks ALL "restoring" stores against BOTH APIs for shipment after restore date
+// Auto-recovery checker - optimized to prevent Out of Memory
+ini_set('memory_limit', '48M');
+ini_set('max_execution_time', '15');
+
 require_once __DIR__ . '/db.php';
 
 $pdo = getDB();
@@ -20,30 +22,24 @@ foreach ($restoringStores as $s) {
     $storeMap[intval($s['store_id'])] = $s;
 }
 
-function fetchAllPages($url, $token) {
-    $allData = [];
-    $cursor = null;
-    do {
-        $fetchUrl = $cursor ? $url . '&cursor=' . $cursor : $url;
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $fetchUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'X-API-TOKEN: ' . $token]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        $response = curl_exec($ch);
-        curl_close($ch);
-        $data = json_decode($response, true);
-        if (isset($data['data']) && is_array($data['data'])) {
-            $allData = array_merge($allData, $data['data']);
-        }
-        $cursor = isset($data['meta']['next_cursor']) ? $data['meta']['next_cursor'] : null;
-    } while ($cursor);
-    return $allData;
+// جلب صفحة واحدة فقط (بدل كل الصفحات) لتوفير الذاكرة
+function fetchOnePage($url, $token) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'X-API-TOKEN: ' . $token]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $data = json_decode($response, true);
+    return (isset($data['data']) && is_array($data['data'])) ? $data['data'] : [];
 }
 
-// Fetch from BOTH APIs
-$newCustomers = fetchAllPages($BASE . '/customers/new?since=2024-01-01', $TOKEN);
-$ordersSummary = fetchAllPages($BASE . '/customers/orders-summary?from=2024-01-01&to=' . date('Y-m-d'), $TOKEN);
+// Fetch from BOTH APIs (صفحة واحدة فقط - أحدث البيانات)
+$since = date('Y-m-d', strtotime('-30 days'));
+$newCustomers = fetchOnePage($BASE . '/customers/new?since=' . $since, $TOKEN);
+$ordersSummary = fetchOnePage($BASE . '/customers/orders-summary?from=' . $since . '&to=' . date('Y-m-d'), $TOKEN);
 
 // Merge: build shipment map by store ID
 $shipmentMap = [];

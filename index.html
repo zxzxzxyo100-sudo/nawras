@@ -593,10 +593,11 @@ async function loadData() {
                 if (needRefresh) { await loadDBState(); runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }
             } catch(e) {}
         }, 5000);
+        const sinceDate = new Date(Date.now() - 90*864e5).toISOString().split('T')[0];
         const results = await Promise.all([
-            apiGet('/api-php/new-customers.php?since=2024-01-01'),
+            apiGet('/api-php/new-customers.php?since=' + sinceDate),
             apiGet('/api-php/inactive-customers.php'),
-            apiGet('/api-php/orders-summary.php?from=2024-01-01&to=' + new Date().toISOString().split('T')[0])
+            apiGet('/api-php/orders-summary.php?from=' + sinceDate + '&to=' + new Date().toISOString().split('T')[0])
         ]);
         processStoresData(results[0], results[1], results[2]);
         runStateMachine();
