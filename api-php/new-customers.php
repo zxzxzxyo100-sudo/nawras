@@ -1,6 +1,6 @@
 <?php
 // حماية من Out of Memory
-ini_set('memory_limit', '48M');
+ini_set('memory_limit', '96M');
 ini_set('max_execution_time', '15');
 
 header('Content-Type: application/json');
@@ -13,7 +13,7 @@ $since = isset($_GET['since']) ? $_GET['since'] : date('Y-m-d', strtotime('-90 d
 
 $allData = [];
 $cursor = null;
-$maxPages = 5; // حد أقصى 5 صفحات لمنع استهلاك الذاكرة
+$maxPages = 10; // حد أقصى 10 صفحات
 $page = 0;
 
 do {

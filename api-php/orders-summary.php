@@ -1,6 +1,6 @@
 <?php
 // حماية من Out of Memory
-ini_set('memory_limit', '48M');
+ini_set('memory_limit', '96M');
 ini_set('max_execution_time', '15');
 
 header('Content-Type: application/json');
@@ -14,7 +14,7 @@ $to = isset($_GET['to']) ? $_GET['to'] : date('Y-m-d');
 
 $allData = [];
 $cursor = null;
-$maxPages = 5; // حد أقصى 5 صفحات لمنع استهلاك الذاكرة
+$maxPages = 15; // حد أقصى 15 صفحة لاستيعاب كل المتاجر النشطة
 $page = 0;
 
 do {
