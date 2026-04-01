@@ -1241,6 +1241,9 @@ function createStoreCard(store) {
         else if (store.recovery_task === 'rcall2') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall2\')">📞 تم الاتصال - مكالمة 2</button>';
         else if (store.recovery_task === 'rcall3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall3\')">📞 تم الاتصال - مكالمة 3</button>';
     }
+    if (store.category === 'restoring' && (currentRole === 'executive' || currentRole === 'inactive_manager')) {
+        actions += '<button class="btn btn-frozen" onclick="cancelRestore('+store.id+')">❌ إلغاء الاستعادة</button>';
+    }
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
     if ((store.category === 'inactive' || store.category === 'cold') && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
     if (store.category === 'frozen' && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
@@ -1409,6 +1412,12 @@ function graduateStore(id) {
     runStateMachine(); updateDashboard(); renderCurrentView();
 }
 function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function cancelRestore(id) {
+    if (!confirm('هل أنت متأكد من إلغاء الاستعادة وإعادة المتجر لغير النشطة؟')) return;
+    setStatus(id, 'inactive', { reason: 'إلغاء استعادة' });
+    showNotification('❌ تم إلغاء الاستعادة');
+    runStateMachine(); updateDashboard(); renderCurrentView();
+}
 function unfreezeStore(id) { setStatus(id,'incubating',{reason:'إلغاء تجميد'}); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
 // ===================== MODALS =====================
