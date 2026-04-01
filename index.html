@@ -628,156 +628,123 @@ function processStoresData(newData, inactiveData, summaryData) {
     });
 }
 
-// ===================== STATE MACHINE =====================
+// ===================== STATE MACHINE (V2 - مصدر موحد) =====================
 function runStateMachine() {
     const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // ===== الخطوة 1: تصنيف كل متجر غير محفوظ في DB =====
     allStores.forEach(store => {
-        if (store.category !== 'incubating') return;
-        const override = localStorage.getItem('store_status_' + store.id);
-        if (override && override !== 'incubating') return;
+        // DB override يأخذ الأولوية (frozen, restoring, recovered - حالات يدوية)
+        const db = dbStates[store.id];
+        if (db && ['frozen','restoring','recovered'].includes(db.category)) {
+            store.category = db.category;
+            return;
+        }
 
         const regDate = store.registered_at ? new Date(store.registered_at) : null;
-        if (!regDate) return;
-
-        const hoursSinceReg = (now - regDate) / 36e5;
-        const daysSinceReg = hoursSinceReg / 24;
-        const hasShipped = store.total_shipments > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد');
+        const daysSinceReg = regDate ? (now - regDate) / 864e5 : 999;
+        const hasShipped = parseInt(store.total_shipments) > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد') || (store.last_shipment_date && store.last_shipment_date !== 'لا يوجد');
         const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
         const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
 
-        // Rule 1: Auto-graduate - 14+ days since registration AND actively shipping
-        if (daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip < 14) {
+        // === نشط: شحن خلال آخر 14 يوم ===
+        if (hasShipped && daysSinceLastShip <= 14 && daysSinceReg >= INCUBATION_DAYS) {
             store.category = 'active';
-            store.state_reason = 'auto_graduated';
-            // حفظ تلقائي في DB
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'active') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'active', store_name: store.name || '',
-                    state_reason: 'auto_graduated', old_status: 'incubating',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'active' };
+            return;
+        }
+
+        // === احتضان: أقل من 14 يوم من التسجيل ===
+        if (regDate && daysSinceReg < INCUBATION_DAYS) {
+            store.category = 'incubating';
+            return;
+        }
+
+        // === تخريج: 14+ يوم + يشحن بنشاط (داخل الاحتضان) ===
+        if (regDate && daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip <= 14) {
+            store.category = 'active';
+            return;
+        }
+
+        // === غير نشط ساخن: آخر شحنة بين 14-60 يوم ===
+        if (hasShipped && daysSinceLastShip > 14 && daysSinceLastShip <= 60) {
+            store.category = 'inactive';
+            store.inactive_type = 'hot';
+            return;
+        }
+
+        // === بارد: آخر شحنة أكثر من 60 يوم ===
+        if (hasShipped && daysSinceLastShip > 60) {
+            store.category = 'cold';
+            return;
+        }
+
+        // === لم يشحن أبداً ===
+        if (!hasShipped) {
+            if (regDate && daysSinceReg <= 2) {
+                store.category = 'incubating'; // أقل من 48 ساعة - لا يزال في الاحتضان
+            } else {
+                store.category = 'inactive';
+                store.state_reason = 'failed_48h';
             }
             return;
         }
+    });
 
-        // Rule 2: 48-hour test - failed (registered > 48h ago, never shipped)
-        if (hoursSinceReg > 48 && !hasShipped) {
-            store.category = 'inactive';
-            store.state_reason = 'failed_48h';
-            // حفظ تلقائي في DB
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'inactive') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'inactive', store_name: store.name || '',
-                    state_reason: 'failed_48h', old_status: 'incubating',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'inactive' };
-            }
-            return;
-        }
-
-        // Rule 3: Conflict prevention - stopped shipping 14+ days during incubation
-        if (hasShipped && daysSinceLastShip >= 14) {
-            store.category = 'inactive';
-            store.state_reason = 'stopped_shipping';
-            return;
-        }
-
-        // Rule 4: Determine incubation task with smart scheduling
-        const callLog = dbCallLogs[store.id] || getStored('calllog', store.id) || {};
-        const today = new Date().toISOString().split('T')[0];
+    // ===== الخطوة 2: مهام الاحتضان =====
+    allStores.forEach(store => {
+        if (store.category !== 'incubating') return;
+        const regDate = store.registered_at ? new Date(store.registered_at) : null;
+        if (!regDate) return;
+        const daysSinceReg = (now - regDate) / 864e5;
+        const hasShipped = parseInt(store.total_shipments) > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد');
+        const callLog = dbCallLogs[store.id] || {};
         const nextCallDate = store.next_call_date || null;
         const dbStage = store.incubation_stage || null;
 
-        // Check if last call was less than 2 hours ago (cooldown)
-        const lastCallTime = getLastCallTime(callLog);
-        if (lastCallTime && (now - new Date(lastCallTime)) < 2 * 36e5) {
-            store.incubation_task = 'cooldown';
-            store.cooldown_until = new Date(new Date(lastCallTime).getTime() + 2 * 36e5);
-        } else if (!callLog.day0) {
+        // مكالمة 1: اليوم + لم يتم الاتصال
+        if (!callLog.day0) {
             store.incubation_task = 'day0';
-        } else if (dbStage === 'day3' && nextCallDate && nextCallDate <= today && !callLog.day3) {
-            // المكالمة الثانية مجدولة واليوم وصل موعدها
-            store.incubation_task = 'day3';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'day10' && nextCallDate && nextCallDate <= today && !callLog.day10) {
-            // المكالمة الثالثة مجدولة واليوم وصل موعدها
-            store.incubation_task = 'day10';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'graduation_ready' && daysSinceReg >= 14 && hasShipped) {
-            // جاهز للتخريج
+        }
+        // مكالمة 2: 3+ أيام + شحن + لم تتم مكالمة 2
+        else if (!callLog.day3 && daysSinceReg >= 3 && hasShipped) {
+            if (dbStage === 'day3' && nextCallDate && nextCallDate > today) {
+                store.incubation_task = 'scheduled_waiting';
+                store.scheduled_date = nextCallDate;
+            } else {
+                store.incubation_task = 'day3';
+            }
+        }
+        // مكالمة 3: 10+ أيام + تمت مكالمة 2
+        else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10) {
+            if (dbStage === 'day10' && nextCallDate && nextCallDate > today) {
+                store.incubation_task = 'scheduled_waiting';
+                store.scheduled_date = nextCallDate;
+            } else {
+                store.incubation_task = 'day10';
+            }
+        }
+        // تخريج: 14+ يوم + نشط
+        else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
             store.incubation_task = 'graduation';
-        } else if (callLog.day0 && !callLog.day3 && hasShipped && daysSinceReg >= 3 && !dbStage) {
-            // fallback: لم يتم الجدولة بعد لكن الشروط متحققة
-            store.incubation_task = 'day3';
-        } else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10 && !dbStage) {
-            // fallback
-            store.incubation_task = 'day10';
-        } else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
-            store.incubation_task = 'graduation';
-        } else if (dbStage === 'day3' && nextCallDate && nextCallDate > today) {
-            // مجدولة لكن لم يحن الموعد بعد
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'day10' && nextCallDate && nextCallDate > today) {
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'graduation_ready' && nextCallDate && nextCallDate > today) {
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else {
+        }
+        else {
             store.incubation_task = 'waiting';
         }
     });
 
-    // ===== RECOVERY STATE MACHINE: 3 calls every 10 days =====
+    // ===== الخطوة 3: مهام الاستعادة =====
     allStores.forEach(store => {
         if (store.category !== 'restoring') return;
         const rcLog = getStored('recoverycalls', store.id) || {};
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        const restoreDate = localStorage.getItem('store_restore_date_' + store.id);
-
-        // Auto-confirm: if shipped after restore started → recovered
-        if (restoreDate && lastShipDate && lastShipDate > new Date(restoreDate)) {
-            store.category = 'recovered';
-            localStorage.setItem('store_status_' + store.id, 'recovered');
-            store.recovery_task = null;
-            return;
-        }
-
-        // Determine which recovery call is due
-        if (!rcLog.rcall1) {
-            store.recovery_task = 'rcall1';
-        } else if (!rcLog.rcall2) {
-            const daysSince1 = (now - new Date(rcLog.rcall1.date)) / 864e5;
-            store.recovery_task = daysSince1 >= 10 ? 'rcall2' : 'rcall_waiting';
+        if (!rcLog.rcall1) store.recovery_task = 'rcall1';
+        else if (!rcLog.rcall2) {
+            const d = (now - new Date(rcLog.rcall1.date)) / 864e5;
+            store.recovery_task = d >= 10 ? 'rcall2' : 'rcall_waiting';
         } else if (!rcLog.rcall3) {
-            const daysSince2 = (now - new Date(rcLog.rcall2.date)) / 864e5;
-            store.recovery_task = daysSince2 >= 10 ? 'rcall3' : 'rcall_waiting';
-        } else {
-            store.recovery_task = 'rcall_done';
-        }
-    });
-
-    // ===== COLD FILTER: 60-day rule - ONLY for stores that shipped before and stopped =====
-    allStores.forEach(store => {
-        if (store.category !== 'inactive') return;
-        if (store.state_reason === 'failed_48h') return; // never shipped → stays inactive, NOT cold
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        if (!lastShipDate) return; // no ship date → not cold
-        const daysSinceLastShip = (now - lastShipDate) / 864e5;
-        if (daysSinceLastShip >= 60) {
-            store.category = 'cold';
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'cold') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'cold', store_name: store.name || '',
-                    state_reason: 'inactive_60days', old_status: 'inactive',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'cold' };
-            }
-        }
+            const d = (now - new Date(rcLog.rcall2.date)) / 864e5;
+            store.recovery_task = d >= 10 ? 'rcall3' : 'rcall_waiting';
+        } else store.recovery_task = 'rcall_done';
     });
 }
 
@@ -882,21 +849,30 @@ function setStatus(id, status, extraData) {
     dbStates[id] = { store_id: id, category: status };
 }
 
-// ===================== DASHBOARD =====================
+// ===================== DASHBOARD (V2 - أرقام من مصدر موحد) =====================
 function updateDashboard() {
-    const c = { incubating:0, active:0, inactive:0, frozen:0, restoring:0 };
-    allStores.forEach(s => { if (c[s.category] !== undefined) c[s.category]++; });
+    // العدادات الموحدة - نفس الفلاتر المستخدمة في العرض
+    const incubating = allStores.filter(s => s.category === 'incubating');
+    const active = allStores.filter(s => s.category === 'active');
+    const inactive = allStores.filter(s => s.category === 'inactive' || s.category === 'restoring');
+    const frozen = allStores.filter(s => s.category === 'frozen');
+    const cold = allStores.filter(s => s.category === 'cold');
 
-    // Count tasks due today for incubation (excluding scheduled_waiting)
-    const tasksDue = allStores.filter(s => s.category === 'incubating' && s.incubation_task && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting').length;
-    const graduationReady = allStores.filter(s => s.category === 'incubating' && s.incubation_task === 'graduation').length;
+    // مهام الاحتضان المستحقة
+    const day0 = incubating.filter(s => s.incubation_task === 'day0').length;
+    const day3 = incubating.filter(s => s.incubation_task === 'day3').length;
+    const day10 = incubating.filter(s => s.incubation_task === 'day10').length;
+    const grad = incubating.filter(s => s.incubation_task === 'graduation').length;
+    const tasksDue = day0 + day3 + day10 + grad;
 
-    document.getElementById('incubating-count').textContent = c.incubating;
-    document.getElementById('active-count').textContent = c.active;
-    document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
-    document.getElementById('frozen-count').textContent = c.frozen;
-    const coldCount = allStores.filter(s => s.category === 'cold').length;
-    document.getElementById('cold-count').textContent = coldCount;
+    // غير نشطة: ساخنة vs باردة
+    const hotInactive = allStores.filter(s => s.category === 'inactive' && s.inactive_type === 'hot').length;
+
+    document.getElementById('incubating-count').textContent = incubating.length;
+    document.getElementById('active-count').textContent = active.length;
+    document.getElementById('inactive-count').textContent = inactive.length;
+    document.getElementById('frozen-count').textContent = frozen.length;
+    document.getElementById('cold-count').textContent = cold.length;
 
     const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
     let sat = '0'; let tc = 0, tt = 0;
@@ -932,16 +908,16 @@ function updateDashboard() {
     let h = '';
 
     if (currentRole === 'executive' || currentRole === 'incubation_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان الذكي</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+c.incubating+'</div><div class="stat-change"><span>📋</span><span>'+tasksDue+' مهمة مطلوبة اليوم</span>'+(graduationReady>0?' | <span style="color:var(--success);font-weight:700">🎓 '+graduationReady+' جاهز للتخريج</span>':'')+'</div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+incubating.length+'</div><div class="stat-change"><span>📋 يوم0: '+day0+' | يوم3: '+day3+' | يوم10: '+day10+' | تخريج: '+grad+'</span></div></div>';
     }
-    if (currentRole === 'executive' || currentRole === 'active_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+c.active+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
+    if (currentRole === 'executive' || currentRole === 'active_manager' || currentRole === 'incubation_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة (شحن آخر 14 يوم)</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+active.length+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
     }
     if (currentRole === 'executive' || currentRole === 'inactive_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+c.inactive+'</div><div class="stat-change"><span>⏰</span><span>تحتاج استعادة</span></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة (14-60 يوم)</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+inactive.length+'</div><div class="stat-change"><span>🔥 ساخنة: '+hotInactive+'</span></div></div>';
     }
     if (currentRole === 'executive') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+c.frozen+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+frozen.length+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
     }
 
     // === DAILY REPORT CARDS ===
