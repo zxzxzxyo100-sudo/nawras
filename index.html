@@ -628,8 +628,9 @@ function processStoresData(newData, inactiveData, summaryData) {
                 })
             }).catch(()=>{});
         }
-        // تحميل حالة متعذر الوصول
-        if (localStorage.getItem('store_unreachable_' + s.id)) {
+        // تحميل حالة متعذر الوصول من DB
+        const dbState = dbStates[s.id];
+        if (dbState && dbState.state_reason === 'unreachable') {
             s.unreachable = true;
         }
     });
@@ -1564,13 +1565,17 @@ function markUnreachable(id) {
     const s = allStores.find(x => x.id === id);
     if (!s) return;
     s.unreachable = true;
-    // حفظ في DB
+    // حفظ في call_logs
     dbPost(DB_API + '?action=log_call', {
         store_id: id, store_name: s.name || '', call_type: 'unreachable',
         note: 'متعذر الوصول للعميل', user: currentUser ? currentUser.fullname : '', user_role: currentRole
     });
-    // حفظ الحالة محلياً
-    localStorage.setItem('store_unreachable_' + id, 'true');
+    // حفظ الحالة في store_states (DB) كـ state_reason
+    dbPost(DB_API + '?action=set_status', {
+        store_id: id, category: s.category, store_name: s.name || '',
+        state_reason: 'unreachable', old_status: s.category,
+        user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
     showNotification('📵 تم تسجيل المتجر كمتعذر الوصول');
     renderCurrentView();
 }
@@ -1583,7 +1588,12 @@ function markReachable(id) {
         store_id: id, store_name: s.name || '', call_type: 'reachable',
         note: 'تم الوصول للعميل بعد تعذر سابق', user: currentUser ? currentUser.fullname : '', user_role: currentRole
     });
-    localStorage.removeItem('store_unreachable_' + id);
+    // إزالة الحالة من store_states
+    dbPost(DB_API + '?action=set_status', {
+        store_id: id, category: s.category, store_name: s.name || '',
+        state_reason: '', old_status: s.category,
+        user: currentUser ? currentUser.fullname : '', user_role: currentRole
+    });
     showNotification('✅ تم إلغاء حالة متعذر الوصول');
     renderCurrentView();
 }
