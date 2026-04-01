@@ -175,9 +175,10 @@ elseif ($action === 'get_all_recovery_calls') {
     jsonResponse(['success' => true, 'data' => $result]);
 }
 
-// ========== GET ALL CALL LOGS (for state machine) ==========
+// ========== GET ALL CALL LOGS (for state machine) - optimized ==========
 elseif ($action === 'get_all_calllogs') {
-    $stmt = $pdo->query("SELECT store_id, call_type, created_at FROM call_logs ORDER BY created_at");
+    // فقط آخر مكالمة من كل نوع لكل متجر (بدل تحميل الكل)
+    $stmt = $pdo->query("SELECT store_id, call_type, MAX(created_at) as created_at FROM call_logs GROUP BY store_id, call_type");
     $result = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $result[$row['store_id']][$row['call_type']] = $row['created_at'];
@@ -200,19 +201,11 @@ elseif ($action === 'save_survey') {
     jsonResponse(['success' => true]);
 }
 
-// ========== GET SURVEYS ==========
+// ========== GET SURVEYS (optimized) ==========
 elseif ($action === 'get_surveys') {
-    $stmt = $pdo->query("SELECT s.*, (SELECT s2.id FROM surveys s2 WHERE s2.store_id = s.store_id ORDER BY s2.created_at DESC LIMIT 1) as latest
-        FROM surveys s ORDER BY created_at DESC");
-    $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    // Group by store, keep latest
-    $byStore = [];
-    foreach ($all as $row) {
-        if (!isset($byStore[$row['store_id']]) || $row['id'] == $row['latest']) {
-            $byStore[$row['store_id']] = $row;
-        }
-    }
-    jsonResponse(['success' => true, 'data' => array_values($byStore)]);
+    // فقط آخر استبيان لكل متجر
+    $stmt = $pdo->query("SELECT s.* FROM surveys s INNER JOIN (SELECT store_id, MAX(id) as max_id FROM surveys GROUP BY store_id) latest ON s.id = latest.max_id");
+    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
 // ========== GET AUDIT LOGS ==========

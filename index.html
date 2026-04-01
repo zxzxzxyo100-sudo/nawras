@@ -446,23 +446,26 @@ let dbSurveys = {};
 let dbIncubation = {};
 
 async function loadDBState() {
-    const [states, calls, rcalls, surveys, incubation] = await Promise.all([
-        fetch(DB_API + '?action=get_states').then(r => r.json()),
-        fetch(DB_API + '?action=get_all_calllogs').then(r => r.json()),
-        fetch(DB_API + '?action=get_all_recovery_calls').then(r => r.json()),
-        fetch(DB_API + '?action=get_surveys').then(r => r.json()),
-        fetch(DB_API + '?action=get_incubation_data').then(r => r.json()).catch(() => ({ data: {} }))
+    // تقسيم الاستدعاءات لتخفيف الحمل على السيرفر
+    const safeFetch = (url) => fetch(url).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch { return { data: [] }; } }).catch(() => ({ data: [] }));
+
+    const [states, calls] = await Promise.all([
+        safeFetch(DB_API + '?action=get_states'),
+        safeFetch(DB_API + '?action=get_all_calllogs')
     ]);
-    // Index by store_id
+    const [rcalls, surveys, incubation] = await Promise.all([
+        safeFetch(DB_API + '?action=get_all_recovery_calls'),
+        safeFetch(DB_API + '?action=get_surveys'),
+        safeFetch(DB_API + '?action=get_incubation_data')
+    ]);
+
     dbStates = {};
     (states.data || []).forEach(s => { dbStates[s.store_id] = s; });
     dbCallLogs = calls.data || {};
     dbRecoveryCalls = rcalls.data || {};
-    // Surveys indexed by store_id
     dbSurveys = {};
-    (surveys.data || []).forEach(s => { dbSurveys[s.store_id] = s; });
-    // بيانات الاحتضان
-    dbIncubation = incubation.data || {};
+    (Array.isArray(surveys.data) ? surveys.data : []).forEach(s => { dbSurveys[s.store_id] = s; });
+    dbIncubation = (typeof incubation.data === 'object' && !Array.isArray(incubation.data)) ? incubation.data : {};
 }
 
 // ===================== AUTH (MySQL) =====================
@@ -556,18 +559,19 @@ function setupNavigation() {
 async function loadData() {
     try {
         await loadDBState();
-        // Auto-check recovery in background (non-blocking)
-        fetch('/api-php/check-recovery.php').then(r=>r.json()).then(d=>{
-            if(d.recovered>0){ showNotification('تم استعادة '+d.recovered+' متجر تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
-        }).catch(()=>{});
-        // فحص التخريج التلقائي (14 يوم)
-        fetch(DB_API + '?action=check_graduation').then(r=>r.json()).then(d=>{
-            if(d.moved_to_graduation>0){ showNotification('🎓 '+d.moved_to_graduation+' متجر جاهز للتخريج'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
-        }).catch(()=>{});
-        // فحص الجدولة المعلقة: متاجر اتصلنا بها day0 لكن لم تكن شحنت والآن شحنت
-        fetch(DB_API + '?action=check_pending_schedules').then(r=>r.json()).then(d=>{
-            if(d.scheduled>0){ showNotification('📅 '+d.scheduled+' متجر تم جدولة مكالماته تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
-        }).catch(()=>{});
+        // فحوصات خلفية مؤجلة (بعد 5 ثواني لتخفيف الحمل على السيرفر)
+        setTimeout(async () => {
+            try {
+                let needRefresh = false;
+                const r1 = await fetch('/api-php/check-recovery.php').then(r=>r.json()).catch(()=>({}));
+                if (r1.recovered > 0) { showNotification('تم استعادة '+r1.recovered+' متجر تلقائياً'); needRefresh = true; }
+                const r2 = await fetch(DB_API+'?action=check_graduation').then(r=>r.json()).catch(()=>({}));
+                if (r2.moved_to_graduation > 0) { showNotification('🎓 '+r2.moved_to_graduation+' متجر جاهز للتخريج'); needRefresh = true; }
+                const r3 = await fetch(DB_API+'?action=check_pending_schedules').then(r=>r.json()).catch(()=>({}));
+                if (r3.scheduled > 0) { showNotification('📅 '+r3.scheduled+' متجر تم جدولته تلقائياً'); needRefresh = true; }
+                if (needRefresh) { await loadDBState(); runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }
+            } catch(e) {}
+        }, 5000);
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=2024-01-01'),
             apiGet('/api-php/inactive-customers.php'),
