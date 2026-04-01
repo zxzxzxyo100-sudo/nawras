@@ -1033,8 +1033,7 @@ function renderCurrentView() {
         const today = new Date().toISOString().split('T')[0];
         const isManager = currentRole === 'executive';
 
-        // ===== تبويبات المدير: لم تشحن / بدأت الشحن =====
-        // تحقق دقيق: نعتبر المتجر "شحن" إذا total_shipments > 0 أو لديه تاريخ شحنة فعلي
+        // ===== دالة التحقق من الشحن =====
         function storeHasShipped(s) {
             if (parseInt(s.total_shipments) > 0) return true;
             if (s.first_shipment_date && s.first_shipment_date !== 'لا يوجد') return true;
@@ -1046,7 +1045,7 @@ function renderCurrentView() {
         const notShipped = all.filter(s => !storeHasShipped(s));
         const hasShippedStores = all.filter(s => storeHasShipped(s));
 
-        // ===== المهام المستحقة (الموظف): next_call_date <= اليوم أو day0 =====
+        // ===== المهام المستحقة اليوم =====
         const actionable = all.filter(s =>
             s.incubation_task === 'day0' ||
             s.incubation_task === 'day3' ||
@@ -1054,40 +1053,31 @@ function renderCurrentView() {
             s.incubation_task === 'graduation'
         );
 
-        // حساب المكتملة اليوم
         const todayCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
         const completedToday = todayCalls.filter(c => ['day0','day3','day10','graduation'].includes(c.type) && c.role === currentRole).length;
         const totalToday = actionable.length + completedToday;
         const remainingToday = actionable.length;
 
-        // الفلاتر (الموظف)
-        const golden = actionable.filter(s => getHeatLevel(s) === 'golden');
-        const hot = actionable.filter(s => getHeatLevel(s) === 'hot');
-        const day0 = all.filter(s => s.incubation_task === 'day0');
-        const day3 = all.filter(s => s.incubation_task === 'day3');
-        const day10 = all.filter(s => s.incubation_task === 'day10');
         const grad = all.filter(s => s.incubation_task === 'graduation');
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
 
-        // ===== عدّادات ديناميكية حسب الصلاحية =====
+        // ===== عدّادات =====
         const statsBar = document.getElementById('incubation-stats');
         const doneScreen = document.getElementById('all-done-screen');
         statsBar.style.display = 'flex';
 
         if (isManager) {
-            // ===== عدّادات المدير: إجمالي + لم تشحن + بدأت الشحن + مهام مستحقة =====
             statsBar.innerHTML = `
                 <div class="inc-stat-card" style="border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" style="color:#6366f1;">${all.length}</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--danger);background:rgba(220,38,38,0.04);"><div><div class="inc-stat-num" style="color:var(--danger);">${notShipped.length}</div><div class="inc-stat-label">لم تشحن</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.04);"><div><div class="inc-stat-num" style="color:var(--success);">${hasShippedStores.length}</div><div class="inc-stat-label">بدأت الشحن</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة اليوم</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة (قادمة)</div></div></div>`;
+                <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة</div></div></div>
+                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة</div></div></div>`;
         } else {
-            // ===== عدّادات الموظف: مكتملة + متبقية + إجمالي اليوم =====
             statsBar.innerHTML = `
-                <div class="inc-stat-card completed"><div><div class="inc-stat-num">${completedToday}</div><div class="inc-stat-label">مهام مكتملة اليوم</div></div></div>
-                <div class="inc-stat-card remaining"><div><div class="inc-stat-num">${remainingToday}</div><div class="inc-stat-label">مهام متبقية اليوم</div></div></div>
-                <div class="inc-stat-card total"><div><div class="inc-stat-num">${totalToday}</div><div class="inc-stat-label">إجمالي مهام اليوم</div></div></div>`;
+                <div class="inc-stat-card completed"><div><div class="inc-stat-num">${completedToday}</div><div class="inc-stat-label">مكتملة اليوم</div></div></div>
+                <div class="inc-stat-card remaining"><div><div class="inc-stat-num">${remainingToday}</div><div class="inc-stat-label">متبقية اليوم</div></div></div>
+                <div class="inc-stat-card total"><div><div class="inc-stat-num">${totalToday}</div><div class="inc-stat-label">إجمالي اليوم</div></div></div>`;
         }
 
         // ===== رسالة الإنجاز (الموظف فقط) =====
@@ -1104,40 +1094,32 @@ function renderCurrentView() {
         sf.style.display = 'flex';
 
         if (isManager) {
-            // ===== واجهة المدير: تبويبان رئيسيان + فلاتر فرعية =====
+            // ===== واجهة المدير =====
             sf.innerHTML = `
                 <button class="sub-filter-btn ${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('not_shipped')" style="background:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'rgba(220,38,38,0.06)'};border-color:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'var(--danger)'}">🚫 لم تشحن <span class="sf-count">${notShipped.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='has_shipped'?'active':''}" onclick="setSubFilter('has_shipped')" style="background:${currentSubFilter==='has_shipped'?'':'rgba(5,150,105,0.06)'};border-color:${currentSubFilter==='has_shipped'?'':'var(--success)'}">📦 بدأت الشحن <span class="sf-count">${hasShippedStores.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام مستحقة <span class="sf-count">${actionable.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مستحقة <span class="sf-count">${actionable.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')" style="background:${currentSubFilter==='scheduled_waiting'?'':'rgba(217,119,6,0.06)'};border-color:${currentSubFilter==='scheduled_waiting'?'':'var(--warning)'}">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 الكل <span class="sf-count">${all.length}</span></button>`;
         } else {
-            // ===== واجهة الموظف: مهام اليوم المستحقة فقط =====
-            sf.innerHTML = `
-                <button class="sub-filter-btn ${currentSubFilter==='due'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('due')" style="background:${currentSubFilter==='due'||currentSubFilter==='all'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='due'||currentSubFilter==='all'?'':'var(--success)'}">📋 مهام اليوم <span class="sf-count">${actionable.length}</span></button>
-                <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
-                <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>`;
+            // ===== واجهة الموظف: نظيفة - بدون فلاتر =====
+            sf.style.display = 'none';
         }
 
         let stores;
-        if (currentSubFilter === 'not_shipped' && isManager) stores = notShipped;
-        else if (currentSubFilter === 'has_shipped' && isManager) stores = hasShippedStores;
-        else if (currentSubFilter === 'all_stores' && isManager) stores = all;
-        else if (currentSubFilter === 'golden') stores = golden;
-        else if (currentSubFilter === 'hot') stores = hot;
-        else if (currentSubFilter === 'day0') stores = day0;
-        else if (currentSubFilter === 'day3') stores = day3;
-        else if (currentSubFilter === 'day10') stores = day10;
-        else if (currentSubFilter === 'graduation') stores = grad;
-        else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
-        else if (isManager) stores = notShipped; // المدير: الافتراضي = لم تشحن
-        else stores = actionable; // الموظف: الافتراضي = المهام المستحقة
+        if (isManager) {
+            if (currentSubFilter === 'not_shipped' || currentSubFilter === 'all') stores = notShipped;
+            else if (currentSubFilter === 'has_shipped') stores = hasShippedStores;
+            else if (currentSubFilter === 'all_stores') stores = all;
+            else if (currentSubFilter === 'due') stores = actionable;
+            else if (currentSubFilter === 'graduation') stores = grad;
+            else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
+            else stores = notShipped;
+        } else {
+            // الموظف: فقط المهام المستحقة اليوم
+            stores = actionable;
+        }
 
         // ===== ترتيب ذكي: ذهبي > ساخن > نوع المهمة > الأقدم =====
         stores.sort((a, b) => {
@@ -1316,10 +1298,12 @@ function createStoreCard(store) {
             badge = '<span class="status-badge day0">⏳ يعود بعد '+mins+' دقيقة</span>';
         }
         else if (store.incubation_task === 'scheduled_waiting') {
-            const schedDate = store.scheduled_date ? new Date(store.scheduled_date).toLocaleDateString('ar-EG') : '?';
+            const schedDate = store.scheduled_date ? new Date(store.scheduled_date) : null;
+            const schedDateStr = schedDate ? schedDate.toLocaleDateString('ar-EG') : '?';
+            const daysUntil = schedDate ? Math.max(0, Math.ceil((schedDate - new Date()) / 864e5)) : '?';
             const stageLabels = { day3:'المكالمة الثانية', day10:'المكالمة الثالثة', graduation_ready:'التخريج' };
             const stageLabel = stageLabels[store.incubation_stage] || 'المرحلة التالية';
-            badge = '<span class="status-badge day0">📅 '+stageLabel+' مجدولة: '+schedDate+'</span>';
+            badge = '<span class="status-badge day0">📅 '+stageLabel+' - مستحقة بعد <strong>'+daysUntil+'</strong> يوم ('+schedDateStr+')</span>';
         }
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
@@ -1450,7 +1434,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.category==='incubating'&&heat==='golden'?' <span style="background:rgba(217,119,6,0.15);color:var(--golden);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🥇 ذهبي</span>':''}${store.category==='incubating'&&heat==='hot'?' <span style="background:rgba(220,38,38,0.1);color:var(--hot);padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;margin-right:0.5rem;">🔥 ساخن</span>':''}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
