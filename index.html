@@ -428,13 +428,23 @@ async function apiGet(url) {
     return d.data || [];
 }
 
-async function dbPost(url, data) {
+async function dbPost(url, data, timeout) {
+    timeout = timeout || 15000;
     try {
-        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            signal: controller.signal
+        });
+        clearTimeout(timer);
         const text = await r.text();
-        try { return JSON.parse(text); } catch { return { success: false, error: 'استجابة غير صالحة من السيرفر' }; }
+        try { return JSON.parse(text); } catch { return { success: false, error: 'استجابة غير صالحة من السيرفر: ' + text.substring(0, 200) }; }
     } catch (e) {
-        return { success: false, error: 'خطأ في الاتصال بالسيرفر: ' + e.message };
+        if (e.name === 'AbortError') return { success: false, error: 'انتهت مهلة الاتصال بالسيرفر - حاول مرة أخرى' };
+        return { success: false, error: 'خطأ في الاتصال: ' + e.message };
     }
 }
 
@@ -447,7 +457,11 @@ let dbIncubation = {};
 
 async function loadDBState() {
     // تقسيم الاستدعاءات لتخفيف الحمل على السيرفر
-    const safeFetch = (url) => fetch(url).then(r => r.text()).then(t => { try { return JSON.parse(t); } catch { return { data: [] }; } }).catch(() => ({ data: [] }));
+    const safeFetch = (url) => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 15000);
+        return fetch(url, { signal: ctrl.signal }).then(r => { clearTimeout(t); return r.text(); }).then(t => { try { return JSON.parse(t); } catch { return { data: [] }; } }).catch(() => ({ data: [] }));
+    };
 
     const [states, calls] = await Promise.all([
         safeFetch(DB_API + '?action=get_states'),
@@ -472,42 +486,49 @@ async function loadDBState() {
 async function handleLogin(e) {
     e.preventDefault();
     const errEl = document.getElementById('login-error');
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitBtn = document.querySelector('#login-form button[type="submit"]') || e.submitter;
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
+
+    // إخفاء خطأ سابق
+    errEl.style.display = 'none';
+
     if (!username || !password) {
         errEl.style.display = 'block';
         errEl.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور';
         return;
     }
-    // إظهار حالة التحميل
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'جاري الدخول...';
-    errEl.style.display = 'none';
 
-    const result = await dbPost(AUTH_API + '?action=login', { username, password });
+    // حالة التحميل
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'جاري الدخول...'; }
 
-    if (!result.success) {
+    try {
+        const result = await dbPost(AUTH_API + '?action=login', { username, password }, 20000);
+
+        if (!result || !result.success) {
+            errEl.style.display = 'block';
+            errEl.textContent = (result && result.error) ? result.error : 'بيانات الدخول غير صحيحة أو السيرفر لا يستجيب';
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
+            return;
+        }
+        if (!result.user || !result.user.id || !result.user.role) {
+            errEl.style.display = 'block';
+            errEl.textContent = 'خطأ في بيانات المستخدم من السيرفر';
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
+            return;
+        }
+        currentUser = result.user;
+        currentRole = result.user.role;
+        localStorage.setItem('nawras_session', JSON.stringify(result.user));
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('loadingScreen').style.display = 'flex';
+        document.getElementById('appContainer').style.display = 'flex';
+        applyRolePermissions(); initApp();
+    } catch (err) {
         errEl.style.display = 'block';
-        errEl.textContent = result.error || 'بيانات الدخول غير صحيحة';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'دخول';
-        return;
+        errEl.textContent = 'خطأ غير متوقع: ' + err.message;
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'دخول'; }
     }
-    if (!result.user || !result.user.id || !result.user.role) {
-        errEl.style.display = 'block';
-        errEl.textContent = 'خطأ في بيانات المستخدم من السيرفر';
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'دخول';
-        return;
-    }
-    currentUser = result.user;
-    currentRole = result.user.role;
-    localStorage.setItem('nawras_session', JSON.stringify(result.user));
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('loadingScreen').style.display = 'flex';
-    document.getElementById('appContainer').style.display = 'flex';
-    applyRolePermissions(); initApp();
 }
 
 function logout() { localStorage.removeItem('nawras_session'); location.reload(); }

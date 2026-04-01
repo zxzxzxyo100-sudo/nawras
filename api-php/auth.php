@@ -1,16 +1,28 @@
 <?php
+// منع التخزين المؤقت
+header('Cache-Control: no-cache, no-store, must-revalidate');
+
 require_once __DIR__ . '/db.php';
-$pdo = getDB();
+
+try {
+    $pdo = getDB();
+} catch (Exception $e) {
+    jsonResponse(['success' => false, 'error' => 'فشل الاتصال بقاعدة البيانات: ' . $e->getMessage()], 500);
+}
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 if ($action === 'login') {
-    $stmt = $pdo->prepare("SELECT id, username, fullname, role FROM users WHERE username = ? AND password = ?");
-    $stmt->execute([$input['username'] ?? '', $input['password'] ?? '']);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user) jsonResponse(['success' => true, 'user' => $user]);
-    else jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
+    try {
+        $stmt = $pdo->prepare("SELECT id, username, fullname, role FROM users WHERE username = ? AND password = ?");
+        $stmt->execute([$input['username'] ?? '', $input['password'] ?? '']);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($user) jsonResponse(['success' => true, 'user' => $user]);
+        else jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'error' => 'خطأ في قاعدة البيانات: ' . $e->getMessage()], 500);
+    }
 }
 
 elseif ($action === 'list_users') {
