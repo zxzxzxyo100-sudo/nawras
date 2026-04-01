@@ -646,10 +646,10 @@ function runStateMachine() {
         const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
         const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
 
-        // Rule 1: 14+ days since registration AND actively shipping → جاهز للتخريج (يبقى في الاحتضان)
+        // Rule 1: Auto-graduate - 14+ days since registration AND actively shipping
         if (daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip < 14) {
-            // لا ننقله تلقائياً - نضعه في قائمة التخريج ليراها المدير ويخرّجه يدوياً
-            store.incubation_task = 'graduation';
+            store.category = 'active';
+            store.state_reason = 'auto_graduated';
             return;
         }
 
@@ -1059,6 +1059,8 @@ function renderCurrentView() {
         const remainingToday = actionable.length;
 
         const grad = all.filter(s => s.incubation_task === 'graduation');
+        // المتاجر التي مر عليها 14+ يوم وما زالت في الاحتضان (لم تتخرج تلقائياً)
+        const over14days = all.filter(s => getDaysSinceReg(s) >= 14);
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
 
         // ===== عدّادات =====
@@ -1071,7 +1073,7 @@ function renderCurrentView() {
                 <div class="inc-stat-card" style="border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" style="color:#6366f1;">${all.length}</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--danger);background:rgba(220,38,38,0.04);"><div><div class="inc-stat-num" style="color:var(--danger);">${notShipped.length}</div><div class="inc-stat-label">لم تشحن</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.04);"><div><div class="inc-stat-num" style="color:var(--success);">${hasShippedStores.length}</div><div class="inc-stat-label">بدأت الشحن</div></div></div>
-                <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.06);"><div><div class="inc-stat-num" style="color:var(--success);">${grad.length}</div><div class="inc-stat-label">جاهز للتخريج</div></div></div>
+                <div class="inc-stat-card" style="border-color:#f59e0b;background:rgba(245,158,11,0.06);"><div><div class="inc-stat-num" style="color:#f59e0b;">${over14days.length}</div><div class="inc-stat-label">14+ يوم (تخريج)</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة</div></div></div>
                 <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة</div></div></div>`;
         } else {
@@ -1100,7 +1102,7 @@ function renderCurrentView() {
                 <button class="sub-filter-btn ${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'active':''}" onclick="setSubFilter('not_shipped')" style="background:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'rgba(220,38,38,0.06)'};border-color:${currentSubFilter==='not_shipped'||currentSubFilter==='all'?'':'var(--danger)'}">🚫 لم تشحن <span class="sf-count">${notShipped.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='has_shipped'?'active':''}" onclick="setSubFilter('has_shipped')" style="background:${currentSubFilter==='has_shipped'?'':'rgba(5,150,105,0.06)'};border-color:${currentSubFilter==='has_shipped'?'':'var(--success)'}">📦 بدأت الشحن <span class="sf-count">${hasShippedStores.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مستحقة <span class="sf-count">${actionable.length}</span></button>
-                <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
+                <button class="sub-filter-btn ${currentSubFilter==='over14'?'active':''}" onclick="setSubFilter('over14')" style="background:${currentSubFilter==='over14'?'':'rgba(245,158,11,0.06)'};border-color:${currentSubFilter==='over14'?'':'#f59e0b'}">🎓 14+ يوم (تخريج) <span class="sf-count">${over14days.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')" style="background:${currentSubFilter==='scheduled_waiting'?'':'rgba(217,119,6,0.06)'};border-color:${currentSubFilter==='scheduled_waiting'?'':'var(--warning)'}">⏳ مجدولة <span class="sf-count">${scheduledWaiting.length}</span></button>
                 <button class="sub-filter-btn ${currentSubFilter==='all_stores'?'active':''}" onclick="setSubFilter('all_stores')" style="background:${currentSubFilter==='all_stores'?'':'rgba(99,102,241,0.06)'};border-color:${currentSubFilter==='all_stores'?'':'#6366f1'}">📊 الكل <span class="sf-count">${all.length}</span></button>`;
         } else {
@@ -1115,6 +1117,7 @@ function renderCurrentView() {
             else if (currentSubFilter === 'all_stores') stores = all;
             else if (currentSubFilter === 'due') stores = actionable;
             else if (currentSubFilter === 'graduation') stores = grad;
+            else if (currentSubFilter === 'over14') stores = over14days;
             else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
             else stores = notShipped;
         } else {
