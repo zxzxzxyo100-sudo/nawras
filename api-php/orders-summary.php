@@ -1,6 +1,6 @@
 <?php
-ini_set('memory_limit', '64M');
-ini_set('max_execution_time', '15');
+ini_set('memory_limit', '128M');
+ini_set('max_execution_time', '30');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -17,7 +17,7 @@ if ($diff > 31) $from = date('Y-m-d', strtotime('-30 days'));
 
 $allData = [];
 $cursor = null;
-$maxPages = 10;
+$maxPages = 20;
 $page = 0;
 
 do {
