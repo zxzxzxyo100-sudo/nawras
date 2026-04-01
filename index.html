@@ -150,9 +150,11 @@
         .timeline-step { display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.8rem; }
         .timeline-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
         .timeline-dot.done { background:var(--success); }
-        .timeline-dot.current { background:var(--primary);box-shadow:0 0 0 3px rgba(0,102,204,0.3); }
+        .timeline-dot.current { background:var(--primary);box-shadow:0 0 0 3px rgba(0,102,204,0.3);animation:pulse-dot 1.5s infinite; }
         .timeline-dot.pending { background:var(--border); }
         .timeline-dot.failed { background:var(--danger); }
+        .timeline-dot.scheduled { background:var(--warning);box-shadow:0 0 0 3px rgba(217,119,6,0.2); }
+        @keyframes pulse-dot { 0%,100%{box-shadow:0 0 0 3px rgba(0,102,204,0.3)} 50%{box-shadow:0 0 0 6px rgba(0,102,204,0.1)} }
 
         .modal { display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center; }
         .modal.active { display:flex; }
@@ -344,7 +346,7 @@ function getUsers() { return JSON.parse(localStorage.getItem('nawras_users') || 
 function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(users)); }
 
 // ===================== STATE =====================
-let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null;
+let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null, cachedUsers = [];
 
 // ===================== API =====================
 const DB_API = '/api-php/store-actions.php';
@@ -367,13 +369,15 @@ let dbStates = {};
 let dbCallLogs = {};
 let dbRecoveryCalls = {};
 let dbSurveys = {};
+let dbIncubation = {};
 
 async function loadDBState() {
-    const [states, calls, rcalls, surveys] = await Promise.all([
+    const [states, calls, rcalls, surveys, incubation] = await Promise.all([
         fetch(DB_API + '?action=get_states').then(r => r.json()),
         fetch(DB_API + '?action=get_all_calllogs').then(r => r.json()),
         fetch(DB_API + '?action=get_all_recovery_calls').then(r => r.json()),
-        fetch(DB_API + '?action=get_surveys').then(r => r.json())
+        fetch(DB_API + '?action=get_surveys').then(r => r.json()),
+        fetch(DB_API + '?action=get_incubation_data').then(r => r.json())
     ]);
     // Index by store_id
     dbStates = {};
@@ -383,6 +387,8 @@ async function loadDBState() {
     // Surveys indexed by store_id
     dbSurveys = {};
     (surveys.data || []).forEach(s => { dbSurveys[s.store_id] = s; });
+    // بيانات الاحتضان
+    dbIncubation = incubation.data || {};
 }
 
 // ===================== AUTH (MySQL) =====================
@@ -458,6 +464,14 @@ async function loadData() {
         fetch('/api-php/check-recovery.php').then(r=>r.json()).then(d=>{
             if(d.recovered>0){ showNotification('تم استعادة '+d.recovered+' متجر تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
         }).catch(()=>{});
+        // فحص التخريج التلقائي (14 يوم)
+        fetch(DB_API + '?action=check_graduation').then(r=>r.json()).then(d=>{
+            if(d.moved_to_graduation>0){ showNotification('🎓 '+d.moved_to_graduation+' متجر جاهز للتخريج'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
+        // فحص الجدولة المعلقة: متاجر اتصلنا بها day0 لكن لم تكن شحنت والآن شحنت
+        fetch(DB_API + '?action=check_pending_schedules').then(r=>r.json()).then(d=>{
+            if(d.scheduled>0){ showNotification('📅 '+d.scheduled+' متجر تم جدولة مكالماته تلقائياً (شحنة جديدة)'); loadDBState().then(()=>{ runStateMachine(); updateDashboard(); if(currentView!=='dashboard') renderCurrentView(); }); }
+        }).catch(()=>{});
         const results = await Promise.all([
             apiGet('/api-php/new-customers.php?since=2024-01-01'),
             apiGet('/api-php/inactive-customers.php'),
@@ -522,6 +536,29 @@ function processStoresData(newData, inactiveData, summaryData) {
         if (sv) {
             s.survey = { answers: [parseInt(sv.q1_delivery),parseInt(sv.q2_collection),parseInt(sv.q3_support),parseInt(sv.q4_app),parseInt(sv.q5_payments),parseInt(sv.q6_returns)], suggestions: sv.suggestions, by: sv.performed_by, date: sv.created_at };
         }
+        // دمج بيانات الاحتضان من قاعدة البيانات
+        const inc = dbIncubation[s.id];
+        if (inc) {
+            s.incubation_stage = inc.incubation_stage;
+            s.next_call_date = inc.next_call_date;
+            if (inc.registration_date) s.registration_date_db = inc.registration_date;
+            if (inc.first_shipped_date) s.first_shipped_date_db = inc.first_shipped_date;
+            if (inc.graduated_at) s.graduated_at = inc.graduated_at;
+        }
+        // مزامنة first_shipped_date مع قاعدة البيانات إذا كانت الشحنة موجودة محلياً ولم تُسجل
+        const hasShipLocal = s.total_shipments > 0 || (s.first_shipment_date && s.first_shipment_date !== 'لا يوجد');
+        if (hasShipLocal && s.category === 'incubating' && (!inc || !inc.first_shipped_date)) {
+            // تحديث في الخلفية بدون انتظار
+            fetch(DB_API + '?action=update_incubation', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    store_id: s.id, store_name: s.name,
+                    registration_date: s.registered_at || null,
+                    first_shipped_date: s.first_shipment_date || new Date().toISOString(),
+                    incubation_stage: s.incubation_stage || 'day0'
+                })
+            }).catch(()=>{});
+        }
     });
 }
 
@@ -563,8 +600,11 @@ function runStateMachine() {
             return;
         }
 
-        // Rule 4: Determine incubation task with 2-hour cooldown
+        // Rule 4: Determine incubation task with smart scheduling
         const callLog = dbCallLogs[store.id] || getStored('calllog', store.id) || {};
+        const today = new Date().toISOString().split('T')[0];
+        const nextCallDate = store.next_call_date || null;
+        const dbStage = store.incubation_stage || null;
 
         // Check if last call was less than 2 hours ago (cooldown)
         const lastCallTime = getLastCallTime(callLog);
@@ -573,12 +613,35 @@ function runStateMachine() {
             store.cooldown_until = new Date(new Date(lastCallTime).getTime() + 2 * 36e5);
         } else if (!callLog.day0) {
             store.incubation_task = 'day0';
-        } else if (hoursSinceReg >= 48 && hasShipped && !callLog.day3 && daysSinceReg >= 3) {
+        } else if (dbStage === 'day3' && nextCallDate && nextCallDate <= today && !callLog.day3) {
+            // المكالمة الثانية مجدولة واليوم وصل موعدها
             store.incubation_task = 'day3';
-        } else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10) {
+            store.scheduled_date = nextCallDate;
+        } else if (dbStage === 'day10' && nextCallDate && nextCallDate <= today && !callLog.day10) {
+            // المكالمة الثالثة مجدولة واليوم وصل موعدها
+            store.incubation_task = 'day10';
+            store.scheduled_date = nextCallDate;
+        } else if (dbStage === 'graduation_ready' && daysSinceReg >= 14 && hasShipped) {
+            // جاهز للتخريج
+            store.incubation_task = 'graduation';
+        } else if (callLog.day0 && !callLog.day3 && hasShipped && daysSinceReg >= 3 && !dbStage) {
+            // fallback: لم يتم الجدولة بعد لكن الشروط متحققة
+            store.incubation_task = 'day3';
+        } else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10 && !dbStage) {
+            // fallback
             store.incubation_task = 'day10';
         } else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
             store.incubation_task = 'graduation';
+        } else if (dbStage === 'day3' && nextCallDate && nextCallDate > today) {
+            // مجدولة لكن لم يحن الموعد بعد
+            store.incubation_task = 'scheduled_waiting';
+            store.scheduled_date = nextCallDate;
+        } else if (dbStage === 'day10' && nextCallDate && nextCallDate > today) {
+            store.incubation_task = 'scheduled_waiting';
+            store.scheduled_date = nextCallDate;
+        } else if (dbStage === 'graduation_ready' && nextCallDate && nextCallDate > today) {
+            store.incubation_task = 'scheduled_waiting';
+            store.scheduled_date = nextCallDate;
         } else {
             store.incubation_task = 'waiting';
         }
@@ -659,14 +722,18 @@ function getStored(type, id) {
 
 function logCall(storeId, callType, note) {
     const s = allStores.find(x => x.id === storeId);
-    // Save to DATABASE
+    const hasShipped = s && (s.total_shipments > 0 || (s.first_shipment_date && s.first_shipment_date !== 'لا يوجد'));
+    const regDate = s ? (s.registered_at || s.registration_date_db || null) : null;
+    // Save to DATABASE with incubation data
     dbPost(DB_API + '?action=log_call', {
         store_id: storeId,
         store_name: s ? s.name : '',
         call_type: callType,
         note: note,
         user: currentUser ? currentUser.fullname : '',
-        user_role: currentRole
+        user_role: currentRole,
+        has_shipped: hasShipped,
+        registration_date: regDate
     });
     // Update local cache
     if (!dbCallLogs[storeId]) dbCallLogs[storeId] = {};
@@ -701,8 +768,9 @@ function updateDashboard() {
     const c = { incubating:0, active:0, inactive:0, frozen:0, restoring:0 };
     allStores.forEach(s => { if (c[s.category] !== undefined) c[s.category]++; });
 
-    // Count tasks due today for incubation
-    const tasksDue = allStores.filter(s => s.category === 'incubating' && s.incubation_task && s.incubation_task !== 'waiting').length;
+    // Count tasks due today for incubation (excluding scheduled_waiting)
+    const tasksDue = allStores.filter(s => s.category === 'incubating' && s.incubation_task && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting').length;
+    const graduationReady = allStores.filter(s => s.category === 'incubating' && s.incubation_task === 'graduation').length;
 
     document.getElementById('incubating-count').textContent = c.incubating;
     document.getElementById('active-count').textContent = c.active;
@@ -745,7 +813,7 @@ function updateDashboard() {
     let h = '';
 
     if (currentRole === 'executive' || currentRole === 'incubation_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+c.incubating+'</div><div class="stat-change"><span>📋</span><span>'+tasksDue+' مهمة مطلوبة اليوم</span></div></div>';
+        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان الذكي</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+c.incubating+'</div><div class="stat-change"><span>📋</span><span>'+tasksDue+' مهمة مطلوبة اليوم</span>'+(graduationReady>0?' | <span style="color:var(--success);font-weight:700">🎓 '+graduationReady+' جاهز للتخريج</span>':'')+'</div></div>';
     }
     if (currentRole === 'executive' || currentRole === 'active_manager') {
         h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+c.active+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
@@ -841,7 +909,7 @@ function switchView(view) {
 function renderCurrentView() {
     if (currentView === 'dashboard') return;
     const titles = {
-        incubating: { icon:'🎯', title:'مسار الاحتضان', sub:'القائمة النظيفة - المهام المطلوبة اليوم' },
+        incubating: { icon:'🎯', title:'مسار الاحتضان الذكي', sub:'جدولة تلقائية - المكالمات المطلوبة اليوم بناءً على تاريخ التسجيل' },
         active: { icon:'⭐', title:'المتاجر النشطة', sub:'تشحن بانتظام' },
         inactive: { icon:'⚠️', title:'غير النشطة', sub:'توقفت أقل من 60 يوم - فرص عودتها عالية' },
         frozen: { icon:'🧊', title:'المجمدة', sub:'تم تجميدها' },
@@ -860,40 +928,48 @@ function renderCurrentView() {
 
     if (currentView === 'incubating') {
         const all = allStores.filter(s => s.category === 'incubating');
-        const due = all.filter(s => s.incubation_task && s.incubation_task !== 'waiting');
+        const today = new Date().toISOString().split('T')[0];
+        // مهام اليوم المجدولة: فقط المتاجر التي حان موعد مكالمتها اليوم أو قبل اليوم
+        const scheduledToday = all.filter(s => s.next_call_date && s.next_call_date <= today && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting');
+        const due = all.filter(s => s.incubation_task && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting' && s.incubation_task !== 'cooldown');
         const golden = all.filter(s => getHeatLevel(s) === 'golden');
         const hot = all.filter(s => getHeatLevel(s) === 'hot');
         const day0 = all.filter(s => s.incubation_task === 'day0');
         const day3 = all.filter(s => s.incubation_task === 'day3');
         const day10 = all.filter(s => s.incubation_task === 'day10');
         const grad = all.filter(s => s.incubation_task === 'graduation');
+        const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
 
         sf.style.display = 'flex';
         sf.innerHTML = `
-            <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام اليوم <span class="sf-count">${due.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='scheduled_today'?'active':''}" onclick="setSubFilter('scheduled_today')" style="background:${currentSubFilter==='scheduled_today'?'':'rgba(5,150,105,0.08)'};border-color:${currentSubFilter==='scheduled_today'?'':'var(--success)'}">📅 مهام اليوم المجدولة <span class="sf-count">${scheduledToday.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='due'?'active':''}" onclick="setSubFilter('due')">📋 مهام مستحقة <span class="sf-count">${due.length}</span></button>
             <button class="sub-filter-btn golden-f ${currentSubFilter==='golden'?'active':''}" onclick="setSubFilter('golden')">🥇 ذهبية <span class="sf-count">${golden.length}</span></button>
             <button class="sub-filter-btn hot-f ${currentSubFilter==='hot'?'active':''}" onclick="setSubFilter('hot')">🔥 ساخنة <span class="sf-count">${hot.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='day0'?'active':''}" onclick="setSubFilter('day0')">📞 يوم 0 <span class="sf-count">${day0.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='day3'?'active':''}" onclick="setSubFilter('day3')">📞 يوم 3 <span class="sf-count">${day3.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='day10'?'active':''}" onclick="setSubFilter('day10')">📞 يوم 10 <span class="sf-count">${day10.length}</span></button>
-            <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')">🎓 تخريج <span class="sf-count">${grad.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='graduation'?'active':''}" onclick="setSubFilter('graduation')" style="background:${currentSubFilter==='graduation'?'':'rgba(5,150,105,0.05)'};border-color:${currentSubFilter==='graduation'?'':'var(--success)'}">🎓 قائمة التخريج <span class="sf-count">${grad.length}</span></button>
+            <button class="sub-filter-btn ${currentSubFilter==='scheduled_waiting'?'active':''}" onclick="setSubFilter('scheduled_waiting')">⏳ مجدولة (قادمة) <span class="sf-count">${scheduledWaiting.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${all.length}</span></button>`;
 
         let stores = all;
-        if (currentSubFilter === 'due') stores = due;
+        if (currentSubFilter === 'scheduled_today') stores = scheduledToday;
+        else if (currentSubFilter === 'due') stores = due;
         else if (currentSubFilter === 'golden') stores = golden;
         else if (currentSubFilter === 'hot') stores = hot;
         else if (currentSubFilter === 'day0') stores = day0;
         else if (currentSubFilter === 'day3') stores = day3;
         else if (currentSubFilter === 'day10') stores = day10;
         else if (currentSubFilter === 'graduation') stores = grad;
+        else if (currentSubFilter === 'scheduled_waiting') stores = scheduledWaiting;
 
         // Default to "due" on first load
         if (currentSubFilter === 'all' && currentRole === 'incubation_manager') {
             // Show all but sort due first
             stores.sort((a,b) => {
-                const order = {day0:0,day3:1,day10:2,graduation:3,waiting:4};
-                return (order[a.incubation_task]||5) - (order[b.incubation_task]||5);
+                const order = {day0:0,day3:1,day10:2,graduation:3,scheduled_waiting:4,waiting:5};
+                return (order[a.incubation_task]||6) - (order[b.incubation_task]||6);
             });
         }
 
@@ -901,14 +977,25 @@ function renderCurrentView() {
         stores.forEach(s => tl.appendChild(createStoreCard(s)));
 
     } else if (currentView === 'inactive') {
+        const now = new Date();
         const neverShipped = allStores.filter(s => s.category === 'inactive' && s.state_reason === 'failed_48h');
         const stoppedShipping = allStores.filter(s => s.category === 'inactive' && s.state_reason !== 'failed_48h');
         const inact = allStores.filter(s => s.category === 'inactive');
         const rest = allStores.filter(s => s.category === 'restoring');
         const recovered = allStores.filter(s => s.category === 'recovered');
         const dueCalls = rest.filter(s => s.recovery_task && s.recovery_task !== 'rcall_waiting' && s.recovery_task !== 'rcall_done');
+
+        // المتاجر الغير نشطة الساخنة: وصلت 14 يوم عدم نشاط اليوم (بين 13 و 15 يوم)
+        const hotInactive = inact.filter(s => {
+            const lastShip = s.last_shipment_date && s.last_shipment_date !== 'لا يوجد' ? new Date(s.last_shipment_date) : null;
+            if (!lastShip) return false;
+            const daysSince = Math.floor((now - lastShip) / 864e5);
+            return daysSince >= 13 && daysSince <= 15;
+        });
+
         sf.style.display = 'flex';
         sf.innerHTML = `
+            <button class="sub-filter-btn ${currentSubFilter==='hot_inactive'?'active':''}" onclick="setSubFilter('hot_inactive')" style="background:${currentSubFilter==='hot_inactive'?'':'rgba(220,38,38,0.06)'};border-color:${currentSubFilter==='hot_inactive'?'':'var(--hot)'}">🔥 ساخنة (14 يوم اليوم) <span class="sf-count">${hotInactive.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='all'?'active':''}" onclick="setSubFilter('all')">الكل <span class="sf-count">${inact.length+rest.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='never_shipped'?'active':''}" onclick="setSubFilter('never_shipped')">🚫 لم تشحن <span class="sf-count">${neverShipped.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='stopped_shipping'?'active':''}" onclick="setSubFilter('stopped_shipping')">📦 شحنت وتوقفت <span class="sf-count">${stoppedShipping.length}</span></button>
@@ -916,7 +1003,8 @@ function renderCurrentView() {
             <button class="sub-filter-btn ${currentSubFilter==='due_recovery'?'active':''}" onclick="setSubFilter('due_recovery')">📞 مكالمات مستحقة <span class="sf-count">${dueCalls.length}</span></button>
             <button class="sub-filter-btn ${currentSubFilter==='recovered'?'active':''}" onclick="setSubFilter('recovered')">✅ تمت الاستعادة <span class="sf-count">${recovered.length}</span></button>`;
         let stores;
-        if (currentSubFilter === 'never_shipped') stores = neverShipped;
+        if (currentSubFilter === 'hot_inactive') stores = hotInactive;
+        else if (currentSubFilter === 'never_shipped') stores = neverShipped;
         else if (currentSubFilter === 'stopped_shipping') stores = stoppedShipping;
         else if (currentSubFilter === 'inactive_only') stores = inact;
         else if (currentSubFilter === 'restoring') stores = rest;
@@ -942,6 +1030,7 @@ async function renderUsersView(container) {
     container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-secondary)">جاري التحميل...</div>';
     const result = await fetch(AUTH_API + '?action=list_users').then(r => r.json());
     const users = result.data || [];
+    cachedUsers = users;
     const roleLabels = { incubation_manager:'مسؤول الاحتضان', active_manager:'مسؤول النشطة', inactive_manager:'مسؤول الاستعادة', executive:'المدير التنفيذي' };
 
     let html = '<button class="btn btn-success" onclick="openAddUserModal()" style="margin-bottom:1.5rem">+ إضافة مستخدم جديد</button>';
@@ -1014,10 +1103,19 @@ function createStoreCard(store) {
             const mins = Math.ceil((store.cooldown_until - new Date()) / 60000);
             badge = '<span class="status-badge day0">⏳ يعود بعد '+mins+' دقيقة</span>';
         }
+        else if (store.incubation_task === 'scheduled_waiting') {
+            const schedDate = store.scheduled_date ? new Date(store.scheduled_date).toLocaleDateString('ar-EG') : '?';
+            const stageLabels = { day3:'المكالمة الثانية', day10:'المكالمة الثالثة', graduation_ready:'التخريج' };
+            const stageLabel = stageLabels[store.incubation_stage] || 'المرحلة التالية';
+            badge = '<span class="status-badge day0">📅 '+stageLabel+' مجدولة: '+schedDate+'</span>';
+        }
         else badge = '<span class="status-badge day0">⏳ بانتظار (يوم '+days+')</span>';
     } else if (store.category === 'active') badge = '<span class="status-badge active">نشط</span>';
     else if (store.category === 'inactive') {
-        if (store.state_reason === 'failed_48h') badge = '<span class="status-badge failed48">🚫 لم تشحن - 48 ساعة</span>';
+        const _ls = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
+        const _daysInactive = _ls ? Math.floor((new Date() - _ls) / 864e5) : 0;
+        if (_ls && _daysInactive >= 13 && _daysInactive <= 15) badge = '<span class="status-badge hot">🔥 ساخنة - '+_daysInactive+' يوم بدون شحن (أولوية اتصال)</span>';
+        else if (store.state_reason === 'failed_48h') badge = '<span class="status-badge failed48">🚫 لم تشحن - 48 ساعة</span>';
         else badge = '<span class="status-badge warning">📦 شحنت وتوقفت</span>';
     }
     else if (store.category === 'frozen') badge = '<span class="status-badge frozen">🧊 مجمد</span>';
@@ -1051,7 +1149,12 @@ function createStoreCard(store) {
         if (store.incubation_task === 'day0') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day0\')">📞 تم الاتصال - ترحيب</button>';
         else if (store.incubation_task === 'day3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day3\')">📞 تم الاتصال - يوم 3</button>';
         else if (store.incubation_task === 'day10') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'day10\')">📞 تم الاتصال - يوم 10</button>';
-        else if (store.incubation_task === 'graduation' && (currentRole === 'executive' || currentRole === 'incubation_manager')) actions += '<button class="btn btn-success" onclick="graduateStore('+store.id+')">🎓 تخريج إلى نشط</button>';
+        else if (store.incubation_task === 'graduation' && (currentRole === 'executive' || currentRole === 'incubation_manager')) actions += '<button class="btn btn-success" onclick="graduateStore('+store.id+')" style="background:linear-gradient(135deg,#059669,#10b981);font-size:1rem;padding:0.6rem 1.5rem;">🎓 تخريج المتجر</button>';
+        // عرض معلومات الجدولة للمهام المنتظرة
+        if (store.incubation_task === 'scheduled_waiting' && store.scheduled_date) {
+            const sd = new Date(store.scheduled_date).toLocaleDateString('ar-EG');
+            actions += '<span style="color:var(--text-secondary);font-size:0.8rem;padding:0.5rem;">📅 الموعد القادم: '+sd+'</span>';
+        }
     }
 
     if (store.category === 'inactive' && (currentRole === 'inactive_manager' || currentRole === 'executive')) {
@@ -1072,27 +1175,36 @@ function createStoreCard(store) {
     // Timeline for incubating stores
     let timelineHtml = '';
     if (store.category === 'incubating') {
-        const cl = getStored('calllog', store.id) || {};
+        const cl = dbCallLogs[store.id] || getStored('calllog', store.id) || {};
+        const regDateObj = store.registered_at ? new Date(store.registered_at) : null;
+        // حساب التواريخ المجدولة بناءً على تاريخ التسجيل
+        const day3Date = regDateObj ? new Date(new Date(regDateObj).setDate(regDateObj.getDate()+3)).toLocaleDateString('ar-EG') : '';
+        const day10Date = regDateObj ? new Date(new Date(regDateObj).setDate(regDateObj.getDate()+10)).toLocaleDateString('ar-EG') : '';
+        const day14Date = regDateObj ? new Date(new Date(regDateObj).setDate(regDateObj.getDate()+14)).toLocaleDateString('ar-EG') : '';
+
         const steps = [
-            { label:'يوم 0 - ترحيب', key:'day0' },
-            { label:'48 ساعة - شحنة أولى', key:'48h', auto:true },
-            { label:'يوم 3 - متابعة', key:'day3' },
-            { label:'يوم 10 - تقييم', key:'day10' },
-            { label:'يوم 14 - تخريج', key:'graduation' }
+            { label:'يوم 0 - ترحيب', key:'day0', dateInfo:'' },
+            { label:'48 ساعة - شحنة أولى', key:'48h', auto:true, dateInfo:'' },
+            { label:'يوم 3 - متابعة', key:'day3', dateInfo: day3Date ? ' ('+day3Date+')' : '' },
+            { label:'يوم 10 - تقييم', key:'day10', dateInfo: day10Date ? ' ('+day10Date+')' : '' },
+            { label:'يوم 14 - تخريج', key:'graduation', dateInfo: day14Date ? ' ('+day14Date+')' : '' }
         ];
-        timelineHtml = '<div class="timeline"><div class="timeline-title">📋 مسار الاحتضان</div>';
+        timelineHtml = '<div class="timeline"><div class="timeline-title">📋 مسار الاحتضان الذكي</div>';
         steps.forEach(step => {
             let dotClass = 'pending';
             if (step.key === '48h') {
                 dotClass = hasShipped ? 'done' : (hours > 48 ? 'failed' : 'pending');
-            } else if (cl[step.key]) dotClass = 'done';
+            } else if (cl[step.key] || (step.key === 'graduation' && store.incubation_stage === 'graduated')) dotClass = 'done';
             else if (store.incubation_task === step.key) dotClass = 'current';
             else if (step.key === 'graduation' && store.incubation_task === 'graduation') dotClass = 'current';
+            // إذا المرحلة مجدولة ولم يحن موعدها بعد
+            else if (store.incubation_stage === step.key && store.incubation_task === 'scheduled_waiting') dotClass = 'scheduled';
             let statusText = '';
             if (dotClass === 'done') statusText = ' ✓';
             else if (dotClass === 'failed') statusText = ' ✗ لم يشحن';
-            else if (dotClass === 'current') statusText = ' ← مطلوب';
-            timelineHtml += '<div class="timeline-step"><div class="timeline-dot '+dotClass+'"></div><span>'+step.label+statusText+'</span></div>';
+            else if (dotClass === 'current') statusText = ' ← مطلوب الآن';
+            else if (dotClass === 'scheduled') statusText = ' ⏰ مجدول';
+            timelineHtml += '<div class="timeline-step"><div class="timeline-dot '+dotClass+'"></div><span>'+step.label+step.dateInfo+statusText+'</span></div>';
         });
         timelineHtml += '</div>';
     }
@@ -1149,10 +1261,15 @@ function openAddUserModal() {
     document.getElementById('user-modal').classList.add('active');
 }
 
-function openEditUserModal(id) {
-    const users = getUsers();
-    const u = users.find(x => x.id === id);
-    if (!u) return;
+async function openEditUserModal(id) {
+    // البحث في الكاش أولاً ثم من API
+    let u = cachedUsers.find(x => x.id == id);
+    if (!u) {
+        const result = await fetch(AUTH_API + '?action=list_users').then(r => r.json());
+        cachedUsers = result.data || [];
+        u = cachedUsers.find(x => x.id == id);
+    }
+    if (!u) { showNotification('لم يتم العثور على المستخدم', 'error'); return; }
     document.getElementById('user-modal-title').textContent = 'تعديل مستخدم: ' + u.fullname;
     document.getElementById('edit-user-id').value = id;
     document.getElementById('new-username').value = u.username;
@@ -1200,7 +1317,21 @@ document.getElementById('user-form').addEventListener('submit', async function(e
     renderCurrentView();
 });
 
-function graduateStore(id) { setStatus(id,'active'); localStorage.setItem('store_graduated_'+id,'true'); logCall(id,'graduation','تم التخريج'); showNotification('🎓 تم تخريج المتجر'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function graduateStore(id) {
+    const s = allStores.find(x => x.id === id);
+    // استخدام API التخريج الجديد
+    dbPost(DB_API + '?action=graduate_store', {
+        store_id: id,
+        store_name: s ? s.name : '',
+        user: currentUser ? currentUser.fullname : '',
+        user_role: currentRole
+    });
+    // تحديث محلي
+    if (s) { s.category = 'active'; s.incubation_stage = 'graduated'; }
+    dbStates[id] = { ...(dbStates[id]||{}), store_id: id, category: 'active' };
+    showNotification('🎓 تم تخريج المتجر إلى المتاجر النشطة');
+    runStateMachine(); updateDashboard(); renderCurrentView();
+}
 function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 function unfreezeStore(id) { setStatus(id,'incubating',{reason:'إلغاء تجميد'}); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
 
@@ -1269,16 +1400,43 @@ function rateStar(q,v) { document.querySelector('.star-rating[data-question="'+q
 function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
 
 // Form handlers
-document.getElementById('call-form').addEventListener('submit', function(e) {
+document.getElementById('call-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = parseInt(document.getElementById('call-store-id').value);
     const type = document.getElementById('call-type').value;
     const note = document.getElementById('call-note').value;
     if (!note.trim()) { showNotification('ملاحظة النورس إلزامية!', 'error'); return; }
     logCall(id, type, note);
+
+    // تسجيل في إحصائيات اليوم
+    const today = new Date().toISOString().split('T')[0];
+    const dailyCalls = JSON.parse(localStorage.getItem('daily_calls_' + today) || '[]');
+    dailyCalls.push({ storeId: id, type, userId: currentUser?.id, userName: currentUser?.fullname, role: currentRole, time: new Date().toISOString() });
+    localStorage.setItem('daily_calls_' + today, JSON.stringify(dailyCalls));
+
     closeModal(); this.reset();
+
+    // إعادة تحميل بيانات الاحتضان لالتقاط الجدولة التلقائية
+    if (['day0','day3','day10'].includes(type)) {
+        await loadDBState();
+        // تحديث المتجر المحلي ببيانات الاحتضان الجديدة
+        const store = allStores.find(x => x.id === id);
+        const inc = dbIncubation[id];
+        if (store && inc) {
+            store.incubation_stage = inc.incubation_stage;
+            store.next_call_date = inc.next_call_date;
+        }
+    }
+
     runStateMachine(); updateDashboard(); renderCurrentView();
-    showNotification('✅ تم تسجيل المكالمة');
+
+    // رسالة مخصصة حسب نوع المكالمة
+    const msgs = {
+        day0: '✅ تم تسجيل المكالمة الترحيبية - سيتم جدولة المكالمة التالية تلقائياً',
+        day3: '✅ تم تسجيل متابعة يوم 3 - المكالمة الثالثة مجدولة تلقائياً',
+        day10: '✅ تم تسجيل تقييم يوم 10 - المتجر بانتظار التخريج',
+    };
+    showNotification(msgs[type] || '✅ تم تسجيل المكالمة');
 });
 
 document.getElementById('freeze-form').addEventListener('submit', function(e) {

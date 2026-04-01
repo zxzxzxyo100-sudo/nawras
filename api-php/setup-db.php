@@ -23,9 +23,27 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS store_states (
     restore_date DATETIME,
     graduated_at DATETIME,
     freeze_reason TEXT,
+    registration_date DATETIME,
+    first_shipped_date DATETIME,
+    incubation_stage ENUM('day0','day3','day10','graduation_ready','graduated') DEFAULT 'day0',
+    next_call_date DATE,
     updated_by VARCHAR(200),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Migrate: add new incubation columns if table already exists
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN registration_date DATETIME AFTER freeze_reason");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN first_shipped_date DATETIME AFTER registration_date");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN incubation_stage ENUM('day0','day3','day10','graduation_ready','graduated') DEFAULT 'day0' AFTER first_shipped_date");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN next_call_date DATE AFTER incubation_stage");
+} catch(Exception $e) {}
 
 // Audit logs - complete history
 $pdo->exec("CREATE TABLE IF NOT EXISTS audit_logs (
