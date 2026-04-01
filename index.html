@@ -579,9 +579,12 @@ function processStoresData(newData, inactiveData, summaryData) {
             ex.total_shipments = s.total_shipments || ex.total_shipments;
             ex.shipments_in_range = s.shipments_in_range || 0;
             if (!ex.first_shipment_date && s.last_shipment_date && s.last_shipment_date !== 'لا يوجد') ex.first_shipment_date = s.last_shipment_date;
-        } else if (s.status === 'active' && s.total_shipments > 0) {
-            // المتاجر النشطة من API الشحنات (تشحن فعلياً)
-            allStores.push({ ...s, category: 'active', notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
+        } else if (s.total_shipments > 0) {
+            // تصنيف حسب آخر شحنة: نشط إذا شحن خلال 14 يوم، غير نشط إذا تجاوز 14 يوم
+            const lastShip = s.last_shipment_date && s.last_shipment_date !== 'لا يوجد' ? new Date(s.last_shipment_date) : null;
+            const daysSinceShip = lastShip ? (new Date() - lastShip) / 864e5 : 999;
+            const cat = daysSinceShip <= 14 ? 'active' : 'inactive';
+            allStores.push({ ...s, category: cat, notes: getStored('notes', s.id) || [], survey: getStored('survey', s.id), freeze_reason: getStored('freeze', s.id) || '' });
         }
     });
 
