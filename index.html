@@ -133,6 +133,14 @@
         .btn-called:hover { background:#7c3aed;transform:translateY(-2px); }
         .btn-outline { background:white;border:2px solid var(--border);color:var(--text-primary); }
         .btn-outline:hover { border-color:var(--primary);color:var(--primary); }
+        /* ===== SEARCH ===== */
+        .search-box { position:relative;display:flex;align-items:center; }
+        .search-box input { padding:0.6rem 2.5rem 0.6rem 1rem;border:2px solid var(--border);border-radius:12px;font-family:'Cairo',sans-serif;font-size:0.85rem;font-weight:600;width:280px;outline:none;transition:all 0.2s;background:var(--bg-main); }
+        .search-box input:focus { border-color:var(--primary);background:white;box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+        .search-box input::placeholder { color:var(--text-secondary);font-weight:500; }
+        .search-box #search-clear { position:absolute;left:8px;background:none;border:none;cursor:pointer;font-size:1rem;color:var(--text-secondary);padding:0.25rem;border-radius:50%;transition:all 0.2s; }
+        .search-box #search-clear:hover { color:var(--danger);background:rgba(220,38,38,0.1); }
+
         .empty-state { text-align:center;padding:4rem 2rem;color:var(--text-secondary); }
         .empty-state-icon { font-size:4rem;margin-bottom:1rem;opacity:0.5; }
 
@@ -250,7 +258,9 @@
             <div id="dashboard-view"><div class="stats-grid" id="stats-grid"></div></div>
             <div id="tasks-view" style="display:none;">
                 <div class="tasks-section">
-                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2></div>
+                    <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
+                        <div class="search-box"><input type="text" id="store-search" placeholder="🔍 بحث بكود المتجر أو اسمه..." oninput="handleSearch(this.value)"><button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button></div>
+                    </div>
                     <div class="sub-filters" id="sub-filters" style="display:none;"></div>
                     <div class="task-list" id="task-list"></div>
                     <div class="pagination-wrapper" id="pagination-wrapper" style="display:none;">
@@ -374,7 +384,7 @@ function saveUsers(users) { localStorage.setItem('nawras_users', JSON.stringify(
 
 // ===================== STATE =====================
 let allStores = [], currentView = 'dashboard', currentSubFilter = 'all', currentRole = null, currentUser = null, cachedUsers = [];
-let currentPage = 1, rowsPerPage = 50;
+let currentPage = 1, rowsPerPage = 50, searchQuery = '';
 
 // ===================== API =====================
 const DB_API = '/api-php/store-actions.php';
@@ -921,6 +931,11 @@ function switchView(view) {
     if (view !== 'dashboard' && !ROLES[currentRole].views.includes(view)) return;
     currentView = view;
     currentPage = 1;
+    searchQuery = '';
+    const si = document.getElementById('store-search');
+    if (si) { si.value = ''; }
+    const sc = document.getElementById('search-clear');
+    if (sc) { sc.style.display = 'none'; }
     document.querySelectorAll('.nav-item').forEach(i => { i.classList.remove('active'); if (i.dataset.view === view) i.classList.add('active'); });
     if (view === 'dashboard') {
         document.getElementById('dashboard-view').style.display = 'block';
@@ -1003,7 +1018,8 @@ function renderCurrentView() {
             });
         }
 
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد مهام</h3></div>'; renderPagination(0); return; }
+        stores = filterBySearch(stores);
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد مهام')+'</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
@@ -1042,7 +1058,8 @@ function renderCurrentView() {
         else if (currentSubFilter === 'due_recovery') stores = dueCalls;
         else if (currentSubFilter === 'recovered') stores = recovered;
         else stores = [...inact, ...rest];
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
+        stores = filterBySearch(stores);
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد متاجر')+'</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
 
@@ -1053,8 +1070,9 @@ function renderCurrentView() {
 
     } else {
         sf.style.display = 'none';
-        const stores = allStores.filter(s => s.category === currentView);
-        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>لا توجد متاجر</h3></div>'; renderPagination(0); return; }
+        let stores = allStores.filter(s => s.category === currentView);
+        stores = filterBySearch(stores);
+        if (!stores.length) { tl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✨</div><h3>'+(searchQuery?'لا توجد نتائج للبحث':'لا توجد متاجر')+'</h3></div>'; renderPagination(0); return; }
         renderPagination(stores.length);
         paginateStores(stores).forEach(s => tl.appendChild(createStoreCard(s)));
     }
@@ -1099,6 +1117,30 @@ async function renderUsersView(container) {
 }
 
 function setSubFilter(f) { currentSubFilter = f; currentPage = 1; renderCurrentView(); }
+
+function handleSearch(val) {
+    searchQuery = val.trim().toLowerCase();
+    currentPage = 1;
+    document.getElementById('search-clear').style.display = searchQuery ? 'block' : 'none';
+    renderCurrentView();
+}
+
+function clearSearch() {
+    searchQuery = '';
+    document.getElementById('store-search').value = '';
+    document.getElementById('search-clear').style.display = 'none';
+    currentPage = 1;
+    renderCurrentView();
+}
+
+function filterBySearch(stores) {
+    if (!searchQuery) return stores;
+    return stores.filter(s => {
+        const id = String(s.id || '').toLowerCase();
+        const name = (s.name || '').toLowerCase();
+        return id.includes(searchQuery) || name.includes(searchQuery);
+    });
+}
 
 // ===================== STORE CARD =====================
 function createStoreCard(store) {
