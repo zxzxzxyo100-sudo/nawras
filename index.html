@@ -559,6 +559,7 @@ function processStoresData(newData, inactiveData, summaryData) {
             s.category = dbState.category;
             if (dbState.freeze_reason) s.freeze_reason = dbState.freeze_reason;
             if (dbState.state_reason) s.state_reason = dbState.state_reason;
+            if (dbState.state_reason === 'unreachable') s.unreachable = true;
         }
         // Apply survey from DB
         const sv = dbSurveys[s.id];
@@ -612,6 +613,15 @@ function runStateMachine() {
         if (daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip < 14) {
             store.category = 'active';
             store.state_reason = 'auto_graduated';
+            // حفظ تلقائي في DB
+            if (!dbStates[store.id] || dbStates[store.id].category !== 'active') {
+                dbPost(DB_API + '?action=set_status', {
+                    store_id: store.id, category: 'active', store_name: store.name || '',
+                    state_reason: 'auto_graduated', old_status: 'incubating',
+                    user: 'النظام', user_role: 'system'
+                });
+                dbStates[store.id] = { store_id: store.id, category: 'active' };
+            }
             return;
         }
 
@@ -619,6 +629,15 @@ function runStateMachine() {
         if (hoursSinceReg > 48 && !hasShipped) {
             store.category = 'inactive';
             store.state_reason = 'failed_48h';
+            // حفظ تلقائي في DB
+            if (!dbStates[store.id] || dbStates[store.id].category !== 'inactive') {
+                dbPost(DB_API + '?action=set_status', {
+                    store_id: store.id, category: 'inactive', store_name: store.name || '',
+                    state_reason: 'failed_48h', old_status: 'incubating',
+                    user: 'النظام', user_role: 'system'
+                });
+                dbStates[store.id] = { store_id: store.id, category: 'inactive' };
+            }
             return;
         }
 
@@ -714,6 +733,14 @@ function runStateMachine() {
         const daysSinceLastShip = (now - lastShipDate) / 864e5;
         if (daysSinceLastShip >= 60) {
             store.category = 'cold';
+            if (!dbStates[store.id] || dbStates[store.id].category !== 'cold') {
+                dbPost(DB_API + '?action=set_status', {
+                    store_id: store.id, category: 'cold', store_name: store.name || '',
+                    state_reason: 'inactive_60days', old_status: 'inactive',
+                    user: 'النظام', user_role: 'system'
+                });
+                dbStates[store.id] = { store_id: store.id, category: 'cold' };
+            }
         }
     });
 }
@@ -1199,11 +1226,18 @@ function createStoreCard(store) {
         if (store.recovery_task === 'rcall1') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall1\')">📞 تم الاتصال - مكالمة 1</button>';
         else if (store.recovery_task === 'rcall2') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall2\')">📞 تم الاتصال - مكالمة 2</button>';
         else if (store.recovery_task === 'rcall3') actions += '<button class="btn btn-called" onclick="openCallModal('+store.id+',\'rcall3\')">📞 تم الاتصال - مكالمة 3</button>';
+        actions += '<button class="btn btn-frozen" onclick="cancelRestore('+store.id+')">❌ إلغاء الاستعادة</button>';
     }
     if (store.category === 'active' && (currentRole === 'active_manager' || currentRole === 'executive')) actions += '<button class="btn btn-success" onclick="openSurveyModal('+store.id+')">📋 استبيان</button>';
-    if ((store.category === 'inactive' || store.category === 'cold') && currentRole === 'executive') actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
-    if (store.category === 'frozen' && currentRole === 'executive') actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
+    if ((store.category === 'inactive' || store.category === 'cold') && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-frozen" onclick="openFreezeModal('+store.id+')">🧊 تجميد</button>';
+    if (store.category === 'frozen' && (currentRole === 'executive' || currentRole === 'inactive_manager')) actions += '<button class="btn btn-success" onclick="unfreezeStore('+store.id+')">إلغاء التجميد</button>';
 
+    // زر متعذر الوصول (كل الصلاحيات)
+    if (!store.unreachable) {
+        actions += '<button class="btn" style="background:#f97316;color:white;border-color:#f97316;" onclick="markUnreachable('+store.id+')">📵 متعذر الوصول</button>';
+    } else {
+        actions += '<button class="btn btn-success" onclick="markReachable('+store.id+')" style="font-size:0.75rem;">✅ تم الوصول</button>';
+    }
     actions += '<button class="btn btn-primary" onclick="openCallModal('+store.id+',\'general\')">📞 اتصال</button>';
     // Audit log icon moved to card header
 
@@ -1270,7 +1304,7 @@ function createStoreCard(store) {
 
     card.innerHTML = `
         <div style="display:flex;justify-content:flex-start;margin-bottom:0.5rem;"><button onclick="showAuditLog(${store.id})" style="background:none;border:none;cursor:pointer;font-size:1.2rem;opacity:0.4;transition:opacity 0.2s;padding:0;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="سجل العمليات">📜</button></div>
-        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}</h3><div class="task-meta">
+        <div class="task-header"><div class="task-info"><h3>${store.name||'بدون اسم'}${store.unreachable?' <span style="background:rgba(249,115,22,0.15);color:#f97316;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.7rem;font-weight:800;">📵 معلق</span>':''}</h3><div class="task-meta">
             <div class="meta-item">🔢 ${store.id}</div>
             <div class="meta-item">📱 ${phone||'-'}</div>
             <div class="meta-item">📍 ${store.city||'-'}</div>
@@ -1368,7 +1402,28 @@ function graduateStore(id) {
     runStateMachine(); updateDashboard(); renderCurrentView();
 }
 function restoreStore(id) { setStatus(id,'restoring',{reason:'بدء استعادة'}); showNotification('🔄 جاري الاستعادة - 3 مكالمات كل 10 أيام'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function cancelRestore(id) {
+    if (!confirm('هل أنت متأكد من إلغاء الاستعادة؟')) return;
+    setStatus(id, 'inactive', { reason: 'إلغاء استعادة' });
+    showNotification('❌ تم إلغاء الاستعادة'); runStateMachine(); updateDashboard(); renderCurrentView();
+}
 function unfreezeStore(id) { setStatus(id,'incubating',{reason:'إلغاء تجميد'}); const s=allStores.find(x=>x.id===id); if(s) s.freeze_reason=''; showNotification('تم إلغاء التجميد'); runStateMachine(); updateDashboard(); renderCurrentView(); }
+function markUnreachable(id) {
+    const s = allStores.find(x => x.id === id);
+    if (!s) return;
+    s.unreachable = true;
+    dbPost(DB_API + '?action=log_call', { store_id: id, store_name: s.name || '', call_type: 'unreachable', note: 'متعذر الوصول للعميل', user: currentUser ? currentUser.fullname : '', user_role: currentRole });
+    dbPost(DB_API + '?action=set_status', { store_id: id, category: s.category, store_name: s.name || '', state_reason: 'unreachable', old_status: s.category, user: currentUser ? currentUser.fullname : '', user_role: currentRole });
+    showNotification('📵 تم تسجيل المتجر كمتعذر الوصول'); renderCurrentView();
+}
+function markReachable(id) {
+    const s = allStores.find(x => x.id === id);
+    if (!s) return;
+    s.unreachable = false;
+    dbPost(DB_API + '?action=log_call', { store_id: id, store_name: s.name || '', call_type: 'reachable', note: 'تم الوصول بعد تعذر سابق', user: currentUser ? currentUser.fullname : '', user_role: currentRole });
+    dbPost(DB_API + '?action=set_status', { store_id: id, category: s.category, store_name: s.name || '', state_reason: '', old_status: s.category, user: currentUser ? currentUser.fullname : '', user_role: currentRole });
+    showNotification('✅ تم إلغاء حالة متعذر الوصول'); renderCurrentView();
+}
 
 // ===================== MODALS =====================
 function openCallModal(id, type) {
