@@ -283,12 +283,7 @@
                     <div class="section-header"><h2 class="section-title"><span id="section-icon">📊</span><span id="section-title">قائمة</span></h2>
                         <div class="search-box"><input type="text" id="store-search" placeholder="🔍 بحث بكود المتجر أو اسمه..." oninput="handleSearch(this.value)"><button id="search-clear" onclick="clearSearch()" style="display:none;">✕</button></div>
                     </div>
-                    <div class="incubation-stats" id="incubation-stats" style="display:none;">
-                        <div class="inc-stat-card completed"><div><div class="inc-stat-num" id="inc-completed-count">0</div><div class="inc-stat-label">مهام مكتملة اليوم</div></div></div>
-                        <div class="inc-stat-card remaining"><div><div class="inc-stat-num" id="inc-remaining-count">0</div><div class="inc-stat-label">مهام متبقية اليوم</div></div></div>
-                        <div class="inc-stat-card total" id="inc-total-card"><div><div class="inc-stat-num" id="inc-total-count">0</div><div class="inc-stat-label" id="inc-total-label">إجمالي مهام اليوم</div></div></div>
-                        <div class="inc-stat-card" id="inc-monitor-card" style="display:none;border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" id="inc-all-incubating" style="color:#6366f1;">0</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
-                    </div>
+                    <div class="incubation-stats" id="incubation-stats" style="display:none;"></div>
                     <div class="all-done-screen" id="all-done-screen">
                         <div class="all-done-icon">🏆</div>
                         <div class="all-done-title">عمل رائع يا بطل!</div>
@@ -1074,21 +1069,25 @@ function renderCurrentView() {
         const grad = all.filter(s => s.incubation_task === 'graduation');
         const scheduledWaiting = all.filter(s => s.incubation_task === 'scheduled_waiting');
 
-        // ===== عدّادات الإنجاز =====
+        // ===== عدّادات ديناميكية حسب الصلاحية =====
         const statsBar = document.getElementById('incubation-stats');
         const doneScreen = document.getElementById('all-done-screen');
         statsBar.style.display = 'flex';
-        document.getElementById('inc-completed-count').textContent = completedToday;
-        document.getElementById('inc-remaining-count').textContent = remainingToday;
-        document.getElementById('inc-total-count').textContent = totalToday;
 
-        // ===== عداد المراقبة (المدير): إجمالي قيد الاحتضان =====
-        const monitorCard = document.getElementById('inc-monitor-card');
         if (isManager) {
-            monitorCard.style.display = 'block';
-            document.getElementById('inc-all-incubating').textContent = all.length;
+            // ===== عدّادات المدير: إجمالي + لم تشحن + بدأت الشحن + مهام مستحقة =====
+            statsBar.innerHTML = `
+                <div class="inc-stat-card" style="border-color:#6366f1;background:rgba(99,102,241,0.04);"><div><div class="inc-stat-num" style="color:#6366f1;">${all.length}</div><div class="inc-stat-label">إجمالي قيد الاحتضان</div></div></div>
+                <div class="inc-stat-card" style="border-color:var(--danger);background:rgba(220,38,38,0.04);"><div><div class="inc-stat-num" style="color:var(--danger);">${notShipped.length}</div><div class="inc-stat-label">لم تشحن</div></div></div>
+                <div class="inc-stat-card" style="border-color:var(--success);background:rgba(5,150,105,0.04);"><div><div class="inc-stat-num" style="color:var(--success);">${hasShippedStores.length}</div><div class="inc-stat-label">بدأت الشحن</div></div></div>
+                <div class="inc-stat-card" style="border-color:var(--primary);background:rgba(37,99,235,0.04);"><div><div class="inc-stat-num" style="color:var(--primary);">${actionable.length}</div><div class="inc-stat-label">مهام مستحقة اليوم</div></div></div>
+                <div class="inc-stat-card" style="border-color:var(--warning);background:rgba(217,119,6,0.04);"><div><div class="inc-stat-num" style="color:var(--warning);">${scheduledWaiting.length}</div><div class="inc-stat-label">مجدولة (قادمة)</div></div></div>`;
         } else {
-            monitorCard.style.display = 'none';
+            // ===== عدّادات الموظف: مكتملة + متبقية + إجمالي اليوم =====
+            statsBar.innerHTML = `
+                <div class="inc-stat-card completed"><div><div class="inc-stat-num">${completedToday}</div><div class="inc-stat-label">مهام مكتملة اليوم</div></div></div>
+                <div class="inc-stat-card remaining"><div><div class="inc-stat-num">${remainingToday}</div><div class="inc-stat-label">مهام متبقية اليوم</div></div></div>
+                <div class="inc-stat-card total"><div><div class="inc-stat-num">${totalToday}</div><div class="inc-stat-label">إجمالي مهام اليوم</div></div></div>`;
         }
 
         // ===== رسالة الإنجاز (الموظف فقط) =====
