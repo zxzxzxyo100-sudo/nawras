@@ -7,7 +7,7 @@ import StoreDrawer from '../components/StoreDrawer'
 // ══════════════════════════════════════════════════════════════════
 // توليد المهام اليومية بناءً على القواعد الحصرية الثلاث
 // ══════════════════════════════════════════════════════════════════
-function generateTasks(allStores, callLogs, storeStates, userRole) {
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments) {
   const tasks = []
   const today = new Date().toISOString().split('T')[0]
 
@@ -103,27 +103,50 @@ function generateTasks(allStores, callLogs, storeStates, userRole) {
         })
       }
     }
+
+    // ─── المتاجر المسندة للمستخدم الحالي ────────────────────────
+    if (assignments && username) {
+      const asgn = assignments[store.id]
+      if (asgn?.assigned_to === username && dbCat === 'active_shipping') {
+        const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
+          ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
+          : 999
+        if (!calledToday) {
+          tasks.push({
+            id:       `${store.id}-assigned`,
+            store,
+            priority: daysSinceShip >= 10 ? 'high' : 'normal',
+            type:     'assigned_store',
+            label:    'متجر مُسنَد إليك',
+            desc:     daysSinceShip < 999
+              ? `آخر شحنة قبل ${daysSinceShip} يوم`
+              : 'لا توجد شحنات بعد',
+          })
+        }
+      }
+    }
   })
 
   return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
 }
 
 const TYPE_COLORS = {
-  new_call:     { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
-  recovery_call: { bg: 'bg-red-50',   border: 'border-red-200',   badge: 'bg-red-100 text-red-700'       },
-  followup_call: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700'   },
+  new_call:      { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
+  recovery_call: { bg: 'bg-red-50',    border: 'border-red-200',    badge: 'bg-red-100 text-red-700'       },
+  followup_call: { bg: 'bg-amber-50',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700'   },
+  assigned_store:{ bg: 'bg-blue-50',   border: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700'     },
 }
 
 export default function Tasks() {
-  const { allStores, callLogs, storeStates, loading, reload } = useStores()
+  const { allStores, callLogs, storeStates, assignments, loading, reload } = useStores()
   const { user } = useAuth()
   const [selected, setSelected]   = useState(null)
   const [doneIds, setDoneIds]     = useState(new Set())
   const [filter, setFilter]       = useState('all')
 
   const tasks = useMemo(
-    () => generateTasks(allStores, callLogs, storeStates, user?.role),
-    [allStores, callLogs, storeStates, user]
+    () => generateTasks(allStores, callLogs, storeStates, user?.role, user?.username, assignments),
+    [allStores, callLogs, storeStates, user, assignments]
   )
 
   const pendingTasks = tasks.filter(t => !doneIds.has(t.id))

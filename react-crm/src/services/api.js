@@ -50,6 +50,13 @@ export const resetCategory = (storeIds, user, userRole, reason) =>
     store_ids: storeIds, user, user_role: userRole, reason,
   }).then(r => r.data)
 
+// ─── Assignments ─────────────────────────────────────────────────────────────
+export const getAssignments = () =>
+  http.get('/store-actions.php?action=get_assignments').then(r => r.data)
+
+export const assignStore = (data) =>
+  http.post('/store-actions.php?action=assign_store', data).then(r => r.data)
+
 // ─── Incubation ──────────────────────────────────────────────────────────────
 export const getIncubationData = () =>
   http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)

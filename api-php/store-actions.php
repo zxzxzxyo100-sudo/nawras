@@ -420,4 +420,60 @@ elseif ($action === 'reset_category') {
     jsonResponse(['success' => true, 'affected' => $affected]);
 }
 
+// ========== GET ASSIGNMENTS ==========
+elseif ($action === 'get_assignments') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS store_assignments (
+        store_id     VARCHAR(50)  PRIMARY KEY,
+        store_name   VARCHAR(255) DEFAULT '',
+        assigned_to  VARCHAR(100) NOT NULL,
+        assigned_by  VARCHAR(100) DEFAULT '',
+        assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes        TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $stmt = $pdo->query("SELECT * FROM store_assignments ORDER BY assigned_at DESC");
+    $data = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $data[$row['store_id']] = $row;
+    }
+    jsonResponse(['success' => true, 'data' => $data]);
+}
+
+// ========== ASSIGN STORE ==========
+elseif ($action === 'assign_store') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS store_assignments (
+        store_id     VARCHAR(50)  PRIMARY KEY,
+        store_name   VARCHAR(255) DEFAULT '',
+        assigned_to  VARCHAR(100) NOT NULL,
+        assigned_by  VARCHAR(100) DEFAULT '',
+        assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes        TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $storeId   = $input['store_id']   ?? '';
+    $storeName = $input['store_name'] ?? '';
+    $assignTo  = $input['assigned_to'] ?? '';
+    $assignBy  = $input['assigned_by'] ?? '';
+    $notes     = $input['notes']       ?? '';
+
+    if (!$storeId) { jsonResponse(['success' => false, 'error' => 'store_id مطلوب'], 400); }
+
+    if ($assignTo === '') {
+        // إلغاء التعيين
+        $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ?")->execute([$storeId]);
+    } else {
+        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                assigned_to  = VALUES(assigned_to),
+                assigned_by  = VALUES(assigned_by),
+                notes        = VALUES(notes),
+                store_name   = VALUES(store_name),
+                assigned_at  = CURRENT_TIMESTAMP")
+            ->execute([$storeId, $storeName, $assignTo, $assignBy, $notes]);
+    }
+
+    jsonResponse(['success' => true]);
+}
+
 else { jsonResponse(['error' => 'Unknown action'], 400); }

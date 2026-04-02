@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls } from '../services/api'
+import { getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments } from '../services/api'
 import { useAuth } from './AuthContext'
 
 const StoresContext = createContext(null)
@@ -24,6 +24,7 @@ export function StoresProvider({ children }) {
     total_active: 0, total: 0,
   })
   const [storeStates, setStoreStates]     = useState({})
+  const [assignments, setAssignments]     = useState({})
   const [callLogs, setCallLogs]           = useState({})
   const [recoveryCalls, setRecoveryCalls] = useState({})
   const [loading, setLoading]             = useState(false)
@@ -34,11 +35,12 @@ export function StoresProvider({ children }) {
     setLoading(true)
     setError(null)
     try {
-      const [apiResult, statesRes, callsRes, rcallsRes] = await Promise.all([
+      const [apiResult, statesRes, callsRes, rcallsRes, assignRes] = await Promise.all([
         getAllStores(),
         getStoreStates(),
         getAllCallLogs(),
         getAllRecoveryCalls(),
+        getAssignments(),
       ])
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
 
@@ -46,6 +48,7 @@ export function StoresProvider({ children }) {
       ;(statesRes.data || []).forEach(s => { stateMap[s.store_id] = s })
 
       setStoreStates(stateMap)
+      setAssignments(assignRes.data || {})
       setCallLogs(callsRes.data || {})
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
@@ -96,7 +99,7 @@ export function StoresProvider({ children }) {
     <StoresContext.Provider value={{
       stores, counts, allStores,
       incubationPath, incubationCounts,
-      storeStates, callLogs, recoveryCalls,
+      storeStates, assignments, callLogs, recoveryCalls,
       loading, error, lastLoaded, reload: load,
     }}>
       {children}
