@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Flame, RefreshCw, TrendingUp, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Flame, RefreshCw, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -96,17 +96,8 @@ export default function HotInactive() {
         if (dbCat === 'frozen') return (
           <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">مجمد</span>
         )
-        return (
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={e => { e.stopPropagation(); markAs(s, 'restoring') }}
-              className="text-xs px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors font-medium flex items-center gap-1"
-            >
-              <TrendingUp size={11} /> جاري الاستعادة
-            </button>
-            {hasCalls && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">تواصل ✓</span>}
-          </div>
-        )
+        // لا حالة مخصصة — العمود فارغ
+        return null
       },
     },
   ]
