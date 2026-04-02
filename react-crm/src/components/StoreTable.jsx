@@ -37,6 +37,7 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
+              <th className="text-right px-4 py-3">رقم المتجر</th>
               <th className="text-right px-4 py-3">اسم المتجر</th>
               <th className="text-right px-4 py-3">تاريخ التسجيل</th>
               <th className="text-right px-4 py-3">آخر شحنة</th>
@@ -50,7 +51,7 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={5 + extraColumns.length} className="text-center py-12 text-slate-400">{emptyMsg}</td>
+                <td colSpan={6 + extraColumns.length} className="text-center py-12 text-slate-400">{emptyMsg}</td>
               </tr>
             ) : (
               paginated.map(store => (
@@ -59,6 +60,9 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
                   className="border-t border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => onSelectStore?.(store)}
                 >
+                  <td className="px-4 py-3.5">
+                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{store.id}</span>
+                  </td>
                   <td className="px-4 py-3.5 font-medium text-slate-800">{store.name}</td>
                   <td className="px-4 py-3.5 text-slate-500">
                     {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
