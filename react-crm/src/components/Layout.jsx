@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Menu, Package } from 'lucide-react'
+import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
+
+// يظهر الشريط فقط في بناء البيئة التجريبية
+const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -38,6 +41,18 @@ export default function Layout() {
           {/* spacer to center the logo */}
           <div className="w-10" />
         </header>
+
+        {/* شريط البيئة التجريبية */}
+        {IS_STAGING && (
+          <div
+            className="sticky top-0 z-30 flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-white"
+            style={{ background: 'repeating-linear-gradient(45deg, #b45309, #b45309 12px, #d97706 12px, #d97706 24px)' }}
+          >
+            <FlaskConical size={13} />
+            بيئة تجريبية — التغييرات هنا لا تؤثر على الإنتاج
+            <FlaskConical size={13} />
+          </div>
+        )}
 
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           <Outlet />
