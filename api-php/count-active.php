@@ -52,8 +52,9 @@ function fetchPages($url, $maxPages = 5) {
 }
 
 // ─── جلب أول 5 صفحات من orders-summary ───────────────────
+$from60 = date('Y-m-d', $now - 60 * 86400);
 $res = fetchPages(
-    NAWRIS_BASE . '/customers/orders-summary?from=2023-01-01&to=' . $today,
+    NAWRIS_BASE . '/customers/orders-summary?from=' . $from60 . '&to=' . $today,
     5
 );
 

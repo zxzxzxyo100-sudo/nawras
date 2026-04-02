@@ -80,13 +80,16 @@ $new = fetchAll(
     MAX_PAGES_NEW
 );
 
-// [B] كل المتاجر التي شحنت — من 2023-01-01 حتى اليوم (تغطية كاملة للتاريخ)
+// [B] المتاجر التي شحنت خلال آخر 60 يوم
+//     → يغطي: active_shipping (≤14) + hot_inactive (15-60)
+//     نطاق محدود = استجابة سريعة
 $orders = fetchAll(
-    NAWRIS_BASE . '/customers/orders-summary?from=2023-01-01&to=' . date('Y-m-d'),
+    NAWRIS_BASE . '/customers/orders-summary?from=' . date('Y-m-d', $now - 60 * 86400) . '&to=' . date('Y-m-d'),
     MAX_PAGES_ALL
 );
 
-// [C] المتاجر غير النشطة منذ > 60 يوم (لالتقاط أي متجر لم يظهر في [B])
+// [C] المتاجر غير النشطة منذ > 60 يوم
+//     → يغطي cold_inactive (تشحن نادراً أو لم تشحن)
 $cold = fetchAll(
     NAWRIS_BASE . '/customers/inactive?days=61',
     MAX_PAGES_INACTIVE
@@ -237,7 +240,7 @@ echo json_encode([
         'fetched_orders'  => count($orders),
         'fetched_cold'    => count($cold),
         'fetched_new'     => count($new),
-        'orders_from'     => '2023-01-01',
+        'orders_from'     => date('Y-m-d', $now - 60 * 86400),
         'orders_to'       => date('Y-m-d'),
         'generated_at'    => date('Y-m-d H:i:s'),
     ],
