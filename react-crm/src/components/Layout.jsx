@@ -45,12 +45,17 @@ export default function Layout() {
         {/* شريط البيئة التجريبية */}
         {IS_STAGING && (
           <div
-            className="sticky top-0 z-30 flex items-center justify-center gap-2 py-1.5 text-xs font-bold text-white"
-            style={{ background: 'repeating-linear-gradient(45deg, #b45309, #b45309 12px, #d97706 12px, #d97706 24px)' }}
+            className="sticky top-0 z-30 flex flex-col items-center justify-center py-1.5 text-center"
+            style={{ background: 'repeating-linear-gradient(45deg, #991b1b, #991b1b 12px, #b91c1c 12px, #b91c1c 24px)' }}
           >
-            <FlaskConical size={13} />
-            بيئة تجريبية — التغييرات هنا لا تؤثر على الإنتاج
-            <FlaskConical size={13} />
+            <div className="flex items-center gap-2 text-xs font-black text-white">
+              <FlaskConical size={13} />
+              ⚠️ بيئة تجريبية — تستخدم قاعدة البيانات الحقيقية!
+              <FlaskConical size={13} />
+            </div>
+            <p className="text-red-200 text-[10px] font-medium mt-0.5">
+              أي حذف أو تعديل هنا سيؤثر على الموقع الرسمي — ستظهر رسالة تأكيد قبل كل إجراء
+            </p>
           </div>
         )}
 
