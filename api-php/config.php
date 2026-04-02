@@ -38,9 +38,9 @@ if ($_isStaging) {
     // ── قاعدة البيانات التجريبية ──────────────────────────────
     // أنشئ قاعدة بيانات جديدة في Hostinger وضع بياناتها هنا:
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_stg');     // ← غيّر هذا
-    define('DB_USER', 'u495355717_nawras_stg');     // ← غيّر هذا
-    define('DB_PASS', 'StagingPass123!');            // ← غيّر هذا
+    define('DB_NAME', 'u495355717_nawras_stg');
+    define('DB_USER', 'u495355717_nawras_stg');
+    define('DB_PASS', 'Zidona11@');
     define('IS_STAGING_ENV', true);
 } else {
     // ── قاعدة البيانات الإنتاجية ──────────────────────────────
