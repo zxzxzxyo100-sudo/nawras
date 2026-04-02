@@ -116,14 +116,28 @@ $counts = [
     'total_active' => 0, 'total' => 0,
 ];
 
+// ── خانات مسار الاحتضان (3 قواعد حصرية + يدوية) ──────────────
+// Q1 تحت الاحتضان : age ≤ 14d  AND  ships > 0
+// Q2 لم تبدأ      : age > 48h  AND  ships = 0
+// Q3 تخريج        : age > 14d  AND  ships > 0
+// Q4 جديدة        : age ≤ 48h  (أي حالة)
+// يدوي: restoring / restored
 $incubation_path = [
-    'new_48h' => [], 'incubating' => [], 'watching' => [],
-    'hot_14_20' => [], 'inactive' => [], 'restoring' => [], 'restored' => [],
+    'new_48h'      => [],
+    'incubating'   => [],
+    'never_started'=> [],
+    'graduated'    => [],
+    'restoring'    => [],
+    'restored'     => [],
 ];
 $incubation_counts = [
-    'new_48h' => 0, 'incubating' => 0, 'watching' => 0,
-    'hot_14_20' => 0, 'inactive' => 0, 'restoring' => 0,
-    'restored' => 0, 'total' => 0,
+    'new_48h'      => 0,
+    'incubating'   => 0,
+    'never_started'=> 0,
+    'graduated'    => 0,
+    'restoring'    => 0,
+    'restored'     => 0,
+    'total'        => 0,
 ];
 
 $newIds = array_fill_keys(array_keys($new), true);
@@ -142,12 +156,12 @@ foreach ($new as $id => $s) {
     $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
                || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
 
-    if      ($regHrs  < 48)                               $sub = 'new_48h';
-    elseif  ($regDays < 14  &&  $hasShipped)              $sub = 'incubating';
-    elseif  ($regDays < 14  && !$hasShipped)              $sub = 'watching';
-    elseif  ($regDays >= 14 &&  $hasShipped)              $sub = 'restored';
-    elseif  ($regDays >= 14 && $regDays <= 20 && !$hasShipped) $sub = 'hot_14_20';
-    else                                                  $sub = 'inactive';
+    // ── تطبيق القواعد الثلاث الحصرية ──────────────────────────────
+    // الأولوية: new_48h > incubating > graduated > never_started
+    if      ($regHrs  < 48)                    $sub = 'new_48h';       // Q4: جديد
+    elseif  ($regDays <= 14 && $hasShipped)    $sub = 'incubating';    // Q1: ≤14يوم + شحن
+    elseif  ($hasShipped)                      $sub = 'graduated';     // Q3: >14يوم + شحن
+    else                                       $sub = 'never_started'; // Q2: >48ساعة + 0 شحنات
 
     $s['_inc'] = $sub; $s['_hours'] = round($regHrs, 1); $s['_days'] = round($regDays, 1);
     $incubation_path[$sub][] = $s;

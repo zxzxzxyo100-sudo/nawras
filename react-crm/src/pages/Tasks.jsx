@@ -4,34 +4,82 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreDrawer from '../components/StoreDrawer'
 
+// ══════════════════════════════════════════════════════════════════
+// توليد المهام اليومية بناءً على القواعد الحصرية الثلاث
+// ══════════════════════════════════════════════════════════════════
 function generateTasks(allStores, callLogs, storeStates, userRole) {
   const tasks = []
   const today = new Date().toISOString().split('T')[0]
 
   allStores.forEach(store => {
-    const log    = callLogs[store.id] || {}
-    const dbCat  = storeStates[store.id]?.category || store.category
+    const log          = callLogs[store.id] || {}
+    const dbCat        = storeStates[store.id]?.category || store.category
+    const incBucket    = store._inc   // الفئة الحصرية من مسار الاحتضان
     const lastCallDate = Object.values(log).map(c => c?.date).filter(Boolean).sort().reverse()[0]
     const calledToday  = lastCallDate?.startsWith(today)
 
-    // ─── مهام المتاجر الجديدة (احتضان) ──────────────────────────
-    if (dbCat === 'incubating' && ['incubation_manager', 'executive'].includes(userRole)) {
+    const daysSinceLast = lastCallDate
+      ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
+      : 999
+
+    // ─── Q1: تحت الاحتضان — مكالمة متابعة لدعم الشحن ────────────
+    // الشرط: age ≤ 14d AND ships > 0
+    if (incBucket === 'incubating' && ['incubation_manager', 'executive'].includes(userRole)) {
       if (!log.day0) {
-        tasks.push({ id: `${store.id}-day0`, store, priority: 'high', type: 'new_call', label: 'مكالمة يوم الأول', desc: 'متجر جديد لم يُتصل به بعد' })
+        tasks.push({
+          id: `${store.id}-inc-day0`, store, priority: 'high',
+          type: 'new_call', label: 'متابعة تحت الاحتضان',
+          desc: 'يشحن ضمن 14 يوم — يحتاج مكالمة دعم',
+        })
       }
     }
 
-    // ─── مهام المتاجر غير النشطة (استعادة) ──────────────────────
+    // ─── Q2: لم تبدأ — استعادة عاجلة ────────────────────────────
+    // الشرط: age > 48h AND ships = 0
+    if (incBucket === 'never_started' && ['incubation_manager', 'executive'].includes(userRole)) {
+      if (!calledToday) {
+        tasks.push({
+          id: `${store.id}-never`, store,
+          priority: daysSinceLast >= 3 ? 'high' : 'normal',
+          type:     'recovery_call',
+          label:    'استعادة — لم تبدأ بعد',
+          desc:     lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'لم يُتصل به قط',
+        })
+      }
+    }
+
+    // ─── جاري الاستعادة (يدوي) — متابعة ──────────────────────────
+    if (incBucket === 'restoring' && ['incubation_manager', 'executive'].includes(userRole)) {
+      if (!calledToday) {
+        tasks.push({
+          id: `${store.id}-restoring`, store,
+          priority: daysSinceLast >= 2 ? 'high' : 'normal',
+          type:     'recovery_call',
+          label:    'متابعة جاري الاستعادة',
+          desc:     lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'يحتاج متابعة',
+        })
+      }
+    }
+
+    // ─── Q3: تخريج — مكالمة ترحيب للانتقال لنشطة ────────────────
+    // الشرط: age > 14d AND ships > 0
+    if (incBucket === 'graduated' && ['incubation_manager', 'executive'].includes(userRole)) {
+      if (!log.graduation_call) {
+        tasks.push({
+          id: `${store.id}-grad`, store, priority: 'normal',
+          type: 'new_call', label: 'مكالمة تخريج',
+          desc: 'أكملت الاحتضان بنجاح — مكالمة ترحيب بالنشطة',
+        })
+      }
+    }
+
+    // ─── المتاجر غير النشطة الرئيسية (hot/cold) — استعادة ────────
     if (['hot_inactive', 'cold_inactive'].includes(dbCat) && ['inactive_manager', 'executive'].includes(userRole)) {
       if (!calledToday) {
-        const daysSinceLast = lastCallDate
-          ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
-          : 999
-        const priority = daysSinceLast >= 7 ? 'high' : 'normal'
         tasks.push({
           id:       `${store.id}-recovery`,
           store,
-          priority,
+          priority: daysSinceLast >= 7 ? 'high' : 'normal',
           type:     'recovery_call',
           label:    'مكالمة استعادة',
           desc:     lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'لم يُتصل به مطلقاً',
@@ -39,7 +87,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole) {
       }
     }
 
-    // ─── مهام المتاجر النشطة (متابعة) ────────────────────────────
+    // ─── المتاجر النشطة — متابعة اقتراب انقطاع ──────────────────
     if (dbCat === 'active_shipping' && ['active_manager', 'executive'].includes(userRole)) {
       const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
         ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
@@ -57,7 +105,6 @@ function generateTasks(allStores, callLogs, storeStates, userRole) {
     }
   })
 
-  // ترتيب: عالية الأولوية أولاً
   return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
 }
 

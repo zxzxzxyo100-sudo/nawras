@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, Flame, XCircle, RefreshCw,
+  Baby, Clock, AlertCircle, GraduationCap, RefreshCw,
   CheckCircle2, TrendingUp, Search, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
@@ -22,89 +22,97 @@ function shipDays(s) {
   return Math.floor((Date.now() - new Date(s.last_shipment_date)) / 86400000)
 }
 
-// ── إعداد التبويبات ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// القواعد الحصرية الثلاث + خانة المراقبة + يدويتان
+// Q4 جديدة        : age ≤ 48h
+// Q1 تحت الاحتضان : 48h < age ≤ 14d  AND  ships > 0
+// Q2 لم تبدأ      : age > 48h  AND  ships = 0
+// Q3 تخريج        : age > 14d  AND  ships > 0
+// يدوي: جاري الاستعادة / تمت الاستعادة
+// ══════════════════════════════════════════════════════════════════
 const TABS = [
   {
-    key: 'new_48h',
+    key:   'new_48h',
     label: 'جديدة',
-    icon: Baby,
+    icon:  Baby,
     color: 'blue',
-    desc: 'سُجّل منذ أقل من 48 ساعة',
+    desc:  'سُجّل منذ أقل من 48 ساعة — فترة المراقبة',
     badge: () => (
       <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">جديد</span>
     ),
   },
   {
-    key: 'under_14',  // يجمع incubating + watching
+    key:   'incubating',
     label: 'تحت الاحتضان',
-    icon: Clock,
+    icon:  Clock,
     color: 'indigo',
-    desc: 'أقل من 14 يوم من التسجيل',
-    badge: s => s._inc === 'incubating'
-      ? <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">يشحن</span>
-      : <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">لم يشحن</span>,
-  },
-  {
-    key: 'hot_14_20',
-    label: 'ساخنة 14-20',
-    icon: Flame,
-    color: 'amber',
-    desc: '14-20 يوماً دون شحن — نافذة استعادة حرجة',
+    desc:  'Q1 — أقل من 14 يوم من التسجيل + شحن طلبية واحدة على الأقل',
     badge: () => (
-      <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">ساخنة</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يشحن ✓</span>
     ),
   },
   {
-    key: 'inactive',
-    label: 'غير نشطة',
-    icon: XCircle,
+    key:   'never_started',
+    label: 'لم تبدأ',
+    icon:  AlertCircle,
     color: 'red',
-    desc: 'تجاوزت 20 يوماً دون شحن أي طلبية',
+    desc:  'Q2 — مضى أكثر من 48 ساعة دون أي شحنة — بحاجة تدخل فوري',
     badge: () => (
-      <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">غير نشطة</span>
+      <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">لم تشحن</span>
     ),
   },
   {
-    key: 'restoring',
-    label: 'جاري الاستعادة',
-    icon: TrendingUp,
-    color: 'orange',
-    desc: 'بدأت في تجهيز طلبية (يُضبط يدوياً)',
-    badge: () => (
-      <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">جاري</span>
-    ),
-  },
-  {
-    key: 'restored',
-    label: 'تمت الاستعادة',
-    icon: CheckCircle2,
+    key:   'graduated',
+    label: 'قائمة التخريج',
+    icon:  GraduationCap,
     color: 'emerald',
-    desc: 'شحنت أول طلبية فعلية بعد يوم 14',
+    desc:  'Q3 — تجاوزت 14 يوماً وشحنت — جاهزة للانتقال إلى المتاجر النشطة',
     badge: () => (
-      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">مستعادة</span>
+      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">تخريج ✓</span>
+    ),
+  },
+  {
+    key:   'restoring',
+    label: 'جاري الاستعادة',
+    icon:  TrendingUp,
+    color: 'orange',
+    desc:  'يدوي — بدأت في تجهيز طلبية بعد انقطاع',
+    badge: () => (
+      <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">جارٍ</span>
+    ),
+  },
+  {
+    key:   'restored',
+    label: 'تمت الاستعادة',
+    icon:  CheckCircle2,
+    color: 'teal',
+    desc:  'يدوي — شحنت أول طلبية فعلية بعد الانقطاع',
+    badge: () => (
+      <span className="text-xs font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">مستعادة</span>
     ),
   },
 ]
 
 const COLOR_CLASSES = {
-  blue:    { active: 'bg-blue-600 text-white shadow-blue-600/20',    count: 'bg-blue-50 text-blue-600 border-blue-200'    },
-  indigo:  { active: 'bg-indigo-600 text-white shadow-indigo-600/20', count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
-  amber:   { active: 'bg-amber-500 text-white shadow-amber-500/20',  count: 'bg-amber-50 text-amber-600 border-amber-200'  },
-  red:     { active: 'bg-red-600 text-white shadow-red-600/20',      count: 'bg-red-50 text-red-600 border-red-200'        },
-  orange:  { active: 'bg-orange-500 text-white shadow-orange-500/20',count: 'bg-orange-50 text-orange-600 border-orange-200' },
-  emerald: { active: 'bg-emerald-600 text-white shadow-emerald-600/20', count: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+  blue:    { active: 'bg-blue-600 text-white shadow-blue-600/20',      count: 'bg-blue-50 text-blue-600 border-blue-200'       },
+  indigo:  { active: 'bg-indigo-600 text-white shadow-indigo-600/20',  count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
+  red:     { active: 'bg-red-600 text-white shadow-red-600/20',        count: 'bg-red-50 text-red-600 border-red-200'          },
+  emerald: { active: 'bg-emerald-600 text-white shadow-emerald-600/20',count: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+  orange:  { active: 'bg-orange-500 text-white shadow-orange-500/20',  count: 'bg-orange-50 text-orange-600 border-orange-200' },
+  teal:    { active: 'bg-teal-600 text-white shadow-teal-600/20',      count: 'bg-teal-50 text-teal-600 border-teal-200'       },
 }
 
-// ── وضع مراقبة / استعادة ────────────────────────────────────────
+// ── أزرار الإجراء حسب الفئة الحصرية ────────────────────────────
 function ActionBadge({ store, onMarkRestoring, onMarkRestored }) {
-  const isHot      = store._inc === 'hot_14_20'
-  const isInactive = store._inc === 'inactive'
-  const isRestoring = store._inc === 'restoring'
+  // Q2: لم تبدأ → يمكن تحويلها يدوياً لـ "جاري الاستعادة"
+  const isNeverStarted = store._inc === 'never_started'
+  // يدوي: جاري الاستعادة → يمكن تأكيد "تمت الاستعادة"
+  const isRestoring    = store._inc === 'restoring'
 
-  if (!isHot && !isInactive && !isRestoring) return null
+  if (!isNeverStarted && !isRestoring) return null
   return (
     <div className="flex gap-1.5">
-      {(isHot || isInactive) && (
+      {isNeverStarted && (
         <button
           onClick={e => { e.stopPropagation(); onMarkRestoring(store) }}
           className="text-xs px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors font-medium"
@@ -115,7 +123,7 @@ function ActionBadge({ store, onMarkRestoring, onMarkRestored }) {
       {isRestoring && (
         <button
           onClick={e => { e.stopPropagation(); onMarkRestored(store) }}
-          className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors font-medium"
+          className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium"
         >
           تمت الاستعادة
         </button>
@@ -261,20 +269,15 @@ export default function IncubationPath() {
   const [callStore, setCallStore]   = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // دمج incubating + watching في تبويب "تحت الاحتضان"
-  const tabStores = useMemo(() => {
-    if (activeTab === 'under_14') {
-      return [...(incubationPath.incubating || []), ...(incubationPath.watching || [])]
-    }
-    return incubationPath[activeTab] || []
-  }, [activeTab, incubationPath])
-
-  const tabCount = useMemo(() => {
-    if (activeTab === 'under_14') {
-      return (incubationCounts.incubating || 0) + (incubationCounts.watching || 0)
-    }
-    return incubationCounts[activeTab] || 0
-  }, [activeTab, incubationCounts])
+  // كل تبويب له فئة مستقلة حصرية — لا دمج
+  const tabStores = useMemo(
+    () => incubationPath[activeTab] || [],
+    [activeTab, incubationPath]
+  )
+  const tabCount = useMemo(
+    () => incubationCounts[activeTab] || 0,
+    [activeTab, incubationCounts]
+  )
 
   const currentTab = TABS.find(t => t.key === activeTab)
 
@@ -318,9 +321,7 @@ export default function IncubationPath() {
       <div className="flex flex-wrap gap-2">
         {TABS.map(tab => {
           const isActive = activeTab === tab.key
-          const count = tab.key === 'under_14'
-            ? (incubationCounts.incubating || 0) + (incubationCounts.watching || 0)
-            : (incubationCounts[tab.key] || 0)
+          const count = incubationCounts[tab.key] || 0
           const cc = COLOR_CLASSES[tab.color]
 
           return (

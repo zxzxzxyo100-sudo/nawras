@@ -14,12 +14,12 @@ export function StoresProvider({ children }) {
     cold_inactive:   [],
   })
   const [incubationPath, setIncubationPath] = useState({
-    new_48h: [], incubating: [], watching: [],
-    hot_14_20: [], inactive: [], restoring: [], restored: [],
+    new_48h: [], incubating: [], never_started: [],
+    graduated: [], restoring: [], restored: [],
   })
   const [incubationCounts, setIncubationCounts] = useState({
-    new_48h: 0, incubating: 0, watching: 0,
-    hot_14_20: 0, inactive: 0, restoring: 0, restored: 0, total: 0,
+    new_48h: 0, incubating: 0, never_started: 0,
+    graduated: 0, restoring: 0, restored: 0, total: 0,
   })
   const [counts, setCounts]               = useState({
     incubating: 0, active_shipping: 0, hot_inactive: 0, cold_inactive: 0,
@@ -58,23 +58,22 @@ export function StoresProvider({ children }) {
       })
       setCounts(apiResult.counts)
 
-      // مسار الاحتضان: دمج بيانات API مع حالة DB (restoring من DB)
+      // مسار الاحتضان: دمج بيانات API مع حالة DB
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
-        new_48h:    rawPath.new_48h    || [],
-        incubating: rawPath.incubating || [],
-        watching:   rawPath.watching   || [],
-        hot_14_20:  rawPath.hot_14_20  || [],
-        inactive:   rawPath.inactive   || [],
-        restored:   rawPath.restored   || [],
-        restoring:  rawPath.restoring  || [],
+        new_48h:       rawPath.new_48h       || [],
+        incubating:    rawPath.incubating    || [],
+        never_started: rawPath.never_started || [],
+        graduated:     rawPath.graduated     || [],
+        restoring:     rawPath.restoring     || [],
+        restored:      rawPath.restored      || [],
       }
 
-      // نقل المتاجر التي وضعها الوكيل في "restoring" عبر DB
+      // نقل المتاجر التي وضعها الوكيل يدوياً في "restoring" عبر DB
+      // تشمل الفحص في الفئات الأربع الأوتوماتيكية
       Object.entries(stateMap).forEach(([storeId, dbState]) => {
         if (dbState.category !== 'restoring') return
-        // ابحث في كل خانة وانقل إلى restoring
-        ;['new_48h','incubating','watching','hot_14_20','inactive'].forEach(bucket => {
+        ;['new_48h', 'incubating', 'never_started', 'graduated'].forEach(bucket => {
           const idx = mergedPath[bucket].findIndex(s => String(s.id) === String(storeId))
           if (idx !== -1) {
             const [store] = mergedPath[bucket].splice(idx, 1)
@@ -88,14 +87,13 @@ export function StoresProvider({ children }) {
 
       setIncubationPath(mergedPath)
       setIncubationCounts({
-        new_48h:    mergedPath.new_48h.length,
-        incubating: mergedPath.incubating.length,
-        watching:   mergedPath.watching.length,
-        hot_14_20:  mergedPath.hot_14_20.length,
-        inactive:   mergedPath.inactive.length,
-        restoring:  mergedPath.restoring.length,
-        restored:   mergedPath.restored.length,
-        total:      (apiResult.incubation_counts?.total) || 0,
+        new_48h:       mergedPath.new_48h.length,
+        incubating:    mergedPath.incubating.length,
+        never_started: mergedPath.never_started.length,
+        graduated:     mergedPath.graduated.length,
+        restoring:     mergedPath.restoring.length,
+        restored:      mergedPath.restored.length,
+        total:         (apiResult.incubation_counts?.total) || 0,
       })
       setLastLoaded(new Date())
     } catch (err) {
