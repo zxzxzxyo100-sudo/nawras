@@ -56,15 +56,24 @@ export default function HotInactive() {
       key: 'action',
       label: 'إجراء',
       render: s => {
-        const dbCat = storeStates[s.id]?.category
-        if (dbCat === 'restoring') return (
-          <button
-            onClick={e => { e.stopPropagation(); markAs(s, 'restored') }}
-            className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium flex items-center gap-1"
-          >
-            <CheckCircle2 size={11} /> تمت الاستعادة
-          </button>
-        )
+        const dbCat    = storeStates[s.id]?.category
+        const hasShipped = (parseInt(s.total_shipments) || 0) > 0 ||
+          (s.last_shipment_date && s.last_shipment_date !== 'لا يوجد')
+
+        if (dbCat === 'restoring') {
+          // تمت الاستعادة تظهر فقط بعد شحن فعلي
+          if (hasShipped) return (
+            <button
+              onClick={e => { e.stopPropagation(); markAs(s, 'restored') }}
+              className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium flex items-center gap-1"
+            >
+              <CheckCircle2 size={11} /> تمت الاستعادة
+            </button>
+          )
+          return (
+            <span className="text-xs text-slate-400 italic">في انتظار الشحن...</span>
+          )
+        }
         if (!dbCat || dbCat === 'frozen') return (
           <button
             onClick={e => { e.stopPropagation(); markAs(s, 'restoring') }}
