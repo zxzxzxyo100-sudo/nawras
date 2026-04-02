@@ -1,0 +1,85 @@
+import { NavLink, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard, Store, TrendingUp, TrendingDown,
+  ClipboardList, Users, LogOut, Package,
+} from 'lucide-react'
+import { useAuth, ROLES } from '../contexts/AuthContext'
+
+const NAV = [
+  { to: '/',         label: 'لوحة التحكم',      icon: LayoutDashboard, view: 'dashboard' },
+  { to: '/new',      label: 'المتاجر الجديدة',   icon: Store,           view: 'new'       },
+  { to: '/active',   label: 'المتاجر النشطة',    icon: TrendingUp,      view: 'active'    },
+  { to: '/inactive', label: 'المتاجر غير النشطة',icon: TrendingDown,    view: 'inactive'  },
+  { to: '/tasks',    label: 'المهام اليومية',     icon: ClipboardList,   view: 'tasks'     },
+  { to: '/users',    label: 'إدارة المستخدمين',   icon: Users,           view: 'users'     },
+]
+
+export default function Sidebar() {
+  const { user, logout, can } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
+
+  const roleLabel = ROLES[user?.role]?.label ?? ''
+
+  return (
+    <aside className="fixed right-0 top-0 h-full w-64 bg-slate-900 flex flex-col z-40 shadow-2xl">
+      {/* Logo */}
+      <div className="p-6 border-b border-slate-700/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
+            <Package size={20} className="text-white" />
+          </div>
+          <div>
+            <div className="text-white font-bold text-lg leading-tight">نظام النورس</div>
+            <div className="text-slate-400 text-xs">{roleLabel}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {NAV.filter(item => can(item.view)).map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-5 py-3.5 mx-3 my-0.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`
+            }
+          >
+            <item.icon size={18} />
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User + Logout */}
+      <div className="p-4 border-t border-slate-700/50">
+        <div className="flex items-center gap-3 mb-3 px-2">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+            {user?.fullname?.charAt(0) ?? 'م'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-sm font-medium truncate">{user?.fullname}</div>
+            <div className="text-slate-500 text-xs truncate">{user?.username}</div>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:bg-red-600/10 hover:border-red-500/50 hover:text-red-400 transition-all text-sm font-medium"
+        >
+          <LogOut size={16} />
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+  )
+}

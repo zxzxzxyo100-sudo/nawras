@@ -1,0 +1,52 @@
+import axios from 'axios'
+
+const BASE = '/api-php'
+
+const http = axios.create({ baseURL: BASE })
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+export const login = (username, password) =>
+  http.post('/auth.php?action=login', { username, password }).then(r => r.data)
+
+export const listUsers = () =>
+  http.get('/auth.php?action=list_users').then(r => r.data)
+
+export const addUser = (data) =>
+  http.post('/auth.php?action=add_user', data).then(r => r.data)
+
+export const updateUser = (data) =>
+  http.post('/auth.php?action=update_user', data).then(r => r.data)
+
+export const deleteUser = (id) =>
+  http.post('/auth.php?action=delete_user', { id }).then(r => r.data)
+
+// ─── Stores ──────────────────────────────────────────────────────────────────
+export const getAllStores = () =>
+  http.get('/all-stores.php').then(r => r.data)
+
+export const getStoreStates = () =>
+  http.get('/store-actions.php?action=get_states').then(r => r.data)
+
+export const setStoreStatus = (data) =>
+  http.post('/store-actions.php?action=set_status', data).then(r => r.data)
+
+// ─── Calls ───────────────────────────────────────────────────────────────────
+export const logCall = (data) =>
+  http.post('/store-actions.php?action=log_call', data).then(r => r.data)
+
+export const getAllCallLogs = () =>
+  http.get('/store-actions.php?action=get_all_calllogs').then(r => r.data)
+
+export const getAllRecoveryCalls = () =>
+  http.get('/store-actions.php?action=get_all_recovery_calls').then(r => r.data)
+
+// ─── Audit ───────────────────────────────────────────────────────────────────
+export const getAuditLog = (storeId) =>
+  http.get(`/store-actions.php?action=get_audit_log&store_id=${storeId}`).then(r => r.data)
+
+// ─── Incubation ──────────────────────────────────────────────────────────────
+export const getIncubationData = () =>
+  http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)
+
+export const updateIncubation = (data) =>
+  http.post('/store-actions.php?action=update_incubation', data).then(r => r.data)
