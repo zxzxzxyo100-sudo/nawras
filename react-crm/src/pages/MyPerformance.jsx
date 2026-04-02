@@ -8,6 +8,7 @@ import { Zap, Phone, Star, RefreshCw, Award, TrendingUp, Wallet } from 'lucide-r
 import { useAuth }   from '../contexts/AuthContext'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 import SmartAds from '../components/SmartAds'
+import MilestonesSection from '../components/MilestonesCard'
 
 // ── Tooltip مخصص ─────────────────────────────────────────────────
 const ChartTip = ({ active, payload, label }) => {
@@ -299,6 +300,17 @@ export default function MyPerformance() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </motion.div>
+
+      {/* ══ محطات الإنجاز ══════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
+        className="rounded-2xl p-5"
+        style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+      >
+        <MilestonesSection />
       </motion.div>
 
       {/* ══ سجل المعاملات ══════════════════════════════════════════ */}
