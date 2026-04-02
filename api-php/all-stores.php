@@ -56,45 +56,24 @@ $now    = time();
 $days90 = date('Y-m-d', $now - 90 * 86400);
 
 // ═══════════════════════════════════════════════════════════════
-// استراتيجية الجلب (3 مصادر — بدون orders-summary):
+// استراتيجية الجلب (مصدر واحد فقط — بسيط وموثوق):
 //
 //   [A] /customers/new?since=2020-01-01
-//         → كل المتاجر (التسجيل منذ 2020)
-//         → منها: recent_new = registered_at > 90 يوم مضت (احتضان)
+//         → كل المتاجر المسجّلة منذ 2020
+//         → كل متجر يحمل: registered_at + last_shipment_date + total_shipments
 //
-//   [B] /customers/inactive?days=15
-//         → غير نشط 15+ يوم → مرشحو hot + cold
-//
-//   [C] /customers/inactive?days=61
-//         → غير نشط 61+ يوم → cold فقط
-//
-//   التصنيف (لكل متجر في [A] مسجّل منذ ≥ 90 يوم):
-//     في [C]                    → cold_inactive
-//     في [B] وليس [C]           → hot_inactive (15-60 يوم)
-//     لا في [B] ولا في [C]      → active_shipping ✅
+//   التصنيف (مسجّل ≥ 90 يوم) بناءً على last_shipment_date:
+//     ≤ 14 يوم   → active_shipping  ✅
+//     15–60 يوم  → hot_inactive     🔥
+//     > 60 يوم   → cold_inactive    ❄️
+//     لا يوجد    → cold_inactive    ❄️
 // ═══════════════════════════════════════════════════════════════
 
-// [A] كل المتاجر منذ 2020
+// [A] كل المتاجر منذ 2020 (مصدر واحد — يحمل last_shipment_date)
 $allStores = fetchAll(
     NAWRIS_BASE . '/customers/new?since=2020-01-01',
-    300   // 300 صفحة تكفي لـ ~15,000 متجر
+    300
 );
-
-// [B] غير نشط منذ 15+ يوم
-$hot_raw = fetchAll(
-    NAWRIS_BASE . '/customers/inactive?days=15',
-    MAX_PAGES_INACTIVE
-);
-
-// [C] غير نشط منذ 61+ يوم
-$cold_raw = fetchAll(
-    NAWRIS_BASE . '/customers/inactive?days=61',
-    MAX_PAGES_INACTIVE
-);
-
-// ═══ hash maps للبحث السريع ═══════════════════════════════════
-$hotMap  = array_fill_keys(array_keys($hot_raw),  true);
-$coldMap = array_fill_keys(array_keys($cold_raw), true);
 
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
@@ -173,24 +152,27 @@ foreach ($allStores as $id => $s) {
         continue; // لا يدخل في التصنيف النشط
     }
 
-    // ── متاجر مسجّلة منذ ≥ 90 يوم: نشط / ساخن / بارد ─────────
-    if (isset($coldMap[$id])) {
-        // غير نشط 61+ يوم → بارد
-        $s['_cat'] = 'cold_inactive';
-        $result['cold_inactive'][] = $s;
-        $counts['cold_inactive']++;
+    // ── متاجر مسجّلة منذ ≥ 90 يوم: تصنيف بناءً على last_shipment_date ──
+    $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+        ? strtotime($s['last_shipment_date'])
+        : null;
+    $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
 
-    } elseif (isset($hotMap[$id])) {
-        // غير نشط 15-60 يوم → ساخن
+    if ($daysShip <= 14) {
+        $s['_cat'] = 'active_shipping';
+        $result['active_shipping'][] = $s;
+        $counts['active_shipping']++;
+
+    } elseif ($daysShip <= 60) {
         $s['_cat'] = 'hot_inactive';
         $result['hot_inactive'][] = $s;
         $counts['hot_inactive']++;
 
     } else {
-        // لا في البارد ولا في الساخن → نشط يشحن ✅
-        $s['_cat'] = 'active_shipping';
-        $result['active_shipping'][] = $s;
-        $counts['active_shipping']++;
+        // > 60 يوم أو لا يوجد تاريخ شحن → بارد
+        $s['_cat'] = 'cold_inactive';
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
     }
 
     $counts['total_active']++;
@@ -210,8 +192,6 @@ echo json_encode([
     'incubation_path'   => $incubation_path,
     'meta'              => [
         'fetched_all'   => count($allStores),
-        'fetched_hot'   => count($hot_raw),
-        'fetched_cold'  => count($cold_raw),
         'days90_cutoff' => $days90,
         'generated_at'  => date('Y-m-d H:i:s'),
     ],
