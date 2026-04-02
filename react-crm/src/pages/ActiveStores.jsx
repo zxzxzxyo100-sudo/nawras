@@ -20,7 +20,7 @@ export default function ActiveStores() {
   useEffect(() => {
     if (!isExecutive) return
     listUsers()
-      .then(res => setUsers((res.users || []).filter(u => u.role === 'active_manager')))
+      .then(res => setUsers((res.data || []).filter(u => u.role === 'active_manager')))
       .catch(() => {})
   }, [isExecutive])
 
