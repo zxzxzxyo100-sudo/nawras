@@ -6,14 +6,23 @@ const StoresContext = createContext(null)
 
 export function StoresProvider({ children }) {
   const { user } = useAuth()
-  const [stores, setStores]         = useState({ incubating: [], active: [], inactive: [] })
-  const [counts, setCounts]         = useState({ incubating: 0, active: 0, inactive: 0, total: 0 })
-  const [storeStates, setStoreStates] = useState({})
-  const [callLogs, setCallLogs]     = useState({})
+
+  const [stores, setStores] = useState({
+    incubating:      [],
+    active_shipping: [],
+    hot_inactive:    [],
+    cold_inactive:   [],
+  })
+  const [counts, setCounts]               = useState({
+    incubating: 0, active_shipping: 0, hot_inactive: 0, cold_inactive: 0,
+    total_active: 0, total: 0,
+  })
+  const [storeStates, setStoreStates]     = useState({})
+  const [callLogs, setCallLogs]           = useState({})
   const [recoveryCalls, setRecoveryCalls] = useState({})
-  const [loading, setLoading]       = useState(false)
-  const [lastLoaded, setLastLoaded] = useState(null)
-  const [error, setError]           = useState(null)
+  const [loading, setLoading]             = useState(false)
+  const [lastLoaded, setLastLoaded]       = useState(null)
+  const [error, setError]                 = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -27,21 +36,18 @@ export function StoresProvider({ children }) {
       ])
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
 
-      // merge API data with DB overrides
-      const mergedStores = {
-        incubating: apiResult.data.incubating || [],
-        active:     apiResult.data.active     || [],
-        inactive:   apiResult.data.inactive   || [],
-      }
-
-      // build state map keyed by store id
       const stateMap = {}
       ;(statesRes.data || []).forEach(s => { stateMap[s.store_id] = s })
 
       setStoreStates(stateMap)
       setCallLogs(callsRes.data || {})
       setRecoveryCalls(rcallsRes.data || {})
-      setStores(mergedStores)
+      setStores({
+        incubating:      apiResult.data.incubating      || [],
+        active_shipping: apiResult.data.active_shipping || [],
+        hot_inactive:    apiResult.data.hot_inactive    || [],
+        cold_inactive:   apiResult.data.cold_inactive   || [],
+      })
       setCounts(apiResult.counts)
       setLastLoaded(new Date())
     } catch (err) {
@@ -55,11 +61,12 @@ export function StoresProvider({ children }) {
     if (user) load()
   }, [user, load])
 
-  // flat list of all stores with category set
+  // قائمة مسطّحة بكل المتاجر مع الفئة
   const allStores = [
-    ...stores.incubating.map(s => ({ ...s, category: storeStates[s.id]?.category || 'incubating' })),
-    ...stores.active.map(s =>     ({ ...s, category: storeStates[s.id]?.category || 'active'     })),
-    ...stores.inactive.map(s =>   ({ ...s, category: storeStates[s.id]?.category || 'inactive'   })),
+    ...stores.incubating.map(s =>      ({ ...s, category: storeStates[s.id]?.category || 'incubating'      })),
+    ...stores.active_shipping.map(s => ({ ...s, category: storeStates[s.id]?.category || 'active_shipping' })),
+    ...stores.hot_inactive.map(s =>    ({ ...s, category: storeStates[s.id]?.category || 'hot_inactive'    })),
+    ...stores.cold_inactive.map(s =>   ({ ...s, category: storeStates[s.id]?.category || 'cold_inactive'   })),
   ]
 
   return (

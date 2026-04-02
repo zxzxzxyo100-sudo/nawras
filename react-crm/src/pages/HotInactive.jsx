@@ -1,30 +1,37 @@
 import { useState } from 'react'
-import { TrendingUp, RefreshCw } from 'lucide-react'
+import { Flame, RefreshCw } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 
-export default function ActiveStores() {
-  const { stores, counts, loading, reload } = useStores()
+export default function HotInactive() {
+  const { stores, counts, callLogs, loading, reload } = useStores()
   const [selected, setSelected] = useState(null)
 
-  const active = stores.active_shipping || []
+  const hotInactive = stores.hot_inactive || []
 
   const extraColumns = [
     {
-      key: 'days_since_ship',
-      label: 'أيام منذ آخر شحنة',
+      key: 'inactive_days',
+      label: 'أيام الانقطاع',
       render: s => {
-        if (!s.last_shipment_date || s.last_shipment_date === 'لا يوجد')
-          return <span className="text-red-400 text-xs">—</span>
+        if (!s.last_shipment_date || s.last_shipment_date === 'لا يوجد') return '—'
         const days = Math.floor((new Date() - new Date(s.last_shipment_date)) / 86400000)
         return (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-            days <= 7  ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-          }`}>
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
             {days} يوم
           </span>
         )
+      },
+    },
+    {
+      key: 'call_status',
+      label: 'حالة التواصل',
+      render: s => {
+        const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
+        return hasCalls
+          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">تم التواصل</span>
+          : <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">لم يُتصل</span>
       },
     },
   ]
@@ -34,11 +41,11 @@ export default function ActiveStores() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <TrendingUp size={24} className="text-green-600" />
-            نشط يشحن
+            <Flame size={24} className="text-amber-500" />
+            غير نشط ساخن
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {counts.active_shipping || 0} متجر — شحن خلال آخر 14 يوم
+            {counts.hot_inactive || 0} متجر — انقطع من 15 إلى 60 يوم
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
@@ -48,10 +55,10 @@ export default function ActiveStores() {
       </div>
 
       <StoreTable
-        stores={active}
+        stores={hotInactive}
         onSelectStore={setSelected}
         extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر نشطة"
+        emptyMsg="لا توجد متاجر في هذه الفئة"
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}

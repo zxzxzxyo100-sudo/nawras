@@ -22,7 +22,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole) {
     }
 
     // ─── مهام المتاجر غير النشطة (استعادة) ──────────────────────
-    if (dbCat === 'inactive' && ['inactive_manager', 'executive'].includes(userRole)) {
+    if (['hot_inactive', 'cold_inactive'].includes(dbCat) && ['inactive_manager', 'executive'].includes(userRole)) {
       if (!calledToday) {
         const daysSinceLast = lastCallDate
           ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
@@ -40,7 +40,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole) {
     }
 
     // ─── مهام المتاجر النشطة (متابعة) ────────────────────────────
-    if (dbCat === 'active' && ['active_manager', 'executive'].includes(userRole)) {
+    if (dbCat === 'active_shipping' && ['active_manager', 'executive'].includes(userRole)) {
       const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
         ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
         : 999

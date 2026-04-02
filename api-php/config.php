@@ -10,11 +10,11 @@ define('NAWRIS_BASE',  'https://backoffice.nawris.algoriza.com/external-api');
 
 // --- حدود الصفحات (Pagination) ---
 // كل رقم يمثل أقصى عدد صفحات يُجلب من External API
-define('MAX_PAGES_NEW',      50);   // customers/new          (كان 10 - رُفع لضمان جلب الكل)
-define('MAX_PAGES_INACTIVE', 80);   // customers/inactive     (بلا حد سابقاً - أُضيف أمان)
+define('MAX_PAGES_NEW',      50);   // customers/new
+define('MAX_PAGES_INACTIVE', 80);   // customers/inactive
 define('MAX_PAGES_ORDERS',   80);   // customers/orders-summary
-define('MAX_PAGES_RECOVERY', 30);   // check-recovery (للدورة الكاملة)
-define('MAX_PAGES_ALL',     100);   // fetchAll() في all-stores.php
+define('MAX_PAGES_RECOVERY', 30);   // check-recovery
+define('MAX_PAGES_ALL',     200);   // fetchAll() في all-stores.php — مرفوع لاستيعاب 1563+ متجر
 
 // --- حدود زمن وذاكرة PHP لكل نوع عملية ---
 // ملاحظة: .htaccess يضبط الحد الأعلى على مستوى السيرفر

@@ -6,7 +6,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
-import InactiveStores from './pages/InactiveStores'
+import HotInactive from './pages/HotInactive'
+import ColdInactive from './pages/ColdInactive'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 
@@ -26,12 +27,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route path="/"         element={<Dashboard />} />
-        <Route path="/new"      element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
-        <Route path="/active"   element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
-        <Route path="/inactive" element={<PrivateRoute view="inactive"><InactiveStores /></PrivateRoute>} />
-        <Route path="/tasks"    element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
-        <Route path="/users"    element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
+        <Route path="/"             element={<Dashboard />} />
+        <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
+        <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
+        <Route path="/hot-inactive" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
+        <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
+        <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
+        <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

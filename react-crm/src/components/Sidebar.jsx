@@ -1,17 +1,18 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Store, TrendingUp, TrendingDown,
-  ClipboardList, Users, LogOut, Package,
+  LayoutDashboard, Store, TrendingUp,
+  Flame, Snowflake, ClipboardList, Users, LogOut, Package,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 
 const NAV = [
-  { to: '/',         label: 'لوحة التحكم',      icon: LayoutDashboard, view: 'dashboard' },
-  { to: '/new',      label: 'المتاجر الجديدة',   icon: Store,           view: 'new'       },
-  { to: '/active',   label: 'المتاجر النشطة',    icon: TrendingUp,      view: 'active'    },
-  { to: '/inactive', label: 'المتاجر غير النشطة',icon: TrendingDown,    view: 'inactive'  },
-  { to: '/tasks',    label: 'المهام اليومية',     icon: ClipboardList,   view: 'tasks'     },
-  { to: '/users',    label: 'إدارة المستخدمين',   icon: Users,           view: 'users'     },
+  { to: '/',             label: 'لوحة التحكم',        icon: LayoutDashboard, view: 'dashboard'    },
+  { to: '/new',          label: 'المتاجر الجديدة',     icon: Store,           view: 'new'          },
+  { to: '/active',       label: 'نشط يشحن',            icon: TrendingUp,      view: 'active'       },
+  { to: '/hot-inactive', label: 'غير نشط ساخن',        icon: Flame,           view: 'hot_inactive' },
+  { to: '/cold-inactive',label: 'غير نشط بارد',        icon: Snowflake,       view: 'cold_inactive'},
+  { to: '/tasks',        label: 'المهام اليومية',       icon: ClipboardList,   view: 'tasks'        },
+  { to: '/users',        label: 'إدارة المستخدمين',     icon: Users,           view: 'users'        },
 ]
 
 export default function Sidebar() {

@@ -1,38 +1,28 @@
 import { useNavigate } from 'react-router-dom'
-import { Store, TrendingUp, TrendingDown, Package, RefreshCw, AlertCircle } from 'lucide-react'
+import {
+  Store, Package, RefreshCw, AlertCircle,
+  TrendingUp, Flame, Snowflake,
+} from 'lucide-react'
 import StatCard from '../components/StatCard'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Dashboard() {
-  const { counts, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
+  const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  // إحصائيات الطرود
   const totalShipments = allStores.reduce((sum, s) => sum + (parseInt(s.total_shipments) || 0), 0)
 
-  // المتاجر المجمدة
-  const frozenCount = allStores.filter(s => s.category === 'frozen').length
-
-  // المتاجر التي لم تُتصل بها اليوم
   const today = new Date().toISOString().split('T')[0]
-  const calledToday = Object.values(callLogs).filter(log => {
-    const entries = Object.values(log || {})
-    return entries.some(e => e?.date?.startsWith(today))
-  }).length
-
-  // مهام معلقة (متاجر جديدة بدون مكالمة)
-  const pendingNewCalls = allStores.filter(s =>
-    s.category === 'incubating' && !callLogs[s.id]?.day0
+  const calledToday = Object.values(callLogs).filter(log =>
+    Object.values(log || {}).some(e => e?.date?.startsWith(today))
   ).length
 
-  const pendingInactiveCalls = allStores.filter(s =>
-    s.category === 'inactive' && !callLogs[s.id]
-  ).length
+  const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
 
-  // آخر 5 متاجر جديدة
-  const recentNew = [...(allStores.filter(s => s.category === 'incubating'))]
+  // أحدث 5 متاجر جديدة
+  const recentNew = [...(stores.incubating || [])]
     .sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0))
     .slice(0, 5)
 
@@ -52,6 +42,9 @@ export default function Dashboard() {
       </button>
     </div>
   )
+
+  // ضمان التوافق: المجموع دائماً = total_active
+  const activeSum = (counts.active_shipping || 0) + (counts.hot_inactive || 0) + (counts.cold_inactive || 0)
 
   return (
     <div className="space-y-6">
@@ -74,7 +67,22 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* KPI Cards */}
+      {/* بطاقة الإجمالي */}
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 shadow-md text-white flex items-center justify-between">
+        <div>
+          <p className="text-slate-400 text-sm font-medium mb-1">إجمالي المتاجر النشطة في API</p>
+          <p className="text-4xl font-black">{activeSum.toLocaleString('ar-SA')}</p>
+          <p className="text-slate-400 text-xs mt-1">
+            {counts.active_shipping || 0} نشط + {counts.hot_inactive || 0} ساخن + {counts.cold_inactive || 0} بارد
+            {activeSum === (counts.total_active || 0) ? ' ✓' : ' ✗'}
+          </p>
+        </div>
+        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
+          <Package size={28} className="text-white" />
+        </div>
+      </div>
+
+      {/* KPI Cards — 4 خانات */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="المتاجر الجديدة"
@@ -85,33 +93,34 @@ export default function Dashboard() {
           onClick={() => navigate('/new')}
         />
         <StatCard
-          title="المتاجر النشطة"
-          value={counts.active}
-          subtitle={`${calledToday} تم الاتصال اليوم`}
+          title="نشط يشحن (≤ 14 يوم)"
+          value={counts.active_shipping}
+          subtitle="شحن خلال آخر 14 يوم"
           icon={TrendingUp}
           color="green"
           onClick={() => navigate('/active')}
         />
         <StatCard
-          title="المتاجر غير النشطة"
-          value={counts.inactive}
-          subtitle={`${pendingInactiveCalls} تحتاج متابعة`}
-          icon={TrendingDown}
-          color="red"
-          onClick={() => navigate('/inactive')}
+          title="غير نشط ساخن (15-60 يوم)"
+          value={counts.hot_inactive}
+          subtitle="انقطع 15 إلى 60 يوم"
+          icon={Flame}
+          color="amber"
+          onClick={() => navigate('/hot-inactive')}
         />
         <StatCard
-          title="إجمالي الطرود"
-          value={totalShipments}
-          subtitle={`عبر ${counts.total} متجر`}
-          icon={Package}
-          color="blue"
+          title="غير نشط بارد (> 60 يوم)"
+          value={counts.cold_inactive}
+          subtitle="انقطع أكثر من 60 يوم أو لم يشحن"
+          icon={Snowflake}
+          color="red"
+          onClick={() => navigate('/cold-inactive')}
         />
       </div>
 
       {/* Second row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent new stores */}
+        {/* أحدث متاجر جديدة */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
@@ -141,18 +150,18 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Quick stats */}
+        {/* ملخص سريع */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
           <h2 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-            <TrendingUp size={18} className="text-blue-600" />
+            <Package size={18} className="text-blue-600" />
             ملخص سريع
           </h2>
           <div className="space-y-3">
             {[
-              { label: 'مجمدة',          value: frozenCount,          color: 'text-slate-600' },
-              { label: 'مكالمات اليوم',  value: calledToday,           color: 'text-green-600' },
-              { label: 'تحتاج تواصل (جديدة)', value: pendingNewCalls, color: 'text-purple-600' },
-              { label: 'تحتاج استعادة',  value: pendingInactiveCalls,  color: 'text-red-600' },
+              { label: 'إجمالي الطرود عبر كل المتاجر', value: totalShipments.toLocaleString('ar-SA'), color: 'text-blue-600' },
+              { label: 'مكالمات اليوم',                  value: calledToday,                            color: 'text-green-600' },
+              { label: 'متاجر جديدة تحتاج تواصل',        value: pendingNewCalls,                        color: 'text-purple-600' },
+              { label: 'الإجمالي الكلي (API + جديد)',     value: (counts.total || 0).toLocaleString('ar-SA'), color: 'text-slate-700' },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
                 <span className="text-slate-500 text-sm">{row.label}</span>
