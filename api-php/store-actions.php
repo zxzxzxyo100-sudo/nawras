@@ -61,9 +61,10 @@ elseif ($action === 'log_call') {
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $callType = $input['call_type'];
-    $note = $input['note'];
-    $user = $input['user'] ?? '';
-    $userRole = $input['user_role'] ?? '';
+    $note = $input['note'] ?? '';
+    // دعم كلا المفتاحين: performed_by (من CallModal) و user (القديم)
+    $user = $input['performed_by'] ?? $input['user'] ?? '';
+    $userRole = $input['performed_role'] ?? $input['user_role'] ?? '';
     $hasShipped = !empty($input['has_shipped']);
     $registrationDate = $input['registration_date'] ?? null;
 
