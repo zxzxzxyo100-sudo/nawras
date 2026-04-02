@@ -116,25 +116,19 @@ $counts = [
     'total_active' => 0, 'total' => 0,
 ];
 
-// ── خانات مسار الاحتضان (قواعد حصرية) ────────────────────────
-// Q4 جديدة      : age ≤ 48h                       → incubation
-// Q1 احتضان     : 48h < age ≤ 14d  AND ships > 0  → incubation
-// Q3 تخريج      : age > 14d  AND ships > 0         → incubation
-// Q2 لم تبدأ   : age > 48h  AND ships = 0          → cold_inactive (مع علامة _never_started)
-// يدوي: restoring / restored                        → incubation
+// ── مسار الاحتضان: خانتان فقط ─────────────────────────────────
+// Q4 جديدة  : age ≤ 48h                      → incubation
+// Q1 احتضان : 48h < age ≤ 14d  AND ships > 0 → incubation
+// Q3 نجاح   : age > 14d        AND ships > 0 → active_shipping مباشرةً (لا قائمة تخريج)
+// Q2 لم تبدأ: age > 48h        AND ships = 0 → cold_inactive (مع علامة _never_started)
+// جاري/تمت الاستعادة: حالة DB تظهر في خانة غير النشطة
 $incubation_path = [
     'new_48h'    => [],
     'incubating' => [],
-    'graduated'  => [],
-    'restoring'  => [],
-    'restored'   => [],
 ];
 $incubation_counts = [
     'new_48h'    => 0,
     'incubating' => 0,
-    'graduated'  => 0,
-    'restoring'  => 0,
-    'restored'   => 0,
     'total'      => 0,
 ];
 
@@ -169,12 +163,22 @@ foreach ($new as $id => $s) {
         $incubation_counts['incubating']++; $incubation_counts['total']++;
 
     } elseif ($hasShipped) {
-        // ── Q3: تخريج (>14 يوم + شحن) ──────────────────────────
-        $s['_cat'] = 'incubating'; $s['_inc'] = 'graduated';
-        $result['incubating'][] = $s;
-        $counts['incubating']++; $counts['total']++;
-        $incubation_path['graduated'][] = $s;
-        $incubation_counts['graduated']++; $incubation_counts['total']++;
+        // ── Q3: نجح الاحتضان (>14 يوم + شحن) → نشط مباشرةً ────
+        if (!empty($s['status']) && $s['status'] !== 'active') continue;
+        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+            ? strtotime($s['last_shipment_date']) : null;
+        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+        $s['_cat'] = 'active_shipping'; $s['_inc'] = 'graduated';
+        if ($daysShip <= 14) {
+            $result['active_shipping'][] = $s; $counts['active_shipping']++;
+        } elseif ($daysShip <= 60) {
+            $s['_cat'] = 'hot_inactive';
+            $result['hot_inactive'][] = $s; $counts['hot_inactive']++;
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $result['cold_inactive'][] = $s; $counts['cold_inactive']++;
+        }
+        $counts['total_active']++; $counts['total']++;
 
     } else {
         // ── Q2: لم تبدأ (>48 ساعة + 0 شحنات) → غير نشط بارد ────

@@ -14,12 +14,10 @@ export function StoresProvider({ children }) {
     cold_inactive:   [],
   })
   const [incubationPath, setIncubationPath] = useState({
-    new_48h: [], incubating: [], graduated: [],
-    restoring: [], restored: [],
+    new_48h: [], incubating: [],
   })
   const [incubationCounts, setIncubationCounts] = useState({
-    new_48h: 0, incubating: 0, graduated: 0,
-    restoring: 0, restored: 0, total: 0,
+    new_48h: 0, incubating: 0, total: 0,
   })
   const [counts, setCounts]               = useState({
     incubating: 0, active_shipping: 0, hot_inactive: 0, cold_inactive: 0,
@@ -58,39 +56,20 @@ export function StoresProvider({ children }) {
       })
       setCounts(apiResult.counts)
 
-      // مسار الاحتضان: دمج بيانات API مع حالة DB
-      // Q2 (never_started) لا يظهر هنا — يذهب لـ cold_inactive مباشرةً من PHP
+      // مسار الاحتضان: خانتان فقط (new_48h + incubating)
+      // Q3 (graduated) → active_shipping مباشرةً من PHP
+      // Q2 (never_started) → cold_inactive مباشرةً من PHP
+      // جاري/تمت الاستعادة → تُدار في خانة غير النشطة عبر DB
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
         new_48h:    rawPath.new_48h    || [],
         incubating: rawPath.incubating || [],
-        graduated:  rawPath.graduated  || [],
-        restoring:  rawPath.restoring  || [],
-        restored:   rawPath.restored   || [],
       }
-
-      // نقل المتاجر التي وضعها الوكيل يدوياً في "restoring" عبر DB
-      Object.entries(stateMap).forEach(([storeId, dbState]) => {
-        if (dbState.category !== 'restoring') return
-        ;['new_48h', 'incubating', 'graduated'].forEach(bucket => {
-          const idx = mergedPath[bucket].findIndex(s => String(s.id) === String(storeId))
-          if (idx !== -1) {
-            const [store] = mergedPath[bucket].splice(idx, 1)
-            store._inc = 'restoring'
-            if (!mergedPath.restoring.find(s => s.id === store.id)) {
-              mergedPath.restoring.push(store)
-            }
-          }
-        })
-      })
 
       setIncubationPath(mergedPath)
       setIncubationCounts({
         new_48h:    mergedPath.new_48h.length,
         incubating: mergedPath.incubating.length,
-        graduated:  mergedPath.graduated.length,
-        restoring:  mergedPath.restoring.length,
-        restored:   mergedPath.restored.length,
         total:      (apiResult.incubation_counts?.total) || 0,
       })
       setLastLoaded(new Date())

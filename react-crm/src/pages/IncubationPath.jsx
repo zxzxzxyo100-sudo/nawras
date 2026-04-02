@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, GraduationCap, RefreshCw,
-  CheckCircle2, TrendingUp, Search, Phone,
+  Baby, Clock, RefreshCw, Search, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
-import { setStoreStatus } from '../services/api'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
 function regDays(s) {
@@ -23,13 +21,13 @@ function shipDays(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// ما يظهر في مسار الاحتضان فقط:
-// Q4 جديدة      : age ≤ 48h                      (مراقبة)
-// Q1 احتضان     : 48h < age ≤ 14d  AND ships > 0
-// Q3 تخريج      : age > 14d        AND ships > 0
-// يدوي: جاري الاستعادة / تمت الاستعادة
+// مسار الاحتضان: خانتان حصريتان فقط
+// Q4 جديدة  : age ≤ 48h                       (مراقبة)
+// Q1 احتضان : 48h < age ≤ 14d  AND ships > 0
 //
-// Q2 (age > 48h AND ships = 0) → يذهب لـ غير نشط بارد (ليس هنا)
+// Q3 (نجاح >14يوم + شحن)   → active_shipping مباشرةً
+// Q2 (>48ساعة + 0 شحنات)   → cold_inactive
+// جاري/تمت الاستعادة       → خانة غير النشطة
 // ══════════════════════════════════════════════════════════════════
 const TABS = [
   {
@@ -52,68 +50,16 @@ const TABS = [
       <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يشحن ✓</span>
     ),
   },
-  {
-    key:   'graduated',
-    label: 'قائمة التخريج',
-    icon:  GraduationCap,
-    color: 'emerald',
-    desc:  'Q3 — تجاوزت 14 يوماً وشحنت — جاهزة للانتقال إلى النشطة',
-    badge: () => (
-      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">تخريج ✓</span>
-    ),
-  },
-  {
-    key:   'restoring',
-    label: 'جاري الاستعادة',
-    icon:  TrendingUp,
-    color: 'orange',
-    desc:  'يدوي — بدأت في تجهيز طلبية بعد انقطاع',
-    badge: () => (
-      <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">جارٍ</span>
-    ),
-  },
-  {
-    key:   'restored',
-    label: 'تمت الاستعادة',
-    icon:  CheckCircle2,
-    color: 'teal',
-    desc:  'يدوي — شحنت أول طلبية فعلية بعد الانقطاع',
-    badge: () => (
-      <span className="text-xs font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">مستعادة</span>
-    ),
-  },
 ]
 
 const COLOR_CLASSES = {
-  blue:    { active: 'bg-blue-600 text-white shadow-blue-600/20',      count: 'bg-blue-50 text-blue-600 border-blue-200'          },
-  indigo:  { active: 'bg-indigo-600 text-white shadow-indigo-600/20',  count: 'bg-indigo-50 text-indigo-600 border-indigo-200'    },
-  emerald: { active: 'bg-emerald-600 text-white shadow-emerald-600/20',count: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  orange:  { active: 'bg-orange-500 text-white shadow-orange-500/20',  count: 'bg-orange-50 text-orange-600 border-orange-200'   },
-  teal:    { active: 'bg-teal-600 text-white shadow-teal-600/20',      count: 'bg-teal-50 text-teal-600 border-teal-200'         },
+  blue:   { active: 'bg-blue-600 text-white shadow-blue-600/20',     count: 'bg-blue-50 text-blue-600 border-blue-200'      },
+  indigo: { active: 'bg-indigo-600 text-white shadow-indigo-600/20', count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
 }
 
-// ── أزرار الإجراء: فقط للمتاجر اليدوية ─────────────────────────
-function ActionBadge({ store, onMarkRestoring, onMarkRestored }) {
-  // يدوي: جاري الاستعادة → يمكن تأكيد "تمت الاستعادة"
-  const isRestoring = store._inc === 'restoring'
-
-  if (!isRestoring) return null
-  return (
-    <div className="flex gap-1.5">
-      {isRestoring && (
-        <button
-          onClick={e => { e.stopPropagation(); onMarkRestored(store) }}
-          className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium"
-        >
-          تمت الاستعادة
-        </button>
-      )}
-    </div>
-  )
-}
 
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
-function IncTable({ stores, tab, callLogs, onSelect, onCall, onMarkRestoring, onMarkRestored }) {
+function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [q, setQ] = useState('')
   const filtered = useMemo(() => {
     if (!q.trim()) return stores
@@ -159,7 +105,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, onMarkRestoring, on
               <th className="px-4 py-3 text-slate-500 font-medium">آخر شحنة</th>
               <th className="px-4 py-3 text-slate-500 font-medium">الحالة</th>
               <th className="px-4 py-3 text-slate-500 font-medium">التواصل</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">إجراء</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -215,13 +160,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, onMarkRestoring, on
                       {hasCalls ? 'متابعة' : 'تواصل'}
                     </button>
                   </td>
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <ActionBadge
-                      store={s}
-                      onMarkRestoring={onMarkRestoring}
-                      onMarkRestored={onMarkRestored}
-                    />
-                  </td>
                 </tr>
               )
             })}
@@ -244,12 +182,11 @@ export default function IncubationPath() {
     loading, error, reload,
   } = useStores()
 
-  const [activeTab, setActiveTab]   = useState('new_48h')
-  const [selected, setSelected]     = useState(null)
-  const [callStore, setCallStore]   = useState(null)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('new_48h')
+  const [selected, setSelected]   = useState(null)
+  const [callStore, setCallStore] = useState(null)
 
-  // كل تبويب له فئة مستقلة حصرية — لا دمج
+  // كل تبويب له فئة مستقلة حصرية
   const tabStores = useMemo(
     () => incubationPath[activeTab] || [],
     [activeTab, incubationPath]
@@ -260,19 +197,6 @@ export default function IncubationPath() {
   )
 
   const currentTab = TABS.find(t => t.key === activeTab)
-
-  // ── تحديث حالة DB ─────────────────────────────────────────────
-  async function markAs(store, category) {
-    setActionLoading(true)
-    try {
-      await setStoreStatus(store.id, category)
-      await reload()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
   return (
     <div className="space-y-5">
@@ -354,8 +278,6 @@ export default function IncubationPath() {
           callLogs={callLogs}
           onSelect={setSelected}
           onCall={setCallStore}
-          onMarkRestoring={s => markAs(s, 'restoring')}
-          onMarkRestored={s => markAs(s, 'restored')}
         />
       )}
 
@@ -369,15 +291,6 @@ export default function IncubationPath() {
         <CallModal store={callStore} onClose={() => setCallStore(null)} />
       )}
 
-      {/* ── مؤشر تحميل الإجراء ── */}
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl flex items-center gap-3">
-            <RefreshCw size={20} className="animate-spin text-blue-500" />
-            <span className="text-sm font-medium text-slate-700">جاري التحديث...</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
