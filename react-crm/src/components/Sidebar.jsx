@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp,
-  Flame, Snowflake, ClipboardList, Users, LogOut, Package, Baby,
+  Flame, Snowflake, ClipboardList, Users, LogOut, Package, Baby, X,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 
@@ -16,7 +16,7 @@ const NAV = [
   { to: '/users',        label: 'إدارة المستخدمين',     icon: Users,           view: 'users'        },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
   const navigate = useNavigate()
 
@@ -25,20 +25,38 @@ export default function Sidebar() {
     navigate('/login')
   }
 
+  function handleNav() {
+    // close sidebar on mobile after navigation
+    if (onClose) onClose()
+  }
+
   const roleLabel = ROLES[user?.role]?.label ?? ''
 
   return (
-    <aside className="fixed right-0 top-0 h-full w-64 bg-slate-900 flex flex-col z-40 shadow-2xl">
-      {/* Logo */}
+    <aside className={`
+      fixed right-0 top-0 h-full w-64 bg-slate-900 flex flex-col z-40 shadow-2xl
+      transition-transform duration-300 ease-in-out
+      ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+      lg:translate-x-0
+    `}>
+      {/* Logo + close button on mobile */}
       <div className="p-6 border-b border-slate-700/50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
-            <Package size={20} className="text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
+              <Package size={20} className="text-white" />
+            </div>
+            <div>
+              <div className="text-white font-bold text-lg leading-tight">نظام النورس</div>
+              <div className="text-slate-400 text-xs">{roleLabel}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-white font-bold text-lg leading-tight">نظام النورس</div>
-            <div className="text-slate-400 text-xs">{roleLabel}</div>
-          </div>
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 
@@ -49,6 +67,7 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            onClick={handleNav}
             className={({ isActive }) =>
               `flex items-center gap-3 px-5 py-3.5 mx-3 my-0.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                 isActive
