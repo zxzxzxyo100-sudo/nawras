@@ -134,7 +134,7 @@ export default function MyPerformance() {
   const { user }  = useAuth()
   const {
     totalPoints, todayPoints, todayCalls,
-    weekData, recent, goalPct, loading, reload,
+    weekData, recent, goalPct, loading, loadError, reload,
   } = usePoints()
 
   // تحضير بيانات آخر 7 أيام
@@ -151,6 +151,30 @@ export default function MyPerformance() {
     }
     return result
   }, [weekData])
+
+  if (loading && totalPoints === 0 && todayCalls === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-400 text-sm">جارٍ تحميل بياناتك...</p>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="text-4xl">⚠️</div>
+        <p className="text-red-400 font-bold">{loadError}</p>
+        <button
+          onClick={reload}
+          className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-colors"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>

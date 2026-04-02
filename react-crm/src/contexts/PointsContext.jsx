@@ -15,27 +15,36 @@ export function PointsProvider({ children }) {
   const [weekData,    setWeekData]    = useState([])
   const [recent,      setRecent]      = useState([])
   const [loading,     setLoading]     = useState(false)
+  const [loadError,   setLoadError]   = useState(null)
 
   // ── حالة الأنيميشن (Global — تُعرض في App.jsx فوق كل شيء) ──────
   const [coinTrigger,  setCoinTrigger]  = useState(null)   // timestamp لتشغيل العملات
   const [earnedPoints, setEarnedPoints] = useState(0)      // نقاط هذه الجلسة
   const [showJackpot,  setShowJackpot]  = useState(false)  // 🎉 احتفال الهدف
 
+  // المعرّف الفريد: fullname أولاً، وإلا username
+  const userId = user?.fullname || user?.username || ''
+
   const load = useCallback(async () => {
-    if (!user?.fullname) return
+    if (!userId) return
     setLoading(true)
+    setLoadError(null)
     try {
-      const res = await getMyStats(user.fullname)
+      const res = await getMyStats(userId)
       if (res.success) {
         setTotalPoints(res.total_points || 0)
         setTodayPoints(res.today_points || 0)
         setTodayCalls(res.today_calls  || 0)
         setWeekData(res.week_data      || [])
         setRecent(res.recent           || [])
+      } else {
+        setLoadError(res.error || 'فشل تحميل النقاط')
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      setLoadError('تعذّر الاتصال بالخادم')
+    }
     setLoading(false)
-  }, [user?.fullname])
+  }, [userId])
 
   useEffect(() => { load() }, [load])
 
@@ -66,7 +75,7 @@ export function PointsProvider({ children }) {
   return (
     <PointsContext.Provider value={{
       totalPoints, todayPoints, todayCalls,
-      weekData, recent, loading,
+      weekData, recent, loading, loadError,
       goalPct,
       // Animation state (يُستهلك في App.jsx)
       coinTrigger, earnedPoints, showJackpot, setShowJackpot,

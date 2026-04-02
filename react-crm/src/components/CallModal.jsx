@@ -31,7 +31,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         call_type:      callType,
         outcome,
         note,
-        performed_by:   user?.fullname,
+        performed_by:   user?.fullname || user?.username || '',
         performed_role: user?.role,
       })
 

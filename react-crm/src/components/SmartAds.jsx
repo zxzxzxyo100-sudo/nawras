@@ -131,7 +131,7 @@ export default function SmartAds() {
     setClaimingId(ad.id)
     try {
       const res = await awardBonus({
-        username:  user.fullname,
+        username:  user.fullname || user.username || '',
         ad_id:     ad.id,
         ad_title:  ad.title,
         points:    ad.points,
