@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { StoresProvider } from './contexts/StoresContext'
-import { PointsProvider } from './contexts/PointsContext'
+import { PointsProvider, usePoints } from './contexts/PointsContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -14,6 +14,7 @@ import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 import Kanban from './pages/Kanban'
 import MyPerformance from './pages/MyPerformance'
+import GoldCoinAnimation from './components/GoldCoinAnimation'
 
 function PrivateRoute({ children, view }) {
   const { user, loading, can } = useAuth()
@@ -47,12 +48,27 @@ function AppRoutes() {
   )
 }
 
+// ── Global Animation Layer — يعيش فوق كل شيء حتى بعد إغلاق أي Modal ──
+function GlobalAnimations() {
+  const { coinTrigger, earnedPoints, showJackpot, setShowJackpot } = usePoints()
+  return (
+    <GoldCoinAnimation
+      trigger={coinTrigger}
+      points={earnedPoints}
+      showJackpot={showJackpot}
+      onJackpotDone={() => setShowJackpot(false)}
+    />
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <StoresProvider>
           <PointsProvider>
+            {/* طبقة الأنيميشن العالمية — مستقلة عن أي Modal */}
+            <GlobalAnimations />
             <AppRoutes />
           </PointsProvider>
         </StoresProvider>

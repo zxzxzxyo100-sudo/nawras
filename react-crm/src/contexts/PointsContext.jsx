@@ -16,8 +16,10 @@ export function PointsProvider({ children }) {
   const [recent,      setRecent]      = useState([])
   const [loading,     setLoading]     = useState(false)
 
-  // عدد النقاط المُكتسبة للعرض الفوري (animation trigger)
-  const [lastEarned, setLastEarned]   = useState(null)
+  // ── حالة الأنيميشن (Global — تُعرض في App.jsx فوق كل شيء) ──────
+  const [coinTrigger,  setCoinTrigger]  = useState(null)   // timestamp لتشغيل العملات
+  const [earnedPoints, setEarnedPoints] = useState(0)      // نقاط هذه الجلسة
+  const [showJackpot,  setShowJackpot]  = useState(false)  // 🎉 احتفال الهدف
 
   const load = useCallback(async () => {
     if (!user?.fullname) return
@@ -37,13 +39,25 @@ export function PointsProvider({ children }) {
 
   useEffect(() => { load() }, [load])
 
-  // يُستدعى بعد حفظ مكالمة لتحديث النقاط فوراً
+  // يُستدعى بعد حفظ مكالمة — يُحدّث الحالة ويُطلق الأنيميشن
   function onCallSaved(pointsEarned = 10) {
+    setTodayCalls(prev => {
+      const next = prev + 1
+      // هل أكمل الهدف للتو؟
+      if (next >= DAILY_GOAL && prev < DAILY_GOAL) {
+        // أطلق الاحتفال بعد لحظة حتى تظهر العملات أولاً
+        setTimeout(() => setShowJackpot(true), 600)
+      }
+      return next
+    })
     setTotalPoints(p => p + pointsEarned)
     setTodayPoints(p => p + pointsEarned)
-    setTodayCalls(c  => c + 1)
-    setLastEarned({ points: pointsEarned, at: Date.now() })
-    // مزامنة كاملة بعد ثانية
+
+    // أطلق أنيميشن العملات
+    setEarnedPoints(pointsEarned)
+    setCoinTrigger(Date.now())
+
+    // مزامنة كاملة من الـ API بعد ثانية
     setTimeout(load, 1200)
   }
 
@@ -53,7 +67,9 @@ export function PointsProvider({ children }) {
     <PointsContext.Provider value={{
       totalPoints, todayPoints, todayCalls,
       weekData, recent, loading,
-      goalPct, lastEarned,
+      goalPct,
+      // Animation state (يُستهلك في App.jsx)
+      coinTrigger, earnedPoints, showJackpot, setShowJackpot,
       onCallSaved, reload: load,
     }}>
       {children}
