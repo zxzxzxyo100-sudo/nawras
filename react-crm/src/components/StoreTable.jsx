@@ -3,7 +3,16 @@ import { Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 
 const PAGE_SIZE = 50
 
-export default function StoreTable({ stores = [], onSelectStore, extraColumns = [], emptyMsg = 'لا توجد متاجر' }) {
+export default function StoreTable({
+  stores = [],
+  onSelectStore,
+  extraColumns = [],
+  emptyMsg = 'لا توجد متاجر',
+  // multi-select props
+  selectable = false,
+  selectedIds = new Set(),
+  onSelectionChange,
+}) {
   const [search, setSearch] = useState('')
   const [page, setPage]     = useState(1)
 
@@ -14,6 +23,29 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handleSearch(v) { setSearch(v); setPage(1) }
+
+  // multi-select helpers
+  const pageIds   = paginated.map(s => s.id)
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id))
+  const somePageSelected = pageIds.some(id => selectedIds.has(id))
+
+  function toggleRow(id) {
+    const next = new Set(selectedIds)
+    next.has(id) ? next.delete(id) : next.add(id)
+    onSelectionChange?.(next)
+  }
+
+  function toggleAll() {
+    const next = new Set(selectedIds)
+    if (allPageSelected) {
+      pageIds.forEach(id => next.delete(id))
+    } else {
+      pageIds.forEach(id => next.add(id))
+    }
+    onSelectionChange?.(next)
+  }
+
+  const extraColCount = selectable ? 1 : 0
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -37,6 +69,17 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
+              {selectable && (
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allPageSelected}
+                    ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected }}
+                    onChange={toggleAll}
+                    className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                  />
+                </th>
+              )}
               <th className="text-right px-4 py-3">رقم المتجر</th>
               <th className="text-right px-4 py-3">اسم المتجر</th>
               <th className="text-right px-4 py-3">رقم الهاتف</th>
@@ -52,46 +95,61 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={7 + extraColumns.length} className="text-center py-12 text-slate-400">{emptyMsg}</td>
+                <td colSpan={7 + extraColumns.length + extraColCount + 1} className="text-center py-12 text-slate-400">{emptyMsg}</td>
               </tr>
             ) : (
-              paginated.map(store => (
-                <tr
-                  key={store.id}
-                  className="border-t border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => onSelectStore?.(store)}
-                >
-                  <td className="px-4 py-3.5">
-                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{store.id}</span>
-                  </td>
-                  <td className="px-4 py-3.5 font-medium text-slate-800">{store.name}</td>
-                  <td className="px-4 py-3.5">
-                    {store.phone
-                      ? <span className="text-xs font-mono text-slate-600" dir="ltr">{store.phone}</span>
-                      : <span className="text-xs text-slate-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500">
-                    {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500">
-                    {store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
-                      ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA')
-                      : <span className="text-red-400 text-xs">لا يوجد</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span className="font-bold text-slate-700">{parseInt(store.total_shipments) || 0}</span>
-                  </td>
-                  {extraColumns.map(col => (
-                    <td key={col.key} className="px-4 py-3.5 text-slate-500">
-                      {col.render ? col.render(store) : store[col.key] ?? '—'}
+              paginated.map(store => {
+                const isSelected = selectedIds.has(store.id)
+                return (
+                  <tr
+                    key={store.id}
+                    className={`border-t border-slate-50 transition-colors cursor-pointer ${
+                      isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                    }`}
+                    onClick={() => selectable ? toggleRow(store.id) : onSelectStore?.(store)}
+                  >
+                    {selectable && (
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(store.id)}
+                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    <td className="px-4 py-3.5">
+                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{store.id}</span>
                     </td>
-                  ))}
-                  <td className="px-4 py-3.5">
-                    <ExternalLink size={14} className="text-slate-300 hover:text-blue-500 transition-colors" />
-                  </td>
-                </tr>
-              ))
+                    <td className="px-4 py-3.5 font-medium text-slate-800">{store.name}</td>
+                    <td className="px-4 py-3.5">
+                      {store.phone
+                        ? <span className="text-xs font-mono text-slate-600" dir="ltr">{store.phone}</span>
+                        : <span className="text-xs text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500">
+                      {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500">
+                      {store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
+                        ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA')
+                        : <span className="text-red-400 text-xs">لا يوجد</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="font-bold text-slate-700">{parseInt(store.total_shipments) || 0}</span>
+                    </td>
+                    {extraColumns.map(col => (
+                      <td key={col.key} className="px-4 py-3.5 text-slate-500">
+                        {col.render ? col.render(store) : store[col.key] ?? '—'}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3.5" onClick={e => { e.stopPropagation(); onSelectStore?.(store) }}>
+                      <ExternalLink size={14} className="text-slate-300 hover:text-blue-500 transition-colors" />
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
