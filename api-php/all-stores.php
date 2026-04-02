@@ -8,23 +8,33 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-function fetchAll($url, $max = MAX_PAGES_ALL) {
+// $body = null → GET بدون body (new, inactive)
+// $body = array → GET مع JSON body (orders-summary يحتاجه)
+function fetchAll($url, $max = MAX_PAGES_ALL, $body = null) {
     $all    = [];
     $cursor = null;
     $p      = 0;
     do {
         $u  = $cursor ? $url . (strpos($url, '?') !== false ? '&' : '?') . 'cursor=' . urlencode($cursor) : $url;
         $ch = curl_init();
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_URL            => $u,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 20,
             CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_CUSTOMREQUEST  => 'GET',
             CURLOPT_HTTPHEADER     => [
                 'Accept: application/json',
                 'X-API-TOKEN: ' . NAWRIS_TOKEN,
             ],
-        ]);
+        ];
+        if ($body !== null) {
+            $jsonBody = json_encode($body);
+            $opts[CURLOPT_POSTFIELDS] = $jsonBody;
+            $opts[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
+            $opts[CURLOPT_HTTPHEADER][] = 'Content-Length: ' . strlen($jsonBody);
+        }
+        curl_setopt_array($ch, $opts);
         $r  = curl_exec($ch);
         curl_close($ch);
         $d  = json_decode($r, true);
@@ -83,10 +93,17 @@ $new = fetchAll(
     MAX_PAGES_NEW
 );
 
-// [B] من شحن خلال آخر 14 يوم فقط (نطاق صغير = سريع)
+// [B] orders-summary — من يناير حتى أمس (نطاق موثوق + JSON body مطلوب)
+//     نستخدم last_shipment_date للتصنيف:
+//       ≤ 14 يوم  → active_shipping
+//       15–60 يوم → hot_inactive
+//       > 60 يوم  → cold_inactive (نادر هنا، يُكمَّل من [D])
+$ordersFrom = date('Y-m-d', mktime(0, 0, 0, 1, 1, date('Y')));  // 2026-01-01
+$ordersTo   = date('Y-m-d', $now - 86400);                       // أمس
 $orders = fetchAll(
-    NAWRIS_BASE . '/customers/orders-summary?from=' . date('Y-m-d', $now - 14 * 86400) . '&to=' . date('Y-m-d'),
-    MAX_PAGES_ORDERS
+    NAWRIS_BASE . '/customers/orders-summary?from=' . $ordersFrom . '&to=' . $ordersTo,
+    MAX_PAGES_ORDERS,
+    ['since' => '2023-01-01']  // JSON body — مطلوب من الـ API
 );
 
 // [C] غير نشط منذ 15+ يوم
@@ -191,13 +208,24 @@ foreach ($new as $id => $s) {
 $coldIds         = array_fill_keys(array_keys($cold), true);
 $activeShipIds   = [];
 
-// ── [B] active_shipping — من شحن في آخر 14 يوم ─────────────────
+// ── [B] تصنيف orders-summary بناءً على last_shipment_date ────────
 foreach ($orders as $id => $s) {
     if (isset($newIds[$id])) continue;          // تجنب تكرار الجديدة
 
-    $s['_cat'] = 'active_shipping';
-    $result['active_shipping'][] = $s;
-    $counts['active_shipping']++;
+    $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+        ? strtotime($s['last_shipment_date'])
+        : null;
+    $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+
+    if ($daysShip <= 14) {
+        $s['_cat'] = 'active_shipping';
+        $result['active_shipping'][] = $s;
+        $counts['active_shipping']++;
+    } else {
+        // 15+ يوم — hot أو cold يُحسم لاحقاً من endpoints المخصصة
+        // نسجّله في seenActive فقط لمنع التكرار
+    }
+
     $counts['total_active']++;
     $counts['total']++;
     $activeShipIds[$id] = true;
@@ -241,12 +269,12 @@ echo json_encode([
     'data'              => $result,
     'incubation_path'   => $incubation_path,
     'meta'              => [
-        'fetched_orders'       => count($orders),
+        'fetched_orders'         => count($orders),
         'fetched_hot_candidates' => count($hot_candidates),
-        'fetched_cold'         => count($cold),
-        'fetched_new'          => count($new),
-        'orders_from'          => date('Y-m-d', $now - 14 * 86400),
-        'orders_to'            => date('Y-m-d'),
+        'fetched_cold'           => count($cold),
+        'fetched_new'            => count($new),
+        'orders_from'            => $ordersFrom,
+        'orders_to'              => $ordersTo,
         'generated_at'    => date('Y-m-d H:i:s'),
     ],
 ], JSON_UNESCAPED_UNICODE);
