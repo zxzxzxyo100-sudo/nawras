@@ -70,11 +70,10 @@ export default function Dashboard() {
       {/* بطاقة الإجمالي */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 shadow-md text-white flex items-center justify-between">
         <div>
-          <p className="text-slate-400 text-sm font-medium mb-1">إجمالي المتاجر النشطة في API</p>
-          <p className="text-4xl font-black">{activeSum.toLocaleString('ar-SA')}</p>
+          <p className="text-slate-400 text-sm font-medium mb-1">إجمالي المتاجر المسجّلة في API</p>
+          <p className="text-4xl font-black">{(counts.total || 0).toLocaleString('ar-SA')}</p>
           <p className="text-slate-400 text-xs mt-1">
-            {counts.active_shipping || 0} نشط + {counts.hot_inactive || 0} ساخن + {counts.cold_inactive || 0} بارد
-            {activeSum === (counts.total_active || 0) ? ' ✓' : ' ✗'}
+            {counts.incubating || 0} جديد + {counts.active_shipping || 0} نشط + {counts.hot_inactive || 0} ساخن + {counts.cold_inactive || 0} بارد
           </p>
         </div>
         <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
