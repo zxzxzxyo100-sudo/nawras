@@ -376,4 +376,48 @@ elseif ($action === 'get_incubation_data') {
     }
 }
 
+// ========== GET AUDIT LOG (single store) ==========
+elseif ($action === 'get_audit_log') {
+    $storeId = $_GET['store_id'] ?? null;
+    if (!$storeId) { jsonResponse(['success' => true, 'data' => []]); }
+    $stmt = $pdo->prepare("SELECT action_type, action_detail, old_status, new_status, performed_by, performed_role, created_at FROM audit_logs WHERE store_id = ? ORDER BY created_at DESC LIMIT 50");
+    $stmt->execute([$storeId]);
+    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ========== RESET CATEGORY (bulk) ==========
+// يحذف حالة DB لمجموعة متاجر ويُعيدها لـ "غير نشطة" الافتراضية
+elseif ($action === 'reset_category') {
+    $storeIds = $input['store_ids'] ?? [];
+    $user     = $input['user']      ?? 'النظام';
+    $userRole = $input['user_role'] ?? '';
+    $reason   = $input['reason']    ?? 'إعادة تعيين يدوية';
+
+    if (empty($storeIds)) { jsonResponse(['success' => true, 'affected' => 0]); }
+
+    $placeholders = implode(',', array_fill(0, count($storeIds), '?'));
+    // جلب الأسماء والحالات الحالية قبل الحذف للتوثيق
+    $stmt = $pdo->prepare("SELECT store_id, store_name, category FROM store_states WHERE store_id IN ($placeholders)");
+    $stmt->execute($storeIds);
+    $existing = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // حذف الحالات من DB
+    $del = $pdo->prepare("DELETE FROM store_states WHERE store_id IN ($placeholders)");
+    $del->execute($storeIds);
+    $affected = $del->rowCount();
+
+    // تسجيل في audit_logs لكل متجر كان له حالة
+    $ins = $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    foreach ($existing as $row) {
+        $ins->execute([
+            $row['store_id'], $row['store_name'],
+            'إعادة تعيين الحالة', $reason,
+            $row['category'], 'inactive',
+            $user, $userRole
+        ]);
+    }
+
+    jsonResponse(['success' => true, 'affected' => $affected]);
+}
+
 else { jsonResponse(['error' => 'Unknown action'], 400); }

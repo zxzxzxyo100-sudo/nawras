@@ -44,6 +44,12 @@ export const getAllRecoveryCalls = () =>
 export const getAuditLog = (storeId) =>
   http.get(`/store-actions.php?action=get_audit_log&store_id=${storeId}`).then(r => r.data)
 
+// ─── Bulk reset ──────────────────────────────────────────────────────────────
+export const resetCategory = (storeIds, user, userRole, reason) =>
+  http.post('/store-actions.php?action=reset_category', {
+    store_ids: storeIds, user, user_role: userRole, reason,
+  }).then(r => r.data)
+
 // ─── Incubation ──────────────────────────────────────────────────────────────
 export const getIncubationData = () =>
   http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)
