@@ -495,9 +495,11 @@ async function loadData() {
         if (!apiResult.success) throw new Error('فشل في جلب البيانات');
 
         allStores = [];
-        (apiResult.data.active   || []).forEach(s => { s.category = 'active';   allStores.push(s); });
-        (apiResult.data.inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
-        (apiResult.data.cold     || []).forEach(s => { s.category = 'cold';     allStores.push(s); });
+        (apiResult.data.incubating  || []).forEach(s => { s.category = 'incubating'; allStores.push(s); });
+        (apiResult.data.graduation  || []).forEach(s => { s.category = 'incubating'; s.incubation_task = 'graduation'; allStores.push(s); });
+        (apiResult.data.not_started || []).forEach(s => { s.category = 'inactive'; s.state_reason = 'not_started'; allStores.push(s); });
+        (apiResult.data.active      || []).forEach(s => { s.category = 'active'; allStores.push(s); });
+        (apiResult.data.inactive    || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
 
         // DB overrides (frozen / restoring / recovered تبقى كما هي)
         allStores.forEach(s => {
@@ -513,7 +515,7 @@ async function loadData() {
 
         updateDashboard(); renderCurrentView();
         const c = apiResult.counts;
-        showNotification('إجمالي: ' + c.total + ' | نشطة: ' + c.active + ' | غير نشطة: ' + c.inactive + ' | باردة: ' + c.cold);
+        showNotification('إجمالي: '+c.total+' | احتضان: '+c.incubating+' | تخريج: '+c.graduation+' | نشط: '+c.active+' | لم تبدأ: '+c.not_started+' | غير نشط: '+c.inactive+(c.balanced?' ✓':' ✗'));
     } catch (error) {
         console.error('Error:', error);
         showNotification('خطأ في تحميل البيانات: ' + error.message, 'error');
