@@ -39,6 +39,7 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
             <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
               <th className="text-right px-4 py-3">رقم المتجر</th>
               <th className="text-right px-4 py-3">اسم المتجر</th>
+              <th className="text-right px-4 py-3">رقم الهاتف</th>
               <th className="text-right px-4 py-3">تاريخ التسجيل</th>
               <th className="text-right px-4 py-3">آخر شحنة</th>
               <th className="text-right px-4 py-3">الطرود</th>
@@ -51,7 +52,7 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={6 + extraColumns.length} className="text-center py-12 text-slate-400">{emptyMsg}</td>
+                <td colSpan={7 + extraColumns.length} className="text-center py-12 text-slate-400">{emptyMsg}</td>
               </tr>
             ) : (
               paginated.map(store => (
@@ -64,6 +65,11 @@ export default function StoreTable({ stores = [], onSelectStore, extraColumns = 
                     <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{store.id}</span>
                   </td>
                   <td className="px-4 py-3.5 font-medium text-slate-800">{store.name}</td>
+                  <td className="px-4 py-3.5">
+                    {store.phone
+                      ? <span className="text-xs font-mono text-slate-600" dir="ltr">{store.phone}</span>
+                      : <span className="text-xs text-slate-300">—</span>}
+                  </td>
                   <td className="px-4 py-3.5 text-slate-500">
                     {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
                   </td>

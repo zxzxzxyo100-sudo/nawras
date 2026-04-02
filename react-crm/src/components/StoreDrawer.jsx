@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History } from 'lucide-react'
+import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone } from 'lucide-react'
 import { setStoreStatus, getAuditLog } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
@@ -163,6 +163,15 @@ export default function StoreDrawer({ store, onClose }) {
             <InfoItem icon={Package} label="إجمالي الطرود" value={parseInt(store.total_shipments) || 0} />
             <InfoItem icon={TrendingUp} label="آخر شحنة" value={store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA') : 'لا يوجد'} />
             <InfoItem icon={History} label="أيام منذ التسجيل" value={store.registered_at ? Math.floor((new Date() - new Date(store.registered_at)) / 86400000) + ' يوم' : '—'} />
+            {store.phone && (
+              <div className="col-span-2">
+                <InfoItem icon={Smartphone} label="رقم الهاتف" value={
+                  <a href={`tel:${store.phone}`} className="text-blue-600 font-mono hover:underline" dir="ltr">
+                    {store.phone}
+                  </a>
+                } />
+              </div>
+            )}
           </div>
 
           {/* Call Logs */}
