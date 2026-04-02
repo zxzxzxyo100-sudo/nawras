@@ -21,44 +21,218 @@ const ChartTip = ({ active, payload, label }) => {
   )
 }
 
-// ── خاتم الأداء اليومي ───────────────────────────────────────────
-function GoalRing({ pct, calls }) {
-  const color = pct >= 100 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#8b5cf6'
-  const glow  = pct >= 100 ? '#10b98180' : pct >= 60 ? '#f59e0b80' : '#8b5cf680'
-  const label = pct >= 100 ? '🏆 أكملت الهدف!' : pct >= 60 ? '💪 أنت في المسار' : '🎯 هيا نبدأ!'
-  const r     = 52
-  const circ  = 2 * Math.PI * r
-  const dash  = circ - (Math.min(pct, 100) / 100) * circ
+// ── Crown Glow Styles ─────────────────────────────────────────────
+const CROWN_CSS = `
+@keyframes goldGlow {
+  0%, 100% { filter: drop-shadow(0 0 12px #f59e0b) drop-shadow(0 0 28px #fbbf24); }
+  50%       { filter: drop-shadow(0 0 24px #fde68a) drop-shadow(0 0 48px #f59e0b); }
+}
+@keyframes seagullFloat {
+  0%, 100% { transform: translateY(0px)   rotate(-2deg); }
+  50%       { transform: translateY(-5px) rotate(2deg);  }
+}
+@keyframes seagullFloatGoal {
+  0%   { transform: translateY(0px)    rotate(-4deg) scale(1);    }
+  25%  { transform: translateY(-8px)   rotate(5deg)  scale(1.06); }
+  50%  { transform: translateY(-4px)   rotate(-2deg) scale(1.03); }
+  75%  { transform: translateY(-10px)  rotate(6deg)  scale(1.08); }
+  100% { transform: translateY(0px)    rotate(-4deg) scale(1);    }
+}
+@keyframes ringPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+`
+
+// ── النورس الملكي 3D ─────────────────────────────────────────────
+function SeagullCrown({ pct, calls }) {
+  const isGoalMet = pct >= 100
+  const ringColor = isGoalMet ? '#f59e0b' : pct >= 60 ? '#a78bfa' : '#7c3aed'
+  const ringGlow  = isGoalMet ? '#f59e0b50' : '#7c3aed40'
+  const label     = isGoalMet ? '🏆 أكملت الهدف!' : pct >= 60 ? '💪 أنت في المسار' : '🎯 هيا نبدأ!'
+  const r         = 62
+  const circ      = 2 * Math.PI * r
+  const dash      = circ - (Math.min(pct, 100) / 100) * circ
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative w-32 h-32">
-        <svg width="128" height="128" viewBox="0 0 128 128" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="10" />
-          <motion.circle
-            cx="64" cy="64" r={r} fill="none"
-            stroke={color} strokeWidth="10" strokeLinecap="round"
-            strokeDasharray={circ}
-            initial={{ strokeDashoffset: circ }}
-            animate={{ strokeDashoffset: dash }}
-            transition={{ duration: 1.6, ease: 'easeOut', delay: 0.3 }}
-            style={{ filter: `drop-shadow(0 0 10px ${glow})` }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <motion.p
-            className="text-white text-3xl font-black leading-none"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', delay: 0.5 }}
+    <>
+      <style dangerouslySetInnerHTML={{ __html: CROWN_CSS }} />
+      <div className="flex flex-col items-center gap-2">
+        <div className="relative w-36 h-36">
+          {/* Progress ring */}
+          <svg
+            width="144" height="144" viewBox="0 0 144 144"
+            className="absolute top-0 left-0"
+            style={{ transform: 'rotate(-90deg)' }}
           >
-            {calls}
-          </motion.p>
-          <p className="text-white/40 text-[10px] mt-0.5">/ {DAILY_GOAL}</p>
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stopColor={isGoalMet ? '#f59e0b' : '#7c3aed'} />
+                <stop offset="100%" stopColor={isGoalMet ? '#fde68a' : '#a78bfa'} />
+              </linearGradient>
+              {/* هالة خارجية */}
+              <filter id="ringBlur">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            {/* الحلقة الخلفية */}
+            <circle cx="72" cy="72" r={r}
+              fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="9" />
+            {/* الحلقة المتعبئة */}
+            <motion.circle
+              cx="72" cy="72" r={r} fill="none"
+              stroke="url(#ringGrad)" strokeWidth="9" strokeLinecap="round"
+              strokeDasharray={circ}
+              initial={{ strokeDashoffset: circ }}
+              animate={{ strokeDashoffset: dash }}
+              transition={{ duration: 1.8, ease: 'easeOut', delay: 0.3 }}
+              style={{
+                filter: `drop-shadow(0 0 6px ${ringGlow})`,
+                animation: isGoalMet ? 'ringPulse 1.5s ease-in-out infinite' : 'none',
+              }}
+            />
+            {/* علامات النقاط على الحلقة */}
+            {[0, 25, 50, 75].map((pctMark, i) => {
+              const angle = (pctMark / 100) * 2 * Math.PI
+              const x = 72 + r * Math.cos(angle)
+              const y = 72 + r * Math.sin(angle)
+              return (
+                <circle key={i} cx={x} cy={y} r={2}
+                  fill={pct >= pctMark ? ringColor : 'rgba(255,255,255,0.15)'} />
+              )
+            })}
+          </svg>
+
+          {/* النورس SVG */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.div
+              style={{
+                animation: isGoalMet
+                  ? 'seagullFloatGoal 2s ease-in-out infinite, goldGlow 1.5s ease-in-out infinite'
+                  : 'seagullFloat 3.5s ease-in-out infinite',
+              }}
+            >
+              <svg width="88" height="64" viewBox="0 0 130 90" fill="none">
+                <defs>
+                  <linearGradient id="sgBody" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor={isGoalMet ? '#fef3c7' : '#ede9fe'} />
+                    <stop offset="100%" stopColor={isGoalMet ? '#f59e0b' : '#8b5cf6'} />
+                  </linearGradient>
+                  <linearGradient id="sgWing" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%"   stopColor={isGoalMet ? '#fde68a' : '#f5f3ff'} />
+                    <stop offset="60%"  stopColor={isGoalMet ? '#fbbf24' : '#c4b5fd'} />
+                    <stop offset="100%" stopColor={isGoalMet ? '#d97706' : '#7c3aed'} />
+                  </linearGradient>
+                  <linearGradient id="sgHead" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor={isGoalMet ? '#fefce8' : '#f5f3ff'} />
+                    <stop offset="100%" stopColor={isGoalMet ? '#f59e0b' : '#a78bfa'} />
+                  </linearGradient>
+                  <linearGradient id="sgTail" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%"   stopColor={isGoalMet ? '#fbbf24' : '#8b5cf6'} />
+                    <stop offset="100%" stopColor={isGoalMet ? '#d97706' : '#6d28d9'} />
+                  </linearGradient>
+                  <filter id="sgGlow">
+                    <feGaussianBlur stdDeviation="1.5" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+
+                {/* ظل الجسم */}
+                <ellipse cx="62" cy="60" rx="17" ry="5" fill="rgba(0,0,0,0.25)" />
+
+                {/* الجناح الأيسر — طبقات */}
+                <path d="M48,50 C30,24 2,28 0,40 C18,34 36,38 50,46 Z"
+                  fill="url(#sgWing)" opacity="0.85" />
+                <path d="M48,52 C30,28 2,30 0,40" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8" fill="none" />
+                <path d="M44,52 C28,34 8,32 2,40" stroke="rgba(255,255,255,0.12)" strokeWidth="0.6" fill="none" />
+
+                {/* الجناح الأيمن */}
+                <path d="M76,50 C94,24 122,28 124,40 C106,34 88,38 74,46 Z"
+                  fill="url(#sgWing)" opacity="0.85" />
+                <path d="M76,52 C94,28 122,30 124,40" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8" fill="none" />
+                <path d="M80,52 C96,34 116,32 122,40" stroke="rgba(255,255,255,0.12)" strokeWidth="0.6" fill="none" />
+
+                {/* الجسم */}
+                <ellipse cx="62" cy="54" rx="17" ry="8" fill="url(#sgBody)" />
+                {/* بريق الجسم */}
+                <ellipse cx="58" cy="50" rx="8" ry="3.5" fill="rgba(255,255,255,0.22)" />
+
+                {/* العنق */}
+                <ellipse cx="74" cy="46" rx="8" ry="9" fill="url(#sgHead)" />
+
+                {/* الرأس */}
+                <circle cx="80" cy="37" r="13" fill="url(#sgHead)" />
+                {/* بريق الرأس 3D */}
+                <ellipse cx="75" cy="33" rx="6" ry="4.5" fill="rgba(255,255,255,0.3)" />
+
+                {/* المنقار */}
+                <path d="M91,35 L108,39 L91,43 Z"
+                  fill={isGoalMet ? '#d97706' : '#f59e0b'} />
+                <path d="M91,35 L108,39 L91,39.5 Z"
+                  fill={isGoalMet ? '#92400e' : '#b45309'} />
+
+                {/* العين */}
+                <circle cx="85" cy="35" r="4" fill="#0a0118" />
+                <circle cx="83.5" cy="33.5" r="1.5" fill="white" />
+                <circle cx="86" cy="33" r="0.7" fill="rgba(255,255,255,0.5)" />
+
+                {/* الذيل */}
+                <path d="M46,56 L28,68 L37,65 L22,76 L46,60 Z"
+                  fill="url(#sgTail)" opacity="0.9" />
+
+                {/* ريشة التاج عند الهدف */}
+                {isGoalMet && (
+                  <g>
+                    <path d="M76,26 L80,14 L84,26" fill="#fbbf24" opacity="0.8" />
+                    <path d="M82,24 L88,12 L91,24" fill="#f59e0b" opacity="0.7" />
+                    <path d="M70,25 L72,12 L77,25" fill="#fde68a" opacity="0.7" />
+                  </g>
+                )}
+              </svg>
+            </motion.div>
+          </div>
+
+          {/* تاج عند الهدف */}
+          <AnimatePresence>
+            {isGoalMet && (
+              <motion.div
+                initial={{ scale: 0, y: -10 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl"
+              >
+                👑
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* شارة العدد */}
+          <div
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-black text-white border"
+            style={{
+              background:  isGoalMet ? 'rgba(245,158,11,0.25)' : 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(8px)',
+              borderColor: isGoalMet ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.1)',
+              color:       isGoalMet ? '#fbbf24' : 'white',
+            }}
+          >
+            {calls} / {DAILY_GOAL}
+          </div>
         </div>
+
+        {/* التسمية */}
+        <motion.p
+          className="text-sm font-black text-center"
+          style={{ color: isGoalMet ? '#fbbf24' : pct >= 60 ? '#a78bfa' : '#7c3aed' }}
+          animate={isGoalMet ? { scale: [1, 1.06, 1] } : {}}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          {label}
+        </motion.p>
       </div>
-      <p className="text-sm font-bold" style={{ color }}>{label}</p>
-    </div>
+    </>
   )
 }
 
@@ -185,14 +359,36 @@ export default function MyPerformance() {
         initial={{ opacity: 0, y: -18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative rounded-3xl overflow-hidden text-white p-5 lg:p-7"
-        style={{ background: 'linear-gradient(135deg, #1e0a3c 0%, #2d1466 55%, #1a0a4e 100%)' }}
+        className="relative rounded-3xl overflow-hidden text-white p-5 lg:p-8"
+        style={{
+          background: goalPct >= 100
+            ? 'linear-gradient(135deg, #1c0a00 0%, #3d1c00 35%, #1c0a00 100%)'
+            : 'linear-gradient(135deg, #0d0320 0%, #1e0a3c 40%, #0a0318 100%)',
+          boxShadow: goalPct >= 100
+            ? '0 0 60px rgba(245,158,11,0.2), 0 20px 60px rgba(0,0,0,0.5)'
+            : '0 20px 60px rgba(0,0,0,0.5)',
+          transition: 'background 1s ease, box-shadow 1s ease',
+        }}
       >
-        <div className="absolute top-0 left-1/4 w-60 h-60 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 right-0 w-48 h-48 bg-amber-500/8 rounded-full blur-2xl pointer-events-none" />
+        {/* خلفية ضوئية */}
+        <div
+          className="absolute top-0 left-1/4 w-72 h-72 rounded-full blur-3xl pointer-events-none transition-all duration-1000"
+          style={{ background: goalPct >= 100 ? 'rgba(245,158,11,0.12)' : 'rgba(124,58,237,0.12)' }}
+        />
+        <div
+          className="absolute -bottom-12 right-0 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-all duration-1000"
+          style={{ background: goalPct >= 100 ? 'rgba(251,191,36,0.08)' : 'rgba(109,40,217,0.08)' }}
+        />
+        {/* نقاط خلفية زخرفية */}
+        <div className="absolute inset-0 pointer-events-none opacity-30"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
 
         <div className="relative flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
-          <GoalRing pct={goalPct} calls={todayCalls} />
+          <SeagullCrown pct={goalPct} calls={todayCalls} />
 
           <div className="flex-1 text-center lg:text-right w-full">
             <h1 className="text-2xl font-black">أدائي اليومي</h1>
@@ -235,7 +431,7 @@ export default function MyPerformance() {
         </div>
       </motion.div>
 
-      {/* ══ محفظة NRS + إعلانات ════════════════════════════════════ */}
+      {/* ══ محفظة NRS + عروض ════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* المحفظة */}
@@ -243,16 +439,15 @@ export default function MyPerformance() {
           <WalletCard totalPoints={totalPoints} todayPoints={todayPoints} />
         </div>
 
-        {/* الإعلانات */}
+        {/* محرك العروض */}
         <div
-          className="lg:col-span-2 rounded-3xl p-4"
-          style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+          className="lg:col-span-2 rounded-3xl p-4 overflow-hidden"
+          style={{
+            background: 'linear-gradient(145deg, #0a0318, #120828)',
+            border:     '1px solid rgba(124,58,237,0.18)',
+            boxShadow:  '0 8px 32px rgba(0,0,0,0.4)',
+          }}
         >
-          <div className="flex items-center gap-2 mb-3">
-            <Zap size={13} className="text-amber-400" />
-            <span className="text-white font-bold text-xs">عروض النورس الذكية</span>
-            <span className="mr-auto text-[10px] text-white/30">نقاط مجانية</span>
-          </div>
           <SmartAds />
         </div>
       </div>
