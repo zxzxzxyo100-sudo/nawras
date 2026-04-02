@@ -597,156 +597,67 @@ function processStoresData(newData, inactiveData, summaryData) {
     });
 }
 
-// ===================== STATE MACHINE =====================
+// ===================== STATE MACHINE (مهام الاحتضان فقط - لا يغيّر الفئات) =====================
 function runStateMachine() {
     const now = new Date();
+    const today = now.toISOString().split('T')[0];
+
+    // التصنيف يأتي جاهز من all-stores.php — لا نغيّر category أبداً
+    // فقط نحدد مهام الاحتضان (incubation_task)
     allStores.forEach(store => {
         if (store.category !== 'incubating') return;
-        const override = localStorage.getItem('store_status_' + store.id);
-        if (override && override !== 'incubating') return;
 
         const regDate = store.registered_at ? new Date(store.registered_at) : null;
         if (!regDate) return;
-
-        const hoursSinceReg = (now - regDate) / 36e5;
-        const daysSinceReg = hoursSinceReg / 24;
-        const hasShipped = store.total_shipments > 0 || (store.first_shipment_date && store.first_shipment_date !== 'لا يوجد');
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        const daysSinceLastShip = lastShipDate ? (now - lastShipDate) / 864e5 : 999;
-
-        // Rule 1: Auto-graduate - 14+ days since registration AND actively shipping
-        if (daysSinceReg >= INCUBATION_DAYS && hasShipped && daysSinceLastShip < 14) {
-            store.category = 'active';
-            store.state_reason = 'auto_graduated';
-            // حفظ تلقائي في DB
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'active') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'active', store_name: store.name || '',
-                    state_reason: 'auto_graduated', old_status: 'incubating',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'active' };
-            }
-            return;
-        }
-
-        // Rule 2: 48-hour test - failed (registered > 48h ago, never shipped)
-        if (hoursSinceReg > 48 && !hasShipped) {
-            store.category = 'inactive';
-            store.state_reason = 'failed_48h';
-            // حفظ تلقائي في DB
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'inactive') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'inactive', store_name: store.name || '',
-                    state_reason: 'failed_48h', old_status: 'incubating',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'inactive' };
-            }
-            return;
-        }
-
-        // Rule 3: Conflict prevention - stopped shipping 14+ days during incubation
-        if (hasShipped && daysSinceLastShip >= 14) {
-            store.category = 'inactive';
-            store.state_reason = 'stopped_shipping';
-            return;
-        }
-
-        // Rule 4: Determine incubation task with smart scheduling
-        const callLog = dbCallLogs[store.id] || getStored('calllog', store.id) || {};
-        const today = new Date().toISOString().split('T')[0];
+        const daysSinceReg = (now - regDate) / 864e5;
+        const hasShipped = parseInt(store.total_shipments) > 0 || (store.last_shipment_date && store.last_shipment_date !== 'لا يوجد');
+        const callLog = dbCallLogs[store.id] || {};
         const nextCallDate = store.next_call_date || null;
         const dbStage = store.incubation_stage || null;
 
-        // Check if last call was less than 2 hours ago (cooldown)
-        const lastCallTime = getLastCallTime(callLog);
-        if (lastCallTime && (now - new Date(lastCallTime)) < 2 * 36e5) {
-            store.incubation_task = 'cooldown';
-            store.cooldown_until = new Date(new Date(lastCallTime).getTime() + 2 * 36e5);
-        } else if (!callLog.day0) {
+        // مكالمة 1
+        if (!callLog.day0) {
             store.incubation_task = 'day0';
-        } else if (dbStage === 'day3' && nextCallDate && nextCallDate <= today && !callLog.day3) {
-            // المكالمة الثانية مجدولة واليوم وصل موعدها
-            store.incubation_task = 'day3';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'day10' && nextCallDate && nextCallDate <= today && !callLog.day10) {
-            // المكالمة الثالثة مجدولة واليوم وصل موعدها
-            store.incubation_task = 'day10';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'graduation_ready' && daysSinceReg >= 14 && hasShipped) {
-            // جاهز للتخريج
+        }
+        // مكالمة 2: 3+ أيام + شحن
+        else if (!callLog.day3 && daysSinceReg >= 3 && hasShipped) {
+            if (dbStage === 'day3' && nextCallDate && nextCallDate > today) {
+                store.incubation_task = 'scheduled_waiting';
+                store.scheduled_date = nextCallDate;
+            } else {
+                store.incubation_task = 'day3';
+            }
+        }
+        // مكالمة 3: 10+ أيام + مكالمة 2 تمت
+        else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10) {
+            if (dbStage === 'day10' && nextCallDate && nextCallDate > today) {
+                store.incubation_task = 'scheduled_waiting';
+                store.scheduled_date = nextCallDate;
+            } else {
+                store.incubation_task = 'day10';
+            }
+        }
+        // تخريج: 14+ يوم + شحن نشط
+        else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
             store.incubation_task = 'graduation';
-        } else if (callLog.day0 && !callLog.day3 && hasShipped && daysSinceReg >= 3 && !dbStage) {
-            // fallback: لم يتم الجدولة بعد لكن الشروط متحققة
-            store.incubation_task = 'day3';
-        } else if (callLog.day3 && !callLog.day10 && daysSinceReg >= 10 && !dbStage) {
-            // fallback
-            store.incubation_task = 'day10';
-        } else if (callLog.day10 && daysSinceReg >= 14 && hasShipped) {
-            store.incubation_task = 'graduation';
-        } else if (dbStage === 'day3' && nextCallDate && nextCallDate > today) {
-            // مجدولة لكن لم يحن الموعد بعد
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'day10' && nextCallDate && nextCallDate > today) {
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else if (dbStage === 'graduation_ready' && nextCallDate && nextCallDate > today) {
-            store.incubation_task = 'scheduled_waiting';
-            store.scheduled_date = nextCallDate;
-        } else {
+        }
+        else {
             store.incubation_task = 'waiting';
         }
     });
 
-    // ===== RECOVERY STATE MACHINE: 3 calls every 10 days =====
+    // مهام الاستعادة
     allStores.forEach(store => {
         if (store.category !== 'restoring') return;
         const rcLog = getStored('recoverycalls', store.id) || {};
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        const restoreDate = localStorage.getItem('store_restore_date_' + store.id);
-
-        // Auto-confirm: if shipped after restore started → recovered
-        if (restoreDate && lastShipDate && lastShipDate > new Date(restoreDate)) {
-            store.category = 'recovered';
-            localStorage.setItem('store_status_' + store.id, 'recovered');
-            store.recovery_task = null;
-            return;
-        }
-
-        // Determine which recovery call is due
-        if (!rcLog.rcall1) {
-            store.recovery_task = 'rcall1';
-        } else if (!rcLog.rcall2) {
-            const daysSince1 = (now - new Date(rcLog.rcall1.date)) / 864e5;
-            store.recovery_task = daysSince1 >= 10 ? 'rcall2' : 'rcall_waiting';
+        if (!rcLog.rcall1) store.recovery_task = 'rcall1';
+        else if (!rcLog.rcall2) {
+            const d = (now - new Date(rcLog.rcall1.date)) / 864e5;
+            store.recovery_task = d >= 10 ? 'rcall2' : 'rcall_waiting';
         } else if (!rcLog.rcall3) {
-            const daysSince2 = (now - new Date(rcLog.rcall2.date)) / 864e5;
-            store.recovery_task = daysSince2 >= 10 ? 'rcall3' : 'rcall_waiting';
-        } else {
-            store.recovery_task = 'rcall_done';
-        }
-    });
-
-    // ===== COLD FILTER: 60-day rule - ONLY for stores that shipped before and stopped =====
-    allStores.forEach(store => {
-        if (store.category !== 'inactive') return;
-        if (store.state_reason === 'failed_48h') return; // never shipped → stays inactive, NOT cold
-        const lastShipDate = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date) : null;
-        if (!lastShipDate) return; // no ship date → not cold
-        const daysSinceLastShip = (now - lastShipDate) / 864e5;
-        if (daysSinceLastShip >= 60) {
-            store.category = 'cold';
-            if (!dbStates[store.id] || dbStates[store.id].category !== 'cold') {
-                dbPost(DB_API + '?action=set_status', {
-                    store_id: store.id, category: 'cold', store_name: store.name || '',
-                    state_reason: 'inactive_60days', old_status: 'inactive',
-                    user: 'النظام', user_role: 'system'
-                });
-                dbStates[store.id] = { store_id: store.id, category: 'cold' };
-            }
-        }
+            const d = (now - new Date(rcLog.rcall2.date)) / 864e5;
+            store.recovery_task = d >= 10 ? 'rcall3' : 'rcall_waiting';
+        } else store.recovery_task = 'rcall_done';
     });
 }
 
