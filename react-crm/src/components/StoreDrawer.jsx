@@ -71,8 +71,12 @@ export default function StoreDrawer({ store, onClose }) {
         <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-white font-bold text-lg">{store.name}</h2>
-              <p className="text-slate-400 text-xs mt-0.5">ID: {store.id}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-white font-bold text-lg">{store.name}</h2>
+                <span className="text-xs font-mono font-bold bg-white/20 text-white px-2.5 py-1 rounded-lg tracking-wide">
+                  #{store.id}
+                </span>
+              </div>
               <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${catInfo.bg} ${catInfo.text}`}>
                 {catInfo.label}
               </span>
