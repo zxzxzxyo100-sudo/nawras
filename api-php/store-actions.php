@@ -146,7 +146,40 @@ elseif ($action === 'log_call') {
         VALUES (?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $labels[$callType] ?? 'اتصال', $note, $user, $userRole]);
 
-    jsonResponse(['success' => true, 'next_stage' => $nextStage, 'next_call_date' => $nextCallDate]);
+    // ========== منح النقاط (NRS Points) ==========
+    $pointsAwarded = 0;
+    if ($user) {
+        // إنشاء جدول النقاط إن لم يكن موجوداً
+        $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+            id         INT AUTO_INCREMENT PRIMARY KEY,
+            username   VARCHAR(100) NOT NULL,
+            fullname   VARCHAR(200) DEFAULT '',
+            points     INT          NOT NULL DEFAULT 10,
+            reason     VARCHAR(200) DEFAULT 'مكالمة',
+            store_id   INT,
+            store_name VARCHAR(300) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user (username),
+            INDEX idx_date (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // قيمة النقاط بناءً على نوع المكالمة
+        $pts = 10;
+        if (in_array($callType, ['day0','day3','day10'])) $pts = 15;
+        if (strpos($callType, 'rcall') === 0)             $pts = 20;
+
+        $pdo->prepare("INSERT INTO points_log (username, fullname, points, reason, store_id, store_name)
+            VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$user, $user, $pts, ($labels[$callType] ?? 'اتصال'), $storeId, $storeName]);
+        $pointsAwarded = $pts;
+    }
+
+    jsonResponse([
+        'success'        => true,
+        'next_stage'     => $nextStage,
+        'next_call_date' => $nextCallDate,
+        'points_awarded' => $pointsAwarded,
+    ]);
 }
 
 // ========== GET CALL LOGS FOR STORE ==========
@@ -489,6 +522,95 @@ elseif ($action === 'assign_store') {
     }
 
     jsonResponse(['success' => true]);
+}
+
+// ========== GET LEADERBOARD (أداء الموظفين + النقاط) ==========
+elseif ($action === 'get_leaderboard') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user (username), INDEX idx_date (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $today = date('Y-m-d');
+
+    // إجمالي النقاط لكل موظف + مكالمات اليوم + مكالمات الأسبوع
+    $stmt = $pdo->query("
+        SELECT
+            u.username,
+            u.fullname,
+            u.role,
+            COALESCE(SUM(p.points), 0)                              AS total_points,
+            COALESCE(SUM(CASE WHEN DATE(p.created_at) = CURDATE() THEN p.points ELSE 0 END), 0) AS today_points,
+            COALESCE(SUM(CASE WHEN p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN p.points ELSE 0 END), 0) AS week_points,
+            COALESCE(COUNT(CASE WHEN DATE(p.created_at) = CURDATE() THEN 1 END), 0)             AS today_calls,
+            COALESCE(COUNT(p.id), 0)                                AS total_calls
+        FROM users u
+        LEFT JOIN points_log p ON p.username = u.fullname
+        WHERE u.role != 'executive'
+        GROUP BY u.username, u.fullname, u.role
+        ORDER BY total_points DESC
+    ");
+
+    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ========== GET MY STATS (إحصائياتي الشخصية) ==========
+elseif ($action === 'get_my_stats') {
+    $username = $input['username'] ?? ($_GET['username'] ?? '');
+    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400); }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user (username), INDEX idx_date (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // إجمالي النقاط
+    $totStmt = $pdo->prepare("SELECT COALESCE(SUM(points),0) AS total FROM points_log WHERE username = ?");
+    $totStmt->execute([$username]);
+    $totalPoints = (int)$totStmt->fetchColumn();
+
+    // نقاط اليوم + مكالمات اليوم
+    $todayStmt = $pdo->prepare("
+        SELECT COALESCE(SUM(points),0) AS pts, COUNT(*) AS calls
+        FROM points_log WHERE username = ? AND DATE(created_at) = CURDATE()
+    ");
+    $todayStmt->execute([$username]);
+    $todayRow = $todayStmt->fetch(PDO::FETCH_ASSOC);
+
+    // مكالمات آخر 7 أيام (للرسم البياني)
+    $weekStmt = $pdo->prepare("
+        SELECT DATE(created_at) AS day, COUNT(*) AS calls, SUM(points) AS pts
+        FROM points_log
+        WHERE username = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY DATE(created_at)
+        ORDER BY day ASC
+    ");
+    $weekStmt->execute([$username]);
+    $weekData = $weekStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // آخر 10 مكالمات
+    $recentStmt = $pdo->prepare("
+        SELECT reason, store_name, points, created_at
+        FROM points_log WHERE username = ?
+        ORDER BY created_at DESC LIMIT 10
+    ");
+    $recentStmt->execute([$username]);
+    $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    jsonResponse([
+        'success'      => true,
+        'total_points' => $totalPoints,
+        'today_points' => (int)($todayRow['pts']   ?? 0),
+        'today_calls'  => (int)($todayRow['calls'] ?? 0),
+        'week_data'    => $weekData,
+        'recent'       => $recent,
+    ]);
 }
 
 else { jsonResponse(['error' => 'Unknown action'], 400); }

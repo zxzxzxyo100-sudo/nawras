@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
@@ -9,10 +9,11 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby,
+  Award, Activity, ArrowUpRight, Baby, Crown, Zap,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
+import { getLeaderboard } from '../services/api'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -89,6 +90,113 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
         <ArrowUpRight size={12} />
       </div>
     </motion.button>
+  )
+}
+
+// ─── Hall of Fame ─────────────────────────────────────────────────
+function HallOfFame() {
+  const [board, setBoard] = useState([])
+
+  useEffect(() => {
+    getLeaderboard().then(r => setBoard(r.data || [])).catch(() => {})
+  }, [])
+
+  if (!board.length) return null
+
+  const top3  = board.slice(0, 3)
+  const rest  = board.slice(3)
+  const medals = ['🥇','🥈','🥉']
+  const podiumColors = [
+    'linear-gradient(135deg, #f59e0b, #d97706)',
+    'linear-gradient(135deg, #9ca3af, #6b7280)',
+    'linear-gradient(135deg, #cd7c2f, #a0522d)',
+  ]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+      className="rounded-2xl p-5 lg:p-6"
+      style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+    >
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-white font-bold text-base flex items-center gap-2">
+            <Crown size={16} className="text-amber-400" />
+            قاعة المتميزين
+          </h2>
+          <p className="text-white/30 text-xs mt-0.5">إجمالي النقاط لكل موظف</p>
+        </div>
+        <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 text-amber-300 text-xs font-bold px-3 py-1 rounded-full">
+          <Zap size={10} /> NRS Points
+        </div>
+      </div>
+
+      {/* Top 3 Podium */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {top3.map((emp, i) => (
+          <motion.div
+            key={emp.username}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.1 }}
+            className="rounded-2xl p-3 text-center"
+            style={{
+              background: i === 0
+                ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))'
+                : 'rgba(255,255,255,0.04)',
+              border: i === 0 ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div className="text-2xl mb-1">{medals[i]}</div>
+            <div
+              className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center text-white font-black text-sm mb-2"
+              style={{ background: podiumColors[i] }}
+            >
+              {emp.fullname?.charAt(0) || '؟'}
+            </div>
+            <p className="text-white text-xs font-bold truncate">{emp.fullname?.split(' ')[0]}</p>
+            <p className="font-black mt-1" style={{ color: i === 0 ? '#fbbf24' : '#a78bfa', fontSize: '1.1rem' }}>
+              {emp.total_points}
+            </p>
+            <p className="text-white/30 text-[9px]">NRS</p>
+            <div className="mt-2 text-[10px] text-white/40 flex items-center justify-center gap-1">
+              <Phone size={8} /> {emp.today_calls} اليوم
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* باقي الموظفين */}
+      {rest.length > 0 && (
+        <div className="space-y-2">
+          {rest.map((emp, i) => (
+            <div key={emp.username} className="flex items-center gap-3">
+              <span className="text-white/30 text-xs w-4 text-center">{i + 4}</span>
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs"
+                style={{ background: 'rgba(124,58,237,0.3)' }}
+              >
+                {emp.fullname?.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/70 text-xs truncate">{emp.fullname}</span>
+                  <span className="text-violet-300 font-bold text-xs mr-2">{emp.total_points} NRS</span>
+                </div>
+                <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-violet-500"
+                    style={{ width: `${top3[0]?.total_points ? (emp.total_points / top3[0].total_points) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
   )
 }
 
@@ -436,6 +544,9 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* ══ Hall of Fame (للمدير التنفيذي فقط) ═══════════════════ */}
+      {user?.role === 'executive' && <HallOfFame />}
 
       {/* ══ Recent + Quick Stats ════════════════════════════════════ */}
       <motion.div

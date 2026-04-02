@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { StoresProvider } from './contexts/StoresContext'
+import { PointsProvider } from './contexts/PointsContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -12,6 +13,7 @@ import IncubationPath from './pages/IncubationPath'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 import Kanban from './pages/Kanban'
+import MyPerformance from './pages/MyPerformance'
 
 function PrivateRoute({ children, view }) {
   const { user, loading, can } = useAuth()
@@ -36,6 +38,7 @@ function AppRoutes() {
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
+        <Route path="/performance"  element={<PrivateRoute view="tasks"><MyPerformance /></PrivateRoute>} />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
         <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
       </Route>
@@ -49,7 +52,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <StoresProvider>
-          <AppRoutes />
+          <PointsProvider>
+            <AppRoutes />
+          </PointsProvider>
         </StoresProvider>
       </AuthProvider>
     </BrowserRouter>
