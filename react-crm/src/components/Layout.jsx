@@ -2,12 +2,18 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
+import FloatingCallBar from './FloatingCallBar'
+import { useAuth } from '../contexts/AuthContext'
 
 // يظهر الشريط فقط في بناء البيئة التجريبية
 const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
 
+// الأدوار التي تستخدم زر الاتصال العائم (الموظفون المباشرون فقط)
+const FLOATING_CALL_ROLES = ['inactive_manager', 'active_manager', 'incubation_officer']
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user } = useAuth()
 
   return (
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
@@ -63,6 +69,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* زر الاتصال العائم — للموظفين فقط */}
+      {FLOATING_CALL_ROLES.includes(user?.role) && <FloatingCallBar />}
     </div>
   )
 }

@@ -99,3 +99,6 @@ export const getLeaderboard = () =>
 
 export const getMyStats = (username) =>
   http.get(`/store-actions.php?action=get_my_stats&username=${encodeURIComponent(username)}`).then(r => r.data)
+
+export const awardBonus = (data) =>
+  http.post('/store-actions.php?action=award_bonus', data).then(r => r.data)

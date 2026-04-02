@@ -613,4 +613,36 @@ elseif ($action === 'get_my_stats') {
     ]);
 }
 
+// ========== AWARD BONUS (إعلانات النورس الذكية) ==========
+elseif ($action === 'award_bonus') {
+    $username  = $input['username']  ?? '';
+    $adId      = $input['ad_id']     ?? 'ad_unknown';
+    $adTitle   = $input['ad_title']  ?? 'بونص إعلاني';
+    $pts       = min((int)($input['points'] ?? 5), 100);
+
+    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400); }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user (username), INDEX idx_date (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // كل إعلان مرة واحدة فقط يومياً لنفس المستخدم
+    $check = $pdo->prepare("SELECT id FROM points_log WHERE username = ? AND reason = ? AND DATE(created_at) = CURDATE()");
+    $check->execute([$username, 'إعلان: ' . $adId]);
+    if ($check->rowCount() > 0) {
+        jsonResponse(['success' => false, 'error' => 'تم استخدام هذا البونص اليوم', 'already_claimed' => true]);
+        exit;
+    }
+
+    $pdo->prepare("INSERT INTO points_log (username, fullname, points, reason)
+        VALUES (?, ?, ?, ?)")
+        ->execute([$username, $username, $pts, 'إعلان: ' . $adId]);
+
+    jsonResponse(['success' => true, 'points_awarded' => $pts, 'ad_title' => $adTitle]);
+}
+
 else { jsonResponse(['error' => 'Unknown action'], 400); }

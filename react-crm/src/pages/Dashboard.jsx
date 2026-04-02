@@ -93,9 +93,10 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
   )
 }
 
-// ─── Hall of Fame ─────────────────────────────────────────────────
+// ─── Hall of Fame + جدول المحافظ الشاملة ─────────────────────────
 function HallOfFame() {
-  const [board, setBoard] = useState([])
+  const [board,    setBoard]    = useState([])
+  const [sortBy,   setSortBy]   = useState('total_points')  // total_points | today_points | today_calls
 
   useEffect(() => {
     getLeaderboard().then(r => setBoard(r.data || [])).catch(() => {})
@@ -103,30 +104,37 @@ function HallOfFame() {
 
   if (!board.length) return null
 
-  const top3  = board.slice(0, 3)
-  const rest  = board.slice(3)
-  const medals = ['🥇','🥈','🥉']
+  const medals       = ['🥇','🥈','🥉']
   const podiumColors = [
     'linear-gradient(135deg, #f59e0b, #d97706)',
     'linear-gradient(135deg, #9ca3af, #6b7280)',
     'linear-gradient(135deg, #cd7c2f, #a0522d)',
   ]
+  const SORT_LABELS = {
+    total_points: 'إجمالي NRS',
+    today_points: 'نقاط اليوم',
+    today_calls:  'مكالمات اليوم',
+  }
+
+  const sorted = [...board].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0))
+  const top3   = sorted.slice(0, 3)
+  const rest   = sorted.slice(3)
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
-      className="rounded-2xl p-5 lg:p-6"
+      className="rounded-2xl overflow-hidden"
       style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
     >
-      <div className="flex items-center justify-between mb-5">
+      {/* رأس */}
+      <div className="flex items-center justify-between p-5 pb-4">
         <div>
           <h2 className="text-white font-bold text-base flex items-center gap-2">
-            <Crown size={16} className="text-amber-400" />
-            قاعة المتميزين
+            <Crown size={16} className="text-amber-400" /> قاعة المتميزين
           </h2>
-          <p className="text-white/30 text-xs mt-0.5">إجمالي النقاط لكل موظف</p>
+          <p className="text-white/30 text-xs mt-0.5">المحفظة الشاملة لكل الموظفين</p>
         </div>
         <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 text-amber-300 text-xs font-bold px-3 py-1 rounded-full">
           <Zap size={10} /> NRS Points
@@ -134,7 +142,7 @@ function HallOfFame() {
       </div>
 
       {/* Top 3 Podium */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 px-5 mb-4">
         {top3.map((emp, i) => (
           <motion.div
             key={emp.username}
@@ -158,44 +166,72 @@ function HallOfFame() {
             </div>
             <p className="text-white text-xs font-bold truncate">{emp.fullname?.split(' ')[0]}</p>
             <p className="font-black mt-1" style={{ color: i === 0 ? '#fbbf24' : '#a78bfa', fontSize: '1.1rem' }}>
-              {emp.total_points}
+              {emp[sortBy] ?? emp.total_points}
             </p>
-            <p className="text-white/30 text-[9px]">NRS</p>
-            <div className="mt-2 text-[10px] text-white/40 flex items-center justify-center gap-1">
+            <p className="text-white/30 text-[9px]">{sortBy === 'today_calls' ? 'مكالمة' : 'NRS'}</p>
+            <div className="mt-1.5 text-[10px] text-white/40 flex items-center justify-center gap-1">
               <Phone size={8} /> {emp.today_calls} اليوم
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* باقي الموظفين */}
-      {rest.length > 0 && (
-        <div className="space-y-2">
-          {rest.map((emp, i) => (
-            <div key={emp.username} className="flex items-center gap-3">
-              <span className="text-white/30 text-xs w-4 text-center">{i + 4}</span>
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs"
-                style={{ background: 'rgba(124,58,237,0.3)' }}
-              >
-                {emp.fullname?.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/70 text-xs truncate">{emp.fullname}</span>
-                  <span className="text-violet-300 font-bold text-xs mr-2">{emp.total_points} NRS</span>
-                </div>
-                <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-violet-500"
-                    style={{ width: `${top3[0]?.total_points ? (emp.total_points / top3[0].total_points) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+      {/* ── جدول المحافظ الشاملة ─────────────────────────────── */}
+      <div className="border-t border-white/5">
+        {/* رأس الجدول + فلاتر الفرز */}
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-white/5 flex-wrap">
+          <span className="text-white/30 text-[10px] ml-2">ترتيب حسب:</span>
+          {Object.entries(SORT_LABELS).map(([key, lbl]) => (
+            <button
+              key={key}
+              onClick={() => setSortBy(key)}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all"
+              style={{
+                background: sortBy === key ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.05)',
+                color: sortBy === key ? '#c4b5fd' : 'rgba(255,255,255,0.35)',
+                border: sortBy === key ? '1px solid rgba(124,58,237,0.4)' : '1px solid transparent',
+              }}
+            >
+              {lbl}
+            </button>
           ))}
         </div>
-      )}
+
+        <div className="divide-y divide-white/5">
+          {sorted.map((emp, i) => {
+            const barW = sorted[0]?.[sortBy] ? Math.round((emp[sortBy] / sorted[0][sortBy]) * 100) : 0
+            return (
+              <div key={emp.username} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/3 transition-colors">
+                <span className="text-white/25 text-xs w-5 text-center font-bold">{i + 1}</span>
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
+                  style={{ background: i < 3 ? podiumColors[i] : 'rgba(124,58,237,0.25)' }}
+                >
+                  {i < 3 ? medals[i] : emp.fullname?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-white/80 text-xs font-semibold truncate">{emp.fullname}</span>
+                    <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                      <span className="text-amber-300 font-black text-xs">{emp.total_points} <span className="text-amber-300/50 font-normal">NRS</span></span>
+                      <span className="text-violet-300 text-[10px]">{emp.today_calls} مكالمة اليوم</span>
+                    </div>
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: i === 0 ? '#f59e0b' : i === 1 ? '#9ca3af' : 'linear-gradient(90deg, #7c3aed, #a855f7)' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${barW}%` }}
+                      transition={{ duration: 0.8, delay: 0.1 + i * 0.05, ease: 'easeOut' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </motion.div>
   )
 }
