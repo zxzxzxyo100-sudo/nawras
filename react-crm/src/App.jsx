@@ -11,6 +11,7 @@ import ColdInactive from './pages/ColdInactive'
 import IncubationPath from './pages/IncubationPath'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
+import Kanban from './pages/Kanban'
 
 function PrivateRoute({ children, view }) {
   const { user, loading, can } = useAuth()
@@ -36,6 +37,7 @@ function AppRoutes() {
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
+        <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

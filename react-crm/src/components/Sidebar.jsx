@@ -1,12 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp,
-  Flame, Snowflake, ClipboardList, Users, LogOut, Package, Baby, X,
+  Flame, Snowflake, ClipboardList, Users, LogOut, Package, Baby, X, Kanban,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 
 const NAV = [
   { to: '/',             label: 'لوحة التحكم',        icon: LayoutDashboard, view: 'dashboard'    },
+  { to: '/kanban',       label: 'Kanban',              icon: Kanban,          view: 'dashboard'    },
   { to: '/new',          label: 'المتاجر الجديدة',     icon: Store,           view: 'new'          },
   { to: '/incubation',   label: 'مسار الاحتضان',       icon: Baby,            view: 'incubation'   },
   { to: '/active',       label: 'نشط يشحن',            icon: TrendingUp,      view: 'active'       },
