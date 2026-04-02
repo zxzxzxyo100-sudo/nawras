@@ -11,8 +11,8 @@ export default defineConfig({
     __STAGING__: true,
   },
   build: {
-    outDir: '../staging',
-    emptyOutDir: true,
+    outDir: '../',
+    emptyOutDir: false,
   },
   server: {
     proxy: {
