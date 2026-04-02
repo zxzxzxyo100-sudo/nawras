@@ -87,17 +87,12 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    // ─── المتاجر النشطة ─────────────────────────────────────────
-    if (dbCat === 'active_shipping') {
+    // ─── المدير التنفيذي: كل المتاجر النشطة المتأخرة ────────────
+    if (userRole === 'executive' && dbCat === 'active_shipping') {
       const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
         ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
         : 999
-
-      const asgn = assignments?.[store.id]
-      const isAssignedToMe = asgn?.assigned_to === username
-
-      if (userRole === 'executive' && daysSinceShip >= 10 && !calledToday) {
-        // المدير التنفيذي: يرى كل المتاجر المتأخرة
+      if (daysSinceShip >= 10 && !calledToday) {
         tasks.push({
           id:       `${store.id}-followup`,
           store,
@@ -106,8 +101,17 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           label:    'متابعة متجر نشط',
           desc:     `لم يشحن منذ ${daysSinceShip} يوم`,
         })
-      } else if (userRole === 'active_manager' && isAssignedToMe && !calledToday) {
-        // مسؤول المتاجر النشطة: يرى فقط متاجره المعيّنة
+      }
+    }
+
+    // ─── مسؤول المتاجر النشطة: المتاجر المعيّنة له فقط ──────────
+    // (بغض النظر عن الفئة — المهم وجود تعيين باسمه)
+    if (userRole === 'active_manager' && username && assignments) {
+      const asgn = assignments[String(store.id)] || assignments[store.id]
+      if (asgn?.assigned_to === username && !calledToday) {
+        const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
+          ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
+          : 999
         tasks.push({
           id:       `${store.id}-assigned`,
           store,
