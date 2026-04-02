@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -19,6 +19,8 @@ export default function ActiveStores() {
   const [assignMode, setAssignMode]       = useState('manual')
   // اليوزرات المحددة للتوزيع التلقائي
   const [autoUsers, setAutoUsers]         = useState(new Set())
+  // فلتر التعيين: 'all' | 'assigned' | 'unassigned' | username
+  const [assignFilter, setAssignFilter]   = useState('all')
 
   const isExecutive = user?.role === 'executive'
   const active = stores.active_shipping || []
@@ -175,7 +177,16 @@ export default function ActiveStores() {
     }]),
   ]
 
-  const assignedCount = active.filter(s => assignments[s.id]?.assigned_to).length
+  const assignedCount   = active.filter(s => assignments[s.id]?.assigned_to).length
+  const unassignedCount = active.length - assignedCount
+
+  // تطبيق الفلتر
+  const filteredActive = useMemo(() => {
+    if (assignFilter === 'assigned')   return active.filter(s =>  assignments[s.id]?.assigned_to)
+    if (assignFilter === 'unassigned') return active.filter(s => !assignments[s.id]?.assigned_to)
+    if (assignFilter !== 'all')        return active.filter(s =>  assignments[s.id]?.assigned_to === assignFilter)
+    return active
+  }, [active, assignments, assignFilter])
 
   return (
     <div className="space-y-4 lg:space-y-5">
@@ -207,6 +218,51 @@ export default function ActiveStores() {
         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-medium">
           <CheckCircle2 size={16} />
           {successMsg}
+        </div>
+      )}
+
+      {/* شريط الفلتر */}
+      {isExecutive && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <Filter size={13} />
+            تصفية:
+          </span>
+          {[
+            { key: 'all',        label: `الكل (${active.length})` },
+            { key: 'assigned',   label: `معيّنة (${assignedCount})` },
+            { key: 'unassigned', label: `غير معيّنة (${unassignedCount})` },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setAssignFilter(f.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                assignFilter === f.key
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+          {/* فلتر لكل مسؤول */}
+          {users.map(u => {
+            const cnt = active.filter(s => assignments[s.id]?.assigned_to === u.username).length
+            if (cnt === 0) return null
+            return (
+              <button
+                key={u.username}
+                onClick={() => setAssignFilter(assignFilter === u.username ? 'all' : u.username)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                  assignFilter === u.username
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50'
+                }`}
+              >
+                {u.fullname || u.username} ({cnt})
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -325,7 +381,7 @@ export default function ActiveStores() {
       )}
 
       <StoreTable
-        stores={active}
+        stores={filteredActive}
         onSelectStore={setSelected}
         extraColumns={extraColumns}
         emptyMsg="لا توجد متاجر نشطة"
