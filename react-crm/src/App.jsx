@@ -8,6 +8,7 @@ import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
 import HotInactive from './pages/HotInactive'
 import ColdInactive from './pages/ColdInactive'
+import IncubationPath from './pages/IncubationPath'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 
@@ -32,6 +33,7 @@ function AppRoutes() {
         <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
         <Route path="/hot-inactive" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
+        <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
       </Route>

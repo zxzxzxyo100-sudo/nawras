@@ -13,6 +13,14 @@ export function StoresProvider({ children }) {
     hot_inactive:    [],
     cold_inactive:   [],
   })
+  const [incubationPath, setIncubationPath] = useState({
+    new_48h: [], incubating: [], watching: [],
+    hot_14_20: [], inactive: [], restoring: [], restored: [],
+  })
+  const [incubationCounts, setIncubationCounts] = useState({
+    new_48h: 0, incubating: 0, watching: 0,
+    hot_14_20: 0, inactive: 0, restoring: 0, restored: 0, total: 0,
+  })
   const [counts, setCounts]               = useState({
     incubating: 0, active_shipping: 0, hot_inactive: 0, cold_inactive: 0,
     total_active: 0, total: 0,
@@ -49,6 +57,46 @@ export function StoresProvider({ children }) {
         cold_inactive:   apiResult.data.cold_inactive   || [],
       })
       setCounts(apiResult.counts)
+
+      // مسار الاحتضان: دمج بيانات API مع حالة DB (restoring من DB)
+      const rawPath = apiResult.incubation_path || {}
+      const mergedPath = {
+        new_48h:    rawPath.new_48h    || [],
+        incubating: rawPath.incubating || [],
+        watching:   rawPath.watching   || [],
+        hot_14_20:  rawPath.hot_14_20  || [],
+        inactive:   rawPath.inactive   || [],
+        restored:   rawPath.restored   || [],
+        restoring:  rawPath.restoring  || [],
+      }
+
+      // نقل المتاجر التي وضعها الوكيل في "restoring" عبر DB
+      Object.entries(stateMap).forEach(([storeId, dbState]) => {
+        if (dbState.category !== 'restoring') return
+        // ابحث في كل خانة وانقل إلى restoring
+        ;['new_48h','incubating','watching','hot_14_20','inactive'].forEach(bucket => {
+          const idx = mergedPath[bucket].findIndex(s => String(s.id) === String(storeId))
+          if (idx !== -1) {
+            const [store] = mergedPath[bucket].splice(idx, 1)
+            store._inc = 'restoring'
+            if (!mergedPath.restoring.find(s => s.id === store.id)) {
+              mergedPath.restoring.push(store)
+            }
+          }
+        })
+      })
+
+      setIncubationPath(mergedPath)
+      setIncubationCounts({
+        new_48h:    mergedPath.new_48h.length,
+        incubating: mergedPath.incubating.length,
+        watching:   mergedPath.watching.length,
+        hot_14_20:  mergedPath.hot_14_20.length,
+        inactive:   mergedPath.inactive.length,
+        restoring:  mergedPath.restoring.length,
+        restored:   mergedPath.restored.length,
+        total:      (apiResult.incubation_counts?.total) || 0,
+      })
       setLastLoaded(new Date())
     } catch (err) {
       setError(err.message)
@@ -72,6 +120,7 @@ export function StoresProvider({ children }) {
   return (
     <StoresContext.Provider value={{
       stores, counts, allStores,
+      incubationPath, incubationCounts,
       storeStates, callLogs, recoveryCalls,
       loading, error, lastLoaded, reload: load,
     }}>
