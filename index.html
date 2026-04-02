@@ -498,9 +498,7 @@ async function loadData() {
         allStores = [];
         (apiResult.data.incubating || []).forEach(s => { s.category = 'incubating'; allStores.push(s); });
         (apiResult.data.active || []).forEach(s => { s.category = 'active'; allStores.push(s); });
-        (apiResult.data.inactive_hot || []).forEach(s => { s.category = 'inactive'; s.inactive_type = 'hot'; allStores.push(s); });
-        (apiResult.data.inactive_cold || []).forEach(s => { s.category = 'cold'; allStores.push(s); });
-        (apiResult.data.other_inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
+        (apiResult.data.inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
 
         // DB overrides
         allStores.forEach(s => {
@@ -519,7 +517,7 @@ async function loadData() {
         runStateMachine();
         updateDashboard(); renderCurrentView();
         const c = apiResult.counts;
-        showNotification('إجمالي: ' + c.total + ' | نشط: ' + c.active + ' | ساخن: ' + c.inactive_hot + ' | بارد: ' + c.inactive_cold + ' | مجموع active: ' + c.api_active_total + (c.match ? ' ✓' : ' ✗'));
+        showNotification('إجمالي: ' + c.total + ' | نشط: ' + c.active + ' | احتضان: ' + c.incubating + ' | غير نشط: ' + c.inactive);
     } catch (error) {
         console.error('Error:', error);
         showNotification('خطأ في تحميل البيانات: ' + error.message, 'error');

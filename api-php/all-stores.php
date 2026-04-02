@@ -56,35 +56,16 @@ foreach ([$ord1,$ord2,$new,$inactive] as $src) {
             $stores[$id]['total_shipments'] = $s['total_shipments'];
         if (!empty($s['registered_at']))
             $stores[$id]['registered_at'] = $s['registered_at'];
-        if (!empty($s['status']))
-            $stores[$id]['status'] = $s['status'];
     }
 }
 
-// ===== التصنيف =====
-// الاحتضان: مسجل أقل من 14 يوم
-// النشطة (1563): كل من status=active في API → مقسمة إلى 3:
-//   - نشط يشحن: شحن خلال 14 يوم
-//   - غير نشط ساخن: آخر شحنة 15-60 يوم
-//   - غير نشط بارد: آخر شحنة 60+ يوم أو لم يشحن أبداً
-// الباقي: غير نشط (ليس status=active)
+// ===== تصنيف بسيط: شرط واحد فقط =====
+// نشط = شحن خلال 14 يوم (شحنة واحدة أو أكثر)
+// احتضان = مسجل أقل من 14 يوم
+// غير نشط = الباقي (انقطع أكثر من 14 يوم)
 
-$result = [
-    'incubating' => [],
-    'active' => [],
-    'inactive_hot' => [],
-    'inactive_cold' => [],
-    'other_inactive' => []
-];
-$counts = [
-    'total' => 0,
-    'incubating' => 0,
-    'api_active_total' => 0,  // إجمالي active في API (المستهدف 1563)
-    'active' => 0,            // منهم: شحن <= 14 يوم
-    'inactive_hot' => 0,      // منهم: شحن 15-60 يوم
-    'inactive_cold' => 0,     // منهم: شحن 60+ أو لم يشحن
-    'other_inactive' => 0     // ليس status=active أصلاً
-];
+$result = ['incubating'=>[], 'active'=>[], 'inactive'=>[]];
+$counts = ['incubating'=>0, 'active'=>0, 'inactive'=>0, 'total'=>0];
 
 foreach ($stores as $s) {
     $counts['total']++;
@@ -95,51 +76,16 @@ foreach ($stores as $s) {
     $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد') ? strtotime($s['last_shipment_date']) : null;
     $daysShip = $lastShip ? ($now - $lastShip) / 86400 : 999;
 
-    $apiStatus = $s['status'] ?? '';
-
-    // 1. احتضان: أقل من 14 يوم
     if ($daysReg < 14) {
-        $s['_cat'] = 'incubating';
         $result['incubating'][] = $s;
         $counts['incubating']++;
-        continue;
+    } elseif ($lastShip && $daysShip <= 14) {
+        $result['active'][] = $s;
+        $counts['active']++;
+    } else {
+        $result['inactive'][] = $s;
+        $counts['inactive']++;
     }
-
-    // 2. المتاجر التي حالتها active في API
-    if ($apiStatus === 'active') {
-        $counts['api_active_total']++;
-
-        if ($daysShip <= 14) {
-            // نشط يشحن
-            $s['_cat'] = 'active';
-            $result['active'][] = $s;
-            $counts['active']++;
-        } elseif ($daysShip > 14 && $daysShip <= 60) {
-            // غير نشط ساخن
-            $s['_cat'] = 'inactive_hot';
-            $result['inactive_hot'][] = $s;
-            $counts['inactive_hot']++;
-        } else {
-            // غير نشط بارد (60+ أو لم يشحن أبداً)
-            $s['_cat'] = 'inactive_cold';
-            $result['inactive_cold'][] = $s;
-            $counts['inactive_cold']++;
-        }
-        continue;
-    }
-
-    // 3. الباقي (ليس active في API)
-    $s['_cat'] = 'other_inactive';
-    $result['other_inactive'][] = $s;
-    $counts['other_inactive']++;
 }
 
-// تحقق: api_active_total = active + inactive_hot + inactive_cold
-$counts['active_check'] = $counts['active'] + $counts['inactive_hot'] + $counts['inactive_cold'];
-$counts['match'] = ($counts['active_check'] === $counts['api_active_total']);
-
-echo json_encode([
-    'success' => true,
-    'counts' => $counts,
-    'data' => $result
-], JSON_UNESCAPED_UNICODE);
+echo json_encode(['success'=>true, 'counts'=>$counts, 'data'=>$result], JSON_UNESCAPED_UNICODE);
