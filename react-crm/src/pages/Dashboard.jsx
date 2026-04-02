@@ -9,11 +9,12 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby, Crown, Zap,
+  Award, Activity, ArrowUpRight, Baby, Crown, Zap, Wallet,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getLeaderboard } from '../services/api'
+import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -241,6 +242,7 @@ export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { totalPoints, todayPoints, todayCalls, goalPct } = usePoints()
 
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
   const workflowData = useMemo(() => {
@@ -434,6 +436,62 @@ export default function Dashboard() {
           onClick={() => navigate('/cold-inactive')}
         />
       </motion.div>
+
+      {/* ══ بطاقة المحفظة السريعة (للموظفين) ══════════════════════ */}
+      {user?.role !== 'executive' && (
+        <motion.button
+          onClick={() => navigate('/performance')}
+          variants={fadeUp} initial="hidden" animate="visible"
+          transition={{ duration: 0.45, delay: 0.28 }}
+          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+          className="w-full rounded-2xl overflow-hidden text-right"
+          style={{
+            background: 'linear-gradient(135deg, #78350f 0%, #92400e 40%, #78350f 100%)',
+            boxShadow: '0 4px 24px rgba(245,158,11,0.25)',
+            border: '1px solid rgba(245,158,11,0.2)',
+          }}
+        >
+          <div className="relative px-5 py-4 flex items-center gap-4">
+            <div className="absolute top-0 right-0 w-32 h-full bg-amber-400/10 blur-2xl pointer-events-none rounded-full" />
+            <motion.div
+              className="absolute top-0 left-0 w-1/3 h-full pointer-events-none"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)' }}
+              animate={{ x: ['0%', '350%'] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 3 }}
+            />
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
+              style={{ background: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.3)' }}
+            >
+              🪙
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-amber-300 text-xs font-medium">محفظة NRS — اضغط لعرض التفاصيل</p>
+              </div>
+              <p className="text-white font-black text-2xl leading-tight">{totalPoints.toLocaleString()}</p>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-amber-400/70 text-xs">+{todayPoints} نقطة اليوم</span>
+                <span className="text-white/20 text-xs">·</span>
+                <span className="text-white/40 text-xs">{todayCalls}/{DAILY_GOAL} مكالمة</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-1 flex-shrink-0">
+              <span className="text-sm font-black" style={{ color: goalPct >= 100 ? '#10b981' : '#fbbf24' }}>{goalPct}%</span>
+              <div className="w-1.5 h-10 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+                <motion.div
+                  className="w-full rounded-full"
+                  style={{ background: goalPct >= 100 ? '#10b981' : 'linear-gradient(180deg, #fbbf24, #d97706)' }}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${goalPct}%` }}
+                  transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
+                />
+              </div>
+              <ArrowUpRight size={12} className="text-amber-400/60" />
+            </div>
+          </div>
+        </motion.button>
+      )}
 
       {/* ══ Charts Row ══════════════════════════════════════════════ */}
       <motion.div
