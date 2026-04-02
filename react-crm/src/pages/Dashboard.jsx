@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -12,6 +13,30 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
+
+// ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
+function SeagullMark({ size = 100, opacity = 0.07 }) {
+  return (
+    <svg width={size} height={size * 0.6} viewBox="0 0 120 72" fill="white" opacity={opacity} aria-hidden="true">
+      <ellipse cx="60" cy="38" rx="22" ry="9" />
+      <path d="M52,33 C38,14 6,18 2,28 C18,24 36,28 50,33 Z" />
+      <path d="M68,33 C82,14 114,18 118,28 C102,24 84,28 70,33 Z" />
+      <circle cx="79" cy="31" r="7" />
+      <path d="M85,30 L95,32 L85,34 Z" />
+      <path d="M40,39 L25,45 L33,44 L23,52 L40,42 Z" />
+    </svg>
+  )
+}
+
+// animation variants
+const fadeUp = {
+  hidden:  { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0  },
+}
+const staggerContainer = {
+  hidden:  {},
+  visible: { transition: { staggerChildren: 0.08 } },
+}
 
 // ─── Tooltip مخصص ────────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
@@ -28,12 +53,15 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-// ─── كرت المتجر الملوّن ───────────────────────────────────────────────────────
+// ─── كرت المتجر الملوّن مع Framer Motion ─────────────────────────
 function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick }) {
   return (
-    <button
+    <motion.button
+      variants={fadeUp}
       onClick={onClick}
-      className="group relative rounded-2xl p-5 text-right overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl w-full"
+      whileHover={{ y: -5, boxShadow: `0 14px 40px ${glow}` }}
+      whileTap={{ scale: 0.97 }}
+      className="group relative rounded-2xl p-5 text-right overflow-hidden w-full"
       style={{ background: gradient, boxShadow: `0 4px 24px ${glow}` }}
     >
       {/* shimmer overlay */}
@@ -48,16 +76,19 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
           <p className="text-white text-4xl font-black leading-none">{(count || 0).toLocaleString('ar-SA')}</p>
           <p className="text-white/60 text-xs mt-2">{sub}</p>
         </div>
-        <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+        <motion.div
+          whileHover={{ scale: 1.15, rotate: 6 }}
+          className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0"
+        >
           <Icon size={20} className="text-white" />
-        </div>
+        </motion.div>
       </div>
 
       <div className="relative flex items-center gap-1 mt-4 text-white/60 text-xs group-hover:text-white/90 transition-colors">
         <span>عرض التفاصيل</span>
         <ArrowUpRight size={12} />
       </div>
-    </button>
+    </motion.button>
   )
 }
 
@@ -140,7 +171,13 @@ export default function Dashboard() {
     <div className="space-y-6 pb-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
 
       {/* ══ Header ══════════════════════════════════════════════════ */}
-      <div className="flex items-center justify-between">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.45 }}
+        className="flex items-center justify-between"
+      >
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">
             لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-purple-500">التحكم</span>
@@ -150,24 +187,37 @@ export default function Dashboard() {
             {lastLoaded && <span className="mr-2 text-slate-300">• {lastLoaded.toLocaleTimeString('ar-SA')}</span>}
           </p>
         </div>
-        <button
+        <motion.button
           onClick={reload}
           disabled={loading}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.96 }}
           className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           تحديث
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
       {/* ══ Hero Stats ══════════════════════════════════════════════ */}
-      <div
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.5, delay: 0.1 }}
         className="relative rounded-3xl p-6 lg:p-8 overflow-hidden text-white"
         style={{ background: 'linear-gradient(135deg, #1e0a3c 0%, #2d1466 50%, #1a0a4e 100%)' }}
       >
         {/* Decorative blobs */}
         <div className="absolute top-0 left-1/3 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 right-0 w-48 h-48 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+        {/* نورس في الخلفية */}
+        <div className="absolute bottom-2 left-6 pointer-events-none">
+          <SeagullMark size={130} opacity={0.055} />
+        </div>
+        <div className="absolute top-3 right-10 pointer-events-none" style={{ transform: 'scaleX(-1)' }}>
+          <SeagullMark size={70} opacity={0.035} />
+        </div>
 
         <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-6">
           {[
@@ -176,7 +226,13 @@ export default function Dashboard() {
             { label: 'مكالمات اليوم',    value: calledToday,                                  icon: Phone,   sub: 'تواصل مباشر' },
             { label: 'تحتاج تواصل',      value: pendingNewCalls,                              icon: Store,   sub: 'متاجر جديدة' },
           ].map((s, i) => (
-            <div key={i} className="flex items-start gap-3">
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 + i * 0.08 }}
+              className="flex items-start gap-3"
+            >
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
                 <s.icon size={18} className="text-violet-300" />
               </div>
@@ -185,13 +241,18 @@ export default function Dashboard() {
                 <p className="text-white text-2xl font-black leading-tight">{s.value}</p>
                 <p className="text-white/40 text-xs mt-0.5">{s.sub}</p>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* ══ Store Type Cards ════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+      >
         <StoreTypeCard
           title="جديدة & احتضان"
           count={counts.incubating}
@@ -228,10 +289,16 @@ export default function Dashboard() {
           glow="#8b5cf655"
           onClick={() => navigate('/cold-inactive')}
         />
-      </div>
+      </motion.div>
 
       {/* ══ Charts Row ══════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.5, delay: 0.35 }}
+        className="grid grid-cols-1 lg:grid-cols-5 gap-5"
+      >
 
         {/* Area Chart — سير العمل */}
         <div
@@ -368,10 +435,16 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* ══ Recent + Quick Stats ════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.5, delay: 0.5 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-5"
+      >
 
         {/* أحدث المتاجر */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -452,7 +525,7 @@ export default function Dashboard() {
             )
           })}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
