@@ -87,12 +87,17 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    // ─── المتاجر النشطة — متابعة اقتراب انقطاع ──────────────────
-    if (dbCat === 'active_shipping' && ['active_manager', 'executive'].includes(userRole)) {
+    // ─── المتاجر النشطة ─────────────────────────────────────────
+    if (dbCat === 'active_shipping') {
       const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
         ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
         : 999
-      if (daysSinceShip >= 10 && !calledToday) {
+
+      const asgn = assignments?.[store.id]
+      const isAssignedToMe = asgn?.assigned_to === username
+
+      if (userRole === 'executive' && daysSinceShip >= 10 && !calledToday) {
+        // المدير التنفيذي: يرى كل المتاجر المتأخرة
         tasks.push({
           id:       `${store.id}-followup`,
           store,
@@ -101,28 +106,18 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           label:    'متابعة متجر نشط',
           desc:     `لم يشحن منذ ${daysSinceShip} يوم`,
         })
-      }
-    }
-
-    // ─── المتاجر المسندة للمستخدم الحالي ────────────────────────
-    if (assignments && username) {
-      const asgn = assignments[store.id]
-      if (asgn?.assigned_to === username && dbCat === 'active_shipping') {
-        const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
-          ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
-          : 999
-        if (!calledToday) {
-          tasks.push({
-            id:       `${store.id}-assigned`,
-            store,
-            priority: daysSinceShip >= 10 ? 'high' : 'normal',
-            type:     'assigned_store',
-            label:    'متجر مُسنَد إليك',
-            desc:     daysSinceShip < 999
-              ? `آخر شحنة قبل ${daysSinceShip} يوم`
-              : 'لا توجد شحنات بعد',
-          })
-        }
+      } else if (userRole === 'active_manager' && isAssignedToMe && !calledToday) {
+        // مسؤول المتاجر النشطة: يرى فقط متاجره المعيّنة
+        tasks.push({
+          id:       `${store.id}-assigned`,
+          store,
+          priority: daysSinceShip >= 10 ? 'high' : 'normal',
+          type:     'assigned_store',
+          label:    'متجر مُسنَد إليك',
+          desc:     daysSinceShip < 999
+            ? `آخر شحنة قبل ${daysSinceShip} يوم`
+            : 'لا توجد شحنات بعد',
+        })
       }
     }
   })
