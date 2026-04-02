@@ -69,6 +69,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS call_logs (
     store_name VARCHAR(300),
     call_type VARCHAR(50) NOT NULL,
     note TEXT NOT NULL,
+    outcome VARCHAR(32) NULL DEFAULT NULL,
     performed_by VARCHAR(200) NOT NULL,
     performed_role VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

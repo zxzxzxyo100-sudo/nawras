@@ -4,6 +4,7 @@ import { setStoreStatus, getAuditLog } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
+import { formatCallOutcome } from '../constants/callOutcomes'
 
 const CATEGORY_LABELS = {
   incubating: { label: 'احتضان',      bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -191,9 +192,11 @@ export default function StoreDrawer({ store, onClose }) {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         c.outcome === 'answered' ? 'bg-green-100 text-green-700' :
                         c.outcome === 'no_answer' ? 'bg-red-100 text-red-700' :
-                        'bg-amber-100 text-amber-700'
+                        c.outcome === 'busy' ? 'bg-amber-100 text-amber-700' :
+                        c.outcome === 'callback' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-600'
                       }`}>
-                        {c.outcome === 'answered' ? 'تم الرد' : c.outcome === 'no_answer' ? 'لم يرد' : c.outcome === 'busy' ? 'مشغول' : 'معاودة اتصال'}
+                        {formatCallOutcome(c.outcome) || '—'}
                       </span>
                     </div>
                     {c.note && <p className="text-xs text-slate-500 mt-1">{c.note}</p>}
