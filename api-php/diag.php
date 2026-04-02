@@ -5,13 +5,16 @@ header('Access-Control-Allow-Origin: *');
 
 $now = time();
 
-// جلب أول صفحة واحدة فقط من new?since=2020-01-01
-$url = NAWRIS_BASE . '/customers/new?since=2020-01-01';
+// جلب أول صفحة من orders-summary (الـ endpoint المشكل)
+$url = NAWRIS_BASE . '/customers/orders-summary?from=2026-01-01&to=' . date('Y-m-d');
 $ch  = curl_init();
 curl_setopt_array($ch, [
     CURLOPT_URL            => $url,
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 20,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_SSL_VERIFYHOST => false,
     CURLOPT_HTTPHEADER     => [
         'Accept: application/json',
         'X-API-TOKEN: ' . NAWRIS_TOKEN,
