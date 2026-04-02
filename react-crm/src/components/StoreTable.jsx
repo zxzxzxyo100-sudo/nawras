@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 
-const PAGE_SIZE = 50
+const PAGE_SIZES = [10, 50, 100, 'الكل']
 
 export default function StoreTable({
   stores = [],
@@ -13,16 +13,19 @@ export default function StoreTable({
   selectedIds = new Set(),
   onSelectionChange,
 }) {
-  const [search, setSearch] = useState('')
-  const [page, setPage]     = useState(1)
+  const [search, setSearch]     = useState('')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
   const filtered = stores.filter(s =>
     !search || s.name?.toLowerCase().includes(search.toLowerCase()) || String(s.id).includes(search)
   )
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const effectiveSize = pageSize === 'الكل' ? filtered.length || 1 : pageSize
+  const totalPages    = Math.max(1, Math.ceil(filtered.length / effectiveSize))
+  const paginated     = filtered.slice((page - 1) * effectiveSize, page * effectiveSize)
 
   function handleSearch(v) { setSearch(v); setPage(1) }
+  function handlePageSize(v) { setPageSize(v === 'الكل' ? 'الكل' : Number(v)); setPage(1) }
 
   // multi-select helpers
   const pageIds   = paginated.map(s => s.id)
@@ -50,8 +53,8 @@ export default function StoreTable({
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       {/* Search bar */}
-      <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
           <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -60,6 +63,25 @@ export default function StoreTable({
             placeholder="بحث بالاسم أو الرقم..."
             className="w-full pr-9 pl-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+        </div>
+        {/* Page size selector */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 whitespace-nowrap">عرض:</span>
+          <div className="flex gap-1">
+            {PAGE_SIZES.map(sz => (
+              <button
+                key={sz}
+                onClick={() => handlePageSize(sz)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {sz}
+              </button>
+            ))}
+          </div>
         </div>
         <span className="text-sm text-slate-500 whitespace-nowrap">{filtered.length} متجر</span>
       </div>

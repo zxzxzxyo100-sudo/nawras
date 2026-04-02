@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -9,12 +9,16 @@ import { assignStore, listUsers } from '../services/api'
 export default function ActiveStores() {
   const { stores, counts, assignments, loading, reload } = useStores()
   const { user } = useAuth()
-  const [selected, setSelected]       = useState(null)
-  const [users, setUsers]             = useState([])
-  const [saving, setSaving]           = useState(false)
-  const [selectedIds, setSelectedIds] = useState(new Set())
-  const [bulkUser, setBulkUser]       = useState('')
-  const [successMsg, setSuccessMsg]   = useState('')
+  const [selected, setSelected]           = useState(null)
+  const [users, setUsers]                 = useState([])
+  const [saving, setSaving]               = useState(false)
+  const [selectedIds, setSelectedIds]     = useState(new Set())
+  const [bulkUser, setBulkUser]           = useState('')
+  const [successMsg, setSuccessMsg]       = useState('')
+  // وضع التعيين: 'manual' | 'auto'
+  const [assignMode, setAssignMode]       = useState('manual')
+  // اليوزرات المحددة للتوزيع التلقائي
+  const [autoUsers, setAutoUsers]         = useState(new Set())
 
   const isExecutive = user?.role === 'executive'
   const active = stores.active_shipping || []
@@ -26,7 +30,7 @@ export default function ActiveStores() {
       .catch(() => {})
   }, [isExecutive])
 
-  // تعيين متجر واحد (من الـ dropdown في الجدول)
+  // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
     setSaving(store.id)
     try {
@@ -37,14 +41,11 @@ export default function ActiveStores() {
         assigned_by: user?.fullname || user?.username || '',
       })
       await reload()
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSaving(null)
-    }
+    } catch (e) { console.error(e) }
+    finally { setSaving(null) }
   }
 
-  // تعيين جماعي
+  // تعيين جماعي يدوي (كل المحددين → يوزر واحد)
   async function handleBulkAssign() {
     if (!bulkUser || selectedIds.size === 0) return
     setSaving(true)
@@ -61,21 +62,54 @@ export default function ActiveStores() {
         )
       )
       await reload()
-      setSuccessMsg(`تم تعيين ${selectedIds.size} متجر بنجاح`)
-      setSelectedIds(new Set())
-      setBulkUser('')
-      setTimeout(() => setSuccessMsg(''), 3000)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSaving(false)
-    }
+      showSuccess(`تم تعيين ${selectedIds.size} متجر لـ "${users.find(u=>u.username===bulkUser)?.fullname || bulkUser}"`)
+      clearSelection()
+    } catch (e) { console.error(e) }
+    finally { setSaving(false) }
   }
 
-  // إلغاء التحديد الجماعي
+  // توزيع تلقائي (round-robin بين اليوزرات المحددة)
+  async function handleAutoAssign() {
+    const targets = [...autoUsers]
+    if (targets.length === 0 || selectedIds.size === 0) return
+    setSaving(true)
+    try {
+      const storeMap  = Object.fromEntries(active.map(s => [s.id, s]))
+      const storeList = [...selectedIds]
+      await Promise.all(
+        storeList.map((id, idx) =>
+          assignStore({
+            store_id:    id,
+            store_name:  storeMap[id]?.name || '',
+            assigned_to: targets[idx % targets.length],   // round-robin
+            assigned_by: user?.fullname || user?.username || '',
+          })
+        )
+      )
+      await reload()
+      const perUser = Math.ceil(storeList.length / targets.length)
+      showSuccess(`تم توزيع ${storeList.length} متجر على ${targets.length} مسؤول (~${perUser} لكل منهم)`)
+      clearSelection()
+    } catch (e) { console.error(e) }
+    finally { setSaving(false) }
+  }
+
+  function toggleAutoUser(username) {
+    const next = new Set(autoUsers)
+    next.has(username) ? next.delete(username) : next.add(username)
+    setAutoUsers(next)
+  }
+
   function clearSelection() {
     setSelectedIds(new Set())
     setBulkUser('')
+    setAutoUsers(new Set())
+    setAssignMode('manual')
+  }
+
+  function showSuccess(msg) {
+    setSuccessMsg(msg)
+    setTimeout(() => setSuccessMsg(''), 4000)
   }
 
   const extraColumns = [
@@ -99,7 +133,7 @@ export default function ActiveStores() {
       key: 'assigned_to',
       label: 'المسؤول',
       render: s => {
-        const current    = assignments[s.id]?.assigned_to || ''
+        const current     = assignments[s.id]?.assigned_to || ''
         const isSavingRow = saving === s.id
         return (
           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -178,40 +212,115 @@ export default function ActiveStores() {
 
       {/* شريط التعيين الجماعي */}
       {isExecutive && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex-wrap">
-          <div className="flex items-center gap-2 text-blue-700 font-medium text-sm">
-            <Users size={16} />
-            <span>تم تحديد {selectedIds.size} متجر</span>
-          </div>
-          <div className="flex items-center gap-2 flex-1 flex-wrap">
-            <select
-              value={bulkUser}
-              onChange={e => setBulkUser(e.target.value)}
-              className="text-sm border border-blue-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-blue-400 min-w-[160px]"
-            >
-              <option value="">اختر المسؤول...</option>
-              {users.map(u => (
-                <option key={u.username} value={u.username}>
-                  {u.fullname || u.username}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleBulkAssign}
-              disabled={!bulkUser || saving === true}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-            >
-              <UserCheck size={14} />
-              {saving === true ? 'جارٍ التعيين...' : 'تعيين'}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+
+          {/* العنوان وعدد المحددين وزر الإغلاق */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-blue-700 font-medium text-sm">
+              <Users size={16} />
+              <span>تم تحديد <strong>{selectedIds.size}</strong> متجر</span>
+            </div>
+            <button onClick={clearSelection} className="text-slate-400 hover:text-slate-600">
+              <X size={18} />
             </button>
           </div>
-          <button
-            onClick={clearSelection}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-            title="إلغاء التحديد"
-          >
-            <X size={18} />
-          </button>
+
+          {/* تبويب وضع التعيين */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setAssignMode('manual')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                assignMode === 'manual'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white border border-blue-200 text-blue-600 hover:bg-blue-50'
+              }`}
+            >
+              <UserCheck size={13} />
+              تعيين لشخص واحد
+            </button>
+            <button
+              onClick={() => setAssignMode('auto')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                assignMode === 'auto'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white border border-blue-200 text-indigo-600 hover:bg-indigo-50'
+              }`}
+            >
+              <Shuffle size={13} />
+              توزيع تلقائي
+            </button>
+          </div>
+
+          {/* وضع يدوي */}
+          {assignMode === 'manual' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={bulkUser}
+                onChange={e => setBulkUser(e.target.value)}
+                className="text-sm border border-blue-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:border-blue-400 min-w-[170px]"
+              >
+                <option value="">اختر المسؤول...</option>
+                {users.map(u => (
+                  <option key={u.username} value={u.username}>
+                    {u.fullname || u.username}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkAssign}
+                disabled={!bulkUser || saving === true}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                <UserCheck size={14} />
+                {saving === true ? 'جارٍ التعيين...' : 'تعيين'}
+              </button>
+            </div>
+          )}
+
+          {/* وضع تلقائي */}
+          {assignMode === 'auto' && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">اختر المسؤولين للتوزيع عليهم (بالتساوي):</p>
+              <div className="flex flex-wrap gap-2">
+                {users.map(u => {
+                  const checked = autoUsers.has(u.username)
+                  return (
+                    <label
+                      key={u.username}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-sm transition-colors ${
+                        checked
+                          ? 'bg-indigo-600 border-indigo-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAutoUser(u.username)}
+                        className="hidden"
+                      />
+                      {u.fullname || u.username}
+                    </label>
+                  )
+                })}
+              </div>
+              {autoUsers.size > 0 && (
+                <div className="flex items-center gap-3 pt-1">
+                  <p className="text-xs text-indigo-600 font-medium">
+                    ~{Math.ceil(selectedIds.size / autoUsers.size)} متجر لكل مسؤول
+                  </p>
+                  <button
+                    onClick={handleAutoAssign}
+                    disabled={saving === true}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Shuffle size={14} />
+                    {saving === true ? 'جارٍ التوزيع...' : 'توزيع'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
