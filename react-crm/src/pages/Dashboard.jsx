@@ -9,11 +9,12 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby, Crown, Zap, Wallet,
+  Award, Activity, ArrowUpRight, Baby, Crown, Zap, Wallet, Trophy, Lock,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getLeaderboard } from '../services/api'
+import { MILESTONES } from '../components/MilestonesCard'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
@@ -94,10 +95,18 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
   )
 }
 
+// ── حساب الميلستون القادم لموظف ──────────────────────────────────
+function getNextMilestone(pts) {
+  return MILESTONES.find(m => pts < m.threshold) ?? null
+}
+function getUnlockedCount(pts) {
+  return MILESTONES.filter(m => pts >= m.threshold).length
+}
+
 // ─── Hall of Fame + جدول المحافظ الشاملة ─────────────────────────
 function HallOfFame() {
   const [board,    setBoard]    = useState([])
-  const [sortBy,   setSortBy]   = useState('total_points')  // total_points | today_points | today_calls
+  const [sortBy,   setSortBy]   = useState('total_points')
 
   useEffect(() => {
     getLeaderboard().then(r => setBoard(r.data || [])).catch(() => {})
@@ -137,8 +146,20 @@ function HallOfFame() {
           </h2>
           <p className="text-white/30 text-xs mt-0.5">المحفظة الشاملة لكل الموظفين</p>
         </div>
-        <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 text-amber-300 text-xs font-bold px-3 py-1 rounded-full">
-          <Zap size={10} /> NRS Points
+        <div className="flex items-center gap-2">
+          {/* إجمالي الإنجازات المفتوحة */}
+          {board.length > 0 && (() => {
+            const totalUnlocked = board.reduce((s, e) => s + getUnlockedCount(e.total_points || 0), 0)
+            return totalUnlocked > 0 ? (
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd' }}>
+                <Trophy size={9} /> {totalUnlocked} إنجاز
+              </div>
+            ) : null
+          })()}
+          <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 text-amber-300 text-xs font-bold px-3 py-1 rounded-full">
+            <Zap size={10} /> NRS Points
+          </div>
         </div>
       </div>
 
@@ -200,32 +221,109 @@ function HallOfFame() {
 
         <div className="divide-y divide-white/5">
           {sorted.map((emp, i) => {
-            const barW = sorted[0]?.[sortBy] ? Math.round((emp[sortBy] / sorted[0][sortBy]) * 100) : 0
+            const pts           = emp.total_points || 0
+            const nextM         = getNextMilestone(pts)
+            const unlockedCount = getUnlockedCount(pts)
+            const progPct       = nextM
+              ? Math.round((pts / nextM.threshold) * 100)
+              : 100
+            const isJustUnlocked = nextM
+              ? (pts >= (MILESTONES[unlockedCount - 1]?.threshold ?? 0) &&
+                 pts <  nextM.threshold &&
+                 pts >= (MILESTONES[unlockedCount - 1]?.threshold ?? 0))
+              : false
+
             return (
-              <div key={emp.username} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/3 transition-colors">
-                <span className="text-white/25 text-xs w-5 text-center font-bold">{i + 1}</span>
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
-                  style={{ background: i < 3 ? podiumColors[i] : 'rgba(124,58,237,0.25)' }}
-                >
-                  {i < 3 ? medals[i] : emp.fullname?.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-white/80 text-xs font-semibold truncate">{emp.fullname}</span>
-                    <div className="flex items-center gap-3 flex-shrink-0 text-right">
-                      <span className="text-amber-300 font-black text-xs">{emp.total_points} <span className="text-amber-300/50 font-normal">NRS</span></span>
-                      <span className="text-violet-300 text-[10px]">{emp.today_calls} مكالمة اليوم</span>
-                    </div>
+              <div key={emp.username} className="px-4 py-3 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-white/25 text-xs w-5 text-center font-bold flex-shrink-0">{i + 1}</span>
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
+                    style={{ background: i < 3 ? podiumColors[i] : 'rgba(124,58,237,0.25)' }}
+                  >
+                    {i < 3 ? medals[i] : emp.fullname?.charAt(0)}
                   </div>
-                  <div className="h-1 bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: i === 0 ? '#f59e0b' : i === 1 ? '#9ca3af' : 'linear-gradient(90deg, #7c3aed, #a855f7)' }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${barW}%` }}
-                      transition={{ duration: 0.8, delay: 0.1 + i * 0.05, ease: 'easeOut' }}
-                    />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-white/80 text-xs font-semibold truncate">{emp.fullname}</span>
+                        {/* شارات الإنجاز */}
+                        {unlockedCount > 0 && (
+                          <div className="flex gap-0.5 flex-shrink-0">
+                            {MILESTONES.slice(0, unlockedCount).map(m => (
+                              <span key={m.id} className="text-[11px]" title={m.title}>{m.emoji}</span>
+                            ))}
+                          </div>
+                        )}
+                        {/* تنبيه الفتح الجديد */}
+                        {pts >= 100 && pts < 110 && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: [0, 1.3, 1] }}
+                            transition={{ duration: 0.5 }}
+                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}
+                          >
+                            🔓 جديد
+                          </motion.span>
+                        )}
+                        {pts >= 200 && pts < 210 && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: [0, 1.3, 1] }}
+                            transition={{ duration: 0.5 }}
+                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}
+                          >
+                            🔓 جديد
+                          </motion.span>
+                        )}
+                        {pts >= 300 && pts < 310 && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: [0, 1.3, 1] }}
+                            transition={{ duration: 0.5 }}
+                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: 'rgba(124,58,237,0.3)', color: '#c4b5fd' }}
+                          >
+                            🏆 ماكس
+                          </motion.span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                        <span className="text-amber-300 font-black text-xs">{pts} <span className="text-amber-300/50 font-normal">NRS</span></span>
+                        <span className="text-violet-300 text-[10px]">{emp.today_calls} اليوم</span>
+                      </div>
+                    </div>
+
+                    {/* شريط التقدم للميلستون القادم */}
+                    <div className="mt-1.5">
+                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{
+                            background: unlockedCount >= 3
+                              ? 'linear-gradient(90deg, #a78bfa, #7c3aed)'
+                              : unlockedCount >= 1
+                              ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                              : 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                          }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progPct}%` }}
+                          transition={{ duration: 0.8, delay: 0.1 + i * 0.05, ease: 'easeOut' }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[9px] text-white/25">
+                          {nextM
+                            ? `${pts}/${nextM.threshold} لفتح ${nextM.emoji} ${nextM.title}`
+                            : '🏆 جميع المكافآت مفتوحة'}
+                        </span>
+                        <span className="text-[9px] font-bold" style={{ color: unlockedCount >= 3 ? '#a78bfa' : '#f59e0b' }}>
+                          {progPct}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

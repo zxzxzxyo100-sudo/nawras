@@ -2,6 +2,20 @@
 require_once __DIR__ . '/db.php';
 $pdo = getDB();
 
+/** عمود outcome لسجل المكالمات (إضافة تلقائية للقواعد القديمة) */
+function ensure_call_logs_outcome_column(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE call_logs ADD COLUMN outcome VARCHAR(32) NULL DEFAULT NULL AFTER note");
+    } catch (Throwable $e) {
+        // العمود موجود مسبقاً
+    }
+    $done = true;
+}
+
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
@@ -58,19 +72,22 @@ elseif ($action === 'set_status') {
 
 // ========== LOG CALL ==========
 elseif ($action === 'log_call') {
+    ensure_call_logs_outcome_column($pdo);
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $callType = $input['call_type'];
-    $note = $input['note'];
-    $user = $input['user'] ?? '';
-    $userRole = $input['user_role'] ?? '';
+    $note = $input['note'] ?? '';
+    $outcome = isset($input['outcome']) ? substr((string) $input['outcome'], 0, 32) : '';
+    // دعم كلا المفتاحين: performed_by (من CallModal) و user (القديم)
+    $user = $input['performed_by'] ?? $input['user'] ?? '';
+    $userRole = $input['performed_role'] ?? $input['user_role'] ?? '';
     $hasShipped = !empty($input['has_shipped']);
     $registrationDate = $input['registration_date'] ?? null;
 
-    // Save call log
-    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, performed_by, performed_role)
-        VALUES (?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, $callType, $note, $user, $userRole]);
+    // Save call log (outcome: answered | no_answer | busy | callback من الواجهة)
+    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
 
     // Save recovery call if applicable
     if (strpos($callType, 'rcall') === 0) {
@@ -210,9 +227,10 @@ elseif ($action === 'get_all_recovery_calls') {
 
 // ========== GET ALL CALL LOGS (for state machine) - optimized ==========
 elseif ($action === 'get_all_calllogs') {
+    ensure_call_logs_outcome_column($pdo);
     // آخر مكالمة من كل نوع لكل متجر مع الملاحظة والمنفذ
     $stmt = $pdo->query("
-        SELECT cl.store_id, cl.call_type, cl.created_at, cl.note, cl.performed_by
+        SELECT cl.store_id, cl.call_type, cl.created_at, cl.note, cl.outcome, cl.performed_by
         FROM call_logs cl
         INNER JOIN (
             SELECT store_id, call_type, MAX(created_at) AS max_date
@@ -228,6 +246,7 @@ elseif ($action === 'get_all_calllogs') {
         $result[$row['store_id']][$row['call_type']] = [
             'date'         => $row['created_at'],
             'note'         => $row['note']         ?? '',
+            'outcome'      => $row['outcome']      ?? '',
             'performed_by' => $row['performed_by'] ?? '',
         ];
     }
@@ -302,6 +321,7 @@ elseif ($action === 'todays_tasks') {
 
 // ========== تخريج المتجر (GRADUATE STORE) ==========
 elseif ($action === 'graduate_store') {
+    ensure_call_logs_outcome_column($pdo);
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $user = $input['user'] ?? '';
@@ -324,7 +344,7 @@ elseif ($action === 'graduate_store') {
         ->execute([$storeId, $storeName, 'تخريج المتجر', 'تم تخريج المتجر من مسار الاحتضان إلى المتاجر النشطة', 'incubating', 'active', $user, $userRole]);
 
     // تسجيل مكالمة التخريج
-    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, performed_by, performed_role) VALUES (?, ?, 'graduation', ?, ?, ?)")
+    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role) VALUES (?, ?, 'graduation', ?, NULL, ?, ?)")
         ->execute([$storeId, $storeName, 'تم التخريج إلى المتاجر النشطة', $user, $userRole]);
 
     jsonResponse(['success' => true]);

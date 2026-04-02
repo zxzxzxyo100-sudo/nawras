@@ -5,6 +5,7 @@ import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { setStoreStatus } from '../services/api'
+import { formatCallOutcome } from '../constants/callOutcomes'
 
 export default function HotInactive() {
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
@@ -49,10 +50,42 @@ export default function HotInactive() {
     },
     {
       key: 'last_call',
+      label: 'نتيجة المكالمة',
+      render: s => {
+        const log = callLogs[s.id] || {}
+        const entries = Object.values(log).filter(c => c?.date)
+        if (!entries.length) return (
+          <span className="flex items-center gap-1 text-xs text-slate-400">
+            <PhoneOff size={11} /> لا يوجد
+          </span>
+        )
+        const latest = entries.sort((a, b) => b.date.localeCompare(a.date))[0]
+        const outcomeLabel = formatCallOutcome(latest.outcome)
+        const noteText = latest.note?.trim()
+        if (!outcomeLabel && !noteText) {
+          return (
+            <span className="flex items-center gap-1 text-xs text-slate-400">
+              <PhoneOff size={11} /> لا يوجد
+            </span>
+          )
+        }
+        return (
+          <div className="flex flex-col gap-0.5 min-w-0 max-w-[220px]">
+            {outcomeLabel && (
+              <span className="text-xs font-semibold text-violet-700">{outcomeLabel}</span>
+            )}
+            {noteText && (
+              <span className="text-[11px] text-slate-600 leading-snug line-clamp-2">{noteText}</span>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'last_call_date',
       label: 'آخر مكالمة',
       render: s => {
         const log = callLogs[s.id] || {}
-        // أحدث مكالمة عبر جميع الأنواع
         const entries = Object.values(log).filter(c => c?.date)
         if (!entries.length) return (
           <span className="flex items-center gap-1 text-xs text-slate-400">
@@ -62,24 +95,16 @@ export default function HotInactive() {
         const latest = entries.sort((a, b) => b.date.localeCompare(a.date))[0]
         const today = new Date().toISOString().slice(0, 10)
         const isToday = latest.date?.startsWith(today)
-        const dateLabel = isToday
-          ? 'اليوم'
-          : latest.date?.slice(0, 10) || '—'
+        const dateLabel = isToday ? 'اليوم' : latest.date?.slice(0, 10) || '—'
+
         return (
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className={`flex items-center gap-1 text-xs font-medium ${isToday ? 'text-green-600' : 'text-slate-500'}`}>
-              <Phone size={10} />
-              {dateLabel}
-              {latest.performed_by && (
-                <span className="text-slate-400 font-normal">· {latest.performed_by}</span>
-              )}
-            </span>
-            {latest.note && (
-              <span className="text-[11px] text-slate-500 leading-snug line-clamp-2 max-w-[180px]">
-                {latest.note}
-              </span>
+          <span className={`flex items-center gap-1 text-xs font-medium ${isToday ? 'text-green-600' : 'text-slate-500'}`}>
+            <Phone size={10} />
+            {dateLabel}
+            {latest.performed_by && (
+              <span className="text-slate-400 font-normal">· {latest.performed_by}</span>
             )}
-          </div>
+          </span>
         )
       },
     },

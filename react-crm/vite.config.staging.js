@@ -2,17 +2,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// ── إعدادات بناء البيئة التجريبية ──────────────────────────────────
-// المخرجات تذهب إلى مجلد /staging/ في جذر المشروع
-// الرابط يكون: https://yourdomain.com/staging/
+// staging.nawras-ly.com → ينشر من فرع staging إلى /public_html/staging
+// base: '/'  لأن السابدومين يخدم من جذر المجلد مباشرة
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/staging/',
+  base: '/',
   define: {
     __STAGING__: true,
   },
   build: {
-    outDir: '../staging',
+    outDir: '../',
     emptyOutDir: false,
   },
   server: {
