@@ -16,10 +16,12 @@ export default function ActiveStores() {
   const isExecutive = user?.role === 'executive'
   const active = stores.active_shipping || []
 
-  // جلب قائمة المستخدمين (للـ dropdown)
+  // جلب مسؤولي المتاجر النشطة فقط (للـ dropdown)
   useEffect(() => {
     if (!isExecutive) return
-    listUsers().then(res => setUsers(res.users || [])).catch(() => {})
+    listUsers()
+      .then(res => setUsers((res.users || []).filter(u => u.role === 'active_manager')))
+      .catch(() => {})
   }, [isExecutive])
 
   async function handleAssign(store, username) {
