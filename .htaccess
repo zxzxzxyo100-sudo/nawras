@@ -1,0 +1,57 @@
+DirectoryIndex index.html
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+</IfModule>
+
+# -------------------------------------------------------
+# إعدادات PHP لـ Hostinger (Apache mod_php)
+# -------------------------------------------------------
+<IfModule mod_php.c>
+    php_value max_execution_time  120
+    php_value memory_limit        256M
+    php_value post_max_size       16M
+    php_value upload_max_filesize 16M
+    php_flag  display_errors      Off
+    php_flag  log_errors          On
+</IfModule>
+
+# -------------------------------------------------------
+# إعدادات PHP لـ Hostinger (LiteSpeed - الأكثر شيوعاً)
+# -------------------------------------------------------
+<IfModule LiteSpeed>
+    php_value max_execution_time  120
+    php_value memory_limit        256M
+    php_value post_max_size       16M
+    php_value upload_max_filesize 16M
+    php_flag  display_errors      Off
+    php_flag  log_errors          On
+</IfModule>
+
+# -------------------------------------------------------
+# حماية ملف الإعدادات الحساس
+# -------------------------------------------------------
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "db.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "setup-db.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# -------------------------------------------------------
+# رؤوس الأمان
+# -------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
