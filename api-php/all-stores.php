@@ -56,17 +56,22 @@ function fetchAll($url, $max = MAX_PAGES_ALL) {
 $now = time();
 
 // ═══════════════════════════════════════════════════════════════
-// استراتيجية الجلب:
+// استراتيجية الجلب (3 مصادر — لا تكرار):
 //
-//   [A] /customers/new  → المتاجر الجديدة (احتضان)
+//   [A] /customers/new?since=90d
+//         → المتاجر الجديدة (احتضان)
 //
-//   [B] /customers/orders-summary (آخر 60 يوم)
-//         → يشمل: active_shipping (≤14 يوم) + hot_inactive (15–60 يوم)
+//   [B] /customers/orders-summary?from=2023-01-01&to=today
+//         → كل المتاجر التي شحنت يوماً ما (مع total_shipments الكامل)
+//         → يُصنَّف بناءً على last_shipment_date:
+//              ≤ 14 يوم  → active_shipping
+//              15–60 يوم → hot_inactive
+//              > 60 يوم  → cold_inactive
 //
 //   [C] /customers/inactive?days=61
-//         → يشمل: cold_inactive (انقطع >60 يوم أو لم يشحن أبداً)
+//         → أي متجر غير نشط لم يظهر في [B] (لم يشحن أبداً أو فاته الفلتر)
 //
-//   الضمان: active_shipping + hot_inactive + cold_inactive = كل المتاجر من B+C
+//   الضمان: active_shipping + hot_inactive + cold_inactive = total_active
 // ═══════════════════════════════════════════════════════════════
 
 // [A] المتاجر الجديدة
@@ -75,15 +80,13 @@ $new = fetchAll(
     MAX_PAGES_NEW
 );
 
-// [B] المتاجر التي شحنت خلال آخر 60 يوم
+// [B] كل المتاجر التي شحنت — من 2023-01-01 حتى اليوم (تغطية كاملة للتاريخ)
 $orders = fetchAll(
-    NAWRIS_BASE . '/customers/orders-summary'
-               . '?from=' . date('Y-m-d', $now - 60 * 86400)
-               . '&to='   . date('Y-m-d'),
+    NAWRIS_BASE . '/customers/orders-summary?from=2023-01-01&to=' . date('Y-m-d'),
     MAX_PAGES_ALL
 );
 
-// [C] المتاجر الغير نشطة منذ أكثر من 60 يوم (cold inactive)
+// [C] المتاجر غير النشطة منذ > 60 يوم (لالتقاط أي متجر لم يظهر في [B])
 $cold = fetchAll(
     NAWRIS_BASE . '/customers/inactive?days=61',
     MAX_PAGES_INACTIVE
@@ -105,7 +108,8 @@ $counts = [
     'total'           => 0,
 ];
 
-$newIds = array_keys($new);
+// hash map للبحث السريع O(1) بدلاً من in_array O(n)
+$newIds = array_fill_keys(array_keys($new), true);
 
 // ── [A] احتضان ──────────────────────────────────────────────────
 foreach ($new as $id => $s) {
@@ -119,7 +123,7 @@ foreach ($new as $id => $s) {
 $seenActive = [];
 
 foreach ($orders as $id => $s) {
-    if (in_array($id, $newIds)) continue;   // تجنب تكرار الجديدة
+    if (isset($newIds[$id])) continue;   // تجنب تكرار الجديدة
 
     $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
         ? strtotime($s['last_shipment_date'])
@@ -130,11 +134,15 @@ foreach ($orders as $id => $s) {
         $s['_cat'] = 'active_shipping';
         $result['active_shipping'][] = $s;
         $counts['active_shipping']++;
-    } else {
-        // 15–60 يوم (لأن الاستعلام يغطي آخر 60 يوم فقط)
+    } elseif ($daysShip <= 60) {
         $s['_cat'] = 'hot_inactive';
         $result['hot_inactive'][] = $s;
         $counts['hot_inactive']++;
+    } else {
+        // > 60 يوم أو لا يوجد تاريخ شحن (يُكتشف من [B] ذو النطاق الكامل)
+        $s['_cat'] = 'cold_inactive';
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
     }
 
     $seenActive[$id] = true;
@@ -144,7 +152,7 @@ foreach ($orders as $id => $s) {
 
 // ── [C] cold_inactive — من inactive?days=61 ─────────────────────
 foreach ($cold as $id => $s) {
-    if (in_array($id, $newIds)) continue;
+    if (isset($newIds[$id])) continue;
     if (isset($seenActive[$id])) continue;   // موجود في B بالفعل
 
     $s['_cat'] = 'cold_inactive';
@@ -164,4 +172,12 @@ echo json_encode([
     'success' => true,
     'counts'  => $counts,
     'data'    => $result,
+    'meta'    => [
+        'fetched_orders'  => count($orders),
+        'fetched_cold'    => count($cold),
+        'fetched_new'     => count($new),
+        'orders_from'     => '2023-01-01',
+        'orders_to'       => date('Y-m-d'),
+        'generated_at'    => date('Y-m-d H:i:s'),
+    ],
 ], JSON_UNESCAPED_UNICODE);
