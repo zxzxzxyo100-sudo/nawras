@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Snowflake, RefreshCw, CheckCircle2, PhoneOff } from 'lucide-react'
+import { Snowflake, RefreshCw, CheckCircle2, Phone, PhoneOff } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -45,6 +45,33 @@ export default function ColdInactive() {
         return (
           <span className="text-[11px] text-slate-600 leading-snug line-clamp-2 max-w-[220px]">
             {resultText || 'لا يوجد'}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'last_call_date',
+      label: 'آخر مكالمة',
+      render: s => {
+        const log = callLogs[s.id] || {}
+        const entries = Object.values(log).filter(c => c?.date)
+        if (!entries.length) return (
+          <span className="flex items-center gap-1 text-xs text-slate-400">
+            <PhoneOff size={11} /> لا يوجد
+          </span>
+        )
+        const latest = entries.sort((a, b) => b.date.localeCompare(a.date))[0]
+        const today = new Date().toISOString().slice(0, 10)
+        const isToday = latest.date?.startsWith(today)
+        const dateLabel = isToday ? 'اليوم' : latest.date?.slice(0, 10) || '—'
+
+        return (
+          <span className={`flex items-center gap-1 text-xs font-medium ${isToday ? 'text-green-600' : 'text-slate-500'}`}>
+            <Phone size={10} />
+            {dateLabel}
+            {latest.performed_by && (
+              <span className="text-slate-400 font-normal">· {latest.performed_by}</span>
+            )}
           </span>
         )
       },
