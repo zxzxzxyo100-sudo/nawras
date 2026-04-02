@@ -222,11 +222,10 @@
                 <div class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span><span>لوحة التحكم</span></div>
                 <div class="nav-divider"></div>
                 <div class="nav-section-label">الأقسام</div>
-                <div class="nav-item" data-view="incubating" id="nav-incubating"><span class="nav-icon">🎯</span><span>مسار الاحتضان</span><span class="badge" id="incubating-count">0</span></div>
                 <div class="nav-item" data-view="active" id="nav-active"><span class="nav-icon">⭐</span><span>النشطة</span><span class="badge" id="active-count" style="background:var(--success)">0</span></div>
                 <div class="nav-item" data-view="inactive" id="nav-inactive"><span class="nav-icon">⚠️</span><span>غير النشطة</span><span class="badge" id="inactive-count" style="background:var(--warning)">0</span></div>
-                <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
                 <div class="nav-item" data-view="cold" id="nav-cold"><span class="nav-icon">🥶</span><span>باردة +60 يوم</span><span class="badge" id="cold-count" style="background:#94a3b8">0</span></div>
+                <div class="nav-item" data-view="frozen" id="nav-frozen"><span class="nav-icon">🧊</span><span>مجمدة</span><span class="badge" id="frozen-count" style="background:var(--frozen)">0</span></div>
                 <div class="nav-divider"></div>
                 <div class="nav-item" data-view="users" id="nav-users"><span class="nav-icon">👥</span><span>إدارة المستخدمين</span></div>
             </nav>
@@ -354,10 +353,10 @@ const SURVEY_QUESTIONS = [
 const SURVEY_LABELS = ['سرعة التوصيل','خدمة التجميع','الدعم الفني','المنظومة','التسويات المالية','سلامة المرجوعات'];
 
 const ROLES = {
-    incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','incubating'] },
-    active_manager: { label:'مسؤول المتاجر النشطة', views:['dashboard','active'] },
-    inactive_manager: { label:'مسؤول الاستعادة', views:['dashboard','inactive'] },
-    executive: { label:'المدير التنفيذي', views:['dashboard','incubating','active','inactive','frozen','cold','users'] }
+    active_manager:   { label:'مسؤول المتاجر النشطة',  views:['dashboard','active'] },
+    inactive_manager: { label:'مسؤول الاستعادة',         views:['dashboard','inactive','cold'] },
+    executive:        { label:'المدير التنفيذي',          views:['dashboard','active','inactive','cold','frozen','users'] },
+    incubation_manager: { label:'مسؤول المتاجر الجديدة', views:['dashboard','active','inactive','cold'] },
 };
 
 // Default admin user
@@ -496,13 +495,11 @@ async function loadData() {
         if (!apiResult.success) throw new Error('فشل في جلب البيانات');
 
         allStores = [];
-        (apiResult.data.incubating || []).forEach(s => { s.category = 'incubating'; allStores.push(s); });
-        (apiResult.data.active || []).forEach(s => { s.category = 'active'; allStores.push(s); });
-        (apiResult.data.inactive_hot || []).forEach(s => { s.category = 'inactive'; s.inactive_type = 'hot'; allStores.push(s); });
-        (apiResult.data.inactive_cold || []).forEach(s => { s.category = 'cold'; allStores.push(s); });
-        (apiResult.data.other_inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
+        (apiResult.data.active   || []).forEach(s => { s.category = 'active';   allStores.push(s); });
+        (apiResult.data.inactive || []).forEach(s => { s.category = 'inactive'; allStores.push(s); });
+        (apiResult.data.cold     || []).forEach(s => { s.category = 'cold';     allStores.push(s); });
 
-        // DB overrides
+        // DB overrides (frozen / restoring / recovered تبقى كما هي)
         allStores.forEach(s => {
             const db = dbStates[s.id];
             if (db) {
@@ -512,14 +509,11 @@ async function loadData() {
             }
             const sv = dbSurveys[s.id];
             if (sv) s.survey = { answers: [parseInt(sv.q1_delivery),parseInt(sv.q2_collection),parseInt(sv.q3_support),parseInt(sv.q4_app),parseInt(sv.q5_payments),parseInt(sv.q6_returns)], suggestions: sv.suggestions, by: sv.performed_by, date: sv.created_at };
-            const inc = dbIncubation[s.id];
-            if (inc) { s.incubation_stage = inc.incubation_stage; s.next_call_date = inc.next_call_date; }
         });
 
-        runStateMachine();
         updateDashboard(); renderCurrentView();
         const c = apiResult.counts;
-        showNotification('إجمالي: ' + c.total + ' | نشط: ' + c.active + ' | ساخن: ' + c.inactive_hot + ' | بارد: ' + c.inactive_cold + ' | مجموع active: ' + c.api_active_total + (c.match ? ' ✓' : ' ✗'));
+        showNotification('إجمالي: ' + c.total + ' | نشطة: ' + c.active + ' | غير نشطة: ' + c.inactive + ' | باردة: ' + c.cold);
     } catch (error) {
         console.error('Error:', error);
         showNotification('خطأ في تحميل البيانات: ' + error.message, 'error');
@@ -832,19 +826,13 @@ function setStatus(id, status, extraData) {
 
 // ===================== DASHBOARD =====================
 function updateDashboard() {
-    const c = { incubating:0, active:0, inactive:0, frozen:0, restoring:0 };
+    const c = { active:0, inactive:0, cold:0, frozen:0, restoring:0 };
     allStores.forEach(s => { if (c[s.category] !== undefined) c[s.category]++; });
 
-    // Count tasks due today for incubation (excluding scheduled_waiting)
-    const tasksDue = allStores.filter(s => s.category === 'incubating' && s.incubation_task && s.incubation_task !== 'waiting' && s.incubation_task !== 'scheduled_waiting').length;
-    const graduationReady = allStores.filter(s => s.category === 'incubating' && s.incubation_task === 'graduation').length;
-
-    document.getElementById('incubating-count').textContent = c.incubating;
-    document.getElementById('active-count').textContent = c.active;
+    document.getElementById('active-count').textContent   = c.active;
     document.getElementById('inactive-count').textContent = c.inactive + c.restoring;
-    document.getElementById('frozen-count').textContent = c.frozen;
-    const coldCount = allStores.filter(s => s.category === 'cold').length;
-    document.getElementById('cold-count').textContent = coldCount;
+    document.getElementById('cold-count').textContent     = c.cold;
+    document.getElementById('frozen-count').textContent   = c.frozen;
 
     const conv = allStores.length > 0 ? Math.round(allStores.filter(s => s.category === 'active' || localStorage.getItem('store_graduated_' + s.id)).length / allStores.length * 100) : 0;
     let sat = '0'; let tc = 0, tt = 0;
@@ -879,14 +867,14 @@ function updateDashboard() {
     const grid = document.getElementById('stats-grid');
     let h = '';
 
-    if (currentRole === 'executive' || currentRole === 'incubation_manager') {
-        h += '<div class="stat-card" style="border-top:4px solid var(--primary)" onclick="switchView(\'incubating\')"><div class="stat-header"><span class="stat-title">مسار الاحتضان الذكي</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">🎯</div></div><div class="stat-value">'+c.incubating+'</div><div class="stat-change"><span>📋</span><span>'+tasksDue+' مهمة مطلوبة اليوم</span>'+(graduationReady>0?' | <span style="color:var(--success);font-weight:700">🎓 '+graduationReady+' جاهز للتخريج</span>':'')+'</div></div>';
-    }
-    if (currentRole === 'executive' || currentRole === 'active_manager') {
+    if (currentRole === 'executive' || currentRole === 'active_manager' || currentRole === 'incubation_manager') {
         h += '<div class="stat-card" style="border-top:4px solid var(--success)" onclick="switchView(\'active\')"><div class="stat-header"><span class="stat-title">نشطة</span><div class="stat-icon" style="background:rgba(0,168,107,0.1);color:var(--success)">⭐</div></div><div class="stat-value">'+c.active+'</div><div class="stat-change"><span>📦</span><span>تشحن بانتظام</span></div></div>';
     }
     if (currentRole === 'executive' || currentRole === 'inactive_manager') {
         h += '<div class="stat-card" style="border-top:4px solid var(--warning)" onclick="switchView(\'inactive\')"><div class="stat-header"><span class="stat-title">غير نشطة</span><div class="stat-icon" style="background:rgba(255,149,0,0.1);color:var(--warning)">⚠️</div></div><div class="stat-value">'+c.inactive+'</div><div class="stat-change"><span>⏰</span><span>تحتاج استعادة</span></div></div>';
+    }
+    if (currentRole === 'executive' || currentRole === 'inactive_manager') {
+        h += '<div class="stat-card" style="border-top:4px solid #94a3b8" onclick="switchView(\'cold\')"><div class="stat-header"><span class="stat-title">باردة +60 يوم</span><div class="stat-icon" style="background:rgba(148,163,184,0.1);color:#94a3b8">🥶</div></div><div class="stat-value">'+c.cold+'</div><div class="stat-change"><span>📅</span><span>بادرة +60 يوم بلا شحن</span></div></div>';
     }
     if (currentRole === 'executive') {
         h += '<div class="stat-card" style="border-top:4px solid var(--frozen)" onclick="switchView(\'frozen\')"><div class="stat-header"><span class="stat-title">مجمدة</span><div class="stat-icon" style="background:rgba(147,51,234,0.1);color:var(--frozen)">🧊</div></div><div class="stat-value">'+c.frozen+'</div><div class="stat-change"><span>❄️</span><span>تم تجميدها</span></div></div>';
@@ -896,8 +884,8 @@ function updateDashboard() {
     // Today's calls - visible to everyone
     h += '<div class="stat-card" style="border-top:4px solid #8b5cf6"><div class="stat-header"><span class="stat-title">اتصالات اليوم</span><div class="stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6">📞</div></div><div class="stat-value">'+todayTotal+'</div><div class="stat-change"><span>📅</span><span>هذا الأسبوع: '+weekCalls+'</span></div></div>';
 
-    // Conversion rate - incubation manager & executive
-    if (currentRole === 'executive' || currentRole === 'incubation_manager') {
+    // نسبة الاحتضان - executive فقط
+    if (currentRole === 'executive') {
         h += '<div class="stat-card" style="border-top:4px solid var(--primary)"><div class="stat-header"><span class="stat-title">نسبة التحويل (احتضان → نشط)</span><div class="stat-icon" style="background:rgba(0,102,204,0.1);color:var(--primary)">📈</div></div><div class="stat-value">'+conv+'%</div><div class="stat-change"><span>🎯</span><span>'+c.active+' نشط من '+allStores.length+' متجر</span></div><div class="progress-bar-bg"><div class="progress-bar-fill blue" style="width:'+conv+'%"></div></div></div>';
     }
 
