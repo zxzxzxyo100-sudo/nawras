@@ -177,11 +177,26 @@ elseif ($action === 'get_all_recovery_calls') {
 
 // ========== GET ALL CALL LOGS (for state machine) - optimized ==========
 elseif ($action === 'get_all_calllogs') {
-    // فقط آخر مكالمة من كل نوع لكل متجر (بدل تحميل الكل)
-    $stmt = $pdo->query("SELECT store_id, call_type, MAX(created_at) as created_at FROM call_logs GROUP BY store_id, call_type");
+    // آخر مكالمة من كل نوع لكل متجر مع الملاحظة والمنفذ
+    $stmt = $pdo->query("
+        SELECT cl.store_id, cl.call_type, cl.created_at, cl.note, cl.performed_by
+        FROM call_logs cl
+        INNER JOIN (
+            SELECT store_id, call_type, MAX(created_at) AS max_date
+            FROM call_logs
+            GROUP BY store_id, call_type
+        ) latest
+        ON  cl.store_id   = latest.store_id
+        AND cl.call_type  = latest.call_type
+        AND cl.created_at = latest.max_date
+    ");
     $result = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $result[$row['store_id']][$row['call_type']] = $row['created_at'];
+        $result[$row['store_id']][$row['call_type']] = [
+            'date'         => $row['created_at'],
+            'note'         => $row['note']         ?? '',
+            'performed_by' => $row['performed_by'] ?? '',
+        ];
     }
     jsonResponse(['success' => true, 'data' => $result]);
 }
