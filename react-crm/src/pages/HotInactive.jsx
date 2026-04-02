@@ -1,23 +1,18 @@
 import { useState } from 'react'
-import { Flame, RefreshCw, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Flame, RefreshCw, CheckCircle2 } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { setStoreStatus, resetCategory } from '../services/api'
+import { setStoreStatus } from '../services/api'
 
 export default function HotInactive() {
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
   const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const [confirmReset, setConfirmReset]   = useState(false)
-  const [resetMsg, setResetMsg]           = useState('')
 
   const hotInactive = stores.hot_inactive || []
-
-  // عدد المتاجر التي لها حالة مخصصة في DB
-  const withCustomState = hotInactive.filter(s => storeStates[s.id]?.category).length
 
   async function markAs(store, category) {
     setActionLoading(true)
@@ -35,23 +30,6 @@ export default function HotInactive() {
       console.error(err)
     } finally {
       setActionLoading(false)
-    }
-  }
-
-  async function handleResetAll() {
-    setActionLoading(true)
-    setConfirmReset(false)
-    try {
-      const ids = hotInactive.map(s => s.id)
-      const res = await resetCategory(ids, user?.fullname, user?.role, 'إعادة تعيين جماعي من صفحة الساخن')
-      setResetMsg(`تم إعادة تعيين ${res.affected} متجر بنجاح`)
-      await reload()
-    } catch (err) {
-      console.error(err)
-      setResetMsg('حدث خطأ أثناء إعادة التعيين')
-    } finally {
-      setActionLoading(false)
-      setTimeout(() => setResetMsg(''), 4000)
     }
   }
 
@@ -112,73 +90,13 @@ export default function HotInactive() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {counts.hot_inactive || 0} متجر — انقطع من 15 إلى 60 يوم
-            {withCustomState > 0 && (
-              <span className="mr-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                {withCustomState} لديهم حالة مخصصة
-              </span>
-            )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* زر إعادة التعيين الجماعي */}
-          {withCustomState > 0 && (
-            <button
-              onClick={() => setConfirmReset(true)}
-              disabled={actionLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-xl text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm disabled:opacity-50"
-            >
-              <RotateCcw size={14} />
-              إعادة تعيين الكل ({withCustomState})
-            </button>
-          )}
-          <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            تحديث
-          </button>
-        </div>
+        <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          تحديث
+        </button>
       </div>
-
-      {/* رسالة نجاح الإعادة */}
-      {resetMsg && (
-        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-medium">
-          <CheckCircle2 size={16} />
-          {resetMsg}
-        </div>
-      )}
-
-      {/* نافذة تأكيد إعادة التعيين */}
-      {confirmReset && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-red-600" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800">تأكيد إعادة التعيين</p>
-                <p className="text-xs text-slate-500 mt-0.5">هذا الإجراء لا يمكن التراجع عنه</p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-600 mb-5">
-              سيتم حذف جميع حالات الاستعادة ({withCustomState} متجر) وإعادتهم إلى الحالة الافتراضية "غير نشطة". سيُسجَّل هذا الإجراء في سجل التغييرات.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleResetAll}
-                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                نعم، إعادة التعيين
-              </button>
-              <button
-                onClick={() => setConfirmReset(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-sm rounded-xl hover:bg-slate-50"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <StoreTable
         stores={hotInactive}
