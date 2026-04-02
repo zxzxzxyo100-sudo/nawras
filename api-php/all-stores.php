@@ -34,10 +34,11 @@ function fetchAll($url, $max = MAX_PAGES_ALL) {
                 if (!isset($all[$id])) {
                     $all[$id] = $i;
                 } else {
-                    // احتفظ بأحدث last_shipment_date وأعلى total_shipments
+                    // نحتفظ بأحدث last_shipment_date وأعلى total_shipments
                     $n = $i['last_shipment_date']          ?? null;
                     $o = $all[$id]['last_shipment_date']   ?? null;
-                    if ($n && $n !== 'لا يوجد' && (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o))) {
+                    if ($n && $n !== 'لا يوجد' &&
+                        (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o))) {
                         $all[$id]['last_shipment_date'] = $n;
                     }
                     if (($i['total_shipments'] ?? 0) > ($all[$id]['total_shipments'] ?? 0)) {
@@ -54,72 +55,59 @@ function fetchAll($url, $max = MAX_PAGES_ALL) {
 
 $now = time();
 
-// ─── 1. المتاجر الجديدة (احتضان) ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// استراتيجية الجلب:
+//
+//   [A] /customers/new  → المتاجر الجديدة (احتضان)
+//
+//   [B] /customers/orders-summary (آخر 60 يوم)
+//         → يشمل: active_shipping (≤14 يوم) + hot_inactive (15–60 يوم)
+//
+//   [C] /customers/inactive?days=61
+//         → يشمل: cold_inactive (انقطع >60 يوم أو لم يشحن أبداً)
+//
+//   الضمان: active_shipping + hot_inactive + cold_inactive = كل المتاجر من B+C
+// ═══════════════════════════════════════════════════════════════
+
+// [A] المتاجر الجديدة
 $new = fetchAll(
     NAWRIS_BASE . '/customers/new?since=' . date('Y-m-d', $now - 90 * 86400),
     MAX_PAGES_NEW
 );
 
-// ─── 2. كل المتاجر النشطة — نجلب فترتين لضمان التغطية الكاملة لـ 1563 متجر
-//    فترة A: آخر 60 يوم  (يشمل Active + Hot Inactive)
-//    فترة B: 61–730 يوم (يشمل Cold Inactive)
-$orders_recent = fetchAll(
-    NAWRIS_BASE . '/customers/orders-summary?from=' . date('Y-m-d', $now - 60 * 86400)
-               . '&to=' . date('Y-m-d'),
-    MAX_PAGES_ALL
-);
-$orders_old = fetchAll(
-    NAWRIS_BASE . '/customers/orders-summary?from=' . date('Y-m-d', $now - 730 * 86400)
-               . '&to=' . date('Y-m-d', $now - 61 * 86400),
+// [B] المتاجر التي شحنت خلال آخر 60 يوم
+$orders = fetchAll(
+    NAWRIS_BASE . '/customers/orders-summary'
+               . '?from=' . date('Y-m-d', $now - 60 * 86400)
+               . '&to='   . date('Y-m-d'),
     MAX_PAGES_ALL
 );
 
-// دمج الفترتين
-$all_active = $orders_recent;
-foreach ($orders_old as $id => $s) {
-    if (!isset($all_active[$id])) {
-        $all_active[$id] = $s;
-    } else {
-        $n = $s['last_shipment_date']             ?? null;
-        $o = $all_active[$id]['last_shipment_date'] ?? null;
-        if ($n && $n !== 'لا يوجد' && (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o))) {
-            $all_active[$id]['last_shipment_date'] = $n;
-        }
-        if (($s['total_shipments'] ?? 0) > ($all_active[$id]['total_shipments'] ?? 0)) {
-            $all_active[$id]['total_shipments'] = $s['total_shipments'];
-        }
-    }
-}
+// [C] المتاجر الغير نشطة منذ أكثر من 60 يوم (cold inactive)
+$cold = fetchAll(
+    NAWRIS_BASE . '/customers/inactive?days=61',
+    MAX_PAGES_INACTIVE
+);
 
-// ─── 3. التصنيف ─────────────────────────────────────────────────────────────
-//
-//  active_shipping  : آخر شحنة ≤ 14 يوم                  → نشط يشحن
-//  hot_inactive     : آخر شحنة 15–60 يوم                  → غير نشط ساخن
-//  cold_inactive    : آخر شحنة > 60 يوم أو لا يوجد شحنة  → غير نشط بارد
-//
-//  incubating       : قادم من /customers/new               → تحت الاحتضان
-//
-//  الضمان: active_shipping + hot_inactive + cold_inactive = إجمالي all_active
-//          (بعد استبعاد المتاجر الجديدة المتداخلة)
-
+// ═══ التصنيف ════════════════════════════════════════════════════
 $result = [
     'incubating'      => [],
-    'active_shipping' => [],
-    'hot_inactive'    => [],
-    'cold_inactive'   => [],
+    'active_shipping' => [],  // شحن ≤ 14 يوم
+    'hot_inactive'    => [],  // شحن 15–60 يوم
+    'cold_inactive'   => [],  // انقطع > 60 يوم أو لم يشحن
 ];
 $counts = [
     'incubating'      => 0,
     'active_shipping' => 0,
     'hot_inactive'    => 0,
     'cold_inactive'   => 0,
-    'total_active'    => 0,   // active_shipping + hot_inactive + cold_inactive
-    'total'           => 0,   // الإجمالي الكلي
+    'total_active'    => 0,
+    'total'           => 0,
 ];
 
 $newIds = array_keys($new);
 
-// ── احتضان ──
+// ── [A] احتضان ──────────────────────────────────────────────────
 foreach ($new as $id => $s) {
     $s['_cat'] = 'incubating';
     $result['incubating'][] = $s;
@@ -127,10 +115,11 @@ foreach ($new as $id => $s) {
     $counts['total']++;
 }
 
-// ── المتاجر النشطة (1563) — التصنيف الثلاثي ──
-foreach ($all_active as $id => $s) {
-    // استبعد المتاجر الجديدة لتجنب التكرار
-    if (in_array($id, $newIds)) continue;
+// ── [B] تصنيف المتاجر من orders-summary ────────────────────────
+$seenActive = [];
+
+foreach ($orders as $id => $s) {
+    if (in_array($id, $newIds)) continue;   // تجنب تكرار الجديدة
 
     $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
         ? strtotime($s['last_shipment_date'])
@@ -141,22 +130,35 @@ foreach ($all_active as $id => $s) {
         $s['_cat'] = 'active_shipping';
         $result['active_shipping'][] = $s;
         $counts['active_shipping']++;
-    } elseif ($daysShip <= 60) {
+    } else {
+        // 15–60 يوم (لأن الاستعلام يغطي آخر 60 يوم فقط)
         $s['_cat'] = 'hot_inactive';
         $result['hot_inactive'][] = $s;
         $counts['hot_inactive']++;
-    } else {
-        $s['_cat'] = 'cold_inactive';
-        $result['cold_inactive'][] = $s;
-        $counts['cold_inactive']++;
     }
 
+    $seenActive[$id] = true;
     $counts['total_active']++;
     $counts['total']++;
 }
 
-// تحقق: مجموع الخانات الثلاث = total_active
-$counts['check'] = ($counts['active_shipping'] + $counts['hot_inactive'] + $counts['cold_inactive'] === $counts['total_active']);
+// ── [C] cold_inactive — من inactive?days=61 ─────────────────────
+foreach ($cold as $id => $s) {
+    if (in_array($id, $newIds)) continue;
+    if (isset($seenActive[$id])) continue;   // موجود في B بالفعل
+
+    $s['_cat'] = 'cold_inactive';
+    $result['cold_inactive'][] = $s;
+    $counts['cold_inactive']++;
+    $counts['total_active']++;
+    $counts['total']++;
+}
+
+// تحقق: المجموع يساوي إجمالي النشطين
+$counts['check'] = (
+    $counts['active_shipping'] + $counts['hot_inactive'] + $counts['cold_inactive']
+    === $counts['total_active']
+);
 
 echo json_encode([
     'success' => true,
