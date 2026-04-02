@@ -7,7 +7,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-slate-100" dir="rtl">
+    <div className="flex min-h-screen bg-slate-50" dir="rtl">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -20,7 +20,7 @@ export default function Layout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col lg:mr-64">
+      <div className="flex-1 flex flex-col lg:mr-60">
         {/* Mobile top header */}
         <header className="lg:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
           <button
