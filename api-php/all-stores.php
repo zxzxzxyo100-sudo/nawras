@@ -116,57 +116,78 @@ $counts = [
     'total_active' => 0, 'total' => 0,
 ];
 
-// ── خانات مسار الاحتضان (3 قواعد حصرية + يدوية) ──────────────
-// Q1 تحت الاحتضان : age ≤ 14d  AND  ships > 0
-// Q2 لم تبدأ      : age > 48h  AND  ships = 0
-// Q3 تخريج        : age > 14d  AND  ships > 0
-// Q4 جديدة        : age ≤ 48h  (أي حالة)
-// يدوي: restoring / restored
+// ── خانات مسار الاحتضان (قواعد حصرية) ────────────────────────
+// Q4 جديدة      : age ≤ 48h                       → incubation
+// Q1 احتضان     : 48h < age ≤ 14d  AND ships > 0  → incubation
+// Q3 تخريج      : age > 14d  AND ships > 0         → incubation
+// Q2 لم تبدأ   : age > 48h  AND ships = 0          → cold_inactive (مع علامة _never_started)
+// يدوي: restoring / restored                        → incubation
 $incubation_path = [
-    'new_48h'      => [],
-    'incubating'   => [],
-    'never_started'=> [],
-    'graduated'    => [],
-    'restoring'    => [],
-    'restored'     => [],
+    'new_48h'    => [],
+    'incubating' => [],
+    'graduated'  => [],
+    'restoring'  => [],
+    'restored'   => [],
 ];
 $incubation_counts = [
-    'new_48h'      => 0,
-    'incubating'   => 0,
-    'never_started'=> 0,
-    'graduated'    => 0,
-    'restoring'    => 0,
-    'restored'     => 0,
-    'total'        => 0,
+    'new_48h'    => 0,
+    'incubating' => 0,
+    'graduated'  => 0,
+    'restoring'  => 0,
+    'restored'   => 0,
+    'total'      => 0,
 ];
 
 $newIds = array_fill_keys(array_keys($new), true);
 
 // ── تصنيف المتاجر الجديدة (احتضان) ───────────────────────────
 foreach ($new as $id => $s) {
-    $s['_cat'] = 'incubating';
-    $result['incubating'][] = $s;
-    $counts['incubating']++;
-    $counts['total']++;
-
-    $regTs  = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
-    $regHrs = $regTs ? ($now - $regTs) / 3600  : PHP_INT_MAX;
+    $regTs   = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
+    $regHrs  = $regTs ? ($now - $regTs) / 3600 : PHP_INT_MAX;
     $regDays = $regHrs / 24;
 
     $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
                || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
 
-    // ── تطبيق القواعد الثلاث الحصرية ──────────────────────────────
-    // الأولوية: new_48h > incubating > graduated > never_started
-    if      ($regHrs  < 48)                    $sub = 'new_48h';       // Q4: جديد
-    elseif  ($regDays <= 14 && $hasShipped)    $sub = 'incubating';    // Q1: ≤14يوم + شحن
-    elseif  ($hasShipped)                      $sub = 'graduated';     // Q3: >14يوم + شحن
-    else                                       $sub = 'never_started'; // Q2: >48ساعة + 0 شحنات
+    $s['_hours'] = round($regHrs, 1);
+    $s['_days']  = round($regDays, 1);
 
-    $s['_inc'] = $sub; $s['_hours'] = round($regHrs, 1); $s['_days'] = round($regDays, 1);
-    $incubation_path[$sub][] = $s;
-    $incubation_counts[$sub]++;
-    $incubation_counts['total']++;
+    if ($regHrs < 48) {
+        // ── Q4: جديد (فترة مراقبة 48 ساعة) ─────────────────────
+        $s['_cat'] = 'incubating'; $s['_inc'] = 'new_48h';
+        $result['incubating'][] = $s;
+        $counts['incubating']++; $counts['total']++;
+        $incubation_path['new_48h'][] = $s;
+        $incubation_counts['new_48h']++; $incubation_counts['total']++;
+
+    } elseif ($regDays <= 14 && $hasShipped) {
+        // ── Q1: تحت الاحتضان (≤14 يوم + شحن) ───────────────────
+        $s['_cat'] = 'incubating'; $s['_inc'] = 'incubating';
+        $result['incubating'][] = $s;
+        $counts['incubating']++; $counts['total']++;
+        $incubation_path['incubating'][] = $s;
+        $incubation_counts['incubating']++; $incubation_counts['total']++;
+
+    } elseif ($hasShipped) {
+        // ── Q3: تخريج (>14 يوم + شحن) ──────────────────────────
+        $s['_cat'] = 'incubating'; $s['_inc'] = 'graduated';
+        $result['incubating'][] = $s;
+        $counts['incubating']++; $counts['total']++;
+        $incubation_path['graduated'][] = $s;
+        $incubation_counts['graduated']++; $incubation_counts['total']++;
+
+    } else {
+        // ── Q2: لم تبدأ (>48 ساعة + 0 شحنات) → غير نشط بارد ────
+        // هذا المتجر خرج من مسار الاحتضان ويظهر في المتاجر الغير نشطة
+        if (!empty($s['status']) && $s['status'] !== 'active') continue;
+        $s['_cat']           = 'cold_inactive';
+        $s['_inc']           = 'never_started';
+        $s['_never_started'] = true;
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+    }
 }
 
 // ── تصنيف مصدر البيانات الرئيسي (orders أو allStores) ─────────

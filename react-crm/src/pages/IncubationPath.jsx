@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, AlertCircle, GraduationCap, RefreshCw,
+  Baby, Clock, GraduationCap, RefreshCw,
   CheckCircle2, TrendingUp, Search, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
@@ -23,12 +23,13 @@ function shipDays(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// القواعد الحصرية الثلاث + خانة المراقبة + يدويتان
-// Q4 جديدة        : age ≤ 48h
-// Q1 تحت الاحتضان : 48h < age ≤ 14d  AND  ships > 0
-// Q2 لم تبدأ      : age > 48h  AND  ships = 0
-// Q3 تخريج        : age > 14d  AND  ships > 0
+// ما يظهر في مسار الاحتضان فقط:
+// Q4 جديدة      : age ≤ 48h                      (مراقبة)
+// Q1 احتضان     : 48h < age ≤ 14d  AND ships > 0
+// Q3 تخريج      : age > 14d        AND ships > 0
 // يدوي: جاري الاستعادة / تمت الاستعادة
+//
+// Q2 (age > 48h AND ships = 0) → يذهب لـ غير نشط بارد (ليس هنا)
 // ══════════════════════════════════════════════════════════════════
 const TABS = [
   {
@@ -46,19 +47,9 @@ const TABS = [
     label: 'تحت الاحتضان',
     icon:  Clock,
     color: 'indigo',
-    desc:  'Q1 — أقل من 14 يوم من التسجيل + شحن طلبية واحدة على الأقل',
+    desc:  'Q1 — أقل من 14 يوم من التسجيل وشحنت طلبية على الأقل',
     badge: () => (
       <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يشحن ✓</span>
-    ),
-  },
-  {
-    key:   'never_started',
-    label: 'لم تبدأ',
-    icon:  AlertCircle,
-    color: 'red',
-    desc:  'Q2 — مضى أكثر من 48 ساعة دون أي شحنة — بحاجة تدخل فوري',
-    badge: () => (
-      <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">لم تشحن</span>
     ),
   },
   {
@@ -66,7 +57,7 @@ const TABS = [
     label: 'قائمة التخريج',
     icon:  GraduationCap,
     color: 'emerald',
-    desc:  'Q3 — تجاوزت 14 يوماً وشحنت — جاهزة للانتقال إلى المتاجر النشطة',
+    desc:  'Q3 — تجاوزت 14 يوماً وشحنت — جاهزة للانتقال إلى النشطة',
     badge: () => (
       <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">تخريج ✓</span>
     ),
@@ -94,32 +85,21 @@ const TABS = [
 ]
 
 const COLOR_CLASSES = {
-  blue:    { active: 'bg-blue-600 text-white shadow-blue-600/20',      count: 'bg-blue-50 text-blue-600 border-blue-200'       },
-  indigo:  { active: 'bg-indigo-600 text-white shadow-indigo-600/20',  count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
-  red:     { active: 'bg-red-600 text-white shadow-red-600/20',        count: 'bg-red-50 text-red-600 border-red-200'          },
+  blue:    { active: 'bg-blue-600 text-white shadow-blue-600/20',      count: 'bg-blue-50 text-blue-600 border-blue-200'          },
+  indigo:  { active: 'bg-indigo-600 text-white shadow-indigo-600/20',  count: 'bg-indigo-50 text-indigo-600 border-indigo-200'    },
   emerald: { active: 'bg-emerald-600 text-white shadow-emerald-600/20',count: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  orange:  { active: 'bg-orange-500 text-white shadow-orange-500/20',  count: 'bg-orange-50 text-orange-600 border-orange-200' },
-  teal:    { active: 'bg-teal-600 text-white shadow-teal-600/20',      count: 'bg-teal-50 text-teal-600 border-teal-200'       },
+  orange:  { active: 'bg-orange-500 text-white shadow-orange-500/20',  count: 'bg-orange-50 text-orange-600 border-orange-200'   },
+  teal:    { active: 'bg-teal-600 text-white shadow-teal-600/20',      count: 'bg-teal-50 text-teal-600 border-teal-200'         },
 }
 
-// ── أزرار الإجراء حسب الفئة الحصرية ────────────────────────────
+// ── أزرار الإجراء: فقط للمتاجر اليدوية ─────────────────────────
 function ActionBadge({ store, onMarkRestoring, onMarkRestored }) {
-  // Q2: لم تبدأ → يمكن تحويلها يدوياً لـ "جاري الاستعادة"
-  const isNeverStarted = store._inc === 'never_started'
   // يدوي: جاري الاستعادة → يمكن تأكيد "تمت الاستعادة"
-  const isRestoring    = store._inc === 'restoring'
+  const isRestoring = store._inc === 'restoring'
 
-  if (!isNeverStarted && !isRestoring) return null
+  if (!isRestoring) return null
   return (
     <div className="flex gap-1.5">
-      {isNeverStarted && (
-        <button
-          onClick={e => { e.stopPropagation(); onMarkRestoring(store) }}
-          className="text-xs px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors font-medium"
-        >
-          جاري الاستعادة
-        </button>
-      )}
       {isRestoring && (
         <button
           onClick={e => { e.stopPropagation(); onMarkRestored(store) }}

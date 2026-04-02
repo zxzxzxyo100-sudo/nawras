@@ -10,7 +10,22 @@ export default function ColdInactive() {
 
   const coldInactive = stores.cold_inactive || []
 
+  // انتقل من مسار الاحتضان (Q2: >48ساعة + 0 شحنات)
+  const neverStarted = coldInactive.filter(s => s._never_started)
+  const neverCount   = neverStarted.length
+
   const extraColumns = [
+    {
+      key: 'origin',
+      label: 'المصدر',
+      render: s => s._never_started
+        ? (
+          <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+            لم تبدأ ({Math.floor(s._days ?? 0)} يوم)
+          </span>
+        )
+        : null,
+    },
     {
       key: 'last_ship',
       label: 'آخر شحنة',
@@ -50,6 +65,11 @@ export default function ColdInactive() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {counts.cold_inactive || 0} متجر — انقطع أكثر من 60 يوم أو لم يشحن أبداً
+            {neverCount > 0 && (
+              <span className="mr-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                {neverCount} من الاحتضان (لم تبدأ)
+              </span>
+            )}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
