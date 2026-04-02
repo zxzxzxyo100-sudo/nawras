@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:staging": "vite build --config vite.config.staging.js",
+    "deploy:staging": "powershell -ExecutionPolicy Bypass -File ../deploy-staging.ps1",
     "lint": "eslint .",
     "preview": "vite preview"
   },

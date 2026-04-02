@@ -1,10 +1,19 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Menu, Package } from 'lucide-react'
+import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
+import FloatingCallBar from './FloatingCallBar'
+import { useAuth } from '../contexts/AuthContext'
+
+// يظهر الشريط فقط في بناء البيئة التجريبية
+const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
+
+// الأدوار التي تستخدم زر الاتصال العائم (الموظفون المباشرون فقط)
+const FLOATING_CALL_ROLES = ['inactive_manager', 'active_manager', 'incubation_officer']
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user } = useAuth()
 
   return (
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
@@ -39,10 +48,30 @@ export default function Layout() {
           <div className="w-10" />
         </header>
 
+        {/* شريط البيئة التجريبية */}
+        {IS_STAGING && (
+          <div
+            className="sticky top-0 z-30 flex flex-col items-center justify-center py-1.5 text-center"
+            style={{ background: 'repeating-linear-gradient(45deg, #991b1b, #991b1b 12px, #b91c1c 12px, #b91c1c 24px)' }}
+          >
+            <div className="flex items-center gap-2 text-xs font-black text-white">
+              <FlaskConical size={13} />
+              ⚠️ بيئة تجريبية — تستخدم قاعدة البيانات الحقيقية!
+              <FlaskConical size={13} />
+            </div>
+            <p className="text-red-200 text-[10px] font-medium mt-0.5">
+              أي حذف أو تعديل هنا سيؤثر على الموقع الرسمي — ستظهر رسالة تأكيد قبل كل إجراء
+            </p>
+          </div>
+        )}
+
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           <Outlet />
         </main>
       </div>
+
+      {/* زر الاتصال العائم — للموظفين فقط */}
+      {FLOATING_CALL_ROLES.includes(user?.role) && <FloatingCallBar />}
     </div>
   )
 }

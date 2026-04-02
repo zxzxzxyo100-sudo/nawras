@@ -4,6 +4,35 @@ const BASE = '/api-php'
 
 const http = axios.create({ baseURL: BASE })
 
+// ─── حارس البيئة التجريبية ────────────────────────────────────────
+// يمنع أي عملية كتابة في staging إلا بتأكيد صريح من المستخدم
+const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
+
+// الطلبات المسموحة دائماً بدون تأكيد (تسجيل الدخول فقط)
+const ALWAYS_ALLOW = ['/auth.php?action=login']
+
+if (IS_STAGING) {
+  http.interceptors.request.use(config => {
+    const isWrite = ['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase())
+    const isAllowed = ALWAYS_ALLOW.some(u => config.url?.includes(u))
+
+    if (isWrite && !isAllowed) {
+      const confirmed = window.confirm(
+        '⚠️ تحذير — البيئة التجريبية\n\n' +
+        'هذا الإجراء يؤثر على قاعدة البيانات الحقيقية!\n' +
+        'أي تعديل أو حذف هنا سيظهر في الموقع الرسمي.\n\n' +
+        'هل أنت متأكد أنك تريد المتابعة؟'
+      )
+      if (!confirmed) {
+        return Promise.reject(
+          new axios.CanceledError('تم إلغاء العملية — البيئة التجريبية')
+        )
+      }
+    }
+    return config
+  })
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export const login = (username, password) =>
   http.post('/auth.php?action=login', { username, password }).then(r => r.data)
@@ -63,3 +92,13 @@ export const getIncubationData = () =>
 
 export const updateIncubation = (data) =>
   http.post('/store-actions.php?action=update_incubation', data).then(r => r.data)
+
+// ─── Points & Gamification ────────────────────────────────────────────────────
+export const getLeaderboard = () =>
+  http.get('/store-actions.php?action=get_leaderboard').then(r => r.data)
+
+export const getMyStats = (username) =>
+  http.get(`/store-actions.php?action=get_my_stats&username=${encodeURIComponent(username)}`).then(r => r.data)
+
+export const awardBonus = (data) =>
+  http.post('/store-actions.php?action=award_bonus', data).then(r => r.data)
