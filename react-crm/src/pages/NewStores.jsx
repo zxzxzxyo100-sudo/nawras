@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Store, RefreshCw } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
@@ -6,8 +7,16 @@ import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
 
 export default function NewStores() {
+  const [searchParams] = useSearchParams()
+  const bucketPreset = searchParams.get('bucket') === 'incubating' ? 'incubating' : 'all'
+
   const { allStores, counts, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
   const [selected, setSelected] = useState(null)
+
+  const filteredForCount = useMemo(() => {
+    if (bucketPreset !== 'incubating') return allStores
+    return allStores.filter(s => s.bucket === 'incubating')
+  }, [allStores, bucketPreset])
 
   const totalCount = counts?.total ?? allStores.length
 
@@ -47,9 +56,13 @@ export default function NewStores() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Store size={24} className="text-purple-600" />
-            المتاجر
+            {bucketPreset === 'incubating' ? 'تحت الاحتضان' : 'المتاجر'}
           </h1>
-          <p className="text-slate-600 text-sm mt-0.5">{totalCount.toLocaleString('ar-SA')} متجر — جميع الخانات</p>
+          <p className="text-slate-600 text-sm mt-0.5">
+            {bucketPreset === 'incubating'
+              ? `${filteredForCount.length.toLocaleString('ar-SA')} متجر — خانة الاحتضان فقط`
+              : `${totalCount.toLocaleString('ar-SA')} متجر — جميع الخانات (جديدة)`}
+          </p>
         </div>
         <button
           type="button"
@@ -65,6 +78,7 @@ export default function NewStores() {
       <StoreTable
         variant="elite"
         stores={allStores}
+        bucketPreset={bucketPreset === 'incubating' ? 'incubating' : 'all'}
         enableBucketFilter
         onSelectStore={setSelected}
         onRestoreStore={setSelected}

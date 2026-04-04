@@ -7,7 +7,7 @@ export const STORE_BUCKET_KEYS = [
 ]
 
 export const STORE_BUCKET_LABELS = {
-  incubating: 'احتضان',
+  incubating: 'تحت الاحتضان',
   active_shipping: 'نشط يشحن',
   hot_inactive: 'غير نشط ساخن',
   cold_inactive: 'غير نشط بارد',

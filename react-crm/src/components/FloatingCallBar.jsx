@@ -10,7 +10,7 @@ const CAT_COLORS = {
   active_shipping: { bg: '#10b981', label: 'نشط' },
   hot_inactive:    { bg: '#f59e0b', label: 'ساخن' },
   cold_inactive:   { bg: '#6b7280', label: 'بارد' },
-  incubating:      { bg: '#8b5cf6', label: 'احتضان' },
+  incubating:      { bg: '#8b5cf6', label: 'تحت الاحتضان' },
 }
 
 export default function FloatingCallBar() {
