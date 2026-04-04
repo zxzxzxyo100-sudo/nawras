@@ -109,7 +109,10 @@ foreach ($storeMap as $sid => $storeInfo) {
     $lastShipDate = $shipmentMap[$sid] ?? null;
     if (!$lastShipDate) continue;
 
-    if (strtotime($lastShipDate) > strtotime($restoreDate)) {
+    // مقارنة باليوم: طلبية نفس يوم «بدء الاستعادة» تُعتبر لاحقة منطقياً (كانت > توقيت تفوتها)
+    $shipDay    = date('Y-m-d', strtotime($lastShipDate));
+    $restoreDay = date('Y-m-d', strtotime($restoreDate));
+    if ($shipDay >= $restoreDay) {
         $pdo->prepare("UPDATE store_states SET category = 'recovered', updated_by = 'System / API' WHERE store_id = ?")
             ->execute([$sid]);
 
