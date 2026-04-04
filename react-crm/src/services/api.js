@@ -25,6 +25,12 @@ export const deleteUser = (id) =>
 export const getAllStores = () =>
   http.get('/all-stores.php').then(r => r.data)
 
+/** ملخص الطرود لكل متجر ضمن نطاق تاريخ (يُستخدم لـ shipments_in_range) */
+export const getOrdersSummaryRange = (from, to) =>
+  http
+    .get(`/orders-summary.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+    .then(r => r.data)
+
 export const getStoreStates = () =>
   http.get('/store-actions.php?action=get_states').then(r => r.data)
 

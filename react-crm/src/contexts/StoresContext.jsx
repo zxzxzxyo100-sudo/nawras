@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments } from '../services/api'
+import {
+  getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments,
+  getOrdersSummaryRange,
+} from '../services/api'
 import { useAuth } from './AuthContext'
 
 const StoresContext = createContext(null)
@@ -30,19 +33,49 @@ export function StoresProvider({ children }) {
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
   const [error, setError]                 = useState(null)
+  /** نطاق تاريخ طُلبت له أعداد الطرود (آخر 14 يومًا — مطابقة لمنطق «نشط يشحن») */
+  const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [apiResult, statesRes, callsRes, rcallsRes, assignRes] = await Promise.all([
+      const toDate = new Date()
+      const fromDate = new Date()
+      fromDate.setDate(fromDate.getDate() - 14)
+      const rangeTo = toDate.toISOString().slice(0, 10)
+      const rangeFrom = fromDate.toISOString().slice(0, 10)
+
+      const [apiResult, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
         getAllStores(),
         getStoreStates(),
         getAllCallLogs(),
         getAllRecoveryCalls(),
         getAssignments(),
+        getOrdersSummaryRange(rangeFrom, rangeTo).catch(() => ({ success: false, data: [] })),
       ])
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
+
+      const rangeMap = {}
+      if (rangeRes?.success && Array.isArray(rangeRes.data)) {
+        rangeRes.data.forEach(s => {
+          const id = s.id
+          rangeMap[id] = parseInt(s.total_shipments, 10) || 0
+          rangeMap[String(id)] = rangeMap[id]
+        })
+        setShipmentsRangeMeta({ from: rangeFrom, to: rangeTo })
+      } else {
+        setShipmentsRangeMeta({ from: null, to: null })
+      }
+
+      function mergeShipmentsInRange(arr) {
+        return (arr || []).map(s => ({
+          ...s,
+          shipments_in_range: rangeMap[s.id] ?? rangeMap[String(s.id)] ?? 0,
+          shipments_range_from: rangeFrom,
+          shipments_range_to: rangeTo,
+        }))
+      }
 
       const stateMap = {}
       ;(statesRes.data || []).forEach(s => { stateMap[s.store_id] = s })
@@ -52,10 +85,10 @@ export function StoresProvider({ children }) {
       setCallLogs(callsRes.data || {})
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
-        incubating:      apiResult.data.incubating      || [],
-        active_shipping: apiResult.data.active_shipping || [],
-        hot_inactive:    apiResult.data.hot_inactive    || [],
-        cold_inactive:   apiResult.data.cold_inactive   || [],
+        incubating:      mergeShipmentsInRange(apiResult.data.incubating),
+        active_shipping: mergeShipmentsInRange(apiResult.data.active_shipping),
+        hot_inactive:    mergeShipmentsInRange(apiResult.data.hot_inactive),
+        cold_inactive:   mergeShipmentsInRange(apiResult.data.cold_inactive),
       })
       setCounts(apiResult.counts)
 
@@ -65,8 +98,8 @@ export function StoresProvider({ children }) {
       // جاري/تمت الاستعادة → تُدار في خانة غير النشطة عبر DB
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
-        new_48h:    rawPath.new_48h    || [],
-        incubating: rawPath.incubating || [],
+        new_48h:    mergeShipmentsInRange(rawPath.new_48h    || []),
+        incubating: mergeShipmentsInRange(rawPath.incubating || []),
       }
 
       setIncubationPath(mergedPath)
@@ -100,6 +133,7 @@ export function StoresProvider({ children }) {
       stores, counts, allStores,
       incubationPath, incubationCounts,
       storeStates, assignments, callLogs, recoveryCalls,
+      shipmentsRangeMeta,
       loading, error, lastLoaded, reload: load,
     }}>
       {children}

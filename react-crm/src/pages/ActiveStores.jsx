@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
 export default function ActiveStores() {
-  const { stores, counts, assignments, loading, reload, storeStates } = useStores()
+  const { stores, counts, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
   const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [users, setUsers]                 = useState([])
@@ -402,6 +402,11 @@ export default function ActiveStores() {
         onSelectStore={setSelected}
         extraColumns={extraColumns}
         emptyMsg="لا توجد متاجر نشطة"
+        parcelsColumnSub={
+          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+            : undefined
+        }
         selectable={isExecutive}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
