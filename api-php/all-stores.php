@@ -135,21 +135,58 @@ $counts = [
     'total'           => 0,
 ];
 
-// ── مسار الاحتضان ────────────────────────────────────────────────
+// ── مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة مرور 72 ساعة للتالية؛ الثالثة تخرج حسب الشحن) ──
 $incubation_path = [
-    'new_48h'    => [],
-    'incubating' => [],
+    'call_1' => [],
+    'call_2' => [],
+    'call_3' => [],
 ];
 $incubation_counts = [
-    'new_48h'  => 0,
-    'incubating' => 0,
-    'total'      => 0,
+    'call_1' => 0,
+    'call_2' => 0,
+    'call_3' => 0,
+    'total'  => 0,
 ];
 
 $newIds = array_fill_keys(array_keys($new), true);
 
+/** مرور 3 أيام (72 ساعة) من الطابع الزمني */
+function incubation_elapsed_3d($mysqlAt, $nowTs) {
+    if (!$mysqlAt) {
+        return false;
+    }
+    $t = strtotime($mysqlAt);
+
+    return $t !== false && ($nowTs - $t) >= 3 * 86400;
+}
+
+$dbMap = [];
+if (!empty($new)) {
+    try {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+        foreach (['inc_call1_at', 'inc_call2_at', 'inc_call3_at'] as $col) {
+            try {
+                $pdoDb->exec("ALTER TABLE store_states ADD COLUMN {$col} DATETIME NULL DEFAULT NULL");
+            } catch (Throwable $e) {
+                // موجود
+            }
+        }
+        $ids = array_keys($new);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category FROM store_states WHERE store_id IN ($ph)");
+        $stmt->execute(array_map('intval', $ids));
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $dbMap[(int) $row['store_id']] = $row;
+        }
+    } catch (Throwable $e) {
+        $dbMap = [];
+    }
+}
+
 // ── تصنيف المتاجر الجديدة (مسار الاحتضان) ───────────────────────
 foreach ($new as $id => $s) {
+    $db = $dbMap[$id] ?? null;
     $regTs   = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
     $regHrs  = $regTs ? ($now - $regTs) / 3600 : PHP_INT_MAX;
     $regDays = $regHrs / 24;
@@ -160,50 +197,212 @@ foreach ($new as $id => $s) {
     $s['_hours'] = round($regHrs, 1);
     $s['_days']  = round($regDays, 1);
 
-    if ($regHrs < 48) {
-        // Q4: جديد (فترة مراقبة 48 ساعة)
-        $s['_cat'] = 'incubating'; $s['_inc'] = 'new_48h';
-        $result['incubating'][] = $s;
-        $counts['incubating']++; $counts['total']++;
-        $incubation_path['new_48h'][] = $s;
-        $incubation_counts['new_48h']++; $incubation_counts['total']++;
+    $inc1 = $db['inc_call1_at'] ?? null;
+    $inc2 = $db['inc_call2_at'] ?? null;
+    $inc3 = $db['inc_call3_at'] ?? null;
+    $dbCat = $db['category'] ?? '';
 
-    } elseif ($regDays <= 14 && $hasShipped) {
-        // Q1: تحت الاحتضان (≤14 يوم + شحن)
-        $s['_cat'] = 'incubating'; $s['_inc'] = 'incubating';
-        $result['incubating'][] = $s;
-        $counts['incubating']++; $counts['total']++;
-        $incubation_path['incubating'][] = $s;
-        $incubation_counts['incubating']++; $incubation_counts['total']++;
-
-    } elseif ($hasShipped) {
-        // Q3: نجح الاحتضان (>14 يوم + شحن) → نشط مباشرةً
-        if (!empty($s['status']) && $s['status'] !== 'active') continue;
+    // تخريج يدوي إلى نشط من الواجهة
+    if ($db && in_array($dbCat, ['active', 'active_shipping'], true) && empty($inc3)) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
         $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
             ? strtotime($s['last_shipment_date']) : null;
         $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
-        if ($daysShip <= 14) {
-            $s['_cat'] = 'active_shipping';
-            $result['active_shipping'][] = $s; $counts['active_shipping']++;
-        } elseif ($daysShip <= 60) {
-            $s['_cat'] = 'hot_inactive';
-            $result['hot_inactive'][] = $s; $counts['hot_inactive']++;
+        if ($hasShipped) {
+            if ($daysShip <= 14) {
+                $s['_cat'] = 'active_shipping';
+                $result['active_shipping'][] = $s;
+                $counts['active_shipping']++;
+            } elseif ($daysShip <= 60) {
+                $s['_cat'] = 'hot_inactive';
+                $result['hot_inactive'][] = $s;
+                $counts['hot_inactive']++;
+            } else {
+                $s['_cat'] = 'cold_inactive';
+                $result['cold_inactive'][] = $s;
+                $counts['cold_inactive']++;
+            }
         } else {
             $s['_cat'] = 'cold_inactive';
-            $result['cold_inactive'][] = $s; $counts['cold_inactive']++;
+            $s['_inc'] = 'never_started';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
         }
-        $counts['total_active']++; $counts['total']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
 
-    } else {
-        // Q2: لم تبدأ (>48 ساعة + 0 شحنات) → غير نشط بارد
-        if (!empty($s['status']) && $s['status'] !== 'active') continue;
-        $s['_cat']           = 'cold_inactive';
-        $s['_inc']           = 'never_started';
+    // بعد المكالمة الثالثة — تصنيف حسب الشحن
+    if (!empty($inc3)) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        if ($hasShipped) {
+            $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+                ? strtotime($s['last_shipment_date']) : null;
+            $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+            if ($daysShip <= 14) {
+                $s['_cat'] = 'active_shipping';
+                $result['active_shipping'][] = $s;
+                $counts['active_shipping']++;
+            } elseif ($daysShip <= 60) {
+                $s['_cat'] = 'hot_inactive';
+                $result['hot_inactive'][] = $s;
+                $counts['hot_inactive']++;
+            } else {
+                $s['_cat'] = 'cold_inactive';
+                $result['cold_inactive'][] = $s;
+                $counts['cold_inactive']++;
+            }
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $s['_inc'] = 'never_started';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // المكالمة الثالثة
+    if ($inc2 && !$inc3 && incubation_elapsed_3d($inc2, $now)) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_3';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_3'][] = $s;
+        $incubation_counts['call_3']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // المكالمة الثانية (بلا شرط شحن)
+    if ($inc1 && !$inc2 && incubation_elapsed_3d($inc1, $now)) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_2';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_2'][] = $s;
+        $incubation_counts['call_2']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // المكالمة الأولى — جديدة < 48 ساعة
+    if ($regHrs < 48 && !$inc1) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_1';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_1'][] = $s;
+        $incubation_counts['call_1']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // انتظار 3 أيام بين المكالمات
+    if ($inc1 && !$inc2 && !incubation_elapsed_3d($inc1, $now)) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'waiting_call2';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        continue;
+    }
+    if ($inc2 && !$inc3 && !incubation_elapsed_3d($inc2, $now)) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'waiting_call3';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // بعد 48 ساعة بدون مكالمة أولى وبدون شحن → بارد
+    if (!$inc1 && $regHrs >= 48 && !$hasShipped) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'cold_inactive';
+        $s['_inc'] = 'never_started';
         $s['_never_started'] = true;
         $result['cold_inactive'][] = $s;
         $counts['cold_inactive']++;
         $counts['total_active']++;
         $counts['total']++;
+        continue;
+    }
+
+    // ترحيل: شحن ضمن 14 يوم دون سجل مكالمة أولى
+    if (!$inc1 && $hasShipped && $regDays <= 14 && $regHrs >= 48) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_2';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_2'][] = $s;
+        $incubation_counts['call_2']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // ترحيل: شحن بعد 14 يوم من التسجيل
+    if ($hasShipped && $regDays > 14) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+            ? strtotime($s['last_shipment_date']) : null;
+        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+        if ($daysShip <= 14) {
+            $s['_cat'] = 'active_shipping';
+            $result['active_shipping'][] = $s;
+            $counts['active_shipping']++;
+        } elseif ($daysShip <= 60) {
+            $s['_cat'] = 'hot_inactive';
+            $result['hot_inactive'][] = $s;
+            $counts['hot_inactive']++;
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // احتياطي — شحن
+    if ($hasShipped) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+            ? strtotime($s['last_shipment_date']) : null;
+        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+        if ($daysShip <= 14) {
+            $s['_cat'] = 'active_shipping';
+            $result['active_shipping'][] = $s;
+            $counts['active_shipping']++;
+        } elseif ($daysShip <= 60) {
+            $s['_cat'] = 'hot_inactive';
+            $result['hot_inactive'][] = $s;
+            $counts['hot_inactive']++;
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
     }
 }
 

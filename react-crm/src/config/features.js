@@ -1,9 +1,7 @@
 /**
- * يُحقَن من Vite: `true` في `vite.config.staging.js` فقط.
- * عند التجريب: إخفاء النقاط و«أدائي» وعدم استدعاء get_my_stats.
+ * إخفاء النقاط (NRS) وصفحة «أدائي» والمؤشرات التنافسية في المهام — في كل البيئات.
  */
-export const DISABLE_POINTS_AND_PERFORMANCE =
-  typeof __STAGING__ !== 'undefined' && __STAGING__
+export const DISABLE_POINTS_AND_PERFORMANCE = true
 
 /**
  * كبار التجار: عند true تُعرض صفحة «قريباً» فقط ولا يُستدعى vip-merchants.php.

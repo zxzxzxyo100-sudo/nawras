@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, Filter, RefreshCw, Phone,
+  Baby, Clock, Filter, RefreshCw, Phone, PhoneCall,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
@@ -24,33 +24,37 @@ function shipDays(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// مسار الاحتضان: خانتان حصريتان فقط
-// Q4 جديدة  : age ≤ 48h                       (مراقبة)
-// Q1 احتضان : 48h < age ≤ 14d  AND ships > 0
-//
-// Q3 (نجاح >14يوم + شحن)   → active_shipping مباشرةً
-// Q2 (>48ساعة + 0 شحنات)   → cold_inactive
-// جاري/تمت الاستعادة       → خانة غير النشطة
+// مسار الاحتضان: ثلاث مكالمات — بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج حسب الشحن
 // ══════════════════════════════════════════════════════════════════
 const TABS = [
   {
-    key:   'new_48h',
-    label: 'جديدة',
+    key:   'call_1',
+    label: 'المكالمة الأولى',
     icon:  Baby,
     color: 'blue',
-    desc:  'سُجّل منذ أقل من 48 ساعة — فترة المراقبة',
+    desc:  'متاجر جديدة (أقل من 48 ساعة). بعد تسجيل المكالمة تختفي من القائمة؛ بعد 3 أيام تظهر في المكالمة الثانية.',
     badge: () => (
       <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">جديد</span>
     ),
   },
   {
-    key:   'incubating',
-    label: 'تحت الاحتضان',
+    key:   'call_2',
+    label: 'المكالمة الثانية',
     icon:  Clock,
     color: 'indigo',
-    desc:  'Q1 — أقل من 14 يوم من التسجيل وشحنت طلبية على الأقل',
+    desc:  'تحت الاحتضان — بلا شرط شحن. بعد المكالمة تختفي؛ بعد 3 أيام تظهر في المكالمة الثالثة.',
     badge: () => (
-      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يشحن ✓</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">متابعة</span>
+    ),
+  },
+  {
+    key:   'call_3',
+    label: 'المكالمة الثالثة',
+    icon:  PhoneCall,
+    color: 'amber',
+    desc:  'التخريج — بعد المكالمة يُصنَّف المتجر نشطًا يشحن أو غير نشط حسب وجود شحنات.',
+    badge: () => (
+      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">تخريج</span>
     ),
   },
 ]
@@ -58,6 +62,7 @@ const TABS = [
 const COLOR_CLASSES = {
   blue:   { active: 'bg-blue-600 text-white shadow-blue-600/20',     count: 'bg-blue-50 text-blue-600 border-blue-200'      },
   indigo: { active: 'bg-indigo-600 text-white shadow-indigo-600/20', count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
+  amber:  { active: 'bg-amber-600 text-white shadow-amber-600/20',   count: 'bg-amber-50 text-amber-800 border-amber-200'    },
 }
 
 
@@ -266,11 +271,13 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
 // ═══════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ═══════════════════════════════════════════════════════════════════
-/** يُستبعد من مسار الاحتضان عند تخريج يدوي إلى «نشط» (حفظ في store_states) */
-function isGraduatedToActive(storeStates, storeId) {
+/** يُستبعد من مسار الاحتضان بعد إكمال المكالمة الثالثة أو التخريج */
+function isDoneIncubationPath(storeStates, storeId) {
   const st = storeStates?.[storeId]
-  const c = st?.category
-  return c === 'active' || c === 'active_shipping'
+  if (!st) return false
+  if (st.inc_call3_at) return true
+  const c = st.category
+  return c === 'active' || c === 'active_shipping' || c === 'inactive'
 }
 
 export default function IncubationPath() {
@@ -279,22 +286,23 @@ export default function IncubationPath() {
     loading, error, reload,
   } = useStores()
 
-  const [activeTab, setActiveTab] = useState('new_48h')
+  const [activeTab, setActiveTab] = useState('call_1')
   const [selected, setSelected]   = useState(null)
   const [callStore, setCallStore] = useState(null)
 
   const filteredPath = useMemo(() => ({
-    new_48h: (incubationPath.new_48h || []).filter(s => !isGraduatedToActive(storeStates, s.id)),
-    incubating: (incubationPath.incubating || []).filter(s => !isGraduatedToActive(storeStates, s.id)),
+    call_1: (incubationPath.call_1 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
+    call_2: (incubationPath.call_2 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
+    call_3: (incubationPath.call_3 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
   }), [incubationPath, storeStates])
 
   const filteredCounts = useMemo(() => ({
-    new_48h: filteredPath.new_48h.length,
-    incubating: filteredPath.incubating.length,
-    total: filteredPath.new_48h.length + filteredPath.incubating.length,
+    call_1: filteredPath.call_1.length,
+    call_2: filteredPath.call_2.length,
+    call_3: filteredPath.call_3.length,
+    total: filteredPath.call_1.length + filteredPath.call_2.length + filteredPath.call_3.length,
   }), [filteredPath])
 
-  // كل تبويب له فئة مستقلة حصرية (بعد استبعاد المُخرَّجين يدوياً إلى نشط)
   const tabStores = useMemo(
     () => filteredPath[activeTab] || [],
     [activeTab, filteredPath]
@@ -306,6 +314,17 @@ export default function IncubationPath() {
 
   const currentTab = TABS.find(t => t.key === activeTab)
 
+  const callTypeForTab =
+    activeTab === 'call_1' ? 'inc_call1'
+      : activeTab === 'call_2' ? 'inc_call2'
+        : 'inc_call3'
+
+  const tabDescClass = currentTab?.color === 'blue'
+    ? 'bg-blue-50 text-blue-800 border-blue-200'
+    : currentTab?.color === 'indigo'
+      ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+      : 'bg-amber-50 text-amber-900 border-amber-200'
+
   return (
     <div className="space-y-5" dir="rtl">
       {/* ── رأس الصفحة ── */}
@@ -316,7 +335,7 @@ export default function IncubationPath() {
             مسار الاحتضان
           </h1>
           <p className="text-slate-600 text-sm mt-0.5">
-            {filteredCounts.total || 0} متجر في مسار الاحتضان
+            {filteredCounts.total || 0} متجر في قوائم المكالمات
           </p>
         </div>
         <button
@@ -361,7 +380,7 @@ export default function IncubationPath() {
 
       {/* ── وصف التبويب الحالي ── */}
       {currentTab && (
-        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium bg-${currentTab.color === 'blue' ? 'blue' : currentTab.color}-50 text-${currentTab.color === 'blue' ? 'blue' : currentTab.color}-700 border border-${currentTab.color === 'blue' ? 'blue' : currentTab.color}-200`}>
+        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border ${tabDescClass}`}>
           <currentTab.icon size={16} />
           {currentTab.desc}
         </div>
@@ -392,14 +411,17 @@ export default function IncubationPath() {
         />
       )}
 
-      {/* ── نافذة تفاصيل المتجر ── */}
       {selected && (
         <StoreDrawer store={selected} onClose={() => setSelected(null)} />
       )}
 
-      {/* ── نافذة تسجيل مكالمة ── */}
       {callStore && (
-        <CallModal store={callStore} onClose={() => setCallStore(null)} />
+        <CallModal
+          store={callStore}
+          callType={callTypeForTab}
+          onClose={() => setCallStore(null)}
+          onSaved={reload}
+        />
       )}
 
     </div>

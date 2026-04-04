@@ -19,10 +19,10 @@ export function StoresProvider({ children }) {
     cold_inactive:   [],
   })
   const [incubationPath, setIncubationPath] = useState({
-    new_48h: [], incubating: [],
+    call_1: [], call_2: [], call_3: [],
   })
   const [incubationCounts, setIncubationCounts] = useState({
-    new_48h: 0, incubating: 0, total: 0,
+    call_1: 0, call_2: 0, call_3: 0, total: 0,
   })
   const [counts, setCounts]               = useState({
     incubating: 0, active_shipping: 0, hot_inactive: 0, cold_inactive: 0,
@@ -151,21 +151,22 @@ export function StoresProvider({ children }) {
       })
       setCounts(apiResult.counts)
 
-      // مسار الاحتضان: خانتان فقط (new_48h + incubating)
-      // Q3 (graduated) → active_shipping مباشرةً من PHP
-      // Q2 (never_started) → cold_inactive مباشرةً من PHP
-      // جاري/تمت الاستعادة → تُدار في خانة غير النشطة عبر DB
+      // مسار الاحتضان: ثلاث مكالمات (call_1 / call_2 / call_3)
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
-        new_48h:    mergeShipmentsInRange(rawPath.new_48h    || []),
-        incubating: mergeShipmentsInRange(rawPath.incubating || []),
+        call_1: mergeShipmentsInRange(rawPath.call_1 ?? rawPath.new_48h ?? []),
+        call_2: mergeShipmentsInRange(rawPath.call_2 ?? rawPath.incubating ?? []),
+        call_3: mergeShipmentsInRange(rawPath.call_3 ?? []),
       }
 
       setIncubationPath(mergedPath)
       setIncubationCounts({
-        new_48h:    mergedPath.new_48h.length,
-        incubating: mergedPath.incubating.length,
-        total:      (apiResult.incubation_counts?.total) || 0,
+        call_1: mergedPath.call_1.length,
+        call_2: mergedPath.call_2.length,
+        call_3: mergedPath.call_3.length,
+        total:
+          apiResult.incubation_counts?.total
+          ?? mergedPath.call_1.length + mergedPath.call_2.length + mergedPath.call_3.length,
       })
       setLastLoaded(new Date())
     } catch (err) {

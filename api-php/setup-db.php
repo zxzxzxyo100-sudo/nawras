@@ -44,6 +44,15 @@ try {
 try {
     $pdo->exec("ALTER TABLE store_states ADD COLUMN next_call_date DATE AFTER incubation_stage");
 } catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call1_at DATETIME NULL DEFAULT NULL AFTER next_call_date");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call2_at DATETIME NULL DEFAULT NULL AFTER inc_call1_at");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL AFTER inc_call2_at");
+} catch(Exception $e) {}
 
 // Audit logs - complete history
 $pdo->exec("CREATE TABLE IF NOT EXISTS audit_logs (

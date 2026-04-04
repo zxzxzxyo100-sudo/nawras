@@ -13,6 +13,14 @@ const OUTCOMES = [
   { value: 'callback',  label: 'طلب معاودة الاتصال',  emoji: '📞' },
 ]
 
+function storeHasShipped(store) {
+  if (!store) return false
+  const n = Number(store.total_shipments ?? 0)
+  if (n > 0) return true
+  const d = store.last_shipment_date
+  return Boolean(d && d !== 'لا يوجد')
+}
+
 export default function CallModal({ store, callType = 'general', onClose, onSaved }) {
   const { user } = useAuth()
   const { onCallSaved, todayCalls, goalPct } = usePoints()
@@ -26,7 +34,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
     setSaving(true)
     setError('')
     try {
-      const res = await logCall({
+      const payload = {
         store_id:       store.id,
         store_name:     store.name,
         call_type:      callType,
@@ -34,7 +42,12 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         note,
         performed_by:   user?.fullname || user?.username || '',
         performed_role: user?.role,
-      })
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
 
       const pts = res?.points_awarded || 10
       onCallSaved(pts)
