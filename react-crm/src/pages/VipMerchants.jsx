@@ -98,10 +98,11 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            الشروط من <span className="font-semibold text-slate-700">واجهة Nawris</span> فقط: الحقل{' '}
-            <span className="font-semibold text-slate-700">status = active</span> و{' '}
-            <span className="font-semibold text-slate-700">total_shipments ≥ {VIP_MIN}</span>
-            — دون الاعتماد على تصنيف الكانبان داخل النظام. للمدير التنفيذي فقط.
+            قائمة كبار التجار تُبنى من <span className="font-semibold text-slate-700">orders-summary</span> (نطاق واسع) مع دمج{' '}
+            <span className="font-semibold text-slate-700">customers/new</span>: يُفضَّل{' '}
+            <span className="font-semibold text-slate-700">status</span> وعدد الطرود من الملخص إن وُجد، ثم بيانات المتجر.
+            الشرط: <span className="font-semibold text-slate-700">active</span> و{' '}
+            <span className="font-semibold text-slate-700">≥ {VIP_MIN}</span> طرد. للمدير التنفيذي فقط.
           </p>
           {shipmentsRangeMeta?.from && shipmentsRangeMeta?.to && (
             <p className="text-xs text-emerald-700 mt-1" dir="ltr">

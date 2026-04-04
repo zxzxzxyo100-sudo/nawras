@@ -170,16 +170,45 @@ function nawris_is_active_status(array $s): bool {
     return in_array($t, ['active', '1', 'true', 'yes'], true);
 }
 
+/** أفضل تقدير لعدد الطرود من صف orders-summary (قد يختلف اسم الحقل بين إصدارات الـ API) */
+function nawris_best_shipment_total_from_summary_row(array $store): int {
+    $parts = [nawris_total_shipments($store)];
+    foreach (['shipments_in_range', 'total_in_range', 'orders_in_range'] as $k) {
+        if (isset($store[$k]) && is_numeric($store[$k])) {
+            $parts[] = (int) $store[$k];
+        }
+    }
+
+    return max($parts ?: [0]);
+}
+
 /**
- * جلب orders-summary من Nawris (نطاق واسع) — نفس مصدر Postman؛ total_shipments هنا غالباً أدق من customers/new.
+ * نشط للـ VIP: يُفضَّل حقل status من orders-summary إن وُجد (نفس Postman)، وإلا من customers/new.
+ */
+function nawris_vip_is_active(?array $orderRow, ?array $allStoreRow): bool {
+    if (is_array($orderRow) && array_key_exists('status', $orderRow)
+        && $orderRow['status'] !== null && $orderRow['status'] !== '') {
+        return nawris_is_active_status($orderRow);
+    }
+    if (is_array($allStoreRow)) {
+        return nawris_is_active_status($allStoreRow);
+    }
+
+    return false;
+}
+
+/**
+ * جلب orders-summary من Nawris (نطاق واسع) — نفس مصدر Postman.
  *
- * @return array{totals: array<int,int>, rows: array<int,array>}
+ * @return array{totals: array<int,int>, rows: array<int,array>, meta: array}
  */
 function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
     $totals = [];
     $rows = [];
     $cursor = null;
     $page = 0;
+    $lastHttp = 0;
+    $curlErr = 0;
     do {
         $url = NAWRIS_BASE . '/customers/orders-summary?from=' . urlencode($from) . '&to=' . urlencode($to);
         if ($cursor) {
@@ -189,8 +218,8 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
         curl_setopt_array($ch, [
             CURLOPT_URL            => $url,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 25,
-            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
@@ -201,12 +230,34 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
         ]);
         $response = curl_exec($ch);
         $curlErr = curl_errno($ch);
+        $lastHttp = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($curlErr || !$response) {
-            break;
+            return [
+                'totals' => $totals,
+                'rows'   => $rows,
+                'meta'   => [
+                    'ok' => false,
+                    'curl_errno' => $curlErr,
+                    'http_code'  => $lastHttp,
+                    'pages'      => $page,
+                ],
+            ];
         }
         $data = json_decode($response, true);
-        if (!is_array($data) || empty($data['data']) || !is_array($data['data'])) {
+        if (!is_array($data)) {
+            return [
+                'totals' => $totals,
+                'rows'   => $rows,
+                'meta'   => [
+                    'ok' => false,
+                    'json_error' => true,
+                    'http_code'  => $lastHttp,
+                    'pages'      => $page,
+                ],
+            ];
+        }
+        if (empty($data['data']) || !is_array($data['data'])) {
             break;
         }
         foreach ($data['data'] as $store) {
@@ -217,7 +268,7 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
             if ($sid <= 0) {
                 continue;
             }
-            $t = nawris_total_shipments($store);
+            $t = nawris_best_shipment_total_from_summary_row($store);
             if (!isset($totals[$sid]) || $t > $totals[$sid]) {
                 $totals[$sid] = $t;
                 $rows[$sid] = $store;
@@ -227,7 +278,16 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
         $page++;
     } while ($cursor && $page < MAX_PAGES_ALL);
 
-    return ['totals' => $totals, 'rows' => $rows];
+    return [
+        'totals' => $totals,
+        'rows'   => $rows,
+        'meta'   => [
+            'ok'         => true,
+            'http_code'  => $lastHttp,
+            'pages'      => $page,
+            'curl_errno' => $curlErr,
+        ],
+    ];
 }
 
 // ═══ هياكل النتيجة ════════════════════════════════════════════
@@ -350,45 +410,51 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
-// ── كبار التجار (VIP): status من سجل المتجر؛ total_shipments = max(customers/new، orders-summary واسع النطاق)
+// ── كبار التجار (VIP): أولوية status وعدد الطرود من orders-summary (Postman)، ثم دمج customers/new
 $vipSummaryFrom = '2020-01-01';
 $vipSummaryTo = date('Y-m-d');
 $osVip = nawris_fetch_orders_summary_for_vip($vipSummaryFrom, $vipSummaryTo);
 $ordersSummaryTotals = $osVip['totals'];
 $ordersSummaryRows = $osVip['rows'];
+$vipFetchMeta = $osVip['meta'] ?? [];
+
+$vipIdSet = [];
+foreach (array_keys($allStores) as $k) {
+    $vipIdSet[(int) $k] = true;
+}
+foreach (array_keys($ordersSummaryTotals) as $k) {
+    $vipIdSet[(int) $k] = true;
+}
 
 $vip_merchants = [];
-$vipSeen = [];
-
-foreach ($allStores as $id => $s) {
+foreach (array_keys($vipIdSet) as $id) {
     $id = (int) $id;
-    if (!nawris_is_active_status($s)) {
+    if ($id <= 0) {
         continue;
     }
-    $tList = nawris_total_shipments($s);
-    $tSum = $ordersSummaryTotals[$id] ?? 0;
-    $total = max($tList, $tSum);
+    $aRow = $allStores[$id] ?? null;
+    $oRow = $ordersSummaryRows[$id] ?? null;
+
+    $tAll = is_array($aRow) ? nawris_total_shipments($aRow) : 0;
+    $tOrd = $ordersSummaryTotals[$id] ?? 0;
+    $total = max($tAll, $tOrd);
+
     if ($total < 300) {
         continue;
     }
-    $row = $s;
-    $row['total_shipments'] = $total;
-    $vip_merchants[] = $row;
-    $vipSeen[$id] = true;
-}
+    if (!nawris_vip_is_active($oRow, $aRow)) {
+        continue;
+    }
 
-// متاجر تظهر في orders-summary بعدد عالٍ ولا تُستكمل في customers/new (صفحات/دمج)
-foreach ($ordersSummaryTotals as $oid => $t) {
-    $oid = (int) $oid;
-    if ($t < 300 || !empty($vipSeen[$oid]) || isset($allStores[$oid])) {
-        continue;
+    if (is_array($aRow) && is_array($oRow)) {
+        $merged = array_merge($aRow, $oRow);
+    } elseif (is_array($aRow)) {
+        $merged = $aRow;
+    } else {
+        $merged = $oRow;
     }
-    $row = $ordersSummaryRows[$oid] ?? null;
-    if (!$row || !is_array($row) || !nawris_is_active_status($row)) {
-        continue;
-    }
-    $row['total_shipments'] = $t;
-    $vip_merchants[] = $row;
+    $merged['total_shipments'] = $total;
+    $vip_merchants[] = $merged;
 }
 
 usort($vip_merchants, function ($a, $b) {
@@ -412,6 +478,7 @@ echo json_encode([
             'from' => $vipSummaryFrom,
             'to'   => $vipSummaryTo,
             'stores_in_summary' => count($ordersSummaryTotals),
+            'fetch'             => $vipFetchMeta,
         ],
         'generated_at'      => date('Y-m-d H:i:s'),
     ],
