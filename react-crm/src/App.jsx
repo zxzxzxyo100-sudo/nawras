@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { DISABLE_POINTS_AND_PERFORMANCE } from './config/features'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { StoresProvider } from './contexts/StoresContext'
 import { PointsProvider, usePoints } from './contexts/PointsContext'
@@ -41,7 +42,16 @@ function AppRoutes() {
         <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
-        <Route path="/performance"  element={<PrivateRoute view="tasks"><MyPerformance /></PrivateRoute>} />
+        <Route
+          path="/performance"
+          element={(
+            <PrivateRoute view="tasks">
+              {DISABLE_POINTS_AND_PERFORMANCE
+                ? <Navigate to="/tasks" replace />
+                : <MyPerformance />}
+            </PrivateRoute>
+          )}
+        />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
         <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
       </Route>
@@ -52,6 +62,7 @@ function AppRoutes() {
 
 function GlobalAnimations() {
   const { coinTrigger, earnedPoints, showJackpot, setShowJackpot } = usePoints()
+  if (DISABLE_POINTS_AND_PERFORMANCE) return null
   return (
     <GoldCoinAnimation
       trigger={coinTrigger}

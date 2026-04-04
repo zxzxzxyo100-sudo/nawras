@@ -4,6 +4,7 @@ import { X, Phone, Zap } from 'lucide-react'
 import { logCall }             from '../services/api'
 import { useAuth }             from '../contexts/AuthContext'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 
 const OUTCOMES = [
   { value: 'answered',  label: 'تم الرد',            emoji: '✅' },
@@ -80,31 +81,33 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
             </button>
           </div>
 
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-white/50 text-xs flex items-center gap-1">
-                <Zap size={10} className="text-amber-400" />
-                هدف اليوم
-              </span>
-              <span className="text-amber-400 text-xs font-bold">
-                {todayCalls} / {DAILY_GOAL} مكالمة
-              </span>
+          {!DISABLE_POINTS_AND_PERFORMANCE && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-white/50 text-xs flex items-center gap-1">
+                  <Zap size={10} className="text-amber-400" />
+                  هدف اليوم
+                </span>
+                <span className="text-amber-400 text-xs font-bold">
+                  {todayCalls} / {DAILY_GOAL} مكالمة
+                </span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: goalPct >= 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
+                      : 'linear-gradient(90deg, #f59e0b, #d97706)',
+                    boxShadow: '0 0 8px rgba(245,158,11,0.5)',
+                  }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${goalPct}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                />
+              </div>
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full rounded-full"
-                style={{
-                  background: goalPct >= 100
-                    ? 'linear-gradient(90deg, #10b981, #059669)'
-                    : 'linear-gradient(90deg, #f59e0b, #d97706)',
-                  boxShadow: '0 0 8px rgba(245,158,11,0.5)',
-                }}
-                initial={{ width: 0 }}
-                animate={{ width: `${goalPct}%` }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Body */}
@@ -165,7 +168,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
           >
             {saving
               ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-              : <><Phone size={15} /> حفظ المكالمة 🪙</>
+              : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
             }
           </motion.button>
           <button

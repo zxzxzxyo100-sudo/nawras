@@ -1,12 +1,30 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { getMyStats } from '../services/api'
 import { useAuth } from './AuthContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 
 const PointsContext = createContext(null)
 
 export const DAILY_GOAL = 20   // هدف المكالمات اليومي
 
-export function PointsProvider({ children }) {
+const POINTS_STUB = {
+  totalPoints: 0,
+  todayPoints: 0,
+  todayCalls: 0,
+  weekData: [],
+  recent: [],
+  loading: false,
+  loadError: null,
+  goalPct: 0,
+  coinTrigger: null,
+  earnedPoints: 0,
+  showJackpot: false,
+  setShowJackpot: () => {},
+  onCallSaved: () => {},
+  reload: () => {},
+}
+
+function PointsProviderActive({ children }) {
   const { user, loading: authLoading } = useAuth()
 
   const [totalPoints, setTotalPoints] = useState(0)
@@ -92,6 +110,17 @@ export function PointsProvider({ children }) {
       {children}
     </PointsContext.Provider>
   )
+}
+
+export function PointsProvider({ children }) {
+  if (DISABLE_POINTS_AND_PERFORMANCE) {
+    return (
+      <PointsContext.Provider value={POINTS_STUB}>
+        {children}
+      </PointsContext.Provider>
+    )
+  }
+  return <PointsProviderActive>{children}</PointsProviderActive>
 }
 
 export const usePoints = () => useContext(PointsContext)

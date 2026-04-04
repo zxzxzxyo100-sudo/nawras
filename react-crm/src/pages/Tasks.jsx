@@ -8,6 +8,7 @@ import {
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
 
 // ══════════════════════════════════════════════════════════════════
@@ -479,7 +480,7 @@ export default function Tasks() {
         </div>
       </motion.div>
 
-      <TasksNrsWallet />
+      {!DISABLE_POINTS_AND_PERFORMANCE && <TasksNrsWallet />}
 
       {/* ══ تبويبات التصفية ══════════════════════════════════════════ */}
       <motion.div
