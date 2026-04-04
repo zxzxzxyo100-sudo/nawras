@@ -1,5 +1,6 @@
 import { Filter } from 'lucide-react'
 import StoreNameAutocomplete from './StoreNameAutocomplete'
+import { STORE_BUCKET_KEYS, STORE_BUCKET_LABELS } from '../utils/storeBuckets'
 
 /**
  * شريط تصفية موحّد: اسم، رقم المتجر، نطاق تاريخ التسجيل، نطاق آخر شحنة
@@ -23,6 +24,10 @@ export default function StoreFilterPanel({
   onShipFromChange,
   onShipToChange,
   onClear,
+  /** تصفية خانة المتجر (احتضان، نشط يشحن، …) */
+  showBucketFilter = false,
+  selectedBucketKeys = [],
+  onBucketKeysChange,
 }) {
   const label = 'block text-[11px] text-slate-500 mb-1'
   const inp = isElite
@@ -52,6 +57,32 @@ export default function StoreFilterPanel({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {showBucketFilter && onBucketKeysChange && (
+          <div className="space-y-2 sm:col-span-2 xl:col-span-4">
+            <span className={label}>حالة المتجر (الخانة)</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {STORE_BUCKET_KEYS.map(key => (
+                <label
+                  key={key}
+                  className="inline-flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBucketKeys.includes(key)}
+                    onChange={() => {
+                      const set = new Set(selectedBucketKeys)
+                      if (set.has(key)) set.delete(key)
+                      else set.add(key)
+                      onBucketKeysChange([...set])
+                    }}
+                    className={`rounded border-slate-300 ${isElite ? 'accent-violet-600' : 'accent-blue-600'} w-4 h-4 shrink-0`}
+                  />
+                  <span className="text-sm text-slate-700">{STORE_BUCKET_LABELS[key]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="space-y-2 sm:col-span-2 xl:col-span-1">
           <label className={label}>اسم المتجر أو رقم الهاتف</label>
           {onNamePickedStoreIdChange ? (

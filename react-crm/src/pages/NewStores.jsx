@@ -3,14 +3,24 @@ import { Store, RefreshCw } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
+import { storeBucketLabel } from '../utils/storeBuckets'
 
 export default function NewStores() {
-  const { stores, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
+  const { allStores, counts, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
   const [selected, setSelected] = useState(null)
 
-  const incubating = stores.incubating || []
+  const totalCount = counts?.total ?? allStores.length
 
   const extraColumns = [
+    {
+      key: 'bucket',
+      label: 'حالة المتجر',
+      render: s => (
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/90 whitespace-nowrap">
+          {storeBucketLabel(s.bucket)}
+        </span>
+      ),
+    },
     {
       key: 'days_old',
       label: 'عمر المتجر',
@@ -37,9 +47,9 @@ export default function NewStores() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Store size={24} className="text-purple-600" />
-            المتاجر الجديدة
+            المتاجر
           </h1>
-          <p className="text-slate-600 text-sm mt-0.5">{incubating.length} متجر قيد الاحتضان</p>
+          <p className="text-slate-600 text-sm mt-0.5">{totalCount.toLocaleString('ar-SA')} متجر — جميع الخانات</p>
         </div>
         <button
           type="button"
@@ -54,11 +64,12 @@ export default function NewStores() {
 
       <StoreTable
         variant="elite"
-        stores={incubating}
+        stores={allStores}
+        enableBucketFilter
         onSelectStore={setSelected}
         onRestoreStore={setSelected}
         extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر جديدة"
+        emptyMsg="لا توجد متاجر"
         parcelsColumnSub={
           shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
             ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`

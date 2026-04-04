@@ -7,7 +7,7 @@ export const ROLES = {
   executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'tasks', 'users', 'vip_merchants'] },
   active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks'] },
   inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks'] },
-  incubation_manager: { label: 'مسؤول المتاجر الجديدة', views: ['dashboard', 'new', 'incubation', 'tasks'] },
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation', 'tasks'] },
 }
 
 export function AuthProvider({ children }) {

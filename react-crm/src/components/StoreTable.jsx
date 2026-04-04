@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
+import { STORE_BUCKET_KEYS } from '../utils/storeBuckets'
 import StoreFilterDrawer from './StoreFilterDrawer'
 
 /** خيارات عدد الصفوف في الصفحة (قائمة منسدلة مثل واجهات الإدارة) */
@@ -38,6 +39,8 @@ export default function StoreTable({
    * تلوين صفوف (غير نشط ساخن/بارد): getStyle يعيد خلفية/لون نص؛ paintMode + onPaintClick للتلوين بالنقر
    */
   rowTint = null,
+  /** تصفية بحسب خانة المتجر (احتضان / نشط يشحن / …) — يتطلب أن يكون لكل عنصر في stores حقل bucket */
+  enableBucketFilter = false,
 }) {
   const isElite = variant === 'elite'
 
@@ -51,6 +54,7 @@ export default function StoreTable({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => [...STORE_BUCKET_KEYS])
 
   const filterPayload = useMemo(
     () => ({
@@ -61,8 +65,9 @@ export default function StoreTable({
       regTo,
       shipFrom,
       shipTo,
+      ...(enableBucketFilter ? { bucketKeys: selectedBucketKeys } : {}),
     }),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys]
   )
 
   const filtered = useMemo(
@@ -88,6 +93,7 @@ export default function StoreTable({
     setRegTo('')
     setShipFrom('')
     setShipTo('')
+    if (enableBucketFilter) setSelectedBucketKeys([...STORE_BUCKET_KEYS])
   }
 
   const hasActiveFilters = useMemo(
@@ -100,8 +106,9 @@ export default function StoreTable({
         || regTo
         || shipFrom
         || shipTo
+        || (enableBucketFilter && selectedBucketKeys.length < STORE_BUCKET_KEYS.length)
       ),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys]
   )
 
   // multi-select helpers
@@ -289,6 +296,9 @@ export default function StoreTable({
         onShipFromChange={setShipFrom}
         onShipToChange={setShipTo}
         onClear={clearFilters}
+        showBucketFilter={enableBucketFilter}
+        selectedBucketKeys={selectedBucketKeys}
+        onBucketKeysChange={setSelectedBucketKeys}
       />
 
       <div className={tableWrapClass}>

@@ -45,9 +45,19 @@ export function filterStoresByToolbar(stores, filters) {
     regTo = '',
     shipFrom = '',
     shipTo = '',
+    /**
+     * تصفية بحسب خانة المتجر (احتضان / نشط يشحن / …). null = بدون تصفية خانة.
+     * مصفوفة فارغة = لا يمر أي متجر.
+     */
+    bucketKeys = null,
   } = filters
 
   return stores.filter(s => {
+    if (bucketKeys != null) {
+      if (bucketKeys.length === 0) return false
+      const b = s.bucket
+      if (b == null || !bucketKeys.includes(b)) return false
+    }
     if (namePickedStoreId != null && namePickedStoreId !== '') {
       if (String(s.id) !== String(namePickedStoreId)) return false
     } else if (nameQuery.trim()) {

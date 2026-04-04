@@ -179,12 +179,12 @@ export function StoresProvider({ children }) {
     if (user) load()
   }, [user, load])
 
-  // قائمة مسطّحة بكل المتاجر مع الفئة
+  // قائمة مسطّحة بكل المتاجر مع الفئة + خانة التقسيم (للتصفية في صفحة «المتاجر»)
   const allStores = [
-    ...stores.incubating.map(s =>      ({ ...s, category: storeStates[s.id]?.category || 'incubating'      })),
-    ...stores.active_shipping.map(s => ({ ...s, category: storeStates[s.id]?.category || 'active_shipping' })),
-    ...stores.hot_inactive.map(s =>    ({ ...s, category: storeStates[s.id]?.category || 'hot_inactive'    })),
-    ...stores.cold_inactive.map(s =>   ({ ...s, category: storeStates[s.id]?.category || 'cold_inactive'   })),
+    ...stores.incubating.map(s =>      ({ ...s, bucket: 'incubating',      category: storeStates[s.id]?.category || 'incubating'      })),
+    ...stores.active_shipping.map(s => ({ ...s, bucket: 'active_shipping', category: storeStates[s.id]?.category || 'active_shipping' })),
+    ...stores.hot_inactive.map(s =>    ({ ...s, bucket: 'hot_inactive',    category: storeStates[s.id]?.category || 'hot_inactive'    })),
+    ...stores.cold_inactive.map(s =>   ({ ...s, bucket: 'cold_inactive',   category: storeStates[s.id]?.category || 'cold_inactive'   })),
   ]
 
   return (
