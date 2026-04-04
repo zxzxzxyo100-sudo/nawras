@@ -23,10 +23,28 @@ export default function IncubationCallDelay() {
     incubationPath, callLogs, storeStates, loading, error, reload,
   } = useStores()
 
-  const baseStores = useMemo(
-    () => (incubationPath.between_calls || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
-    [incubationPath.between_calls, storeStates]
-  )
+  const baseStores = useMemo(() => {
+    const seen = new Set()
+    const out = []
+    for (const s of [
+      ...(incubationPath.call_1 || []),
+      ...(incubationPath.call_2 || []),
+      ...(incubationPath.call_3 || []),
+      ...(incubationPath.between_calls || []),
+    ]) {
+      const id = s?.id
+      if (id == null || seen.has(id)) continue
+      seen.add(id)
+      if (!isDoneIncubationPath(storeStates, id)) out.push(s)
+    }
+    return out
+  }, [
+    incubationPath.call_1,
+    incubationPath.call_2,
+    incubationPath.call_3,
+    incubationPath.between_calls,
+    storeStates,
+  ])
 
   const [selectedStages, setSelectedStages] = useState(() => new Set(ALL_STAGE_KEYS))
   const [delayMin, setDelayMin] = useState('')
@@ -82,7 +100,7 @@ export default function IncubationCallDelay() {
             تأخير المكالمة
           </h1>
           <p className="text-slate-600 text-sm mt-0.5">
-            متاجر بين المكالمات — تصفية حسب مرحلة المسار وأيام التأخير في تلك المرحلة
+            مسار الاحتضان — تصفية حسب مرحلة المسار وأيام التأخير (جميع خانات المكالمات)
           </p>
         </div>
         <button
@@ -97,7 +115,7 @@ export default function IncubationCallDelay() {
       </div>
 
       <div className="rounded-2xl border border-amber-200/80 bg-amber-50/60 px-4 py-3 text-sm text-amber-950">
-        البيانات مأخوذة من مسار الاحتضان (بين المكالمات). يوم التأخير = عدد أيام التجاوز عن نافذة اليوم المحدّد (1 أو 3 أو 10) ضمن دورة 14 يومًا.
+        البيانات مأخوذة من مسار الاحتضان (المكالمة الأولى / الثانية / الثالثة وبين المكالمات). يوم التأخير = عدد أيام التجاوز عن نافذة اليوم المحدّد (1 أو 3 أو 10) ضمن دورة 14 يومًا.
       </div>
 
       {/* تصفية */}

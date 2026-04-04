@@ -33,9 +33,9 @@ const TABS = [
     label: 'المكالمة الأولى',
     icon:  Baby,
     color: 'blue',
-    desc:  'يظهر المتجر هنا في يوم 1 من 14 يومًا منذ التسجيل إذا لم تُسجَّل المكالمة الأولى بعد.',
+    desc:  'يظهر المتجر هنا ما دامت المكالمة الأولى غير مسجّلة (أي يوم في الدورة قبل الترحيل أو التصنيف الآخر).',
     badge: () => (
-      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">يوم 1</span>
+      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">مطلوبة</span>
     ),
   },
   {
@@ -43,9 +43,9 @@ const TABS = [
     label: 'المكالمة الثانية',
     icon:  Clock,
     color: 'indigo',
-    desc:  'يظهر المتجر هنا في يوم 3 من 14 بعد تسجيل المكالمة الأولى وقبل الثانية.',
+    desc:  'من يوم 3 من 14 حتى تسجيل المكالمة الثانية — بعد المكالمة الأولى وقبل الثانية.',
     badge: () => (
-      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يوم 3</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">من يوم 3</span>
     ),
   },
   {
@@ -53,9 +53,9 @@ const TABS = [
     label: 'المكالمة الثالثة',
     icon:  PhoneCall,
     color: 'amber',
-    desc:  'يظهر المتجر هنا في يوم 10 من 14 بعد المكالمة الثانية — التخريج بعد المكالمة حسب الشحن.',
+    desc:  'من يوم 10 من 14 حتى تسجيل المكالمة الثالثة — بعد المكالمة الثانية.',
     badge: () => (
-      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">يوم 10</span>
+      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">من يوم 10</span>
     ),
   },
   {
@@ -63,7 +63,7 @@ const TABS = [
     label: 'بين المكالمات',
     icon:  Layers,
     color: 'slate',
-    desc:  'متاجر تحت الاحتضان لم تُعرَض بعد في خانة يوم 1 أو 3 أو 10 — يُعرض يوم الدورة والمرحلة والمتبقي للنافذة التالية.',
+    desc:  'متاجر سجّلت المكالمة السابقة وتنتظر يوم 3 أو 10 فقط — بدون تأخير ولا غياب المكالمة الأولى.',
     badge: () => (
       <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">انتظار</span>
     ),
