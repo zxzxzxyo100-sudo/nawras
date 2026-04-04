@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  Search,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -8,6 +7,8 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
+import { filterStoresByToolbar } from '../utils/storeFilters'
+import StoreFilterPanel from './StoreFilterPanel'
 
 const PAGE_SIZES = [10, 50, 100, 'الكل']
 
@@ -33,19 +34,43 @@ export default function StoreTable({
 }) {
   const isElite = variant === 'elite'
 
-  const [search, setSearch] = useState('')
+  const [nameQuery, setNameQuery] = useState('')
+  const [idQuery, setIdQuery] = useState('')
+  const [regFrom, setRegFrom] = useState('')
+  const [regTo, setRegTo] = useState('')
+  const [shipFrom, setShipFrom] = useState('')
+  const [shipTo, setShipTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
-  const filtered = stores.filter(s =>
-    !search || s.name?.toLowerCase().includes(search.toLowerCase()) || String(s.id).includes(search)
+  const filterPayload = useMemo(
+    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
+    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
+
+  const filtered = useMemo(
+    () => filterStoresByToolbar(stores, filterPayload),
+    [stores, filterPayload]
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [filterPayload])
+
   const effectiveSize = pageSize === 'الكل' ? filtered.length || 1 : pageSize
   const totalPages    = Math.max(1, Math.ceil(filtered.length / effectiveSize))
   const paginated     = filtered.slice((page - 1) * effectiveSize, page * effectiveSize)
 
-  function handleSearch(v) { setSearch(v); setPage(1) }
   function handlePageSize(v) { setPageSize(v === 'الكل' ? 'الكل' : Number(v)); setPage(1) }
+
+  function clearFilters() {
+    setNameQuery('')
+    setIdQuery('')
+    setRegFrom('')
+    setRegTo('')
+    setShipFrom('')
+    setShipTo('')
+  }
 
   // multi-select helpers
   const pageIds   = paginated.map(s => s.id)
@@ -75,16 +100,8 @@ export default function StoreTable({
     : 'bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden'
 
   const toolbarClass = isElite
-    ? 'p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm'
-    : 'p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap'
-
-  const searchInputClass = isElite
-    ? 'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-white to-violet-50/50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
-    : 'w-full pr-9 pl-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-
-  const searchIconClass = isElite
-    ? 'absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 drop-shadow-[0_0_8px_rgba(139,92,246,0.25)]'
-    : 'absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
+    ? 'p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm space-y-4'
+    : 'p-4 border-b border-slate-100 space-y-4'
 
   const pageBtn = (sz, active) =>
     isElite
@@ -142,75 +159,55 @@ export default function StoreTable({
 
   return (
     <div className={shellClass} dir="rtl">
-      {/* Search + page size */}
+      {/* تصفية + عرض */}
       <div className={toolbarClass}>
-        {isElite ? (
-          <div className="flex flex-wrap items-stretch gap-3 md:gap-4">
-            <div className="flex flex-wrap items-center gap-1.5 shrink-0 order-1">
-              <span className="text-[11px] text-slate-500 whitespace-nowrap hidden sm:inline">عرض:</span>
-              <div className="flex flex-wrap gap-1">
-                {PAGE_SIZES.map(sz => {
-                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
-                  return (
-                    <button
-                      key={sz}
-                      type="button"
-                      onClick={() => handlePageSize(sz)}
-                      className={pageBtn(sz, active)}
-                    >
-                      {sz}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="relative flex-1 min-w-[200px] order-2">
-              <Search size={16} className={searchIconClass} strokeWidth={2} />
-              <input
-                type="text"
-                value={search}
-                onChange={e => handleSearch(e.target.value)}
-                placeholder="بحث بالاسم أو الرقم..."
-                className={searchInputClass}
-              />
-            </div>
-            <span className="text-xs text-slate-500 whitespace-nowrap self-center order-3 tabular-nums">
-              {filtered.length} متجر
+        <StoreFilterPanel
+          isElite={isElite}
+          nameQuery={nameQuery}
+          idQuery={idQuery}
+          regFrom={regFrom}
+          regTo={regTo}
+          shipFrom={shipFrom}
+          shipTo={shipTo}
+          onNameChange={setNameQuery}
+          onIdChange={setIdQuery}
+          onRegFromChange={setRegFrom}
+          onRegToChange={setRegTo}
+          onShipFromChange={setShipFrom}
+          onShipToChange={setShipTo}
+          onClear={clearFilters}
+        />
+        <div
+          className={
+            isElite
+              ? 'flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/80'
+              : 'flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100'
+          }
+        >
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`whitespace-nowrap ${isElite ? 'text-[11px] text-slate-500 hidden sm:inline' : 'text-xs text-slate-400'}`}>
+              عرض:
             </span>
+            <div className="flex flex-wrap gap-1">
+              {PAGE_SIZES.map(sz => {
+                const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
+                return (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => handlePageSize(sz)}
+                    className={pageBtn(sz, active)}
+                  >
+                    {sz}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={15} className={searchIconClass} />
-              <input
-                type="text"
-                value={search}
-                onChange={e => handleSearch(e.target.value)}
-                placeholder="بحث بالاسم أو الرقم..."
-                className={searchInputClass}
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-400 whitespace-nowrap">عرض:</span>
-              <div className="flex gap-1">
-                {PAGE_SIZES.map(sz => {
-                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
-                  return (
-                    <button
-                      key={sz}
-                      type="button"
-                      onClick={() => handlePageSize(sz)}
-                      className={pageBtn(sz, active)}
-                    >
-                      {sz}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <span className="text-sm text-slate-500 whitespace-nowrap">{filtered.length} متجر</span>
-          </>
-        )}
+          <span className={`tabular-nums ${isElite ? 'text-xs text-slate-600' : 'text-sm text-slate-500'}`}>
+            {filtered.length} متجر
+          </span>
+        </div>
       </div>
 
       <div className={tableWrapClass}>
@@ -256,7 +253,9 @@ export default function StoreTable({
                   colSpan={7 + extraColumns.length + extraColCount + 1}
                   className={`text-center py-12 ${isElite ? 'text-slate-500 bg-white' : 'text-slate-400'}`}
                 >
-                  {emptyMsg}
+                  {stores.length > 0 && filtered.length === 0
+                    ? 'لا توجد نتائج تطابق التصفية الحالية'
+                    : emptyMsg}
                 </td>
               </tr>
             ) : (

@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, RefreshCw, Search, Phone,
+  Baby, Clock, RefreshCw, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
+import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
+import StoreFilterPanel from '../components/StoreFilterPanel'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
 function regDays(s) {
@@ -61,16 +63,31 @@ const COLOR_CLASSES = {
 
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
 function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
-  const [q, setQ] = useState('')
-  const filtered = useMemo(() => {
-    if (!q.trim()) return stores
-    const low = q.toLowerCase()
-    return stores.filter(s =>
-      String(s.name || '').toLowerCase().includes(low) ||
-      String(s.id || '').toLowerCase().includes(low) ||
-      String(s.phone || '').toLowerCase().includes(low)
-    )
-  }, [stores, q])
+  const [nameQuery, setNameQuery] = useState('')
+  const [idQuery, setIdQuery] = useState('')
+  const [regFrom, setRegFrom] = useState('')
+  const [regTo, setRegTo] = useState('')
+  const [shipFrom, setShipFrom] = useState('')
+  const [shipTo, setShipTo] = useState('')
+
+  const filterPayload = useMemo(
+    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
+    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+  )
+
+  const filtered = useMemo(
+    () => filterStoresByToolbar(stores, filterPayload),
+    [stores, filterPayload]
+  )
+
+  function clearFilters() {
+    setNameQuery('')
+    setIdQuery('')
+    setRegFrom('')
+    setRegTo('')
+    setShipFrom('')
+    setShipTo('')
+  }
 
   if (!stores.length) {
     return (
@@ -86,8 +103,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     )
   }
 
-  const searchInputClass =
-    'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-white to-violet-50/50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
   const rowElite =
     'border-b border-slate-100 transition-all duration-300 cursor-pointer bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)] hover:bg-amber-50/50 hover:shadow-[inset_0_0_0_1px_rgba(234,179,8,0.28),0_6px_24px_-12px_rgba(234,179,8,0.18)]'
 
@@ -96,20 +111,23 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
       className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90"
       dir="rtl"
     >
-      <div className="p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm">
-        <div className="relative w-full max-w-full sm:max-w-md">
-          <Search
-            size={16}
-            strokeWidth={2}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 drop-shadow-[0_0_8px_rgba(139,92,246,0.25)]"
-          />
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="بحث باسم أو رقم..."
-            className={searchInputClass}
-          />
-        </div>
+      <div className="p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm space-y-4">
+        <StoreFilterPanel
+          isElite
+          nameQuery={nameQuery}
+          idQuery={idQuery}
+          regFrom={regFrom}
+          regTo={regTo}
+          shipFrom={shipFrom}
+          shipTo={shipTo}
+          onNameChange={setNameQuery}
+          onIdChange={setIdQuery}
+          onRegFromChange={setRegFrom}
+          onRegToChange={setRegTo}
+          onShipFromChange={setShipFrom}
+          onShipToChange={setShipTo}
+          onClear={clearFilters}
+        />
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner">
@@ -125,6 +143,13 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
             </tr>
           </thead>
           <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-12 text-center text-slate-500">
+                  لا توجد نتائج تطابق التصفية الحالية
+                </td>
+              </tr>
+            )}
             {filtered.map((s, i) => {
               const hours   = regHours(s)
               const days    = regDays(s)
