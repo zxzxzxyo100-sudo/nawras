@@ -11,7 +11,7 @@ import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
-  { to: '/new',           label: 'المتاجر الجديدة',    icon: Store,           view: 'new'          },
+  { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/incubation',    label: 'مسار الاحتضان',      icon: Baby,            view: 'incubation'   },
   { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
