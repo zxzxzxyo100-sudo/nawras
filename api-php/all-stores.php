@@ -290,22 +290,30 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
-// ── كبار التجار (VIP): نشط يشحن + total_shipments >= 300 + status نشط ──
+// ── كبار التجار (VIP): total_shipments >= 300 + status نشط — من كل المتاجر ما عدا الاحتضان
+// (لا يقتصر على «نشط يشحن» حتى يظهر من لديه حجم شحن عالٍ حتى لو آخر شحنة > 14 يومًا)
+$incubatingIds = [];
+foreach ($result['incubating'] as $row) {
+    $iid = $row['id'] ?? null;
+    if ($iid !== null) {
+        $incubatingIds[$iid] = true;
+    }
+}
 $vip_merchants = [];
-foreach ($result['active_shipping'] as $s) {
-    $id = $s['id'] ?? null;
-    $merged = ($id !== null && isset($allStores[$id])) ? array_merge($allStores[$id], $s) : $s;
-    if (!nawris_is_active_status($merged)) {
+foreach ($allStores as $id => $s) {
+    if (isset($incubatingIds[$id])) {
         continue;
     }
-    $tCat = nawris_total_shipments($s);
-    $tAll = ($id !== null && isset($allStores[$id])) ? nawris_total_shipments($allStores[$id]) : 0;
-    $total = max($tCat, $tAll);
+    if (!nawris_is_active_status($s)) {
+        continue;
+    }
+    $total = nawris_total_shipments($s);
     if ($total < 300) {
         continue;
     }
-    $merged['total_shipments'] = $total;
-    $vip_merchants[] = $merged;
+    $row = $s;
+    $row['total_shipments'] = $total;
+    $vip_merchants[] = $row;
 }
 usort($vip_merchants, function ($a, $b) {
     return nawris_total_shipments($b) - nawris_total_shipments($a);

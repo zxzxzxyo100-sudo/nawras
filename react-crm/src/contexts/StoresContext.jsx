@@ -85,11 +85,24 @@ export function StoresProvider({ children }) {
       if (Array.isArray(apiResult.vip_merchants)) {
         vipList = apiResult.vip_merchants
       } else {
-        // خادم قديم بلا مفتاح vip_merchants — نفس المنطق: نشط يشحن + ≥300 + status نشط
-        vipList = (apiResult.data?.active_shipping || []).filter(s => {
-          if (!isActiveMerchantStatus(s)) return false
-          return totalShipments(s) >= 300
-        })
+        // خادم قديم: نشط + ≥300 من جميع الخانات ما عدا الاحتضان (لا يقتصر على نشط يشحن)
+        const incub = new Set((apiResult.data?.incubating || []).map(s => s.id))
+        const buckets = [
+          ...(apiResult.data?.active_shipping || []),
+          ...(apiResult.data?.hot_inactive || []),
+          ...(apiResult.data?.cold_inactive || []),
+        ]
+        const seen = new Set()
+        vipList = []
+        for (const s of buckets) {
+          const sid = s?.id
+          if (sid == null || seen.has(sid)) continue
+          seen.add(sid)
+          if (incub.has(sid)) continue
+          if (!isActiveMerchantStatus(s)) continue
+          if (totalShipments(s) < 300) continue
+          vipList.push(s)
+        }
       }
       setVipMerchants(mergeShipmentsInRange(vipList))
 

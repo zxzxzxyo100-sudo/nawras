@@ -98,9 +98,9 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            يظهر التاجر هنا عندما يكون <span className="font-semibold text-slate-700">نشطًا (status = active)</span> ضمن خانة «نشط يشحن»، وإجمالي الطرود{' '}
-            <span className="font-semibold text-slate-700">≥ {VIP_MIN}</span>
-            — للمدير التنفيذي فقط
+            يظهر التاجر عندما يكون الحساب <span className="font-semibold text-slate-700">نشطًا (status = active)</span> وإجمالي الطرود{' '}
+            <span className="font-semibold text-slate-700">total_shipments ≥ {VIP_MIN}</span>
+            — يشمل التجار الكبار حتى لو تصنيفهم الحالي «غير نشط» بسبب آخر شحنة؛ مستثنى من في الاحتضان فقط. للمدير التنفيذي فقط.
           </p>
           {shipmentsRangeMeta?.from && shipmentsRangeMeta?.to && (
             <p className="text-xs text-emerald-700 mt-1" dir="ltr">
