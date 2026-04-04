@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
-import { Flame, RefreshCw, CheckCircle2, Phone, PhoneOff, Users } from 'lucide-react'
+import { Flame, RefreshCw, Phone, PhoneOff, Users } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
-import { useAuth } from '../contexts/AuthContext'
-import { setStoreStatus } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
@@ -34,9 +32,7 @@ function aggregateUserStats(stores, storeStates, callLogs) {
 export default function HotInactive() {
   const { recoverySegment } = useParams()
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
-  const { user } = useAuth()
-  const [selected, setSelected]           = useState(null)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [selected, setSelected] = useState(null)
 
   if (!SEGMENTS.has(recoverySegment || '')) {
     return <Navigate to="/hot-inactive/all" replace />
@@ -52,7 +48,8 @@ export default function HotInactive() {
       const dbCat = storeStates[s.id]?.category
       if (isAllTab) return true
       if (isRestoredTab) return dbCat === 'restored'
-      return dbCat !== 'restored'
+      /* جاري الاستعادة: فقط من علِقت حالته بـ restoring في النظام */
+      return dbCat === 'restoring'
     })
   }, [hotInactive, storeStates, isAllTab, isRestoredTab])
 
@@ -60,25 +57,6 @@ export default function HotInactive() {
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
     [filteredStores, storeStates, callLogs]
   )
-
-  async function markAs(store, category) {
-    setActionLoading(true)
-    try {
-      await setStoreStatus({
-        store_id:   store.id,
-        store_name: store.name,
-        category,
-        old_status: storeStates[store.id]?.category || 'hot_inactive',
-        user:       user?.fullname,
-        user_role:  user?.role,
-      })
-      await reload()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
   const extraColumns = [
     {
@@ -165,16 +143,12 @@ export default function HotInactive() {
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={e => { e.stopPropagation(); markAs(s, 'restored') }}
-              className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium flex items-center gap-1"
-            >
-              <CheckCircle2 size={11} /> تأكيد الاستعادة
-            </button>
+          <div className="flex flex-col gap-1 max-w-[200px]">
+            <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full font-medium w-fit">قيد الاستعادة</span>
             {dbUpdatedBy && (
-              <span className="text-[10px] text-slate-400">{dbUpdatedBy}</span>
+              <span className="text-[10px] text-slate-500">{dbUpdatedBy}</span>
             )}
+            <span className="text-[10px] text-slate-400 leading-snug">تمت الاستعادة تُحدَّث تلقائياً — لا يمكن اختيارها يدوياً</span>
           </div>
         )
         if (dbCat === 'frozen') return (
@@ -251,20 +225,11 @@ export default function HotInactive() {
             ? 'لا توجد متاجر في غير نشط ساخن'
             : isRestoredTab
               ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة'
-              : 'لا توجد متاجر جاري استعادتها هنا'
+              : 'لا توجد متاجر بحالة «قيد الاستعادة» — تُعرض هنا فقط بعد تغيير الحالة إلى استعادة من النظام'
         }
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
-
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl flex items-center gap-3">
-            <RefreshCw size={20} className="animate-spin text-orange-500" />
-            <span className="text-sm font-medium text-slate-700">جاري التحديث...</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
