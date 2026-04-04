@@ -3,6 +3,7 @@ import { inactiveRowStyleForKey } from '../constants/inactiveRowColors'
 
 function loadMap(storageKey) {
   try {
+    if (typeof localStorage === 'undefined') return {}
     const raw = localStorage.getItem(storageKey)
     if (!raw) return {}
     const p = JSON.parse(raw)
