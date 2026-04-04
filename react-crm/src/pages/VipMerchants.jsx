@@ -54,7 +54,7 @@ export default function VipMerchants() {
         const m = {}
         if (res?.success && Array.isArray(res.data)) {
           res.data.forEach(s => {
-            const n = parseInt(s.total_shipments, 10) || 0
+            const n = totalShipments(s)
             m[s.id] = n
             m[String(s.id)] = n
           })
@@ -98,13 +98,14 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            يظهر التاجر عندما يكون الحساب <span className="font-semibold text-slate-700">نشطًا (status = active)</span> وإجمالي الطرود{' '}
+            الشروط من <span className="font-semibold text-slate-700">واجهة Nawris</span> فقط: الحقل{' '}
+            <span className="font-semibold text-slate-700">status = active</span> و{' '}
             <span className="font-semibold text-slate-700">total_shipments ≥ {VIP_MIN}</span>
-            — يشمل التجار الكبار حتى لو تصنيفهم الحالي «غير نشط» بسبب آخر شحنة؛ مستثنى من في الاحتضان فقط. للمدير التنفيذي فقط.
+            — دون الاعتماد على تصنيف الكانبان داخل النظام. للمدير التنفيذي فقط.
           </p>
           {shipmentsRangeMeta?.from && shipmentsRangeMeta?.to && (
             <p className="text-xs text-emerald-700 mt-1" dir="ltr">
-              نطاق الطرود الحالي (للمؤشر): {shipmentsRangeMeta.from} ← {shipmentsRangeMeta.to}
+              نطاق الطرود (من استجابة API orders-summary): {shipmentsRangeMeta.from} ← {shipmentsRangeMeta.to}
             </p>
           )}
           {prevLabel && (
@@ -123,8 +124,7 @@ export default function VipMerchants() {
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
-        <strong>المؤشر:</strong> بجانب طردات النطاق الحالي — سهم أخضر إذا زادت الطرود عن{' '}
-        <strong>الفترة السابقة</strong> (نفس طول النطاق الحالي مباشرةً قبل بدايته)، وأحمر إذا نقصت، ورمادي عند التساوي.
+        <strong>المؤشر:</strong> أعداد عمود «طرود النطاق» من <strong>طلب orders-summary</strong> إلى Nawris؛ المقارنة مع الفترة السابقة بنفس الطول (تواريخ محسوبة من نطاق الـ API أعلاه).
         {loadingPrev && <span className="mr-2 text-amber-700"> جارٍ جلب الفترة السابقة…</span>}
       </div>
 
@@ -172,7 +172,7 @@ export default function VipMerchants() {
               ) : emptyNoVip ? (
                 <tr>
                   <td colSpan={8} className="text-center py-16 text-slate-400">
-                    لا يوجد تجار نشطين يطابقون الشرط (حالة نشط، ≥ {VIP_MIN} طرد)
+                    لا يوجد تجار يطابقون شرط واجهة Nawris (status نشط، total_shipments ≥ {VIP_MIN})
                   </td>
                 </tr>
               ) : (

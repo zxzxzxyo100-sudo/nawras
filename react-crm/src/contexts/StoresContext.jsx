@@ -34,9 +34,9 @@ export function StoresProvider({ children }) {
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
   const [error, setError]                 = useState(null)
-  /** نطاق تاريخ طُلبت له أعداد الطرود (آخر 30 يومًا — بدون تقييد 14 يوم) */
+  /** نطاق الطرود: التواريخ المعادة من orders-summary.php (واجهة Nawرس عبر الخادم) */
   const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
-  /** كبار التجار: من الخادم (نشط يشحن + total_shipments ≥ 300 + status = active) */
+  /** كبار التجار: من all-stores — حقول واجهة Nawris فقط (status + total_shipments) */
   const [vipMerchants, setVipMerchants] = useState([])
 
   const load = useCallback(async () => {
@@ -61,13 +61,18 @@ export function StoresProvider({ children }) {
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
 
       const rangeMap = {}
+      let resolvedFrom = rangeFrom
+      let resolvedTo = rangeTo
       if (rangeRes?.success && Array.isArray(rangeRes.data)) {
         rangeRes.data.forEach(s => {
           const id = s.id
-          rangeMap[id] = parseInt(s.total_shipments, 10) || 0
-          rangeMap[String(id)] = rangeMap[id]
+          const n = totalShipments(s)
+          rangeMap[id] = n
+          rangeMap[String(id)] = n
         })
-        setShipmentsRangeMeta({ from: rangeFrom, to: rangeTo })
+        resolvedFrom = rangeRes.from != null && rangeRes.from !== '' ? String(rangeRes.from) : rangeFrom
+        resolvedTo = rangeRes.to != null && rangeRes.to !== '' ? String(rangeRes.to) : rangeTo
+        setShipmentsRangeMeta({ from: resolvedFrom, to: resolvedTo })
       } else {
         setShipmentsRangeMeta({ from: null, to: null })
       }
@@ -76,8 +81,8 @@ export function StoresProvider({ children }) {
         return (arr || []).map(s => ({
           ...s,
           shipments_in_range: rangeMap[s.id] ?? rangeMap[String(s.id)] ?? 0,
-          shipments_range_from: rangeFrom,
-          shipments_range_to: rangeTo,
+          shipments_range_from: resolvedFrom,
+          shipments_range_to: resolvedTo,
         }))
       }
 
@@ -85,9 +90,9 @@ export function StoresProvider({ children }) {
       if (Array.isArray(apiResult.vip_merchants)) {
         vipList = apiResult.vip_merchants
       } else {
-        // خادم قديم: نشط + ≥300 من جميع الخانات ما عدا الاحتضان (لا يقتصر على نشط يشحن)
-        const incub = new Set((apiResult.data?.incubating || []).map(s => s.id))
+        // خادم قديم: نفس منطق API — دمج كل الخانات، الشروط status + total_shipments فقط (لا استثناء منظومة)
         const buckets = [
+          ...(apiResult.data?.incubating || []),
           ...(apiResult.data?.active_shipping || []),
           ...(apiResult.data?.hot_inactive || []),
           ...(apiResult.data?.cold_inactive || []),
@@ -98,7 +103,6 @@ export function StoresProvider({ children }) {
           const sid = s?.id
           if (sid == null || seen.has(sid)) continue
           seen.add(sid)
-          if (incub.has(sid)) continue
           if (!isActiveMerchantStatus(s)) continue
           if (totalShipments(s) < 300) continue
           vipList.push(s)

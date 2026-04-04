@@ -290,20 +290,9 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
-// ── كبار التجار (VIP): total_shipments >= 300 + status نشط — من كل المتاجر ما عدا الاحتضان
-// (لا يقتصر على «نشط يشحن» حتى يظهر من لديه حجم شحن عالٍ حتى لو آخر شحنة > 14 يومًا)
-$incubatingIds = [];
-foreach ($result['incubating'] as $row) {
-    $iid = $row['id'] ?? null;
-    if ($iid !== null) {
-        $incubatingIds[$iid] = true;
-    }
-}
+// ── كبار التجار (VIP): حصراً من حقول واجهة Nawris — total_shipments >= 300 و status نشط (لا يعتمد تصنيف الكانبان)
 $vip_merchants = [];
 foreach ($allStores as $id => $s) {
-    if (isset($incubatingIds[$id])) {
-        continue;
-    }
     if (!nawris_is_active_status($s)) {
         continue;
     }
