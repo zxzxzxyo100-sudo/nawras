@@ -11,9 +11,9 @@ function getDB() {
             DB_USER,
             DB_PASS,
             [
-                PDO::ATTR_ERRMODE              => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_TIMEOUT              => 5,
-                PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false,
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT => 5,
+                // استعلامات مُخزَّنة (افتراضي) — مطلوب لعدة SELECT متتالية في نفس الطلب (مثل get_my_stats)
             ]
         );
         return $pdo;

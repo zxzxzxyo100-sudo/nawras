@@ -582,55 +582,66 @@ elseif ($action === 'get_my_stats') {
     $username = $input['username'] ?? ($_GET['username'] ?? '');
     if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب']); }
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
-        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
-        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
-        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user (username), INDEX idx_date (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+            id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+            fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+            reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user (username), INDEX idx_date (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // إجمالي النقاط
-    $totStmt = $pdo->prepare("SELECT COALESCE(SUM(points),0) AS total FROM points_log WHERE username = ?");
-    $totStmt->execute([$username]);
-    $totalPoints = (int)$totStmt->fetchColumn();
+        // إجمالي النقاط
+        $totStmt = $pdo->prepare("SELECT COALESCE(SUM(points),0) AS total FROM points_log WHERE username = ?");
+        $totStmt->execute([$username]);
+        $totalPoints = (int)$totStmt->fetchColumn();
+        $totStmt->closeCursor();
 
-    // نقاط اليوم + مكالمات اليوم
-    $todayStmt = $pdo->prepare("
-        SELECT COALESCE(SUM(points),0) AS pts, COUNT(*) AS calls
-        FROM points_log WHERE username = ? AND DATE(created_at) = CURDATE()
-    ");
-    $todayStmt->execute([$username]);
-    $todayRow = $todayStmt->fetch(PDO::FETCH_ASSOC);
+        // نقاط اليوم + مكالمات اليوم
+        $todayStmt = $pdo->prepare("
+            SELECT COALESCE(SUM(points),0) AS pts, COUNT(*) AS calls
+            FROM points_log WHERE username = ? AND DATE(created_at) = CURDATE()
+        ");
+        $todayStmt->execute([$username]);
+        $todayRow = $todayStmt->fetch(PDO::FETCH_ASSOC);
+        $todayStmt->closeCursor();
 
-    // مكالمات آخر 7 أيام (للرسم البياني)
-    $weekStmt = $pdo->prepare("
-        SELECT DATE(created_at) AS day, COUNT(*) AS calls, SUM(points) AS pts
-        FROM points_log
-        WHERE username = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-        GROUP BY DATE(created_at)
-        ORDER BY day ASC
-    ");
-    $weekStmt->execute([$username]);
-    $weekData = $weekStmt->fetchAll(PDO::FETCH_ASSOC);
+        // مكالمات آخر 7 أيام (للرسم البياني)
+        $weekStmt = $pdo->prepare("
+            SELECT DATE(created_at) AS day, COUNT(*) AS calls, COALESCE(SUM(points),0) AS pts
+            FROM points_log
+            WHERE username = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+        ");
+        $weekStmt->execute([$username]);
+        $weekData = $weekStmt->fetchAll(PDO::FETCH_ASSOC);
+        $weekStmt->closeCursor();
 
-    // آخر 10 مكالمات
-    $recentStmt = $pdo->prepare("
-        SELECT reason, store_name, points, created_at
-        FROM points_log WHERE username = ?
-        ORDER BY created_at DESC LIMIT 10
-    ");
-    $recentStmt->execute([$username]);
-    $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+        // آخر 10 مكالمات
+        $recentStmt = $pdo->prepare("
+            SELECT reason, store_name, points, created_at
+            FROM points_log WHERE username = ?
+            ORDER BY created_at DESC LIMIT 10
+        ");
+        $recentStmt->execute([$username]);
+        $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    jsonResponse([
-        'success'      => true,
-        'total_points' => $totalPoints,
-        'today_points' => (int)($todayRow['pts']   ?? 0),
-        'today_calls'  => (int)($todayRow['calls'] ?? 0),
-        'week_data'    => $weekData,
-        'recent'       => $recent,
-    ]);
+        jsonResponse([
+            'success'      => true,
+            'total_points' => $totalPoints,
+            'today_points' => (int)($todayRow['pts']   ?? 0),
+            'today_calls'  => (int)($todayRow['calls'] ?? 0),
+            'week_data'    => $weekData,
+            'recent'       => $recent,
+        ]);
+    } catch (Throwable $e) {
+        error_log('get_my_stats: ' . $e->getMessage());
+        jsonResponse([
+            'success' => false,
+            'error'   => 'تعذّر قراءة إحصائيات النقاط — تحقق من جدول points_log أو إعدادات MySQL',
+        ]);
+    }
 }
 
 // ========== AWARD BONUS (إعلانات النورس الذكية) ==========
