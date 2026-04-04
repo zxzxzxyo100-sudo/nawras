@@ -1,9 +1,9 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import {
-  LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
+  LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
-  ChevronDown, Circle,
+  ChevronDown, Circle, Layers,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -14,33 +14,37 @@ const NAV_ALL = [
   { to: '/new',           label: 'المتاجر الجديدة',    icon: Store,           view: 'new'          },
   { to: '/incubation',    label: 'مسار الاحتضان',      icon: Baby,            view: 'incubation'   },
   { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
-  { to: '/cold-inactive', label: 'غير نشط بارد',       icon: Snowflake,       view: 'cold_inactive'},
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
 
-/** ترتيب عناصر مجموعة المتاجر — غير نشط ساخن له قائمة فرعية منفصلة */
+/** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */
+const INACTIVE_SUB = [
+  { to: '/hot-inactive/all',       label: 'غير نشطة ساخنة', view: 'hot_inactive' },
+  { to: '/cold-inactive',          label: 'غير نشطة باردة', view: 'cold_inactive' },
+  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', view: 'hot_inactive' },
+  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة',  view: 'hot_inactive' },
+]
+
+/** ترتيب عناصر مجموعة المتاجر — «غير نشطة» قائمة فرعية موحدة */
 const STORE_NAV_ORDER = [
-  '/new', '/incubation', '/active', '__hot_inactive__', '/cold-inactive', '/vip',
+  '/new', '/incubation', '/active', '__inactive_group__', '/vip',
 ]
 
-const HOT_INACTIVE_SUB = [
-  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة' },
-  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة' },
-]
-
-function HotInactiveNavGroup({ can, onClose }) {
+function InactiveNavGroup({ can, onClose }) {
   const location = useLocation()
-  const isUnderHot = location.pathname.startsWith('/hot-inactive')
-  const [open, setOpen] = useState(isUnderHot)
+  const isInactiveSection =
+    location.pathname.startsWith('/hot-inactive') || location.pathname.startsWith('/cold-inactive')
+  const [open, setOpen] = useState(isInactiveSection)
 
   useEffect(() => {
-    if (isUnderHot) setOpen(true)
-  }, [isUnderHot])
+    if (isInactiveSection) setOpen(true)
+  }, [isInactiveSection])
 
-  if (!can('hot_inactive')) return null
+  const links = INACTIVE_SUB.filter(item => can(item.view))
+  if (links.length === 0) return null
 
   return (
     <div className="mb-0.5">
@@ -48,27 +52,28 @@ function HotInactiveNavGroup({ can, onClose }) {
         type="button"
         onClick={() => setOpen(o => !o)}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
-          isUnderHot ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+          isInactiveSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isUnderHot ? {
+        style={isInactiveSection ? {
           background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
           boxShadow: '0 0 20px rgba(139,92,246,0.15)',
         } : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isUnderHot ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isInactiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
         }`}>
-          <Flame size={14} className={isUnderHot ? 'text-white' : 'text-white/50'} />
+          <Layers size={14} className={isInactiveSection ? 'text-white' : 'text-white/50'} />
         </div>
-        <span className="flex-1 truncate">غير نشط ساخن</span>
+        <span className="flex-1 truncate">غير نشطة</span>
         <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
-          {HOT_INACTIVE_SUB.map(sub => (
+          {links.map(sub => (
             <NavLink
               key={sub.to}
               to={sub.to}
+              end={sub.to === '/cold-inactive'}
               onClick={() => { if (onClose) onClose() }}
               className={({ isActive }) =>
                 `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
@@ -152,8 +157,8 @@ export default function Sidebar({ isOpen, onClose }) {
         {NAV_GROUPS.map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
-              if (key === '__hot_inactive__') {
-                return <HotInactiveNavGroup key="hot" can={can} onClose={onClose} />
+              if (key === '__inactive_group__') {
+                return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />
               }
               const item = NAV.find(n => n.to === key)
               if (!item || !can(item.view)) return null

@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { setStoreStatus } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 
-const SEGMENTS = new Set(['restoring', 'restored'])
+const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
 function aggregateUserStats(stores, storeStates, callLogs) {
   const today = new Date().toISOString().slice(0, 10)
@@ -39,9 +39,10 @@ export default function HotInactive() {
   const [actionLoading, setActionLoading] = useState(false)
 
   if (!SEGMENTS.has(recoverySegment || '')) {
-    return <Navigate to="/hot-inactive/restoring" replace />
+    return <Navigate to="/hot-inactive/all" replace />
   }
 
+  const isAllTab = recoverySegment === 'all'
   const isRestoredTab = recoverySegment === 'restored'
 
   const hotInactive = stores.hot_inactive || []
@@ -49,10 +50,11 @@ export default function HotInactive() {
   const filteredStores = useMemo(() => {
     return hotInactive.filter(s => {
       const dbCat = storeStates[s.id]?.category
+      if (isAllTab) return true
       if (isRestoredTab) return dbCat === 'restored'
       return dbCat !== 'restored'
     })
-  }, [hotInactive, storeStates, isRestoredTab])
+  }, [hotInactive, storeStates, isAllTab, isRestoredTab])
 
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
@@ -183,7 +185,11 @@ export default function HotInactive() {
     },
   ]
 
-  const subTitle = isRestoredTab ? 'تمت الاستعادة' : 'جاري الاستعادة'
+  const subTitle = isAllTab
+    ? 'غير نشطة ساخنة'
+    : isRestoredTab
+      ? 'تمت الاستعادة'
+      : 'جاري الاستعادة'
 
   return (
     <div className="space-y-5">
@@ -240,7 +246,13 @@ export default function HotInactive() {
         stores={filteredStores}
         onSelectStore={setSelected}
         extraColumns={extraColumns}
-        emptyMsg={isRestoredTab ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة' : 'لا توجد متاجر جاري استعادتها هنا'}
+        emptyMsg={
+          isAllTab
+            ? 'لا توجد متاجر في غير نشط ساخن'
+            : isRestoredTab
+              ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة'
+              : 'لا توجد متاجر جاري استعادتها هنا'
+        }
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
