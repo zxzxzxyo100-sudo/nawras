@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, Phone, Zap } from 'lucide-react'
+import { X, Phone } from 'lucide-react'
 import { logCall }             from '../services/api'
 import { useAuth }             from '../contexts/AuthContext'
-import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
-import { IS_STAGING_BUILD } from '../config/env'
 
 const OUTCOMES = [
   { value: 'answered',  label: 'تم الرد',            emoji: '✅' },
@@ -14,8 +12,7 @@ const OUTCOMES = [
 ]
 
 export default function CallModal({ store, callType = 'general', onClose, onSaved }) {
-  const { user }                              = useAuth()
-  const { onCallSaved, todayCalls, goalPct }  = usePoints()
+  const { user } = useAuth()
 
   const [outcome, setOutcome] = useState('answered')
   const [note,    setNote]    = useState('')
@@ -36,10 +33,6 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         performed_role: user?.role,
       })
 
-      const pts = res?.points_awarded || 10
-
-      // يُطلق الأنيميشن عبر Context (يظهر حتى بعد إغلاق الـ Modal)
-      onCallSaved(pts)
       onSaved?.()
 
       // أغلق الـ Modal بعد لحظة قصيرة
@@ -82,34 +75,6 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
               <X size={15} />
             </button>
           </div>
-
-          {!IS_STAGING_BUILD && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-white/50 text-xs flex items-center gap-1">
-                  <Zap size={10} className="text-amber-400" />
-                  هدف اليوم
-                </span>
-                <span className="text-amber-400 text-xs font-bold">
-                  {todayCalls} / {DAILY_GOAL} مكالمة
-                </span>
-              </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: goalPct >= 100
-                      ? 'linear-gradient(90deg, #10b981, #059669)'
-                      : 'linear-gradient(90deg, #f59e0b, #d97706)',
-                    boxShadow: '0 0 8px rgba(245,158,11,0.5)',
-                  }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${goalPct}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Body */}

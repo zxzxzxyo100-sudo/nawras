@@ -1,12 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
-  ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2,
+  ClipboardList, Users, LogOut, Baby, X, Kanban,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
-import { IS_STAGING_BUILD } from '../config/env'
 
-const NAV_ALL = [
+const NAV = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر الجديدة',    icon: Store,           view: 'new'          },
@@ -15,20 +14,14 @@ const NAV_ALL = [
   { to: '/hot-inactive',  label: 'غير نشط ساخن',       icon: Flame,           view: 'hot_inactive' },
   { to: '/cold-inactive', label: 'غير نشط بارد',       icon: Snowflake,       view: 'cold_inactive'},
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
-  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
-
-/** في التجريبية: إخفاء «أدائي» (بدون نقاط NRS) */
-const NAV = IS_STAGING_BUILD
-  ? NAV_ALL.filter(n => n.to !== '/performance')
-  : NAV_ALL
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
   { label: 'الرئيسية',  keys: ['/', '/kanban'] },
   { label: 'المتاجر',   keys: ['/new', '/incubation', '/active', '/hot-inactive', '/cold-inactive'] },
-  { label: 'الإدارة',   keys: IS_STAGING_BUILD ? ['/tasks', '/users'] : ['/tasks', '/performance', '/users'] },
+  { label: 'الإدارة',   keys: ['/tasks', '/users'] },
 ]
 
 export default function Sidebar({ isOpen, onClose }) {
