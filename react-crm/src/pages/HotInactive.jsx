@@ -55,6 +55,8 @@ export default function HotInactive() {
 
   const hotInactive = stores.hot_inactive || []
   const coldInactive = stores.cold_inactive || []
+  const activeShipping = stores.active_shipping || []
+  const incubating = stores.incubating || []
 
   const filteredStores = useMemo(() => {
     const cat = id => storeStates[id]?.category
@@ -62,15 +64,22 @@ export default function HotInactive() {
       return hotInactive.filter(() => true)
     }
     if (isRestoredTab) {
-      const hot = hotInactive.filter(s => isRestoredCategory(cat(s.id)))
-      const cold = coldInactive.filter(s => isRestoredCategory(cat(s.id)))
-      return dedupeById([...hot, ...cold])
+      /* غير نشط ساخن/بارد + أي متجر انتقل لنشط/احتضان بعد recovered (لم يعد في قوائم غير النشط) */
+      const inactiveRows = [
+        ...hotInactive.filter(s => isRestoredCategory(cat(s.id))),
+        ...coldInactive.filter(s => isRestoredCategory(cat(s.id))),
+      ]
+      const afterRecovery = [
+        ...activeShipping.filter(s => isRestoredCategory(cat(s.id))),
+        ...incubating.filter(s => isRestoredCategory(cat(s.id))),
+      ]
+      return dedupeById([...inactiveRows, ...afterRecovery])
     }
     /* جاري الاستعادة: ساخن + بارد بحالة restoring */
     const hot = hotInactive.filter(s => cat(s.id) === 'restoring')
     const cold = coldInactive.filter(s => cat(s.id) === 'restoring')
     return dedupeById([...hot, ...cold])
-  }, [hotInactive, coldInactive, storeStates, isAllTab, isRestoredTab])
+  }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab])
 
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
@@ -81,11 +90,21 @@ export default function HotInactive() {
     ? [{
         key: 'list_bucket',
         label: 'المسار',
-        render: s => (
-          coldInactive.some(c => c.id === s.id)
-            ? <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">غير نشط بارد</span>
-            : <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium">غير نشط ساخن</span>
-        ),
+        render: s => {
+          if (coldInactive.some(c => c.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">غير نشط بارد</span>
+          }
+          if (hotInactive.some(c => c.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium">غير نشط ساخن</span>
+          }
+          if (activeShipping.some(x => x.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">نشط يشحن (بعد الاستعادة)</span>
+          }
+          if (incubating.some(x => x.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 font-medium">مسار الاحتضان</span>
+          }
+          return <span className="text-xs text-slate-400">—</span>
+        },
       }]
     : []
 
