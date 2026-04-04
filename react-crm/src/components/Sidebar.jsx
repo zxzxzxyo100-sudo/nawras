@@ -24,8 +24,8 @@ const NAV_ALL = [
 const INACTIVE_SUB = [
   { to: '/hot-inactive/all',       label: 'غير نشطة ساخنة', view: 'hot_inactive' },
   { to: '/cold-inactive',          label: 'غير نشطة باردة', view: 'cold_inactive' },
-  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', viewAny: ['hot_inactive', 'cold_inactive'] },
-  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة',  viewAny: ['hot_inactive', 'cold_inactive'] },
+  { to: '/hot-inactive/restoring', label: 'غير نشط — جاري الاستعادة', viewAny: ['hot_inactive', 'cold_inactive'] },
+  { to: '/hot-inactive/restored',  label: 'غير نشط — تمت الاستعادة',  viewAny: ['hot_inactive', 'cold_inactive'] },
 ]
 
 function canInactiveSub(item, canFn) {
