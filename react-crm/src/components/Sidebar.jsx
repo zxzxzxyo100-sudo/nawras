@@ -24,9 +24,14 @@ const NAV_ALL = [
 const INACTIVE_SUB = [
   { to: '/hot-inactive/all',       label: 'غير نشطة ساخنة', view: 'hot_inactive' },
   { to: '/cold-inactive',          label: 'غير نشطة باردة', view: 'cold_inactive' },
-  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', view: 'hot_inactive' },
-  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة',  view: 'hot_inactive' },
+  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', viewAny: ['hot_inactive', 'cold_inactive'] },
+  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة',  viewAny: ['hot_inactive', 'cold_inactive'] },
 ]
+
+function canInactiveSub(item, canFn) {
+  if (item.viewAny?.length) return item.viewAny.some(v => canFn(v))
+  return canFn(item.view)
+}
 
 /** ترتيب عناصر مجموعة المتاجر — «غير نشطة» قائمة فرعية موحدة */
 const STORE_NAV_ORDER = [
@@ -43,7 +48,7 @@ function InactiveNavGroup({ can, onClose }) {
     if (isInactiveSection) setOpen(true)
   }, [isInactiveSection])
 
-  const links = INACTIVE_SUB.filter(item => can(item.view))
+  const links = INACTIVE_SUB.filter(item => canInactiveSub(item, can))
   if (links.length === 0) return null
 
   return (

@@ -8,6 +8,16 @@ import { formatCallOutcome } from '../constants/callOutcomes'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
+function dedupeById(list) {
+  const seen = new Set()
+  return list.filter(s => {
+    const id = s?.id
+    if (id == null || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
+
 function aggregateUserStats(stores, storeStates, callLogs) {
   const today = new Date().toISOString().slice(0, 10)
   const weekAgo = Date.now() - 7 * 86400000
@@ -40,25 +50,46 @@ export default function HotInactive() {
 
   const isAllTab = recoverySegment === 'all'
   const isRestoredTab = recoverySegment === 'restored'
+  const isRecoveryTab = recoverySegment === 'restoring' || recoverySegment === 'restored'
 
   const hotInactive = stores.hot_inactive || []
+  const coldInactive = stores.cold_inactive || []
 
   const filteredStores = useMemo(() => {
-    return hotInactive.filter(s => {
-      const dbCat = storeStates[s.id]?.category
-      if (isAllTab) return true
-      if (isRestoredTab) return dbCat === 'restored'
-      /* جاري الاستعادة: فقط من علِقت حالته بـ restoring في النظام */
-      return dbCat === 'restoring'
-    })
-  }, [hotInactive, storeStates, isAllTab, isRestoredTab])
+    const cat = id => storeStates[id]?.category
+    if (isAllTab) {
+      return hotInactive.filter(() => true)
+    }
+    if (isRestoredTab) {
+      const hot = hotInactive.filter(s => cat(s.id) === 'restored')
+      const cold = coldInactive.filter(s => cat(s.id) === 'restored')
+      return dedupeById([...hot, ...cold])
+    }
+    /* جاري الاستعادة: ساخن + بارد بحالة restoring */
+    const hot = hotInactive.filter(s => cat(s.id) === 'restoring')
+    const cold = coldInactive.filter(s => cat(s.id) === 'restoring')
+    return dedupeById([...hot, ...cold])
+  }, [hotInactive, coldInactive, storeStates, isAllTab, isRestoredTab])
 
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
     [filteredStores, storeStates, callLogs]
   )
 
+  const bucketColumn = isRecoveryTab
+    ? [{
+        key: 'list_bucket',
+        label: 'المسار',
+        render: s => (
+          coldInactive.some(c => c.id === s.id)
+            ? <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">غير نشط بارد</span>
+            : <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium">غير نشط ساخن</span>
+        ),
+      }]
+    : []
+
   const extraColumns = [
+    ...bucketColumn,
     {
       key: 'inactive_days',
       label: 'أيام الانقطاع',
@@ -175,7 +206,10 @@ export default function HotInactive() {
             <span className="text-slate-400 font-medium text-lg">— {subTitle}</span>
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {filteredStores.length} متجر في هذا الفرع — إجمالي الفئة {counts.hot_inactive || 0}
+            {filteredStores.length} متجر في هذا الفرع
+            {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
+            {recoverySegment === 'restoring' && ' — يشمل الساخن والبارد بحالة «قيد الاستعادة»'}
+            {isRestoredTab && ' — يشمل الساخن والبارد بحالة «تمت الاستعادة»'}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">

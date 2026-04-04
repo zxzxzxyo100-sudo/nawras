@@ -18,10 +18,14 @@ import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
-function PrivateRoute({ children, view }) {
+function PrivateRoute({ children, view, viewAny }) {
   const { user, loading, can } = useAuth()
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">جارٍ التحميل...</div>
   if (!user) return <Navigate to="/login" replace />
+  if (viewAny?.length) {
+    if (!viewAny.some(v => can(v))) return <Navigate to="/" replace />
+    return children
+  }
   if (view && !can(view)) return <Navigate to="/" replace />
   return children
 }
@@ -38,7 +42,14 @@ function AppRoutes() {
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
         <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
         <Route path="/hot-inactive" element={<Navigate to="/hot-inactive/all" replace />} />
-        <Route path="/hot-inactive/:recoverySegment" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
+        <Route
+          path="/hot-inactive/:recoverySegment"
+          element={(
+            <PrivateRoute viewAny={['hot_inactive', 'cold_inactive']}>
+              <HotInactive />
+            </PrivateRoute>
+          )}
+        />
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
         <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
