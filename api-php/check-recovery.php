@@ -75,16 +75,17 @@ function fetchShipmentMap(string $url, int $maxPages, array $targetIds): array {
     return $shipMap;
 }
 
-$since      = date('Y-m-d', strtotime('-30 days'));
+/* نطاق واسع مثل all-stores.php — نافذة 30 يوماً كانت تفوت متاجر قديمة في /customers/new */
+$sinceWide = '2020-01-01';
 $targetIds  = array_keys($storeMap);
 
 $shipNew    = fetchShipmentMap(
-    NAWRIS_BASE . '/customers/new?since=' . $since,
+    NAWRIS_BASE . '/customers/new?since=' . $sinceWide,
     MAX_PAGES_RECOVERY,
     $targetIds
 );
 $shipOrders = fetchShipmentMap(
-    NAWRIS_BASE . '/customers/orders-summary?from=' . $since . '&to=' . date('Y-m-d'),
+    NAWRIS_BASE . '/customers/orders-summary?from=' . $sinceWide . '&to=' . date('Y-m-d'),
     MAX_PAGES_RECOVERY,
     $targetIds
 );

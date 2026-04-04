@@ -5,7 +5,12 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
-import { isRestoredCategory } from '../constants/storeCategories'
+import {
+  isRestoredCategory,
+  isRestoredForRecoveryLists,
+  isStillRestoringStore,
+  isRecoveryCompletedByShipment,
+} from '../constants/storeCategories'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
@@ -59,26 +64,30 @@ export default function HotInactive() {
   const incubating = stores.incubating || []
 
   const filteredStores = useMemo(() => {
-    const cat = id => storeStates[id]?.category
+    const matchRestored = s => isRestoredForRecoveryLists(s, storeStates[s.id])
+    const matchRestoring = s => isStillRestoringStore(s, storeStates[s.id])
+
     if (isAllTab) {
       return hotInactive.filter(() => true)
     }
     if (isRestoredTab) {
-      /* غير نشط ساخن/بارد + أي متجر انتقل لنشط/احتضان بعد recovered (لم يعد في قوائم غير النشط) */
+      /* + متاجر بقيت restoring في DB لكن الشحنة بعد restore_date (تظهر في نشط يشحن) */
       const inactiveRows = [
-        ...hotInactive.filter(s => isRestoredCategory(cat(s.id))),
-        ...coldInactive.filter(s => isRestoredCategory(cat(s.id))),
+        ...hotInactive.filter(matchRestored),
+        ...coldInactive.filter(matchRestored),
       ]
       const afterRecovery = [
-        ...activeShipping.filter(s => isRestoredCategory(cat(s.id))),
-        ...incubating.filter(s => isRestoredCategory(cat(s.id))),
+        ...activeShipping.filter(matchRestored),
+        ...incubating.filter(matchRestored),
       ]
       return dedupeById([...inactiveRows, ...afterRecovery])
     }
-    /* جاري الاستعادة: ساخن + بارد بحالة restoring */
-    const hot = hotInactive.filter(s => cat(s.id) === 'restoring')
-    const cold = coldInactive.filter(s => cat(s.id) === 'restoring')
-    return dedupeById([...hot, ...cold])
+    /* جاري الاستعادة: كل القوائم — بما فيها نشط/احتضان إذا لم تكتمل الشحنة بعد */
+    const hot = hotInactive.filter(matchRestoring)
+    const cold = coldInactive.filter(matchRestoring)
+    const activeR = activeShipping.filter(matchRestoring)
+    const incR = incubating.filter(matchRestoring)
+    return dedupeById([...hot, ...cold, ...activeR, ...incR])
   }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab])
 
   const userStats = useMemo(
@@ -189,8 +198,12 @@ export default function HotInactive() {
       render: s => {
         const dbCat = storeStates[s.id]?.category
         const dbUpdatedBy = storeStates[s.id]?.updated_by
+        const st = storeStates[s.id]
 
         if (isRestoredCategory(dbCat)) return (
+          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
+        )
+        if (isRecoveryCompletedByShipment(s, st)) return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (
@@ -228,8 +241,8 @@ export default function HotInactive() {
           <p className="text-slate-500 text-sm mt-0.5">
             {filteredStores.length} متجر في هذا الفرع
             {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
-            {recoverySegment === 'restoring' && ' — يشمل الساخن والبارد بحالة «قيد الاستعادة»'}
-            {isRestoredTab && ' — يشمل الساخن والبارد بتمت الاستعادة'}
+            {recoverySegment === 'restoring' && ' — ساخن وبارد ونشط إن بقيت الحالة «قيد الاستعادة» في السجل'}
+            {isRestoredTab && ' — يشمل من اكتملت شحنياً أو حالة recovered في السجل'}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
