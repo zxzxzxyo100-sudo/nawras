@@ -2,23 +2,19 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck } from 'lucide-react'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
-const ACTIVE_SEGMENTS = new Set(['pending', 'completed'])
+const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
 
 export default function ActiveStores() {
   const { activeSegment } = useParams()
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
-
-  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
-    return <Navigate to="/active/pending" replace />
-  }
-  const isPendingTab = activeSegment === 'pending'
+  const { user } = useAuth()
 
   function parseDbDate(v) {
     if (v == null || v === '') return null
@@ -26,7 +22,6 @@ export default function ActiveStores() {
     const d = parseISO(s.length >= 19 ? s.slice(0, 19) : s)
     return Number.isNaN(d.getTime()) ? null : d
   }
-  const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [users, setUsers]                 = useState([])
   const [saving, setSaving]               = useState(false)
@@ -61,6 +56,13 @@ export default function ActiveStores() {
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
   }, [stores.completed_merchants, stores.incubating, storeStates])
+
+  const unreachable = useMemo(() => {
+    const base = stores.unreachable_merchants || []
+    const fromInc = (stores.incubating || []).filter(s => storeStates[s.id]?.category === 'unreachable')
+    const seen = new Set(base.map(s => s.id))
+    return [...base, ...fromInc.filter(s => !seen.has(s.id))]
+  }, [stores.unreachable_merchants, stores.incubating, storeStates])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -250,6 +252,23 @@ export default function ActiveStores() {
     ...extraColumns,
   ]
 
+  const unreachableExtraColumns = [
+    {
+      key: 'last_call_date',
+      label: 'آخر محاولة اتصال',
+      render: s => {
+        const raw = s.last_call_date || storeStates[s.id]?.last_call_date
+        const d = parseDbDate(raw)
+        return d ? (
+          <span className="text-xs font-medium text-slate-800">{format(d, 'd MMMM yyyy', { locale: ar })}</span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )
+      },
+    },
+    ...extraColumns,
+  ]
+
   const assignedCount   = active.filter(s => assignments[s.id]?.assigned_to).length
   const unassignedCount = active.length - assignedCount
 
@@ -261,33 +280,60 @@ export default function ActiveStores() {
     return active
   }, [active, assignments, assignFilter])
 
+  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
+    return <Navigate to="/active/pending" replace />
+  }
+
+  const isPendingTab = activeSegment === 'pending'
+  const isCompletedTab = activeSegment === 'completed'
+  const isUnreachableTab = activeSegment === 'unreachable'
+
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
         <div className="min-w-0">
           <h1 className="text-xl lg:text-2xl font-bold text-slate-800 flex items-center gap-2">
-            {isPendingTab ? (
-              <TrendingUp size={22} className="text-green-600" />
-            ) : (
-              <BadgeCheck size={22} className="text-violet-600" />
+            {isPendingTab && (
+              <>
+                <TrendingUp size={22} className="text-green-600" />
+                نشط يشحن — قيد المكالمة
+              </>
             )}
-            {isPendingTab ? 'نشط يشحن — قيد المكالمة' : 'نشط يشحن — المتاجر المنجزة'}
+            {isCompletedTab && (
+              <>
+                <BadgeCheck size={22} className="text-violet-600" />
+                نشط يشحن — المتاجر المنجزة
+              </>
+            )}
+            {isUnreachableTab && (
+              <>
+                <PhoneOff size={22} className="text-amber-600" />
+                نشط يشحن — لم يتم الوصول للمتجر
+              </>
+            )}
           </h1>
           <p className="text-slate-600 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
-            {isPendingTab ? (
+            {isPendingTab && (
               <>
                 {active.length} متجر — عمود الطرود: آخر 30 يومًا
                 {completed.length > 0 && (
                   <span className="text-violet-600 font-medium"> — إجمالي منجز: {completed.length}</span>
                 )}
+                {unreachable.length > 0 && (
+                  <span className="text-amber-700 font-medium"> — لم يُصل للمتجر: {unreachable.length}</span>
+                )}
               </>
-            ) : (
-              <span>{completed.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة</span>
+            )}
+            {isCompletedTab && (
+              <span>{completed.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
+            )}
+            {isUnreachableTab && (
+              <span>{unreachable.length} متجر — «لم يرد» أو «مشغول»؛ يُنقل للمنجزة عند «تم الرد»</span>
             )}
             {isPendingTab && (stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
-              return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed'
+              return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable'
             }) && (
               <span className="text-emerald-600 text-xs"> (يشمل مُخرَّجين من الاحتضان)</span>
             )}
@@ -484,7 +530,9 @@ export default function ActiveStores() {
               <TrendingUp size={17} className="text-emerald-600 shrink-0" />
               المتاجر النشطة — قيد المكالمة
             </h2>
-            <p className="text-[11px] text-emerald-800/80 mt-0.5">تسجيل مكالمة «عامة» يحرك المتجر إلى «منجز» حتى يمرّ 30 يوماً على تاريخ المكالمة.</p>
+            <p className="text-[11px] text-emerald-800/80 mt-0.5">
+              «تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول للمتجر». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المكالمة.
+            </p>
           </div>
 
           <StoreTable
@@ -506,7 +554,7 @@ export default function ActiveStores() {
         </>
       )}
 
-      {!isPendingTab && (
+      {isCompletedTab && (
         <>
           <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm">
             <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
@@ -523,7 +571,35 @@ export default function ActiveStores() {
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={completedExtraColumns}
-            emptyMsg="لا توجد متاجر منجزة — تظهر هنا بعد تسجيل مكالمة عامة لمتجر «قيد المكالمة»"
+            emptyMsg="لا توجد متاجر منجزة — تظهر هنا بعد تسجيل مكالمة واختيار «تم الرد»"
+            parcelsColumnSub={
+              shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+                ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+                : undefined
+            }
+            selectable={false}
+          />
+        </>
+      )}
+
+      {isUnreachableTab && (
+        <>
+          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-l from-amber-50/90 to-white px-4 py-3 shadow-sm">
+            <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+              <PhoneOff size={17} className="text-amber-600 shrink-0" />
+              لم يتم الوصول للمتجر
+            </h2>
+            <p className="text-[11px] text-amber-900/80 mt-0.5">
+              تُسجَّل هنا عند اختيار «لم يرد» أو «مشغول» في مكالمة عامة. عند «تم الرد» في مكالمة لاحقة يُنقل المتجر إلى «المتاجر المنجزة».
+            </p>
+          </div>
+          <StoreTable
+            variant="elite"
+            stores={unreachable}
+            onSelectStore={setSelected}
+            onRestoreStore={setSelected}
+            extraColumns={unreachableExtraColumns}
+            emptyMsg="لا توجد متاجر — تظهر هنا عند تسجيل مكالمة بـ «لم يرد» أو «مشغول»"
             parcelsColumnSub={
               shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
                 ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`

@@ -15,6 +15,7 @@ const CATEGORY_LABELS = {
   active:     { label: 'نشط',         bg: 'bg-green-100',  text: 'text-green-700'  },
   active_pending_calls: { label: 'نشط قيد المكالمة', bg: 'bg-emerald-50', text: 'text-emerald-800' },
   completed:  { label: 'منجز',       bg: 'bg-violet-100', text: 'text-violet-800' },
+  unreachable: { label: 'لم يتم الوصول', bg: 'bg-amber-100', text: 'text-amber-900' },
   inactive:   { label: 'غير نشط',     bg: 'bg-red-100',    text: 'text-red-700'    },
   frozen:     { label: 'مجمد',        bg: 'bg-slate-100',  text: 'text-slate-600'  },
   restoring:  { label: 'قيد الاستعادة', bg: 'bg-cyan-100', text: 'text-cyan-700'  },

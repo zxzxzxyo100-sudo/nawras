@@ -11,6 +11,8 @@ const CAT_COLORS = {
   active_pending_calls: { bg: '#059669', label: 'قيد المكالمة' },
   completed:          { bg: '#7c3aed', label: 'منجز' },
   completed_merchants:  { bg: '#7c3aed', label: 'منجز' },
+  unreachable:          { bg: '#d97706', label: 'لم يُصل' },
+  unreachable_merchants: { bg: '#d97706', label: 'لم يُصل' },
   hot_inactive:         { bg: '#f59e0b', label: 'ساخن' },
   cold_inactive:        { bg: '#6b7280', label: 'بارد' },
   incubating:           { bg: '#8b5cf6', label: 'تحت الاحتضان' },

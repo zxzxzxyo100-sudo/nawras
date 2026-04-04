@@ -165,10 +165,17 @@ elseif ($action === 'log_call') {
         VALUES (?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
 
-    // —— نشط قيد المكالمة → منجز عند تسجيل مكالمة (باستثناء مسار الاحتضان واستعادة غير النشط) ——
+    // —— نشط يشحن: تم الرد → منجز | لم يرد / مشغول → لم يتم الوصول (باستثناء احتضان واستعادة) ——
     if (!in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true) && strpos($callType, 'rcall') !== 0) {
-        $upd = $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping')");
-        $upd->execute([(int) $storeId]);
+        $sid = (int) $storeId;
+        $oc = $outcome !== '' ? $outcome : '';
+        if ($oc === 'answered') {
+            $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                ->execute([$sid]);
+        } elseif ($oc === 'no_answer' || $oc === 'busy') {
+            $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                ->execute([$sid]);
+        }
     }
 
     // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——

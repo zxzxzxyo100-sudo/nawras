@@ -121,18 +121,20 @@ foreach ($inactive as $id => $s) {
 
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
-    'incubating'           => [],
-    'active_shipping'      => [],
-    'completed_merchants'  => [],
-    'hot_inactive'         => [],
-    'cold_inactive'        => [],
+    'incubating'            => [],
+    'active_shipping'       => [],
+    'completed_merchants'   => [],
+    'unreachable_merchants' => [],
+    'hot_inactive'          => [],
+    'cold_inactive'         => [],
 ];
 $counts = [
-    'incubating'           => 0,
-    'active_shipping'      => 0,
-    'completed_merchants'  => 0,
-    'hot_inactive'         => 0,
-    'cold_inactive'        => 0,
+    'incubating'            => 0,
+    'active_shipping'       => 0,
+    'completed_merchants'   => 0,
+    'unreachable_merchants' => 0,
+    'hot_inactive'          => 0,
+    'cold_inactive'         => 0,
     'total_active'         => 0,
     'total'                => 0,
 ];
@@ -476,6 +478,7 @@ try {
             }
             $activePending = [];
             $completed = [];
+            $unreachable = [];
             foreach ($result['active_shipping'] as $s) {
                 $id = (int) ($s['id'] ?? 0);
                 $row = $catById[$id] ?? null;
@@ -485,14 +488,21 @@ try {
                         $s['last_call_date'] = $row['last_call_date'];
                     }
                     $completed[] = $s;
+                } elseif ($cat === 'unreachable') {
+                    if (!empty($row['last_call_date'])) {
+                        $s['last_call_date'] = $row['last_call_date'];
+                    }
+                    $unreachable[] = $s;
                 } else {
                     $activePending[] = $s;
                 }
             }
             $result['active_shipping'] = $activePending;
             $result['completed_merchants'] = $completed;
+            $result['unreachable_merchants'] = $unreachable;
             $counts['active_shipping'] = count($activePending);
             $counts['completed_merchants'] = count($completed);
+            $counts['unreachable_merchants'] = count($unreachable);
         }
     }
 } catch (Throwable $e) {
@@ -500,7 +510,7 @@ try {
 }
 
 $counts['check'] = (
-    $counts['active_shipping'] + $counts['completed_merchants'] + $counts['hot_inactive'] + $counts['cold_inactive']
+    $counts['active_shipping'] + $counts['completed_merchants'] + $counts['unreachable_merchants'] + $counts['hot_inactive'] + $counts['cold_inactive']
     === $counts['total_active']
 );
 
