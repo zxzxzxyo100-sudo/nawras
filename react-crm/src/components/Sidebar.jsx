@@ -29,6 +29,7 @@ const STORES_SUB = [
 /** مسار الاحتضان — أسفل المتاجر */
 const INCUBATION_SUB = [
   { to: '/incubation/between-calls', label: 'بين المكالمات', kind: 'between' },
+  { to: '/incubation/call-delay', label: 'تأخير المكالمة', kind: 'delay' },
   { to: '/incubation/call-1', label: 'المكالمة الأولى', kind: 'call1' },
   { to: '/incubation/call-2', label: 'المكالمة الثانية', kind: 'call2' },
   { to: '/incubation/call-3', label: 'المكالمة الثالثة', kind: 'call3' },
@@ -67,6 +68,8 @@ function incubationSubLinkActive(kind, pathname) {
   switch (kind) {
     case 'between':
       return pathname.startsWith('/incubation/between-calls')
+    case 'delay':
+      return pathname.startsWith('/incubation/call-delay')
     case 'call1':
       return pathname.startsWith('/incubation/call-1')
     case 'call2':
@@ -180,7 +183,7 @@ function IncubationNavGroup({ can, onClose }) {
               <NavLink
                 key={sub.kind}
                 to={sub.to}
-                end={sub.kind === 'between' || sub.kind.startsWith('call')}
+                end={sub.kind === 'between' || sub.kind === 'delay' || sub.kind.startsWith('call')}
                 onClick={() => { if (onClose) onClose() }}
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${

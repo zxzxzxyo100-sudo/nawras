@@ -162,16 +162,20 @@ function incubation_cycle_day($regTs, $now) {
     return min(14, max(1, $d + 1));
 }
 
-/** بيانات عرض لصفحة «بين المكالمات» */
+/** بيانات عرض لصفحة «بين المكالمات» + مفاتيح تصفية «تأخير المكالمة» */
 function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped) {
     $cd = min(14, max(1, (int) $cycleDay));
     $s['_cycle_day'] = $cd;
+    $s['_inc_stage_key'] = '';
+    $s['_delay_days'] = 0;
     if (!$inc1) {
         $s['_inc_phase'] = $hasShipped
             ? 'شحن مسجّل — لم تُسجَّل المكالمة الأولى بعد'
             : ($cd > 1 ? 'تأخّر عن نافذة المكالمة الأولى (يوم 1 من 14)' : '');
         $s['_days_until_window'] = max(0, 3 - $cd);
         $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
+        $s['_inc_stage_key'] = $hasShipped ? 'shipped_no_c1' : 'late_c1';
+        $s['_delay_days'] = max(0, $cd - 1);
 
         return;
     }
@@ -180,12 +184,16 @@ function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasS
             $s['_inc_phase'] = 'بين المكالمة الأولى والثانية — انتظار يوم 3 من 14';
             $s['_days_until_window'] = max(0, 3 - $cd);
             $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
+            $s['_inc_stage_key'] = 'wait_c2';
+            $s['_delay_days'] = 0;
         } else {
             $s['_inc_phase'] = $cd > 3
                 ? 'تأخّر عن نافذة المكالمة الثانية (يوم 3 من 14)'
                 : '';
             $s['_days_until_window'] = max(0, 10 - $cd);
             $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
+            $s['_inc_stage_key'] = $cd > 3 ? 'late_c2' : 'wait_c2';
+            $s['_delay_days'] = $cd > 3 ? max(0, $cd - 3) : 0;
         }
 
         return;
@@ -196,6 +204,8 @@ function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasS
             : 'تأخّر عن نافذة المكالمة الثالثة (يوم 10 من 14)';
         $s['_days_until_window'] = max(0, 10 - $cd);
         $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
+        $s['_inc_stage_key'] = $cd < 10 ? 'wait_c3' : 'late_c3';
+        $s['_delay_days'] = $cd > 10 ? max(0, $cd - 10) : 0;
     }
 }
 
