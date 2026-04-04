@@ -29,6 +29,7 @@ const STORES_SUB = [
 const ACTIVE_SUB = [
   { to: '/active/pending', label: 'قيد المكالمة', kind: 'pending' },
   { to: '/active/completed', label: 'المتاجر المنجزة', kind: 'completed' },
+  { to: '/active/unreachable', label: 'لم يتم الوصول للمتجر', kind: 'unreachable' },
 ]
 
 /** مسار الاحتضان — أسفل المتاجر */
@@ -75,6 +76,8 @@ function activeSubLinkActive(kind, pathname) {
       return pathname === '/active/pending' || pathname === '/active'
     case 'completed':
       return pathname === '/active/completed'
+    case 'unreachable':
+      return pathname === '/active/unreachable'
     default:
       return false
   }

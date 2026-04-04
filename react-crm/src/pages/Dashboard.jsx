@@ -265,11 +265,16 @@ export default function Dashboard() {
         <StoreTypeCard
           title="نشط يشحن"
           count={counts.active_shipping}
-          sub={
-            (counts.completed_merchants || 0) > 0
-              ? `قيد المكالمة — منجز: ${(counts.completed_merchants || 0).toLocaleString('ar-SA')}`
-              : 'آخر 30 يوم — قيد المكالمة'
-          }
+          sub={(() => {
+            const parts = []
+            if ((counts.completed_merchants || 0) > 0) {
+              parts.push(`منجز: ${(counts.completed_merchants || 0).toLocaleString('ar-SA')}`)
+            }
+            if ((counts.unreachable_merchants || 0) > 0) {
+              parts.push(`لم يُصل: ${(counts.unreachable_merchants || 0).toLocaleString('ar-SA')}`)
+            }
+            return parts.length ? `قيد المكالمة — ${parts.join(' — ')}` : 'آخر 30 يوم — قيد المكالمة'
+          })()}
           icon={TrendingUp}
           gradient="linear-gradient(135deg, #065f46, #059669)"
           glow="#05966955"
