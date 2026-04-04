@@ -52,7 +52,11 @@ function AppRoutes() {
         />
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
         <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
-        <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
+        <Route path="/incubation" element={<Navigate to="/incubation/call-1" replace />} />
+        <Route
+          path="/incubation/:tabKey"
+          element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>}
+        />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route
           path="/performance"

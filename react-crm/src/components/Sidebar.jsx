@@ -12,12 +12,18 @@ const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
-  { to: '/incubation',    label: 'مسار الاحتضان',      icon: Baby,            view: 'incubation'   },
   { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
+]
+
+/** مسار الاحتضان — ثلاث مكالمات (نفس أسلوب القائمة الفرعية لـ «غير نشطة») */
+const INCUBATION_SUB = [
+  { to: '/incubation/call-1', label: 'المكالمة الأولى' },
+  { to: '/incubation/call-2', label: 'المكالمة الثانية' },
+  { to: '/incubation/call-3', label: 'المكالمة الثالثة' },
 ]
 
 /** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */
@@ -33,10 +39,70 @@ function canInactiveSub(item, canFn) {
   return canFn(item.view)
 }
 
-/** ترتيب عناصر مجموعة المتاجر — «غير نشطة» قائمة فرعية موحدة */
+/** ترتيب عناصر مجموعة المتاجر — «مسار الاحتضان» و«غير نشطة» قوائم فرعية */
 const STORE_NAV_ORDER = [
-  '/new', '/incubation', '/active', '__inactive_group__', '/vip',
+  '/new', '__incubation_group__', '/active', '__inactive_group__', '/vip',
 ]
+
+function IncubationNavGroup({ can, onClose }) {
+  const location = useLocation()
+  const isIncubationSection = location.pathname.startsWith('/incubation')
+  const [open, setOpen] = useState(isIncubationSection)
+
+  useEffect(() => {
+    if (isIncubationSection) setOpen(true)
+  }, [isIncubationSection])
+
+  if (!can('incubation')) return null
+
+  return (
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
+          isIncubationSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+        }`}
+        style={isIncubationSection ? {
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
+          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
+        } : {}}
+      >
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isIncubationSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+        }`}>
+          <Baby size={14} className={isIncubationSection ? 'text-white' : 'text-white/50'} />
+        </div>
+        <span className="flex-1 truncate">مسار الاحتضان</span>
+        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
+          {INCUBATION_SUB.map(sub => (
+            <NavLink
+              key={sub.to}
+              to={sub.to}
+              end
+              onClick={() => { if (onClose) onClose() }}
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
+                  isActive ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Circle size={6} className={isActive ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
+                  <span>{sub.label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function InactiveNavGroup({ can, onClose }) {
   const location = useLocation()
@@ -162,6 +228,9 @@ export default function Sidebar({ isOpen, onClose }) {
         {NAV_GROUPS.map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
+              if (key === '__incubation_group__') {
+                return <IncubationNavGroup key="incubation" can={can} onClose={onClose} />
+              }
               if (key === '__inactive_group__') {
                 return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />
               }

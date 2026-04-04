@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Baby, Clock, Filter, RefreshCw, Phone, PhoneCall,
 } from 'lucide-react'
@@ -59,10 +60,11 @@ const TABS = [
   },
 ]
 
-const COLOR_CLASSES = {
-  blue:   { active: 'bg-blue-600 text-white shadow-blue-600/20',     count: 'bg-blue-50 text-blue-600 border-blue-200'      },
-  indigo: { active: 'bg-indigo-600 text-white shadow-indigo-600/20', count: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
-  amber:  { active: 'bg-amber-600 text-white shadow-amber-600/20',   count: 'bg-amber-50 text-amber-800 border-amber-200'    },
+/** مطابقة المسار /incubation/call-1 ↔ المفتاح الداخلي call_1 */
+const ROUTE_TAB = {
+  'call-1': 'call_1',
+  'call-2': 'call_2',
+  'call-3': 'call_3',
 }
 
 
@@ -281,12 +283,21 @@ function isDoneIncubationPath(storeStates, storeId) {
 }
 
 export default function IncubationPath() {
+  const { tabKey } = useParams()
+  const navigate = useNavigate()
   const {
-    incubationPath, incubationCounts, callLogs, storeStates,
+    incubationPath, callLogs, storeStates,
     loading, error, reload,
   } = useStores()
 
-  const [activeTab, setActiveTab] = useState('call_1')
+  const activeTab = ROUTE_TAB[tabKey] ?? 'call_1'
+
+  useEffect(() => {
+    if (!tabKey || !ROUTE_TAB[tabKey]) {
+      navigate('/incubation/call-1', { replace: true })
+    }
+  }, [tabKey, navigate])
+
   const [selected, setSelected]   = useState(null)
   const [callStore, setCallStore] = useState(null)
 
@@ -306,10 +317,6 @@ export default function IncubationPath() {
   const tabStores = useMemo(
     () => filteredPath[activeTab] || [],
     [activeTab, filteredPath]
-  )
-  const tabCount = useMemo(
-    () => filteredCounts[activeTab] || 0,
-    [activeTab, filteredCounts]
   )
 
   const currentTab = TABS.find(t => t.key === activeTab)
@@ -335,7 +342,7 @@ export default function IncubationPath() {
             مسار الاحتضان
           </h1>
           <p className="text-slate-600 text-sm mt-0.5">
-            {filteredCounts.total || 0} متجر في قوائم المكالمات
+            {currentTab?.label} — {(filteredCounts[activeTab] ?? 0).toLocaleString('ar-SA')} متجر
           </p>
         </div>
         <button
@@ -349,36 +356,7 @@ export default function IncubationPath() {
         </button>
       </div>
 
-      {/* ── تبويبات ── */}
-      <div className="flex flex-wrap gap-2">
-        {TABS.map(tab => {
-          const isActive = activeTab === tab.key
-          const count = filteredCounts[tab.key] || 0
-          const cc = COLOR_CLASSES[tab.color]
-
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm ${
-                isActive
-                  ? `${cc.active} shadow-lg`
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <tab.icon size={15} />
-              {tab.label}
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                isActive ? 'bg-white/20 text-white border-white/30' : cc.count
-              }`}>
-                {count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── وصف التبويب الحالي ── */}
+      {/* ── وصف المرحلة (التنقّل من الشريط الجانبي) ── */}
       {currentTab && (
         <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border ${tabDescClass}`}>
           <currentTab.icon size={16} />
