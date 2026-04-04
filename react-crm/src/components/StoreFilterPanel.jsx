@@ -5,6 +5,8 @@ import { Filter } from 'lucide-react'
  */
 export default function StoreFilterPanel({
   isElite = true,
+  /** إخفاء صف العنوان + «مسح التصفية» (للاستخدام داخل لوحة جانبية) */
+  showHeaderRow = true,
   nameQuery,
   idQuery,
   regFrom,
@@ -34,15 +36,17 @@ export default function StoreFilterPanel({
 
   return (
     <div className="w-full space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 text-slate-600">
-          <Filter size={15} className={isElite ? 'text-violet-600' : 'text-slate-500'} strokeWidth={2} />
-          <span className="text-xs font-semibold">تصفية</span>
+      {showHeaderRow && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-slate-600">
+            <Filter size={15} className={isElite ? 'text-violet-600' : 'text-slate-500'} strokeWidth={2} />
+            <span className="text-xs font-semibold">تصفية</span>
+          </div>
+          <button type="button" onClick={onClear} className={clearBtn}>
+            مسح التصفية
+          </button>
         </div>
-        <button type="button" onClick={onClear} className={clearBtn}>
-          مسح التصفية
-        </button>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div>

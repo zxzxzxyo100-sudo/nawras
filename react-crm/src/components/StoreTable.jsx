@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
+  Filter,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -8,7 +9,7 @@ import {
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
-import StoreFilterPanel from './StoreFilterPanel'
+import StoreFilterDrawer from './StoreFilterDrawer'
 
 const PAGE_SIZES = [10, 50, 100, 'الكل']
 
@@ -42,6 +43,7 @@ export default function StoreTable({
   const [shipTo, setShipTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
+  const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
     () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
@@ -71,6 +73,19 @@ export default function StoreTable({
     setShipFrom('')
     setShipTo('')
   }
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        nameQuery.trim()
+        || idQuery.trim()
+        || regFrom
+        || regTo
+        || shipFrom
+        || shipTo
+      ),
+    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+  )
 
   // multi-select helpers
   const pageIds   = paginated.map(s => s.id)
@@ -159,56 +174,81 @@ export default function StoreTable({
 
   return (
     <div className={shellClass} dir="rtl">
-      {/* تصفية + عرض */}
+      {/* زر تصفية + عرض */}
       <div className={toolbarClass}>
-        <StoreFilterPanel
-          isElite={isElite}
-          nameQuery={nameQuery}
-          idQuery={idQuery}
-          regFrom={regFrom}
-          regTo={regTo}
-          shipFrom={shipFrom}
-          shipTo={shipTo}
-          onNameChange={setNameQuery}
-          onIdChange={setIdQuery}
-          onRegFromChange={setRegFrom}
-          onRegToChange={setRegTo}
-          onShipFromChange={setShipFrom}
-          onShipToChange={setShipTo}
-          onClear={clearFilters}
-        />
         <div
           className={
             isElite
-              ? 'flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/80'
-              : 'flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100'
+              ? 'flex flex-wrap items-center justify-between gap-4'
+              : 'flex flex-wrap items-center justify-between gap-4'
           }
         >
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={`whitespace-nowrap ${isElite ? 'text-[11px] text-slate-500 hidden sm:inline' : 'text-xs text-slate-400'}`}>
-              عرض:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {PAGE_SIZES.map(sz => {
-                const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
-                return (
-                  <button
-                    key={sz}
-                    type="button"
-                    onClick={() => handlePageSize(sz)}
-                    className={pageBtn(sz, active)}
-                  >
-                    {sz}
-                  </button>
-                )
-              })}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              className={
+                isElite
+                  ? 'inline-flex items-center gap-2 rounded-xl border-2 border-blue-500 bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition-colors hover:bg-blue-700'
+                  : 'inline-flex items-center gap-2 rounded-xl border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700'
+              }
+            >
+              <Filter size={18} strokeWidth={2.5} className="shrink-0" />
+              تصفية
+              {hasActiveFilters && (
+                <span className="flex h-2 w-2 rounded-full bg-amber-300 ring-2 ring-white" title="تصفية نشطة" />
+              )}
+            </button>
+            <div className="hidden sm:block h-8 w-px bg-slate-200/90" aria-hidden />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span
+                className={`whitespace-nowrap ${isElite ? 'text-[11px] text-slate-500' : 'text-xs text-slate-400'}`}
+              >
+                عرض:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {PAGE_SIZES.map(sz => {
+                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => handlePageSize(sz)}
+                      className={pageBtn(sz, active)}
+                    >
+                      {sz}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
-          <span className={`tabular-nums ${isElite ? 'text-xs text-slate-600' : 'text-sm text-slate-500'}`}>
-            {filtered.length} متجر
+          <span
+            className={`tabular-nums font-medium ${isElite ? 'text-sm text-slate-700' : 'text-sm text-slate-600'}`}
+          >
+            {filtered.length.toLocaleString('ar-SA')} متجر
           </span>
         </div>
       </div>
+
+      <StoreFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        isElite={isElite}
+        nameQuery={nameQuery}
+        idQuery={idQuery}
+        regFrom={regFrom}
+        regTo={regTo}
+        shipFrom={shipFrom}
+        shipTo={shipTo}
+        onNameChange={setNameQuery}
+        onIdChange={setIdQuery}
+        onRegFromChange={setRegFrom}
+        onRegToChange={setRegTo}
+        onShipFromChange={setShipFrom}
+        onShipToChange={setShipTo}
+        onClear={clearFilters}
+      />
 
       <div className={tableWrapClass}>
         <table className="w-full text-sm">
