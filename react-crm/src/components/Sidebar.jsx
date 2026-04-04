@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
-  ClipboardList, Users, LogOut, Baby, X, Kanban,
+  ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/hot-inactive',  label: 'غير نشط ساخن',       icon: Flame,           view: 'hot_inactive' },
   { to: '/cold-inactive', label: 'غير نشط بارد',       icon: Snowflake,       view: 'cold_inactive'},
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
+  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
 
@@ -21,7 +22,7 @@ const NAV = [
 const NAV_GROUPS = [
   { label: 'الرئيسية',  keys: ['/', '/kanban'] },
   { label: 'المتاجر',   keys: ['/new', '/incubation', '/active', '/hot-inactive', '/cold-inactive'] },
-  { label: 'الإدارة',   keys: ['/tasks', '/users'] },
+  { label: 'الإدارة',   keys: ['/tasks', '/performance', '/users'] },
 ]
 
 export default function Sidebar({ isOpen, onClose }) {

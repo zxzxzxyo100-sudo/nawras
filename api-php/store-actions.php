@@ -47,9 +47,18 @@ elseif ($action === 'set_status') {
     if ($category === 'restoring') {
         $pdo->prepare("UPDATE store_states SET restore_date = NOW() WHERE store_id = ?")->execute([$storeId]);
     }
-    // Set graduated date
+    // انتقال من مسار الاحتضان إلى نشط: إكمال المسار في DB (مقبول / تخريج)
     if ($category === 'active' && $oldStatus === 'incubating') {
-        $pdo->prepare("UPDATE store_states SET graduated_at = NOW() WHERE store_id = ?")->execute([$storeId]);
+        try {
+            $pdo->prepare("UPDATE store_states SET
+                graduated_at = COALESCE(graduated_at, NOW()),
+                incubation_stage = 'graduated',
+                next_call_date = NULL
+                WHERE store_id = ?")->execute([$storeId]);
+        } catch (Throwable $e) {
+            // أعمدة قديمة: على الأقل graduated_at
+            $pdo->prepare("UPDATE store_states SET graduated_at = COALESCE(graduated_at, NOW()) WHERE store_id = ?")->execute([$storeId]);
+        }
     }
 
     // Audit log
@@ -63,9 +72,18 @@ elseif ($action === 'set_status') {
         'cold' => 'نقل للباردة'
     ][$category] ?? 'تغيير حالة';
 
+    if ($category === 'active' && $oldStatus === 'incubating') {
+        $actionName = 'تخريج من مسار الاحتضان — انتقال إلى نشط (مقبول)';
+    }
+
+    $detail = $freezeReason ?: $reason;
+    if ($category === 'active' && $oldStatus === 'incubating') {
+        $detail = trim(($detail ? $detail . ' — ' : '') . 'مسار الاحتضان → نشط يشحن (مقبول)');
+    }
+
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, $actionName, $freezeReason ?: $reason, $oldStatus, $category, $user, $userRole]);
+        ->execute([$storeId, $storeName, $actionName, $detail, $oldStatus, $category, $user, $userRole]);
 
     jsonResponse(['success' => true]);
 }

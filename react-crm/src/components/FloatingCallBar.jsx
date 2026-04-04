@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, X, Search, Zap } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
+import { usePoints }  from '../contexts/PointsContext'
 import CallModal      from './CallModal'
 
 const CAT_COLORS = {
@@ -13,6 +14,7 @@ const CAT_COLORS = {
 
 export default function FloatingCallBar() {
   const { allStores } = useStores()
+  const { todayCalls, goalPct } = usePoints()
 
   const [open,       setOpen]       = useState(false)
   const [query,      setQuery]      = useState('')
@@ -45,14 +47,26 @@ export default function FloatingCallBar() {
     setShowModal(true)
   }
 
-  const pulsing = false
+  const pulsing = goalPct < 100
 
   return (
     <>
       {/* ─── زر الاتصال العائم ─────────────────────────────────── */}
       <div className="fixed bottom-6 left-6 z-[900] flex flex-col items-center gap-2">
 
-        {/* شارة عدد مكالمات اليوم */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 8 }}
+              animate={{ opacity: 1, scale: 1,   y: 0 }}
+              exit={{   opacity: 0, scale: 0.8,  y: 8 }}
+              className="text-xs font-bold text-amber-400 bg-[#0f0820] border border-amber-500/30 px-3 py-1 rounded-full"
+            >
+              {todayCalls} مكالمة اليوم
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* الزر الرئيسي */}
         <div className="relative">
           {/* موجة النبض */}
@@ -95,6 +109,16 @@ export default function FloatingCallBar() {
             </motion.div>
           </motion.button>
 
+          {!open && (
+            <div
+              className="absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black"
+              style={{
+                background: goalPct >= 100 ? '#10b981' : goalPct >= 50 ? '#f59e0b' : '#8b5cf6',
+              }}
+            >
+              {goalPct >= 100 ? '✓' : `${goalPct}%`}
+            </div>
+          )}
         </div>
       </div>
 
@@ -127,6 +151,9 @@ export default function FloatingCallBar() {
               <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
                 <Zap size={14} className="text-amber-400" />
                 <p className="text-white font-bold text-sm">تسجيل مكالمة سريعة</p>
+                <div className="mr-auto flex items-center gap-1 text-[10px] text-violet-300 font-medium">
+                  <Phone size={9} /> {todayCalls}/20
+                </div>
               </div>
 
               {/* شريط البحث */}

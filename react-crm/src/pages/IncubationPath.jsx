@@ -176,9 +176,16 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
 // ═══════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ═══════════════════════════════════════════════════════════════════
+/** يُستبعد من مسار الاحتضان عند تخريج يدوي إلى «نشط» (حفظ في store_states) */
+function isGraduatedToActive(storeStates, storeId) {
+  const st = storeStates?.[storeId]
+  const c = st?.category
+  return c === 'active' || c === 'active_shipping'
+}
+
 export default function IncubationPath() {
   const {
-    incubationPath, incubationCounts, callLogs,
+    incubationPath, incubationCounts, callLogs, storeStates,
     loading, error, reload,
   } = useStores()
 
@@ -186,14 +193,25 @@ export default function IncubationPath() {
   const [selected, setSelected]   = useState(null)
   const [callStore, setCallStore] = useState(null)
 
-  // كل تبويب له فئة مستقلة حصرية
+  const filteredPath = useMemo(() => ({
+    new_48h: (incubationPath.new_48h || []).filter(s => !isGraduatedToActive(storeStates, s.id)),
+    incubating: (incubationPath.incubating || []).filter(s => !isGraduatedToActive(storeStates, s.id)),
+  }), [incubationPath, storeStates])
+
+  const filteredCounts = useMemo(() => ({
+    new_48h: filteredPath.new_48h.length,
+    incubating: filteredPath.incubating.length,
+    total: filteredPath.new_48h.length + filteredPath.incubating.length,
+  }), [filteredPath])
+
+  // كل تبويب له فئة مستقلة حصرية (بعد استبعاد المُخرَّجين يدوياً إلى نشط)
   const tabStores = useMemo(
-    () => incubationPath[activeTab] || [],
-    [activeTab, incubationPath]
+    () => filteredPath[activeTab] || [],
+    [activeTab, filteredPath]
   )
   const tabCount = useMemo(
-    () => incubationCounts[activeTab] || 0,
-    [activeTab, incubationCounts]
+    () => filteredCounts[activeTab] || 0,
+    [activeTab, filteredCounts]
   )
 
   const currentTab = TABS.find(t => t.key === activeTab)
@@ -208,7 +226,7 @@ export default function IncubationPath() {
             مسار الاحتضان
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {incubationCounts.total || 0} متجر في مسار الاحتضان
+            {filteredCounts.total || 0} متجر في مسار الاحتضان
           </p>
         </div>
         <button
@@ -225,7 +243,7 @@ export default function IncubationPath() {
       <div className="flex flex-wrap gap-2">
         {TABS.map(tab => {
           const isActive = activeTab === tab.key
-          const count = incubationCounts[tab.key] || 0
+          const count = filteredCounts[tab.key] || 0
           const cc = COLOR_CLASSES[tab.color]
 
           return (
