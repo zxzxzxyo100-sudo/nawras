@@ -112,8 +112,6 @@ function HallOfFame() {
     getLeaderboard().then(r => setBoard(r.data || [])).catch(() => {})
   }, [])
 
-  if (!board.length) return null
-
   const medals       = ['🥇','🥈','🥉']
   const podiumColors = [
     'linear-gradient(135deg, #f59e0b, #d97706)',
@@ -129,6 +127,34 @@ function HallOfFame() {
   const sorted = [...board].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0))
   const top3   = sorted.slice(0, 3)
   const rest   = sorted.slice(3)
+
+  if (!board.length) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="rounded-2xl overflow-hidden border border-dashed border-white/15"
+        style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+      >
+        <div className="p-8 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
+            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))' }}>
+            <Crown size={28} className="text-amber-400" />
+          </div>
+          <h2 className="text-white font-bold text-base flex items-center justify-center gap-2">
+            قاعة المتميزين
+          </h2>
+          <p className="text-white/35 text-xs mt-2 max-w-sm mx-auto leading-relaxed">
+            لا يوجد ترتيب بعد. عند تسجيل مكالمات وحفظها تُضاف نقاط NRS وتظهر هنا تلقائياً.
+          </p>
+          <div className="mt-4 inline-flex items-center gap-1.5 text-amber-400/80 text-[10px] font-bold px-3 py-1.5 rounded-full border border-amber-500/20 bg-amber-500/5">
+            <Zap size={10} /> NRS Points
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
@@ -336,9 +362,11 @@ function HallOfFame() {
 }
 
 // ─── الداشبورد ────────────────────────────────────────────────────────────────
+const IS_STAGING_BUILD = typeof __STAGING__ !== 'undefined' && __STAGING__
+
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const navigate = useNavigate()
   const { totalPoints, todayPoints, todayCalls, goalPct } = usePoints()
 
@@ -737,8 +765,8 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ══ Hall of Fame (للمدير التنفيذي فقط) ═══════════════════ */}
-      {user?.role === 'executive' && <HallOfFame />}
+      {/* ══ Hall of Fame: تنفيذي دائماً؛ في التجريبية يظهر لكل من يملك لوحة التحكم (للمراجعة) ══ */}
+      {(user?.role === 'executive' || (IS_STAGING_BUILD && can('dashboard'))) && <HallOfFame />}
 
       {/* ══ Recent + Quick Stats ════════════════════════════════════ */}
       <motion.div
