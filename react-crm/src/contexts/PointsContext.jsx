@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { getMyStats } from '../services/api'
 import { useAuth } from './AuthContext'
+import { IS_STAGING_BUILD } from '../config/env'
 
 const PointsContext = createContext(null)
 
@@ -27,6 +28,16 @@ export function PointsProvider({ children }) {
 
   const load = useCallback(async () => {
     if (authLoading) return
+    if (IS_STAGING_BUILD) {
+      setTotalPoints(0)
+      setTodayPoints(0)
+      setTodayCalls(0)
+      setWeekData([])
+      setRecent([])
+      setLoadError(null)
+      setLoading(false)
+      return
+    }
     if (!userId) {
       setLoadError(null)
       setLoading(false)
@@ -68,6 +79,7 @@ export function PointsProvider({ children }) {
 
   // يُستدعى بعد حفظ مكالمة — يُحدّث الحالة ويُطلق الأنيميشن
   function onCallSaved(pointsEarned = 10) {
+    if (IS_STAGING_BUILD) return
     setTodayCalls(prev => {
       const next = prev + 1
       // هل أكمل الهدف للتو؟

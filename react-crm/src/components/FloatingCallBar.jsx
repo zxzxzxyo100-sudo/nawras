@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, X, Search, Zap } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { usePoints }  from '../contexts/PointsContext'
+import { IS_STAGING_BUILD } from '../config/env'
 import CallModal      from './CallModal'
 
 const CAT_COLORS = {
@@ -47,7 +48,7 @@ export default function FloatingCallBar() {
     setShowModal(true)
   }
 
-  const pulsing = goalPct < 100   // ينبض طالما لم يكتمل الهدف
+  const pulsing = !IS_STAGING_BUILD && goalPct < 100
 
   return (
     <>
@@ -56,7 +57,7 @@ export default function FloatingCallBar() {
 
         {/* شارة عدد مكالمات اليوم */}
         <AnimatePresence>
-          {open && (
+          {open && !IS_STAGING_BUILD && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8, y: 8 }}
               animate={{ opacity: 1, scale: 1,   y: 0 }}
@@ -110,8 +111,7 @@ export default function FloatingCallBar() {
             </motion.div>
           </motion.button>
 
-          {/* شارة الهدف */}
-          {!open && (
+          {!open && !IS_STAGING_BUILD && (
             <div
               className="absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black"
               style={{
@@ -153,9 +153,11 @@ export default function FloatingCallBar() {
               <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
                 <Zap size={14} className="text-amber-400" />
                 <p className="text-white font-bold text-sm">تسجيل مكالمة سريعة</p>
-                <div className="mr-auto flex items-center gap-1 text-[10px] text-violet-300 font-medium">
-                  <Phone size={9} /> {todayCalls}/{20}
-                </div>
+                {!IS_STAGING_BUILD && (
+                  <div className="mr-auto flex items-center gap-1 text-[10px] text-violet-300 font-medium">
+                    <Phone size={9} /> {todayCalls}/20
+                  </div>
+                )}
               </div>
 
               {/* شريط البحث */}

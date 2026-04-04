@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { IS_STAGING_BUILD } from './config/env'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { StoresProvider } from './contexts/StoresContext'
 import { PointsProvider, usePoints } from './contexts/PointsContext'
@@ -39,7 +40,14 @@ function AppRoutes() {
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
-        <Route path="/performance"  element={<PrivateRoute view="tasks"><MyPerformance /></PrivateRoute>} />
+        <Route
+          path="/performance"
+          element={
+            IS_STAGING_BUILD
+              ? <Navigate to="/tasks" replace />
+              : <PrivateRoute view="tasks"><MyPerformance /></PrivateRoute>
+          }
+        />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
         <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
       </Route>
@@ -67,8 +75,7 @@ export default function App() {
       <AuthProvider>
         <StoresProvider>
           <PointsProvider>
-            {/* طبقة الأنيميشن العالمية — مستقلة عن أي Modal */}
-            <GlobalAnimations />
+            {!IS_STAGING_BUILD && <GlobalAnimations />}
             <AppRoutes />
           </PointsProvider>
         </StoresProvider>
