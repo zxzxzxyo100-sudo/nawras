@@ -16,12 +16,33 @@ function ensure_call_logs_outcome_column(PDO $pdo) {
     $done = true;
 }
 
+/** أعمدة تواريخ مكالمات مسار الاحتضان (ثلاث مكالمات + 3 أيام) */
+function ensure_incubation_call_columns(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    foreach ([
+        'inc_call1_at' => "ALTER TABLE store_states ADD COLUMN inc_call1_at DATETIME NULL DEFAULT NULL",
+        'inc_call2_at' => "ALTER TABLE store_states ADD COLUMN inc_call2_at DATETIME NULL DEFAULT NULL",
+        'inc_call3_at' => "ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL",
+    ] as $_col => $sql) {
+        try {
+            $pdo->exec($sql);
+        } catch (Throwable $e) {
+            // العمود موجود
+        }
+    }
+    $done = true;
+}
+
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 // ========== GET STORE STATES ==========
 if ($action === 'get_states') {
-    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by FROM store_states");
+    ensure_incubation_call_columns($pdo);
+    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
@@ -108,6 +129,54 @@ elseif ($action === 'log_call') {
     $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
+
+    // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——
+    if (in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true)) {
+        ensure_incubation_call_columns($pdo);
+        $regDate = !empty($registrationDate) ? $registrationDate : null;
+
+        if ($callType === 'inc_call1') {
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call1_at, registration_date)
+                VALUES (?, ?, 'incubating', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call1_at = IF(inc_call1_at IS NULL, NOW(), inc_call1_at),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $regDate]);
+        } elseif ($callType === 'inc_call2') {
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call2_at, registration_date)
+                VALUES (?, ?, 'incubating', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call2_at = IF(inc_call2_at IS NULL, NOW(), inc_call2_at),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $regDate]);
+        } elseif ($callType === 'inc_call3') {
+            $hasShipped = !empty($input['has_shipped']);
+            $newCat = $hasShipped ? 'active' : 'inactive';
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call3_at, incubation_stage, graduated_at, registration_date)
+                VALUES (?, ?, ?, NOW(), 'graduated', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call3_at = IF(inc_call3_at IS NULL, NOW(), inc_call3_at),
+                  category = VALUES(category),
+                  incubation_stage = 'graduated',
+                  graduated_at = COALESCE(graduated_at, NOW()),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $newCat, $regDate]);
+        }
+
+        $labels = [
+            'inc_call1' => 'مسار الاحتضان — المكالمة الأولى',
+            'inc_call2' => 'مسار الاحتضان — المكالمة الثانية',
+            'inc_call3' => 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
+        ];
+        $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$storeId, $storeName, $labels[$callType] ?? $callType, $note, $user, $userRole]);
+
+        jsonResponse(['success' => true, 'points_awarded' => 0]);
+    }
 
     // Save recovery call if applicable
     if (strpos($callType, 'rcall') === 0) {
