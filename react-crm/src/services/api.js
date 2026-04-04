@@ -25,6 +25,10 @@ export const deleteUser = (id) =>
 export const getAllStores = () =>
   http.get('/all-stores.php').then(r => r.data)
 
+/** كبار التجار — مسار مستقل (جلب كامل orders-summary) */
+export const getVipMerchants = () =>
+  http.get('/vip-merchants.php').then(r => r.data)
+
 /** ملخص الطرود لكل متجر ضمن نطاق تاريخ (يُستخدم لـ shipments_in_range) */
 export const getOrdersSummaryRange = (from, to) =>
   http

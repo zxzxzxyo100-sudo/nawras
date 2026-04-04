@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import {
-  getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments,
+  getAllStores, getVipMerchants, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments,
   getOrdersSummaryRange,
 } from '../services/api'
 import { useAuth } from './AuthContext'
@@ -36,7 +36,7 @@ export function StoresProvider({ children }) {
   const [error, setError]                 = useState(null)
   /** نطاق الطرود: التواريخ المعادة من orders-summary.php (واجهة Nawرس عبر الخادم) */
   const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
-  /** كبار التجار: من all-stores — حقول واجهة Nawris فقط (status + total_shipments) */
+  /** كبار التجار: من vip-merchants.php (orders-summary كامل الصفحات) */
   const [vipMerchants, setVipMerchants] = useState([])
 
   const load = useCallback(async () => {
@@ -50,8 +50,9 @@ export function StoresProvider({ children }) {
       const rangeTo = toDate.toISOString().slice(0, 10)
       const rangeFrom = fromDate.toISOString().slice(0, 10)
 
-      const [apiResult, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
+      const [apiResult, vipRes, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
         getAllStores(),
+        getVipMerchants().catch(() => ({ success: false, data: [] })),
         getStoreStates(),
         getAllCallLogs(),
         getAllRecoveryCalls(),
@@ -87,10 +88,11 @@ export function StoresProvider({ children }) {
       }
 
       let vipList = []
-      if (Array.isArray(apiResult.vip_merchants)) {
+      if (vipRes?.success && Array.isArray(vipRes.data)) {
+        vipList = vipRes.data
+      } else if (Array.isArray(apiResult.vip_merchants) && apiResult.vip_merchants.length > 0) {
         vipList = apiResult.vip_merchants
       } else {
-        // خادم قديم: نفس منطق API — دمج كل الخانات، الشروط status + total_shipments فقط (لا استثناء منظومة)
         const buckets = [
           ...(apiResult.data?.incubating || []),
           ...(apiResult.data?.active_shipping || []),
@@ -98,7 +100,6 @@ export function StoresProvider({ children }) {
           ...(apiResult.data?.cold_inactive || []),
         ]
         const seen = new Set()
-        vipList = []
         for (const s of buckets) {
           const sid = s?.id
           if (sid == null || seen.has(sid)) continue

@@ -98,9 +98,8 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            قائمة كبار التجار تُبنى من <span className="font-semibold text-slate-700">orders-summary</span> (نطاق واسع) مع دمج{' '}
-            <span className="font-semibold text-slate-700">customers/new</span>: يُفضَّل{' '}
-            <span className="font-semibold text-slate-700">status</span> وعدد الطرود من الملخص إن وُجد، ثم بيانات المتجر.
+            قائمة كبار التجار تُجلب من <span className="font-semibold text-slate-700">vip-merchants.php</span> (مسار مستقل) اعتماداً على{' '}
+            <span className="font-semibold text-slate-700">orders-summary</span> من Nawris مع جلب <span className="font-semibold text-slate-700">كل الصفحات</span> حتى لا يُفوت تاجر كبير.
             الشرط: <span className="font-semibold text-slate-700">active</span> و{' '}
             <span className="font-semibold text-slate-700">≥ {VIP_MIN}</span> طرد. للمدير التنفيذي فقط.
           </p>
