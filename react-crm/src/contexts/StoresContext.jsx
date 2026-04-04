@@ -67,24 +67,38 @@ export function StoresProvider({ children }) {
       const rangeMap = {}
       let resolvedFrom = rangeFrom
       let resolvedTo = rangeTo
-      if (rangeRes?.success && Array.isArray(rangeRes.data)) {
-        rangeRes.data.forEach(s => {
-          const id = s.id
+      const rangeRows = Array.isArray(rangeRes?.data)
+        ? rangeRes.data
+        : Array.isArray(rangeRes)
+          ? rangeRes
+          : null
+      const rangeFailed = rangeRes != null && rangeRes.success === false
+      if (!rangeFailed && Array.isArray(rangeRows)) {
+        rangeRows.forEach(s => {
+          const id = s.id ?? s.store_id
+          if (id == null) return
           const n = totalShipments(s)
           rangeMap[id] = n
           rangeMap[String(id)] = n
+          rangeMap[Number(id)] = n
         })
-        resolvedFrom = rangeRes.from != null && rangeRes.from !== '' ? String(rangeRes.from) : rangeFrom
-        resolvedTo = rangeRes.to != null && rangeRes.to !== '' ? String(rangeRes.to) : rangeTo
+        const metaObj = rangeRes && typeof rangeRes === 'object' && !Array.isArray(rangeRes) ? rangeRes : null
+        resolvedFrom = metaObj?.from != null && metaObj.from !== '' ? String(metaObj.from) : rangeFrom
+        resolvedTo = metaObj?.to != null && metaObj.to !== '' ? String(metaObj.to) : rangeTo
         setShipmentsRangeMeta({ from: resolvedFrom, to: resolvedTo })
       } else {
-        setShipmentsRangeMeta({ from: null, to: null })
+        /* فشل orders-summary.php: نعرض نفس نطاق الطلب مع 0 طرود — لا نخفي تواريخ العمود */
+        setShipmentsRangeMeta({ from: rangeFrom, to: rangeTo })
       }
 
       function mergeShipmentsInRange(arr) {
         return (arr || []).map(s => ({
           ...s,
-          shipments_in_range: rangeMap[s.id] ?? rangeMap[String(s.id)] ?? 0,
+          shipments_in_range:
+            rangeMap[s.id] ??
+            rangeMap[String(s.id)] ??
+            rangeMap[Number(s.id)] ??
+            0,
           shipments_range_from: resolvedFrom,
           shipments_range_to: resolvedTo,
         }))

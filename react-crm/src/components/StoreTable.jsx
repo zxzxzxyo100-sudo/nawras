@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 
 const PAGE_SIZES = [10, 50, 100, 'الكل']
 
@@ -176,9 +177,7 @@ export default function StoreTable({
                             : undefined
                         }
                       >
-                        {store.shipments_in_range !== undefined && store.shipments_in_range !== null
-                          ? store.shipments_in_range
-                          : (parseInt(store.total_shipments, 10) || 0)}
+                        {parcelsInRangeDisplay(store)}
                       </span>
                     </td>
                     {extraColumns.map(col => (
