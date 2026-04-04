@@ -7,10 +7,13 @@ import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import CallModal      from './CallModal'
 
 const CAT_COLORS = {
-  active_shipping: { bg: '#10b981', label: 'نشط' },
-  hot_inactive:    { bg: '#f59e0b', label: 'ساخن' },
-  cold_inactive:   { bg: '#6b7280', label: 'بارد' },
-  incubating:      { bg: '#8b5cf6', label: 'تحت الاحتضان' },
+  active_shipping:      { bg: '#10b981', label: 'نشط' },
+  active_pending_calls: { bg: '#059669', label: 'قيد المكالمة' },
+  completed:          { bg: '#7c3aed', label: 'منجز' },
+  completed_merchants:  { bg: '#7c3aed', label: 'منجز' },
+  hot_inactive:         { bg: '#f59e0b', label: 'ساخن' },
+  cold_inactive:        { bg: '#6b7280', label: 'بارد' },
+  incubating:           { bg: '#8b5cf6', label: 'تحت الاحتضان' },
 }
 
 export default function FloatingCallBar() {

@@ -53,6 +53,9 @@ try {
 try {
     $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL AFTER inc_call2_at");
 } catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at");
+} catch(Exception $e) {}
 
 // Audit logs - complete history
 $pdo->exec("CREATE TABLE IF NOT EXISTS audit_logs (

@@ -121,18 +121,20 @@ foreach ($inactive as $id => $s) {
 
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
-    'incubating'      => [],
-    'active_shipping' => [],
-    'hot_inactive'    => [],
-    'cold_inactive'   => [],
+    'incubating'           => [],
+    'active_shipping'      => [],
+    'completed_merchants'  => [],
+    'hot_inactive'         => [],
+    'cold_inactive'        => [],
 ];
 $counts = [
-    'incubating'      => 0,
-    'active_shipping' => 0,
-    'hot_inactive'    => 0,
-    'cold_inactive'   => 0,
-    'total_active'    => 0,
-    'total'           => 0,
+    'incubating'           => 0,
+    'active_shipping'      => 0,
+    'completed_merchants'  => 0,
+    'hot_inactive'         => 0,
+    'cold_inactive'        => 0,
+    'total_active'         => 0,
+    'total'                => 0,
 ];
 
 // ── مسار الاحتضان: دورة 14 يومًا — المكالمات في الأيام 1 و 3 و 10؛ «بين المكالمات» للباقي ──
@@ -445,8 +447,60 @@ foreach ($allStores as $id => $s) {
     $counts['total']++;
 }
 
+// فصل «المتاجر المنجزة» عن «نشط قيد المكالمة» (حسب store_states)
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    try {
+        $pdoDb->exec('ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at');
+    } catch (Throwable $e) {
+        // موجود
+    }
+    if (!empty($result['active_shipping'])) {
+        $ids = [];
+        foreach ($result['active_shipping'] as $s) {
+            if (isset($s['id'])) {
+                $ids[] = (int) $s['id'];
+            }
+        }
+        $ids = array_values(array_unique(array_filter($ids)));
+        if (!empty($ids)) {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdoDb->prepare("SELECT store_id, category, last_call_date FROM store_states WHERE store_id IN ($ph)");
+            $st->execute($ids);
+            $catById = [];
+            while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                $catById[(int) $r['store_id']] = $r;
+            }
+            $activePending = [];
+            $completed = [];
+            foreach ($result['active_shipping'] as $s) {
+                $id = (int) ($s['id'] ?? 0);
+                $row = $catById[$id] ?? null;
+                $cat = $row['category'] ?? '';
+                if ($cat === 'completed') {
+                    if (!empty($row['last_call_date'])) {
+                        $s['last_call_date'] = $row['last_call_date'];
+                    }
+                    $completed[] = $s;
+                } else {
+                    $activePending[] = $s;
+                }
+            }
+            $result['active_shipping'] = $activePending;
+            $result['completed_merchants'] = $completed;
+            $counts['active_shipping'] = count($activePending);
+            $counts['completed_merchants'] = count($completed);
+        }
+    }
+} catch (Throwable $e) {
+    // بدون DB لا نفصل القائمة
+}
+
 $counts['check'] = (
-    $counts['active_shipping'] + $counts['hot_inactive'] + $counts['cold_inactive']
+    $counts['active_shipping'] + $counts['completed_merchants'] + $counts['hot_inactive'] + $counts['cold_inactive']
     === $counts['total_active']
 );
 

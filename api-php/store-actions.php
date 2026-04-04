@@ -36,13 +36,28 @@ function ensure_incubation_call_columns(PDO $pdo) {
     $done = true;
 }
 
+/** تاريخ آخر مكالمة أنشأت حالة «منجز» (للعودة التلقائية بعد 30 يوماً) */
+function ensure_last_call_date_column(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec('ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at');
+    } catch (Throwable $e) {
+        // موجود
+    }
+    $done = true;
+}
+
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 // ========== GET STORE STATES ==========
 if ($action === 'get_states') {
     ensure_incubation_call_columns($pdo);
-    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at FROM store_states");
+    ensure_last_call_date_column($pdo);
+    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
@@ -63,7 +78,7 @@ elseif ($action === 'set_status') {
         jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
     }
 
-    $allowedTargets = ['frozen', 'active', 'restoring'];
+    $allowedTargets = ['frozen', 'active_pending_calls', 'restoring'];
     if (!in_array($category, $allowedTargets, true)) {
         jsonResponse(['success' => false, 'error' => 'التحويل اليدوي مقتصر على التجميد أو رفع التجميد أو بدء الاستعادة فقط.'], 400);
     }
@@ -80,7 +95,7 @@ elseif ($action === 'set_status') {
         } elseif ($freezeReason === '') {
             $err = 'سبب التجميد مطلوب.';
         }
-    } elseif ($category === 'active') {
+    } elseif ($category === 'active_pending_calls') {
         if ($currentCat !== 'frozen') {
             $err = 'رفع التجميد مسموح فقط عندما تكون الحالة «مجمد». باقي الانتقالات تتم آلياً (مكالمات، شحن، قواعد النظام).';
         }
@@ -96,8 +111,8 @@ elseif ($action === 'set_status') {
         jsonResponse(['success' => false, 'error' => $err], 400);
     }
 
-    // رفع التجميد: إفراغ سبب التجميد في السجل
-    if ($category === 'active' && $currentCat === 'frozen') {
+    // رفع التجميد: إفراغ سبب التجميد في السجل — العودة إلى «نشط قيد المكالمة»
+    if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
         $freezeReason = '';
     }
 
@@ -111,7 +126,7 @@ elseif ($action === 'set_status') {
         $pdo->prepare('UPDATE store_states SET restore_date = NOW() WHERE store_id = ?')->execute([$storeId]);
     }
 
-    if ($category === 'active' && $currentCat === 'frozen') {
+    if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
         $actionName = 'رفع التجميد';
     } elseif ($category === 'frozen') {
         $actionName = 'تجميد المتجر';
@@ -133,6 +148,7 @@ elseif ($action === 'set_status') {
 // ========== LOG CALL ==========
 elseif ($action === 'log_call') {
     ensure_call_logs_outcome_column($pdo);
+    ensure_last_call_date_column($pdo);
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $callType = $input['call_type'];
@@ -148,6 +164,12 @@ elseif ($action === 'log_call') {
     $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
+
+    // —— نشط قيد المكالمة → منجز عند تسجيل مكالمة (باستثناء مسار الاحتضان واستعادة غير النشط) ——
+    if (!in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true) && strpos($callType, 'rcall') !== 0) {
+        $upd = $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping')");
+        $upd->execute([(int) $storeId]);
+    }
 
     // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——
     if (in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true)) {
@@ -172,7 +194,7 @@ elseif ($action === 'log_call') {
                 ->execute([$storeId, $storeName, $regDate]);
         } elseif ($callType === 'inc_call3') {
             $hasShipped = !empty($input['has_shipped']);
-            $newCat = $hasShipped ? 'active' : 'inactive';
+            $newCat = $hasShipped ? 'active_pending_calls' : 'inactive';
             $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call3_at, incubation_stage, graduated_at, registration_date)
                 VALUES (?, ?, ?, NOW(), 'graduated', NOW(), ?)
                 ON DUPLICATE KEY UPDATE
@@ -435,21 +457,21 @@ elseif ($action === 'graduate_store') {
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
 
-    // تحديث الحالة إلى نشط + تسجيل التخريج
-    $pdo->prepare("UPDATE store_states SET category = 'active', incubation_stage = 'graduated', graduated_at = NOW() WHERE store_id = ?")
+    // تحديث الحالة إلى نشط قيد المكالمة + تسجيل التخريج
+    $pdo->prepare("UPDATE store_states SET category = 'active_pending_calls', incubation_stage = 'graduated', graduated_at = NOW() WHERE store_id = ?")
         ->execute([$storeId]);
 
     // إذا لم يوجد سجل
     $stmt = $pdo->prepare("SELECT store_id FROM store_states WHERE store_id = ?");
     $stmt->execute([$storeId]);
     if (!$stmt->fetch()) {
-        $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, incubation_stage, graduated_at) VALUES (?, ?, 'active', 'graduated', NOW())")
+        $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, incubation_stage, graduated_at) VALUES (?, ?, 'active_pending_calls', 'graduated', NOW())")
             ->execute([$storeId, $storeName]);
     }
 
     // سجل العمليات
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, 'تخريج المتجر', 'تم تخريج المتجر من مسار الاحتضان إلى المتاجر النشطة', 'incubating', 'active', $user, $userRole]);
+        ->execute([$storeId, $storeName, 'تخريج المتجر', 'تم تخريج المتجر من مسار الاحتضان إلى المتاجر النشطة (قيد المكالمة)', 'incubating', 'active_pending_calls', $user, $userRole]);
 
     // تسجيل مكالمة التخريج
     $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role) VALUES (?, ?, 'graduation', ?, NULL, ?, ?)")
