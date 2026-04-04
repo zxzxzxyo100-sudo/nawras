@@ -5,6 +5,7 @@
 if (!defined('NAWRIS_BASE')) {
     require_once __DIR__ . '/config.php';
 }
+require_once __DIR__ . '/nawris-orders-summary-core.php';
 
 /** أقصى صفحات لـ orders-summary في مسار VIP فقط */
 if (!defined('VIP_ORDERS_SUMMARY_MAX_PAGES')) {
@@ -70,110 +71,67 @@ function nawris_best_shipment_total_from_summary_row(array $store): int {
 }
 
 /**
- * جلب orders-summary لنطاق تاريخ واحد — حتى نفاد cursor.
+ * تحويل خريطة المتاجر (مثل orders-summary.php) إلى totals/rows للـ VIP.
+ */
+function nawris_store_map_to_vip_totals_rows(array $storeMap): array {
+    $totals = [];
+    $rows = [];
+    foreach ($storeMap as $sid => $store) {
+        if (!is_array($store)) {
+            continue;
+        }
+        $sid = (int) $sid;
+        if ($sid <= 0) {
+            continue;
+        }
+        $t = nawris_best_shipment_total_from_summary_row($store);
+        $totals[$sid] = $t;
+        $rows[$sid] = $store;
+    }
+
+    return ['totals' => $totals, 'rows' => $rows];
+}
+
+/**
+ * جلب orders-summary لنطاق واحد — نفس منطق orders-summary.php ثم بدون SSL ثم عبر استدعاء محلي.
  *
  * @return array{totals: array<int,int>, rows: array<int,array>, meta: array}
  */
 function nawris_fetch_orders_summary_single_range(string $from, string $to): array {
-    $totals = [];
-    $rows = [];
-    $cursor = null;
-    $page = 0;
-    $lastHttp = 0;
-    $curlErr = 0;
-    do {
-        $url = NAWRIS_BASE . '/customers/orders-summary?from=' . urlencode($from) . '&to=' . urlencode($to);
-        if ($cursor) {
-            $url .= '&cursor=' . urlencode($cursor);
+    foreach ([true, false] as $verifySsl) {
+        $r = nawris_orders_summary_fetch_all($from, $to, VIP_ORDERS_SUMMARY_MAX_PAGES, $verifySsl);
+        if (!empty($r['meta']['ok'])) {
+            $out = nawris_store_map_to_vip_totals_rows($r['stores']);
+            $out['meta'] = $r['meta'];
+
+            return $out;
         }
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'X-API-TOKEN: ' . NAWRIS_TOKEN,
-            ],
-        ]);
-        $response = curl_exec($ch);
-        $curlErr = curl_errno($ch);
-        $lastHttp = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($curlErr || !$response) {
-            return [
-                'totals' => $totals,
-                'rows'   => $rows,
-                'meta'   => [
-                    'ok' => false,
-                    'curl_errno' => $curlErr,
-                    'http_code'  => $lastHttp,
-                    'pages'      => $page,
-                    'range'      => ['from' => $from, 'to' => $to],
-                ],
-            ];
+        $code = (int) ($r['meta']['http_code'] ?? 0);
+        if ($code !== 500 && $code !== 502 && $code !== 503 && $code !== 504) {
+            $out = nawris_store_map_to_vip_totals_rows($r['stores']);
+            $out['meta'] = $r['meta'];
+
+            return $out;
         }
-        if ($lastHttp < 200 || $lastHttp >= 400) {
-            return [
-                'totals' => $totals,
-                'rows'   => $rows,
-                'meta'   => [
-                    'ok' => false,
-                    'http_code' => $lastHttp,
-                    'pages'     => $page,
-                    'range'     => ['from' => $from, 'to' => $to],
-                ],
-            ];
-        }
-        $data = json_decode($response, true);
-        if (!is_array($data)) {
-            return [
-                'totals' => $totals,
-                'rows'   => $rows,
-                'meta'   => [
-                    'ok' => false,
-                    'json_error' => true,
-                    'http_code'  => $lastHttp,
-                    'pages'      => $page,
-                    'range'      => ['from' => $from, 'to' => $to],
-                ],
-            ];
-        }
-        if (empty($data['data']) || !is_array($data['data'])) {
-            break;
-        }
-        foreach ($data['data'] as $store) {
-            if (!is_array($store)) {
-                continue;
-            }
-            $sid = isset($store['id']) ? (int) $store['id'] : 0;
-            if ($sid <= 0) {
-                continue;
-            }
-            $t = nawris_best_shipment_total_from_summary_row($store);
-            if (!isset($totals[$sid]) || $t > $totals[$sid]) {
-                $totals[$sid] = $t;
-                $rows[$sid] = $store;
-            }
-        }
-        $cursor = $data['meta']['next_cursor'] ?? null;
-        $page++;
-    } while ($cursor && $page < VIP_ORDERS_SUMMARY_MAX_PAGES);
+    }
+
+    $local = nawris_orders_summary_fetch_via_local_script($from, $to);
+    if ($local !== null && !empty($local['meta']['ok'])) {
+        $out = nawris_store_map_to_vip_totals_rows($local['stores']);
+        $out['meta'] = $local['meta'];
+
+        return $out;
+    }
 
     return [
-        'totals' => $totals,
-        'rows'   => $rows,
+        'totals' => [],
+        'rows'   => [],
         'meta'   => [
-            'ok'                     => true,
-            'http_code'              => $lastHttp,
-            'pages'                  => $page,
-            'curl_errno'             => $curlErr,
-            'range'                  => ['from' => $from, 'to' => $to],
-            'truncated_by_page_cap'  => $cursor !== null && $page >= VIP_ORDERS_SUMMARY_MAX_PAGES,
+            'ok'        => false,
+            'http_code' => 500,
+            'pages'     => 0,
+            'range'     => ['from' => $from, 'to' => $to],
+            'note'      => 'direct_curl_and_local_orders_summary_failed',
         ],
     ];
 }
