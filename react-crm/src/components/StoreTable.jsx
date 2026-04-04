@@ -71,47 +71,47 @@ export default function StoreTable({
   const extraColCount = selectable ? 1 : 0
 
   const shellClass = isElite
-    ? 'rounded-3xl overflow-hidden bg-gradient-to-br from-[#0c0618] via-[#151028] to-[#0e1018] p-2 sm:p-3 shadow-2xl shadow-black/50 border border-violet-500/15'
+    ? 'rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90'
     : 'bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden'
 
   const toolbarClass = isElite
-    ? 'p-4 md:p-5 backdrop-blur-xl bg-white/[0.06] border border-white/10 rounded-2xl mb-3 shadow-inner'
+    ? 'p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm'
     : 'p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap'
 
   const searchInputClass = isElite
-    ? 'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-violet-950/45 to-slate-900/35 border-white/10 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/35 focus:border-violet-400/25'
+    ? 'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-white to-violet-50/50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
     : 'w-full pr-9 pl-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
   const searchIconClass = isElite
-    ? 'absolute right-3 top-1/2 -translate-y-1/2 text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,0.45)]'
+    ? 'absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 drop-shadow-[0_0_8px_rgba(139,92,246,0.25)]'
     : 'absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
 
   const pageBtn = (sz, active) =>
     isElite
       ? `px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
           active
-            ? 'border-violet-400/35 bg-violet-600/25 text-violet-100 shadow-[0_0_14px_-3px_rgba(139,92,246,0.35)]'
-            : 'border-white/10 bg-white/[0.04] text-slate-400 hover:bg-white/10 hover:border-white/15'
+            ? 'border-violet-300 bg-violet-100 text-violet-900 shadow-sm'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
         }`
       : `px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
           active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
         }`
 
   const tableWrapClass = isElite
-    ? 'rounded-2xl border border-white/5 bg-black/20 backdrop-blur-md overflow-x-auto'
+    ? 'rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner'
     : 'overflow-x-auto'
 
   const theadTrClass = isElite
-    ? 'text-slate-400/95 text-[11px] font-semibold border-b border-white/10'
+    ? 'bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200'
     : 'bg-slate-50 text-slate-500 text-xs font-semibold'
 
   const rowClass = (isSelected) => {
     if (isElite) {
       return [
-        'border-b border-white/[0.06] transition-all duration-300 cursor-pointer rounded-xl',
-        'bg-white/[0.03] backdrop-blur-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]',
-        isSelected ? 'bg-violet-500/20 ring-1 ring-violet-400/30' : '',
-        'hover:bg-white/[0.07] hover:shadow-[inset_0_0_0_1px_rgba(234,179,8,0.14),0_8px_28px_-14px_rgba(234,179,8,0.12)]',
+        'border-b border-slate-100 transition-all duration-300 cursor-pointer',
+        'bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]',
+        isSelected ? 'bg-violet-50 ring-1 ring-violet-200/80' : '',
+        'hover:bg-amber-50/50 hover:shadow-[inset_0_0_0_1px_rgba(234,179,8,0.28),0_6px_24px_-12px_rgba(234,179,8,0.18)]',
       ].join(' ')
     }
     return `border-t border-slate-50 transition-colors cursor-pointer ${
@@ -119,7 +119,10 @@ export default function StoreTable({
     }`
   }
 
-  const tdPad = isElite ? 'px-5 py-4' : 'px-4 py-3.5'
+  /** نص موحّد لخلايا الجدول في الوضع الفاتح */
+  const eliteCell = 'text-slate-700'
+
+  const tdPad = isElite ? `px-5 py-4 ${eliteCell}` : 'px-4 py-3.5'
   const thPad = isElite ? 'px-5 py-3.5' : 'px-4 py-3'
 
   function handleRowClick(store) {
@@ -211,11 +214,11 @@ export default function StoreTable({
       </div>
 
       <div className={tableWrapClass}>
-        <table className={`w-full text-sm ${isElite ? 'border-separate border-spacing-y-2' : ''}`}>
+        <table className="w-full text-sm">
           <thead>
             <tr className={theadTrClass}>
               {selectable && (
-                <th className={`${thPad} w-10 ${isElite ? 'bg-transparent' : ''}`}>
+                <th className={`${thPad} w-10 ${isElite ? 'bg-slate-50/95' : ''}`}>
                   <input
                     type="checkbox"
                     checked={allPageSelected}
@@ -225,23 +228,23 @@ export default function StoreTable({
                   />
                 </th>
               )}
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>رقم المتجر</th>
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>اسم المتجر</th>
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>رقم الهاتف</th>
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>تاريخ التسجيل</th>
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>آخر شحنة</th>
-              <th className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>رقم المتجر</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>اسم المتجر</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>رقم الهاتف</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>تاريخ التسجيل</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>آخر شحنة</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>
                 <span className="block">الطرود</span>
                 {parcelsColumnSub && (
-                  <span className="block text-[10px] font-normal text-slate-400 mt-0.5" dir="ltr">
+                  <span className="block text-[10px] font-normal text-slate-500 mt-0.5" dir="ltr">
                     {parcelsColumnSub}
                   </span>
                 )}
               </th>
               {extraColumns.map(col => (
-                <th key={col.key} className={`text-right ${thPad} ${isElite ? 'bg-transparent' : ''}`}>{col.label}</th>
+                <th key={col.key} className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>{col.label}</th>
               ))}
-              <th className={`${thPad} w-24 ${isElite ? 'text-center text-slate-500 text-[10px] font-medium bg-transparent' : ''}`}>
+              <th className={`${thPad} w-24 ${isElite ? 'text-center text-slate-500 text-[10px] font-medium bg-slate-50/95' : ''}`}>
                 {isElite ? 'إجراءات' : ''}
               </th>
             </tr>
@@ -251,7 +254,7 @@ export default function StoreTable({
               <tr>
                 <td
                   colSpan={7 + extraColumns.length + extraColCount + 1}
-                  className={`text-center py-12 ${isElite ? 'text-slate-500' : 'text-slate-400'}`}
+                  className={`text-center py-12 ${isElite ? 'text-slate-500 bg-white' : 'text-slate-400'}`}
                 >
                   {emptyMsg}
                 </td>
@@ -280,7 +283,7 @@ export default function StoreTable({
                         <span
                           className={
                             isElite
-                              ? 'text-xs font-mono tabular-nums text-slate-200 bg-white/10 text-slate-100 px-2.5 py-1 rounded-lg border border-white/10'
+                              ? 'text-xs font-mono tabular-nums text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/90'
                               : 'text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg'
                           }
                         >
@@ -289,7 +292,7 @@ export default function StoreTable({
                         {renderIdBadge?.(store)}
                       </div>
                     </td>
-                    <td className={`${tdPad} ${isElite ? 'font-semibold text-slate-100' : 'font-medium text-slate-800'}`}>
+                    <td className={`${tdPad} ${isElite ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}`}>
                       {store.name}
                     </td>
                     <td className={tdPad}>
@@ -298,7 +301,7 @@ export default function StoreTable({
                           <span
                             className={
                               isElite
-                                ? 'text-sm font-mono tabular-nums tracking-tight text-slate-200'
+                                ? 'text-sm font-mono tabular-nums tracking-tight text-slate-800'
                                 : 'text-xs font-mono text-slate-600'
                             }
                             dir="ltr"
@@ -306,22 +309,22 @@ export default function StoreTable({
                             {store.phone}
                           </span>
                         )
-                        : <span className={`text-xs ${isElite ? 'text-slate-600' : 'text-slate-300'}`}>—</span>}
+                        : <span className={`text-xs ${isElite ? 'text-slate-400' : 'text-slate-300'}`}>—</span>}
                     </td>
-                    <td className={`${tdPad} ${isElite ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <td className={`${tdPad} ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
                       {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
                     </td>
-                    <td className={`${tdPad} ${isElite ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <td className={`${tdPad} ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
                       {store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
                         ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA')
-                        : <span className={`text-xs ${isElite ? 'text-rose-400/90' : 'text-red-400'}`}>لا يوجد</span>
+                        : <span className={`text-xs ${isElite ? 'text-rose-600' : 'text-red-400'}`}>لا يوجد</span>
                       }
                     </td>
                     <td className={tdPad}>
                       <span
                         className={
                           isElite
-                            ? 'font-bold text-slate-100'
+                            ? 'font-bold text-slate-900'
                             : 'font-bold text-slate-700'
                         }
                         title={
@@ -334,7 +337,7 @@ export default function StoreTable({
                       </span>
                     </td>
                     {extraColumns.map(col => (
-                      <td key={col.key} className={`${tdPad} ${isElite ? 'text-slate-300' : 'text-slate-500'}`}>
+                      <td key={col.key} className={`${tdPad} ${isElite ? eliteCell : 'text-slate-500'}`}>
                         {col.render ? col.render(store) : store[col.key] ?? '—'}
                       </td>
                     ))}
@@ -349,15 +352,15 @@ export default function StoreTable({
                             title="اتصال"
                             disabled={!store.phone}
                             onClick={() => (onCallStore || defaultCall)(store)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/25 bg-violet-600/15 text-violet-300 transition-all hover:bg-violet-500/25 hover:shadow-[0_0_16px_-4px_rgba(167,139,250,0.55)] disabled:opacity-30 disabled:pointer-events-none"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 transition-all hover:bg-violet-100 hover:shadow-[0_0_14px_-4px_rgba(139,92,246,0.35)] disabled:opacity-35 disabled:pointer-events-none"
                           >
-                            <Phone size={16} strokeWidth={2} className="drop-shadow-[0_0_6px_rgba(167,139,250,0.5)]" />
+                            <Phone size={16} strokeWidth={2} className="text-violet-600 drop-shadow-[0_0_4px_rgba(139,92,246,0.2)]" />
                           </button>
                           <button
                             type="button"
                             title="استعادة / تفاصيل"
                             onClick={() => handleRestoreClick(store)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/25 bg-white/[0.04] text-violet-300/95 transition-all hover:bg-violet-500/20 hover:shadow-[0_0_14px_-4px_rgba(139,92,246,0.4)]"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-700 transition-all hover:bg-violet-50 hover:shadow-[0_0_12px_-4px_rgba(139,92,246,0.25)]"
                           >
                             <RotateCcw size={16} strokeWidth={2} />
                           </button>
@@ -379,7 +382,7 @@ export default function StoreTable({
         <div
           className={
             isElite
-              ? 'flex items-center justify-between px-4 py-3 border-t border-white/10 bg-black/15'
+              ? 'flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/80'
               : 'flex items-center justify-between px-4 py-3 border-t border-slate-100'
           }
         >
@@ -389,14 +392,14 @@ export default function StoreTable({
             disabled={page === 1}
             className={
               isElite
-                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-slate-300 disabled:opacity-40 hover:bg-white/5 transition-colors'
+                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 disabled:opacity-40 hover:bg-white transition-colors'
                 : 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors'
             }
           >
             <ChevronRight size={14} />
             السابق
           </button>
-          <span className={`text-xs ${isElite ? 'text-slate-500' : 'text-slate-500'}`}>
+          <span className={`text-xs ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
             صفحة {page} من {totalPages}
           </span>
           <button
@@ -405,7 +408,7 @@ export default function StoreTable({
             disabled={page === totalPages}
             className={
               isElite
-                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-medium text-slate-300 disabled:opacity-40 hover:bg-white/5 transition-colors'
+                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 disabled:opacity-40 hover:bg-white transition-colors'
                 : 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors'
             }
           >

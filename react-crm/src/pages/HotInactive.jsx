@@ -31,7 +31,7 @@ function recoveryIdBadge(store, storeStates) {
     return (
       <span
         title="تمت الاستعادة"
-        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-teal-400/35 bg-teal-500/18 px-1 text-[10px] font-semibold text-teal-100/95"
+        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-teal-200 bg-teal-50 px-1 text-[10px] font-semibold text-teal-800"
       >
         ✓
       </span>
@@ -41,7 +41,7 @@ function recoveryIdBadge(store, storeStates) {
     return (
       <span
         title="قيد الاستعادة"
-        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-cyan-400/35 bg-cyan-500/15 px-1 text-[10px] font-medium text-cyan-100/95"
+        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 px-1 text-[10px] font-medium text-cyan-800"
       >
         ↻
       </span>
@@ -127,16 +127,16 @@ export default function HotInactive() {
         label: 'المسار',
         render: s => {
           if (coldInactive.some(c => c.id === s.id)) {
-            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-blue-400/25 bg-blue-500/15 text-blue-100 font-medium">غير نشط بارد</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-900 font-medium">غير نشط بارد</span>
           }
           if (hotInactive.some(c => c.id === s.id)) {
-            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-amber-400/25 bg-amber-500/12 text-amber-100 font-medium">غير نشط ساخن</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-amber-200 bg-amber-50/90 text-amber-900 font-medium">غير نشط ساخن</span>
           }
           if (activeShipping.some(x => x.id === s.id)) {
-            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-emerald-400/25 bg-emerald-500/15 text-emerald-100 font-medium">نشط يشحن (بعد الاستعادة)</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 font-medium">نشط يشحن (بعد الاستعادة)</span>
           }
           if (incubating.some(x => x.id === s.id)) {
-            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-violet-400/25 bg-violet-500/15 text-violet-100 font-medium">مسار الاحتضان</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-900 font-medium">مسار الاحتضان</span>
           }
           return <span className="text-xs text-slate-500">—</span>
         },
@@ -152,7 +152,7 @@ export default function HotInactive() {
         if (!s.last_shipment_date || s.last_shipment_date === 'لا يوجد') return '—'
         const days = Math.floor((new Date() - new Date(s.last_shipment_date)) / 86400000)
         return (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-amber-400/20 bg-amber-400/12 text-amber-100/95">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-900">
             {days} يوم
           </span>
         )
@@ -182,10 +182,10 @@ export default function HotInactive() {
         return (
           <div className="flex flex-col gap-0.5 min-w-0 max-w-[220px]">
             {outcomeLabel && (
-              <span className="text-xs font-semibold text-violet-300/95">{outcomeLabel}</span>
+              <span className="text-xs font-semibold text-violet-800">{outcomeLabel}</span>
             )}
             {noteText && (
-              <span className="text-[11px] text-slate-400 leading-snug line-clamp-2">{noteText}</span>
+              <span className="text-[11px] text-slate-600 leading-snug line-clamp-2">{noteText}</span>
             )}
           </div>
         )
@@ -208,8 +208,8 @@ export default function HotInactive() {
         const dateLabel = isToday ? 'اليوم' : latest.date?.slice(0, 10) || '—'
 
         return (
-          <span className={`flex items-center gap-1.5 text-xs font-medium ${isToday ? 'text-emerald-400/90' : 'text-slate-400'}`}>
-            <Phone size={12} strokeWidth={2} className="text-violet-400/75 shrink-0 opacity-90" />
+          <span className={`flex items-center gap-1.5 text-xs font-medium ${isToday ? 'text-emerald-700' : 'text-slate-600'}`}>
+            <Phone size={12} strokeWidth={2} className="text-violet-600 shrink-0 opacity-90" />
             {dateLabel}
             {latest.performed_by && (
               <span className="text-slate-500 font-normal">· {latest.performed_by}</span>
@@ -227,22 +227,22 @@ export default function HotInactive() {
         const st = storeStates[s.id]
 
         if (isRestoredCategory(dbCat)) return (
-          <span className="text-[11px] border border-teal-400/25 bg-teal-500/12 text-teal-100 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
+          <span className="text-[11px] border border-teal-200 bg-teal-50 text-teal-900 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
         )
         if (isRecoveryCompletedByShipment(s, st)) return (
-          <span className="text-[11px] border border-teal-400/25 bg-teal-500/12 text-teal-100 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
+          <span className="text-[11px] border border-teal-200 bg-teal-50 text-teal-900 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
         )
         if (dbCat === 'restoring') return (
           <div className="flex flex-col gap-1 max-w-[200px]">
-            <span className="text-[11px] border border-cyan-400/25 bg-cyan-500/12 text-cyan-100 px-2 py-0.5 rounded-lg font-medium w-fit">قيد الاستعادة</span>
+            <span className="text-[11px] border border-cyan-200 bg-cyan-50 text-cyan-900 px-2 py-0.5 rounded-lg font-medium w-fit">قيد الاستعادة</span>
             {dbUpdatedBy && (
-              <span className="text-[10px] text-slate-500">{dbUpdatedBy}</span>
+              <span className="text-[10px] text-slate-600">{dbUpdatedBy}</span>
             )}
             <span className="text-[10px] text-slate-500 leading-snug">تُحدَّث تلقائياً</span>
           </div>
         )
         if (dbCat === 'frozen') return (
-          <span className="text-[11px] border border-white/10 bg-white/5 text-slate-400 px-2 py-0.5 rounded-lg">مجمد</span>
+          <span className="text-[11px] border border-slate-200 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">مجمد</span>
         )
         return null
       },
