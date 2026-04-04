@@ -38,6 +38,7 @@ export default function StoreTable({
   const isElite = variant === 'elite'
 
   const [nameQuery, setNameQuery] = useState('')
+  const [namePickedStoreId, setNamePickedStoreId] = useState(null)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -48,8 +49,16 @@ export default function StoreTable({
   const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
-    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    () => ({
+      nameQuery,
+      namePickedStoreId,
+      idQuery,
+      regFrom,
+      regTo,
+      shipFrom,
+      shipTo,
+    }),
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -69,6 +78,7 @@ export default function StoreTable({
 
   function clearFilters() {
     setNameQuery('')
+    setNamePickedStoreId(null)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -80,13 +90,14 @@ export default function StoreTable({
     () =>
       Boolean(
         nameQuery.trim()
+        || namePickedStoreId != null
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   // multi-select helpers
@@ -249,6 +260,8 @@ export default function StoreTable({
         onClose={() => setFilterOpen(false)}
         isElite={isElite}
         nameQuery={nameQuery}
+        namePickedStoreId={namePickedStoreId}
+        onNamePickedStoreIdChange={setNamePickedStoreId}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}

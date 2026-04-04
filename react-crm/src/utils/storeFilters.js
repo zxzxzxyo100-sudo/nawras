@@ -1,3 +1,27 @@
+/** مطابقة الهاتف: نص كما هو، أو أرقام فقط في أي موضع (حتى لو لم يُكتب أول الرقم) */
+function phoneMatches(phone, queryLower) {
+  const raw = String(phone || '')
+  const phoneLower = raw.toLowerCase()
+  const q = queryLower.trim()
+  if (!q) return true
+
+  const digits = raw.replace(/\D/g, '')
+  const qDigits = q.replace(/\D/g, '')
+  if (qDigits.length > 0 && digits.includes(qDigits)) return true
+
+  return phoneLower.includes(q)
+}
+
+/** الاسم يحتوي النص أو الهاتف يطابق */
+function nameOrPhoneMatches(name, phone, queryLower) {
+  const nameLower = String(name || '').toLowerCase()
+  const q = queryLower.trim()
+  if (!q) return true
+  const phoneOk = phoneMatches(phone, queryLower)
+  const nameOk = nameLower.includes(q)
+  return nameOk || phoneOk
+}
+
 /**
  * يُرجع YYYY-MM-DD من حقل تاريخ المتجر أو null
  */
@@ -14,6 +38,8 @@ export function dateOnlyFromStoreField(val) {
 export function filterStoresByToolbar(stores, filters) {
   const {
     nameQuery = '',
+    /** عند الاختيار من Autocomplete: تصفية بحسب المعرّف فقط */
+    namePickedStoreId = null,
     idQuery = '',
     regFrom = '',
     regTo = '',
@@ -22,11 +48,11 @@ export function filterStoresByToolbar(stores, filters) {
   } = filters
 
   return stores.filter(s => {
-    if (nameQuery.trim()) {
+    if (namePickedStoreId != null && namePickedStoreId !== '') {
+      if (String(s.id) !== String(namePickedStoreId)) return false
+    } else if (nameQuery.trim()) {
       const n = nameQuery.trim().toLowerCase()
-      const nameOk = String(s.name || '').toLowerCase().includes(n)
-      const phoneOk = String(s.phone || '').toLowerCase().includes(n)
-      if (!nameOk && !phoneOk) return false
+      if (!nameOrPhoneMatches(s.name, s.phone, n)) return false
     }
 
     if (idQuery.trim()) {

@@ -64,6 +64,7 @@ const COLOR_CLASSES = {
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
 function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [nameQuery, setNameQuery] = useState('')
+  const [namePickedStoreId, setNamePickedStoreId] = useState(null)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -72,8 +73,16 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
-    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    () => ({
+      nameQuery,
+      namePickedStoreId,
+      idQuery,
+      regFrom,
+      regTo,
+      shipFrom,
+      shipTo,
+    }),
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -83,6 +92,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
 
   function clearFilters() {
     setNameQuery('')
+    setNamePickedStoreId(null)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -94,13 +104,14 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     () =>
       Boolean(
         nameQuery.trim()
+        || namePickedStoreId != null
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   if (!stores.length) {
@@ -149,6 +160,8 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         onClose={() => setFilterOpen(false)}
         isElite
         nameQuery={nameQuery}
+        namePickedStoreId={namePickedStoreId}
+        onNamePickedStoreIdChange={setNamePickedStoreId}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}
