@@ -1,7 +1,9 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
+  ChevronDown, Circle,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -12,13 +14,81 @@ const NAV_ALL = [
   { to: '/new',           label: 'المتاجر الجديدة',    icon: Store,           view: 'new'          },
   { to: '/incubation',    label: 'مسار الاحتضان',      icon: Baby,            view: 'incubation'   },
   { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
-  { to: '/hot-inactive',  label: 'غير نشط ساخن',       icon: Flame,           view: 'hot_inactive' },
   { to: '/cold-inactive', label: 'غير نشط بارد',       icon: Snowflake,       view: 'cold_inactive'},
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
+
+/** ترتيب عناصر مجموعة المتاجر — غير نشط ساخن له قائمة فرعية منفصلة */
+const STORE_NAV_ORDER = [
+  '/new', '/incubation', '/active', '__hot_inactive__', '/cold-inactive', '/vip',
+]
+
+const HOT_INACTIVE_SUB = [
+  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة' },
+  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة' },
+]
+
+function HotInactiveNavGroup({ can, onClose }) {
+  const location = useLocation()
+  const isUnderHot = location.pathname.startsWith('/hot-inactive')
+  const [open, setOpen] = useState(isUnderHot)
+
+  useEffect(() => {
+    if (isUnderHot) setOpen(true)
+  }, [isUnderHot])
+
+  if (!can('hot_inactive')) return null
+
+  return (
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
+          isUnderHot ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+        }`}
+        style={isUnderHot ? {
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
+          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
+        } : {}}
+      >
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isUnderHot ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+        }`}>
+          <Flame size={14} className={isUnderHot ? 'text-white' : 'text-white/50'} />
+        </div>
+        <span className="flex-1 truncate">غير نشط ساخن</span>
+        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
+          {HOT_INACTIVE_SUB.map(sub => (
+            <NavLink
+              key={sub.to}
+              to={sub.to}
+              onClick={() => { if (onClose) onClose() }}
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
+                  isActive ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Circle size={6} className={isActive ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
+                  <span>{sub.label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const NAV = DISABLE_POINTS_AND_PERFORMANCE
   ? NAV_ALL.filter(n => n.to !== '/performance')
@@ -27,7 +97,7 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
   { label: 'الرئيسية',  keys: ['/', '/kanban'] },
-  { label: 'المتاجر',   keys: ['/new', '/incubation', '/active', '/hot-inactive', '/cold-inactive', '/vip'] },
+  { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
@@ -80,6 +150,62 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* ── Navigation ───────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         {NAV_GROUPS.map(group => {
+          if (group.keys.includes('__store_section__')) {
+            const blocks = STORE_NAV_ORDER.map(key => {
+              if (key === '__hot_inactive__') {
+                return <HotInactiveNavGroup key="hot" can={can} onClose={onClose} />
+              }
+              const item = NAV.find(n => n.to === key)
+              if (!item || !can(item.view)) return null
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  onClick={handleNav}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
+                      isActive
+                        ? 'text-white'
+                        : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+                    }`
+                  }
+                  style={({ isActive }) => isActive
+                    ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                    : {}
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                        isActive
+                          ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                          : 'bg-white/5 group-hover:bg-white/10'
+                      }`}>
+                        <item.icon size={14} className={isActive ? 'text-white' : 'text-white/50'} />
+                      </div>
+                      <span className="truncate">{item.label}</span>
+                      {isActive && (
+                        <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              )
+            })
+            if (!blocks.some(Boolean)) return null
+            return (
+              <div key={group.label} className="mb-5">
+                <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {blocks}
+                </div>
+              </div>
+            )
+          }
+
           const items = NAV.filter(n => group.keys.includes(n.to) && can(n.view))
           if (items.length === 0) return null
           return (

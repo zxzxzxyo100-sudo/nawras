@@ -37,7 +37,8 @@ function AppRoutes() {
         <Route path="/"             element={<Dashboard />} />
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
         <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
-        <Route path="/hot-inactive" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
+        <Route path="/hot-inactive" element={<Navigate to="/hot-inactive/restoring" replace />} />
+        <Route path="/hot-inactive/:recoverySegment" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
         <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />

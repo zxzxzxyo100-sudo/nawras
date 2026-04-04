@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Flame, RefreshCw, CheckCircle2, Phone, PhoneOff } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { useParams, Navigate } from 'react-router-dom'
+import { Flame, RefreshCw, CheckCircle2, Phone, PhoneOff, Users } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -7,13 +8,56 @@ import { useAuth } from '../contexts/AuthContext'
 import { setStoreStatus } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 
+const SEGMENTS = new Set(['restoring', 'restored'])
+
+function aggregateUserStats(stores, storeStates, callLogs) {
+  const today = new Date().toISOString().slice(0, 10)
+  const weekAgo = Date.now() - 7 * 86400000
+  const map = {}
+  for (const s of stores) {
+    const uid = (storeStates[s.id]?.updated_by || '').trim() || 'غير محدد'
+    if (!map[uid]) {
+      map[uid] = { label: uid, storeCount: 0, callsToday: 0, callsWeek: 0 }
+    }
+    map[uid].storeCount += 1
+    const log = callLogs[s.id] || {}
+    for (const c of Object.values(log)) {
+      if (!c?.date) continue
+      if (c.date.startsWith(today)) map[uid].callsToday += 1
+      const t = new Date(c.date).getTime()
+      if (!Number.isNaN(t) && t >= weekAgo) map[uid].callsWeek += 1
+    }
+  }
+  return Object.values(map).sort((a, b) => b.storeCount - a.storeCount)
+}
+
 export default function HotInactive() {
+  const { recoverySegment } = useParams()
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
   const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
+  if (!SEGMENTS.has(recoverySegment || '')) {
+    return <Navigate to="/hot-inactive/restoring" replace />
+  }
+
+  const isRestoredTab = recoverySegment === 'restored'
+
   const hotInactive = stores.hot_inactive || []
+
+  const filteredStores = useMemo(() => {
+    return hotInactive.filter(s => {
+      const dbCat = storeStates[s.id]?.category
+      if (isRestoredTab) return dbCat === 'restored'
+      return dbCat !== 'restored'
+    })
+  }, [hotInactive, storeStates, isRestoredTab])
+
+  const userStats = useMemo(
+    () => aggregateUserStats(filteredStores, storeStates, callLogs),
+    [filteredStores, storeStates, callLogs]
+  )
 
   async function markAs(store, category) {
     setActionLoading(true)
@@ -114,7 +158,6 @@ export default function HotInactive() {
       render: s => {
         const dbCat = storeStates[s.id]?.category
         const dbUpdatedBy = storeStates[s.id]?.updated_by
-        const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
 
         if (dbCat === 'restored') return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
@@ -135,22 +178,24 @@ export default function HotInactive() {
         if (dbCat === 'frozen') return (
           <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">مجمد</span>
         )
-        // لا حالة مخصصة — العمود فارغ
         return null
       },
     },
   ]
 
+  const subTitle = isRestoredTab ? 'تمت الاستعادة' : 'جاري الاستعادة'
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
             <Flame size={24} className="text-amber-500" />
             غير نشط ساخن
+            <span className="text-slate-400 font-medium text-lg">— {subTitle}</span>
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {counts.hot_inactive || 0} متجر — انقطع من 15 إلى 60 يوم
+            {filteredStores.length} متجر في هذا الفرع — إجمالي الفئة {counts.hot_inactive || 0}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
@@ -159,11 +204,43 @@ export default function HotInactive() {
         </button>
       </div>
 
+      {/* إحصاءات حسب آخر من حدّث حالة المتجر في النظام */}
+      {userStats.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-white/80 flex items-center gap-2">
+            <Users size={18} className="text-violet-600" />
+            <h2 className="text-sm font-bold text-slate-800">إحصاءات حسب المسؤول (آخر تحديث للحالة)</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-right text-xs text-slate-500 border-b border-slate-200 bg-white">
+                  <th className="px-4 py-2.5 font-semibold">المسؤول</th>
+                  <th className="px-4 py-2.5 font-semibold">عدد المتاجر</th>
+                  <th className="px-4 py-2.5 font-semibold">مكالمات اليوم</th>
+                  <th className="px-4 py-2.5 font-semibold">مكالمات 7 أيام</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userStats.map(row => (
+                  <tr key={row.label} className="border-b border-slate-100 bg-white hover:bg-slate-50/80">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{row.label}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-700">{row.storeCount}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-emerald-700 font-medium">{row.callsToday}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{row.callsWeek}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <StoreTable
-        stores={hotInactive}
+        stores={filteredStores}
         onSelectStore={setSelected}
         extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر في هذه الفئة"
+        emptyMsg={isRestoredTab ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة' : 'لا توجد متاجر جاري استعادتها هنا'}
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
