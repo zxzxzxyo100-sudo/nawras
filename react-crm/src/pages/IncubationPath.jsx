@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar } from '../utils/storeFilters'
+import { filterStoresByToolbar, NAME_MATCH_MODES } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 import StoreFilterDrawer from '../components/StoreFilterDrawer'
@@ -64,6 +64,7 @@ const COLOR_CLASSES = {
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
 function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [nameQuery, setNameQuery] = useState('')
+  const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -72,8 +73,16 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
-    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    () => ({
+      nameQuery,
+      nameMatchMode,
+      idQuery,
+      regFrom,
+      regTo,
+      shipFrom,
+      shipTo,
+    }),
+    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -94,13 +103,14 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     () =>
       Boolean(
         nameQuery.trim()
+        || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   if (!stores.length) {
@@ -149,6 +159,8 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         onClose={() => setFilterOpen(false)}
         isElite
         nameQuery={nameQuery}
+        nameMatchMode={nameMatchMode}
+        onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}

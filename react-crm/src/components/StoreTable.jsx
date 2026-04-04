@@ -9,7 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar } from '../utils/storeFilters'
+import { filterStoresByToolbar, NAME_MATCH_MODES } from '../utils/storeFilters'
 import StoreFilterDrawer from './StoreFilterDrawer'
 
 /** خيارات عدد الصفوف في الصفحة (قائمة منسدلة مثل واجهات الإدارة) */
@@ -38,6 +38,7 @@ export default function StoreTable({
   const isElite = variant === 'elite'
 
   const [nameQuery, setNameQuery] = useState('')
+  const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -48,8 +49,16 @@ export default function StoreTable({
   const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
-    () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    () => ({
+      nameQuery,
+      nameMatchMode,
+      idQuery,
+      regFrom,
+      regTo,
+      shipFrom,
+      shipTo,
+    }),
+    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -69,6 +78,7 @@ export default function StoreTable({
 
   function clearFilters() {
     setNameQuery('')
+    setNameMatchMode(NAME_MATCH_MODES.contains)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -80,13 +90,14 @@ export default function StoreTable({
     () =>
       Boolean(
         nameQuery.trim()
+        || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   // multi-select helpers
@@ -249,6 +260,8 @@ export default function StoreTable({
         onClose={() => setFilterOpen(false)}
         isElite={isElite}
         nameQuery={nameQuery}
+        nameMatchMode={nameMatchMode}
+        onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}

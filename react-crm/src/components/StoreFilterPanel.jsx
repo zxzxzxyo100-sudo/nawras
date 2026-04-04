@@ -1,4 +1,5 @@
 import { Filter } from 'lucide-react'
+import { NAME_MATCH_MODES } from '../utils/storeFilters'
 
 /**
  * شريط تصفية موحّد: اسم، رقم المتجر، نطاق تاريخ التسجيل، نطاق آخر شحنة
@@ -8,6 +9,8 @@ export default function StoreFilterPanel({
   /** إخفاء صف العنوان + «مسح التصفية» (للاستخدام داخل لوحة جانبية) */
   showHeaderRow = true,
   nameQuery,
+  nameMatchMode = NAME_MATCH_MODES.contains,
+  onNameMatchModeChange,
   idQuery,
   regFrom,
   regTo,
@@ -49,16 +52,36 @@ export default function StoreFilterPanel({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <div>
+        <div className="space-y-2 sm:col-span-2 xl:col-span-1">
           <label className={label}>اسم المتجر</label>
           <input
             type="text"
             value={nameQuery}
             onChange={e => onNameChange(e.target.value)}
-            placeholder="اسم المتجر أو جزء من رقم الهاتف..."
+            placeholder="اكتب اسماً أو حرفاً أو كلمة..."
             className={inp}
             dir="rtl"
           />
+          {onNameMatchModeChange && (
+            <div>
+              <label className={label}>طريقة البحث في الاسم</label>
+              <select
+                value={nameMatchMode}
+                onChange={e => onNameMatchModeChange(e.target.value)}
+                className={`${inp} cursor-pointer`}
+              >
+                <option value={NAME_MATCH_MODES.contains}>
+                  يحتوي على النص — في أي مكان بالاسم أو الهاتف
+                </option>
+                <option value={NAME_MATCH_MODES.startsWith}>
+                  يبدأ الاسم بهذا النص أو الحرف الأول
+                </option>
+                <option value={NAME_MATCH_MODES.word}>
+                  كلمة من اسم المتجر (أي كلمة تضمّ النص)
+                </option>
+              </select>
+            </div>
+          )}
         </div>
         <div>
           <label className={label}>رقم المتجر / المعرف</label>
