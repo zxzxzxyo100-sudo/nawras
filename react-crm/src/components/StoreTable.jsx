@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   Filter,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -11,7 +12,8 @@ import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreFilterDrawer from './StoreFilterDrawer'
 
-const PAGE_SIZES = [10, 50, 100, 'الكل']
+/** خيارات عدد الصفوف في الصفحة (قائمة منسدلة مثل واجهات الإدارة) */
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 150, 200, 500, 1000, 'الكل']
 
 export default function StoreTable({
   stores = [],
@@ -118,16 +120,9 @@ export default function StoreTable({
     ? 'p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm space-y-4'
     : 'p-4 border-b border-slate-100 space-y-4'
 
-  const pageBtn = (sz, active) =>
-    isElite
-      ? `px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-          active
-            ? 'border-violet-300 bg-violet-100 text-violet-900 shadow-sm'
-            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-        }`
-      : `px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-          active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-        }`
+  const pageSizeSelectClass = isElite
+    ? 'min-w-[8.5rem] rounded-xl border border-slate-200 bg-white py-2 ps-3 pe-9 text-sm font-medium text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300 cursor-pointer appearance-none'
+    : 'min-w-[8.5rem] rounded-lg border border-slate-200 bg-white py-2 ps-3 pe-9 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer appearance-none'
 
   const tableWrapClass = isElite
     ? 'rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner'
@@ -200,26 +195,44 @@ export default function StoreTable({
               )}
             </button>
             <div className="hidden sm:block h-8 w-px bg-slate-200/90" aria-hidden />
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span
-                className={`whitespace-nowrap ${isElite ? 'text-[11px] text-slate-500' : 'text-xs text-slate-400'}`}
+                className={`flex items-center gap-2 whitespace-nowrap ${
+                  isElite ? 'text-xs text-slate-600' : 'text-xs text-slate-500'
+                }`}
               >
-                عرض:
+                <span dir="ltr" className="font-semibold tracking-tight text-slate-700">
+                  Show
+                </span>
+                <span className="text-slate-300" aria-hidden>
+                  |
+                </span>
+                <span className="font-medium">عرض:</span>
               </span>
-              <div className="flex flex-wrap gap-1">
-                {PAGE_SIZES.map(sz => {
-                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
-                  return (
-                    <button
+              <div className="relative inline-flex">
+                <select
+                  aria-label="عدد الصفوف في الصفحة"
+                  value={pageSize === 'الكل' ? 'all' : String(pageSize)}
+                  onChange={e => {
+                    const v = e.target.value
+                    handlePageSize(v === 'all' ? 'الكل' : Number(v))
+                  }}
+                  className={pageSizeSelectClass}
+                >
+                  {PAGE_SIZE_OPTIONS.map(sz => (
+                    <option
                       key={sz}
-                      type="button"
-                      onClick={() => handlePageSize(sz)}
-                      className={pageBtn(sz, active)}
+                      value={sz === 'الكل' ? 'all' : String(sz)}
                     >
-                      {sz}
-                    </button>
-                  )
-                })}
+                      {sz === 'الكل' ? 'الكل' : sz.toLocaleString('en-US')}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={16}
+                  className="pointer-events-none absolute top-1/2 -translate-y-1/2 end-2.5 text-slate-400"
+                  aria-hidden
+                />
               </div>
             </div>
           </div>
