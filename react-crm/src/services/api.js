@@ -66,9 +66,6 @@ export const updateIncubation = (data) =>
   http.post('/store-actions.php?action=update_incubation', data).then(r => r.data)
 
 // ─── Points & Gamification ────────────────────────────────────────────────────
-export const getLeaderboard = () =>
-  http.get('/store-actions.php?action=get_leaderboard').then(r => r.data)
-
 export const getMyStats = (username) =>
   http.get(`/store-actions.php?action=get_my_stats&username=${encodeURIComponent(username)}`).then(r => r.data)
 

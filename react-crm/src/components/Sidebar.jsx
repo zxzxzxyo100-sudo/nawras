@@ -1,10 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
-  ClipboardList, Users, LogOut, Baby, X, Kanban, Zap, BarChart2,
+  ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
-import { usePoints } from '../contexts/PointsContext'
 
 const NAV = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
@@ -29,8 +28,6 @@ const NAV_GROUPS = [
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
   const navigate = useNavigate()
-  const { totalPoints, todayCalls } = usePoints()
-
   function handleLogout() { logout(); navigate('/login') }
   function handleNav()    { if (onClose) onClose() }
 
@@ -123,29 +120,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── User ─────────────────────────────── */}
       <div className="p-4 border-t border-white/5 space-y-2">
-        {/* شارة النقاط */}
-        <NavLink
-          to="/performance"
-          onClick={handleNav}
-          className="flex items-center gap-2 p-2.5 rounded-xl transition-all hover:bg-white/5"
-          style={{ border: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.06)' }}
-        >
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-          >
-            <Zap size={13} className="text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-amber-400 text-[10px] font-medium">نقاطي</p>
-            <p className="text-white text-xs font-black">{totalPoints} NRS</p>
-          </div>
-          <div className="text-[9px] text-white/30 text-center">
-            <div className="text-amber-400 font-bold">{todayCalls}</div>
-            <div>اليوم</div>
-          </div>
-        </NavLink>
-
         {/* بيانات المستخدم */}
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
           <div

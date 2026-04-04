@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
@@ -9,13 +9,10 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby, Crown, Zap, Wallet, Trophy, Lock,
+  Award, Activity, ArrowUpRight, Baby,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getLeaderboard } from '../services/api'
-import { MILESTONES } from '../components/MilestonesCard'
-import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -95,281 +92,12 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
   )
 }
 
-// ── حساب الميلستون القادم لموظف ──────────────────────────────────
-function getNextMilestone(pts) {
-  return MILESTONES.find(m => pts < m.threshold) ?? null
-}
-function getUnlockedCount(pts) {
-  return MILESTONES.filter(m => pts >= m.threshold).length
-}
-
-// ─── Hall of Fame + جدول المحافظ الشاملة ─────────────────────────
-function HallOfFame() {
-  const [board,    setBoard]    = useState([])
-  const [sortBy,   setSortBy]   = useState('total_points')
-
-  useEffect(() => {
-    getLeaderboard().then(r => setBoard(r.data || [])).catch(() => {})
-  }, [])
-
-  const medals       = ['🥇','🥈','🥉']
-  const podiumColors = [
-    'linear-gradient(135deg, #f59e0b, #d97706)',
-    'linear-gradient(135deg, #9ca3af, #6b7280)',
-    'linear-gradient(135deg, #cd7c2f, #a0522d)',
-  ]
-  const SORT_LABELS = {
-    total_points: 'إجمالي NRS',
-    today_points: 'نقاط اليوم',
-    today_calls:  'مكالمات اليوم',
-  }
-
-  const sorted = [...board].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0))
-  const top3   = sorted.slice(0, 3)
-  const rest   = sorted.slice(3)
-
-  if (!board.length) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="rounded-2xl overflow-hidden border border-dashed border-white/15"
-        style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
-      >
-        <div className="p-8 text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
-            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))' }}>
-            <Crown size={28} className="text-amber-400" />
-          </div>
-          <h2 className="text-white font-bold text-base flex items-center justify-center gap-2">
-            قاعة المتميزين
-          </h2>
-          <p className="text-white/35 text-xs mt-2 max-w-sm mx-auto leading-relaxed">
-            لا يوجد ترتيب بعد. عند تسجيل مكالمات وحفظها تُضاف نقاط NRS وتظهر هنا تلقائياً.
-          </p>
-          <div className="mt-4 inline-flex items-center gap-1.5 text-amber-400/80 text-[10px] font-bold px-3 py-1.5 rounded-full border border-amber-500/20 bg-amber-500/5">
-            <Zap size={10} /> NRS Points
-          </div>
-        </div>
-      </motion.div>
-    )
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
-      className="rounded-2xl overflow-hidden"
-      style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
-    >
-      {/* رأس */}
-      <div className="flex items-center justify-between p-5 pb-4">
-        <div>
-          <h2 className="text-white font-bold text-base flex items-center gap-2">
-            <Crown size={16} className="text-amber-400" /> قاعة المتميزين
-          </h2>
-          <p className="text-white/30 text-xs mt-0.5">المحفظة الشاملة لكل الموظفين</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* إجمالي الإنجازات المفتوحة */}
-          {board.length > 0 && (() => {
-            const totalUnlocked = board.reduce((s, e) => s + getUnlockedCount(e.total_points || 0), 0)
-            return totalUnlocked > 0 ? (
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
-                style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)', color: '#c4b5fd' }}>
-                <Trophy size={9} /> {totalUnlocked} إنجاز
-              </div>
-            ) : null
-          })()}
-          <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/25 text-amber-300 text-xs font-bold px-3 py-1 rounded-full">
-            <Zap size={10} /> NRS Points
-          </div>
-        </div>
-      </div>
-
-      {/* Top 3 Podium */}
-      <div className="grid grid-cols-3 gap-3 px-5 mb-4">
-        {top3.map((emp, i) => (
-          <motion.div
-            key={emp.username}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.1 }}
-            className="rounded-2xl p-3 text-center"
-            style={{
-              background: i === 0
-                ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))'
-                : 'rgba(255,255,255,0.04)',
-              border: i === 0 ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div className="text-2xl mb-1">{medals[i]}</div>
-            <div
-              className="w-9 h-9 rounded-xl mx-auto flex items-center justify-center text-white font-black text-sm mb-2"
-              style={{ background: podiumColors[i] }}
-            >
-              {emp.fullname?.charAt(0) || '؟'}
-            </div>
-            <p className="text-white text-xs font-bold truncate">{emp.fullname?.split(' ')[0]}</p>
-            <p className="font-black mt-1" style={{ color: i === 0 ? '#fbbf24' : '#a78bfa', fontSize: '1.1rem' }}>
-              {emp[sortBy] ?? emp.total_points}
-            </p>
-            <p className="text-white/30 text-[9px]">{sortBy === 'today_calls' ? 'مكالمة' : 'NRS'}</p>
-            <div className="mt-1.5 text-[10px] text-white/40 flex items-center justify-center gap-1">
-              <Phone size={8} /> {emp.today_calls} اليوم
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* ── جدول المحافظ الشاملة ─────────────────────────────── */}
-      <div className="border-t border-white/5">
-        {/* رأس الجدول + فلاتر الفرز */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-white/5 flex-wrap">
-          <span className="text-white/30 text-[10px] ml-2">ترتيب حسب:</span>
-          {Object.entries(SORT_LABELS).map(([key, lbl]) => (
-            <button
-              key={key}
-              onClick={() => setSortBy(key)}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all"
-              style={{
-                background: sortBy === key ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.05)',
-                color: sortBy === key ? '#c4b5fd' : 'rgba(255,255,255,0.35)',
-                border: sortBy === key ? '1px solid rgba(124,58,237,0.4)' : '1px solid transparent',
-              }}
-            >
-              {lbl}
-            </button>
-          ))}
-        </div>
-
-        <div className="divide-y divide-white/5">
-          {sorted.map((emp, i) => {
-            const pts           = emp.total_points || 0
-            const nextM         = getNextMilestone(pts)
-            const unlockedCount = getUnlockedCount(pts)
-            const progPct       = nextM
-              ? Math.round((pts / nextM.threshold) * 100)
-              : 100
-            const isJustUnlocked = nextM
-              ? (pts >= (MILESTONES[unlockedCount - 1]?.threshold ?? 0) &&
-                 pts <  nextM.threshold &&
-                 pts >= (MILESTONES[unlockedCount - 1]?.threshold ?? 0))
-              : false
-
-            return (
-              <div key={emp.username} className="px-4 py-3 hover:bg-white/3 transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className="text-white/25 text-xs w-5 text-center font-bold flex-shrink-0">{i + 1}</span>
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
-                    style={{ background: i < 3 ? podiumColors[i] : 'rgba(124,58,237,0.25)' }}
-                  >
-                    {i < 3 ? medals[i] : emp.fullname?.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-white/80 text-xs font-semibold truncate">{emp.fullname}</span>
-                        {/* شارات الإنجاز */}
-                        {unlockedCount > 0 && (
-                          <div className="flex gap-0.5 flex-shrink-0">
-                            {MILESTONES.slice(0, unlockedCount).map(m => (
-                              <span key={m.id} className="text-[11px]" title={m.title}>{m.emoji}</span>
-                            ))}
-                          </div>
-                        )}
-                        {/* تنبيه الفتح الجديد */}
-                        {pts >= 100 && pts < 110 && (
-                          <motion.span
-                            initial={{ scale: 0 }}
-                            animate={{ scale: [0, 1.3, 1] }}
-                            transition={{ duration: 0.5 }}
-                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}
-                          >
-                            🔓 جديد
-                          </motion.span>
-                        )}
-                        {pts >= 200 && pts < 210 && (
-                          <motion.span
-                            initial={{ scale: 0 }}
-                            animate={{ scale: [0, 1.3, 1] }}
-                            transition={{ duration: 0.5 }}
-                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: 'rgba(245,158,11,0.25)', color: '#fbbf24' }}
-                          >
-                            🔓 جديد
-                          </motion.span>
-                        )}
-                        {pts >= 300 && pts < 310 && (
-                          <motion.span
-                            initial={{ scale: 0 }}
-                            animate={{ scale: [0, 1.3, 1] }}
-                            transition={{ duration: 0.5 }}
-                            className="text-[9px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: 'rgba(124,58,237,0.3)', color: '#c4b5fd' }}
-                          >
-                            🏆 ماكس
-                          </motion.span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 text-right">
-                        <span className="text-amber-300 font-black text-xs">{pts} <span className="text-amber-300/50 font-normal">NRS</span></span>
-                        <span className="text-violet-300 text-[10px]">{emp.today_calls} اليوم</span>
-                      </div>
-                    </div>
-
-                    {/* شريط التقدم للميلستون القادم */}
-                    <div className="mt-1.5">
-                      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full"
-                          style={{
-                            background: unlockedCount >= 3
-                              ? 'linear-gradient(90deg, #a78bfa, #7c3aed)'
-                              : unlockedCount >= 1
-                              ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-                              : 'linear-gradient(90deg, #3b82f6, #60a5fa)',
-                          }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progPct}%` }}
-                          transition={{ duration: 0.8, delay: 0.1 + i * 0.05, ease: 'easeOut' }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-[9px] text-white/25">
-                          {nextM
-                            ? `${pts}/${nextM.threshold} لفتح ${nextM.emoji} ${nextM.title}`
-                            : '🏆 جميع المكافآت مفتوحة'}
-                        </span>
-                        <span className="text-[9px] font-bold" style={{ color: unlockedCount >= 3 ? '#a78bfa' : '#f59e0b' }}>
-                          {progPct}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
 // ─── الداشبورد ────────────────────────────────────────────────────────────────
-const IS_STAGING_BUILD = typeof __STAGING__ !== 'undefined' && __STAGING__
 
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
-  const { user, can } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const { totalPoints, todayPoints, todayCalls, goalPct } = usePoints()
-
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
   const workflowData = useMemo(() => {
     const days = []
@@ -563,62 +291,6 @@ export default function Dashboard() {
         />
       </motion.div>
 
-      {/* ══ بطاقة المحفظة السريعة (للموظفين) ══════════════════════ */}
-      {user?.role !== 'executive' && (
-        <motion.button
-          onClick={() => navigate('/performance')}
-          variants={fadeUp} initial="hidden" animate="visible"
-          transition={{ duration: 0.45, delay: 0.28 }}
-          whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-          className="w-full rounded-2xl overflow-hidden text-right"
-          style={{
-            background: 'linear-gradient(135deg, #78350f 0%, #92400e 40%, #78350f 100%)',
-            boxShadow: '0 4px 24px rgba(245,158,11,0.25)',
-            border: '1px solid rgba(245,158,11,0.2)',
-          }}
-        >
-          <div className="relative px-5 py-4 flex items-center gap-4">
-            <div className="absolute top-0 right-0 w-32 h-full bg-amber-400/10 blur-2xl pointer-events-none rounded-full" />
-            <motion.div
-              className="absolute top-0 left-0 w-1/3 h-full pointer-events-none"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)' }}
-              animate={{ x: ['0%', '350%'] }}
-              transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 3 }}
-            />
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
-              style={{ background: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.3)' }}
-            >
-              🪙
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-amber-300 text-xs font-medium">محفظة NRS — اضغط لعرض التفاصيل</p>
-              </div>
-              <p className="text-white font-black text-2xl leading-tight">{totalPoints.toLocaleString()}</p>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-amber-400/70 text-xs">+{todayPoints} نقطة اليوم</span>
-                <span className="text-white/20 text-xs">·</span>
-                <span className="text-white/40 text-xs">{todayCalls}/{DAILY_GOAL} مكالمة</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <span className="text-sm font-black" style={{ color: goalPct >= 100 ? '#10b981' : '#fbbf24' }}>{goalPct}%</span>
-              <div className="w-1.5 h-10 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
-                <motion.div
-                  className="w-full rounded-full"
-                  style={{ background: goalPct >= 100 ? '#10b981' : 'linear-gradient(180deg, #fbbf24, #d97706)' }}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${goalPct}%` }}
-                  transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
-                />
-              </div>
-              <ArrowUpRight size={12} className="text-amber-400/60" />
-            </div>
-          </div>
-        </motion.button>
-      )}
-
       {/* ══ Charts Row ══════════════════════════════════════════════ */}
       <motion.div
         variants={fadeUp}
@@ -764,9 +436,6 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.div>
-
-      {/* ══ Hall of Fame: تنفيذي دائماً؛ في التجريبية يظهر لكل من يملك لوحة التحكم (للمراجعة) ══ */}
-      {(user?.role === 'executive' || (IS_STAGING_BUILD && can('dashboard'))) && <HallOfFame />}
 
       {/* ══ Recent + Quick Stats ════════════════════════════════════ */}
       <motion.div
