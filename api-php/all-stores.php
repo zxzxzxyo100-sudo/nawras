@@ -239,17 +239,23 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
+// كبار التجار: يُجلب عبر vip-merchants.php (جلب كامل الصفحات) — يُترك هنا فارغاً للتوافق
+$vip_merchants = [];
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
     'incubation_counts' => $incubation_counts,
     'data'              => $result,
+    'vip_merchants'     => $vip_merchants,
+    'vip_merchants_count' => count($vip_merchants),
     'incubation_path'   => $incubation_path,
     'meta'              => [
         'sources'           => ['new_90d', 'new_since_2020', 'inactive_365'],
         'fetched_new_90d'   => count($new),
         'fetched_all_2020'  => count($allStores),
         'fetched_inactive'  => count($inactive),
+        'vip_endpoint'      => 'vip-merchants.php',
         'generated_at'      => date('Y-m-d H:i:s'),
     ],
 ], JSON_UNESCAPED_UNICODE);

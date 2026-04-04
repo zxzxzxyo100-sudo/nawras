@@ -1,11 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Store, TrendingUp, Flame, Snowflake,
-  ClipboardList, Users, LogOut, Baby, X, Kanban,
+  ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 
-const NAV = [
+const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر الجديدة',    icon: Store,           view: 'new'          },
@@ -13,15 +14,26 @@ const NAV = [
   { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
   { to: '/hot-inactive',  label: 'غير نشط ساخن',       icon: Flame,           view: 'hot_inactive' },
   { to: '/cold-inactive', label: 'غير نشط بارد',       icon: Snowflake,       view: 'cold_inactive'},
+  { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
+  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
+
+const NAV = DISABLE_POINTS_AND_PERFORMANCE
+  ? NAV_ALL.filter(n => n.to !== '/performance')
+  : NAV_ALL
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
   { label: 'الرئيسية',  keys: ['/', '/kanban'] },
-  { label: 'المتاجر',   keys: ['/new', '/incubation', '/active', '/hot-inactive', '/cold-inactive'] },
-  { label: 'الإدارة',   keys: ['/tasks', '/users'] },
+  { label: 'المتاجر',   keys: ['/new', '/incubation', '/active', '/hot-inactive', '/cold-inactive', '/vip'] },
+  {
+    label: 'الإدارة',
+    keys: DISABLE_POINTS_AND_PERFORMANCE
+      ? ['/tasks', '/users']
+      : ['/tasks', '/performance', '/users'],
+  },
 ]
 
 export default function Sidebar({ isOpen, onClose }) {

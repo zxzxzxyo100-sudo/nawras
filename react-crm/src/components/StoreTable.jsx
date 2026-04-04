@@ -8,6 +8,8 @@ export default function StoreTable({
   onSelectStore,
   extraColumns = [],
   emptyMsg = 'لا توجد متاجر',
+  /** نص تحت عنوان «الطرود»، مثل نطاق التاريخ لـ shipments_in_range */
+  parcelsColumnSub,
   // multi-select props
   selectable = false,
   selectedIds = new Set(),
@@ -107,7 +109,14 @@ export default function StoreTable({
               <th className="text-right px-4 py-3">رقم الهاتف</th>
               <th className="text-right px-4 py-3">تاريخ التسجيل</th>
               <th className="text-right px-4 py-3">آخر شحنة</th>
-              <th className="text-right px-4 py-3">الطرود</th>
+              <th className="text-right px-4 py-3">
+                <span className="block">الطرود</span>
+                {parcelsColumnSub && (
+                  <span className="block text-[10px] font-normal text-slate-400 mt-0.5" dir="ltr">
+                    {parcelsColumnSub}
+                  </span>
+                )}
+              </th>
               {extraColumns.map(col => (
                 <th key={col.key} className="text-right px-4 py-3">{col.label}</th>
               ))}
@@ -159,7 +168,18 @@ export default function StoreTable({
                       }
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="font-bold text-slate-700">{parseInt(store.total_shipments) || 0}</span>
+                      <span
+                        className="font-bold text-slate-700"
+                        title={
+                          store.shipments_range_from && store.shipments_range_to
+                            ? `طرود في النطاق (${store.shipments_range_from} — ${store.shipments_range_to})`
+                            : undefined
+                        }
+                      >
+                        {store.shipments_in_range !== undefined && store.shipments_in_range !== null
+                          ? store.shipments_in_range
+                          : (parseInt(store.total_shipments, 10) || 0)}
+                      </span>
                     </td>
                     {extraColumns.map(col => (
                       <td key={col.key} className="px-4 py-3.5 text-slate-500">

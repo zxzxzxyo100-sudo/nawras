@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import {
   ClipboardList, Phone, RefreshCw, CheckCircle,
-  Target, Zap, Star, Award, Wallet,
+  Target, Zap, Star, Award, Wallet, ArrowUpRight,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
+import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
 
 // ══════════════════════════════════════════════════════════════════
@@ -315,6 +318,74 @@ function TaskCard({ task, index, onCall, onDone }) {
   )
 }
 
+function TasksNrsWallet() {
+  const navigate = useNavigate()
+  const { totalPoints, todayPoints, todayCalls, goalPct } = usePoints()
+  return (
+    <motion.button
+      onClick={() => navigate('/performance')}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.12 }}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      className="w-full rounded-2xl overflow-hidden text-right"
+      style={{
+        background: 'linear-gradient(135deg, #78350f 0%, #92400e 40%, #78350f 100%)',
+        boxShadow: '0 4px 24px rgba(245,158,11,0.25)',
+        border: '1px solid rgba(245,158,11,0.2)',
+      }}
+    >
+      <div className="relative px-5 py-4 flex items-center gap-4">
+        <div className="absolute top-0 right-0 w-28 h-full bg-amber-400/10 blur-2xl pointer-events-none rounded-full" />
+        <motion.div
+          className="absolute top-0 left-0 w-1/3 h-full pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)' }}
+          animate={{ x: ['0%', '350%'] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 3 }}
+        />
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
+          style={{ background: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.3)' }}
+        >
+          🪙
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-amber-300 text-xs font-medium">محفظة NRS</p>
+            <span className="text-amber-400/50 text-[10px]">Nawras Points</span>
+          </div>
+          <p className="text-white font-black text-2xl leading-tight">{totalPoints.toLocaleString()}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-amber-400/70 text-xs">+{todayPoints} اليوم</span>
+            <span className="text-white/20 text-xs">·</span>
+            <span className="text-white/40 text-xs">{todayCalls}/{DAILY_GOAL} مكالمة</span>
+          </div>
+        </div>
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+          <div className="text-xs font-black" style={{ color: goalPct >= 100 ? '#10b981' : '#fbbf24' }}>
+            {goalPct}%
+          </div>
+          <div className="w-1.5 h-12 bg-white/10 rounded-full overflow-hidden">
+            <motion.div
+              className="w-full rounded-full"
+              style={{
+                background: goalPct >= 100 ? '#10b981' : 'linear-gradient(180deg, #fbbf24, #d97706)',
+                height: `${goalPct}%`,
+                marginTop: `${100 - goalPct}%`,
+              }}
+              initial={{ height: 0, marginTop: '100%' }}
+              animate={{ height: `${goalPct}%`, marginTop: `${100 - goalPct}%` }}
+              transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+            />
+          </div>
+          <ArrowUpRight size={13} className="text-amber-400/60" />
+        </div>
+      </div>
+    </motion.button>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ══════════════════════════════════════════════════════════════════
@@ -408,6 +479,8 @@ export default function Tasks() {
           </motion.button>
         </div>
       </motion.div>
+
+      {!DISABLE_POINTS_AND_PERFORMANCE && <TasksNrsWallet />}
 
       {/* ══ تبويبات التصفية ══════════════════════════════════════════ */}
       <motion.div

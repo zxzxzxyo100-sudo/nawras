@@ -1,6 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { getAllStores, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments } from '../services/api'
+import {
+  getAllStores, getVipMerchants, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments,
+  getOrdersSummaryRange,
+} from '../services/api'
 import { useAuth } from './AuthContext'
+import { totalShipments, isActiveMerchantStatus } from '../utils/storeFields'
+import { VIP_MERCHANTS_COMING_SOON } from '../config/features'
 
 const StoresContext = createContext(null)
 
@@ -30,19 +35,86 @@ export function StoresProvider({ children }) {
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
   const [error, setError]                 = useState(null)
+  /** نطاق الطرود: التواريخ المعادة من orders-summary.php (واجهة Nawرس عبر الخادم) */
+  const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
+  /** كبار التجار: من vip-merchants.php (orders-summary كامل الصفحات) */
+  const [vipMerchants, setVipMerchants] = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [apiResult, statesRes, callsRes, rcallsRes, assignRes] = await Promise.all([
+      const toDate = new Date()
+      const fromDate = new Date()
+      const SHIPMENTS_RANGE_DAYS = 30
+      fromDate.setDate(fromDate.getDate() - (SHIPMENTS_RANGE_DAYS - 1))
+      const rangeTo = toDate.toISOString().slice(0, 10)
+      const rangeFrom = fromDate.toISOString().slice(0, 10)
+
+      const [apiResult, vipRes, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
         getAllStores(),
+        VIP_MERCHANTS_COMING_SOON
+          ? Promise.resolve({ success: false, data: [] })
+          : getVipMerchants().catch(() => ({ success: false, data: [] })),
         getStoreStates(),
         getAllCallLogs(),
         getAllRecoveryCalls(),
         getAssignments(),
+        getOrdersSummaryRange(rangeFrom, rangeTo).catch(() => ({ success: false, data: [] })),
       ])
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
+
+      const rangeMap = {}
+      let resolvedFrom = rangeFrom
+      let resolvedTo = rangeTo
+      if (rangeRes?.success && Array.isArray(rangeRes.data)) {
+        rangeRes.data.forEach(s => {
+          const id = s.id
+          const n = totalShipments(s)
+          rangeMap[id] = n
+          rangeMap[String(id)] = n
+        })
+        resolvedFrom = rangeRes.from != null && rangeRes.from !== '' ? String(rangeRes.from) : rangeFrom
+        resolvedTo = rangeRes.to != null && rangeRes.to !== '' ? String(rangeRes.to) : rangeTo
+        setShipmentsRangeMeta({ from: resolvedFrom, to: resolvedTo })
+      } else {
+        setShipmentsRangeMeta({ from: null, to: null })
+      }
+
+      function mergeShipmentsInRange(arr) {
+        return (arr || []).map(s => ({
+          ...s,
+          shipments_in_range: rangeMap[s.id] ?? rangeMap[String(s.id)] ?? 0,
+          shipments_range_from: resolvedFrom,
+          shipments_range_to: resolvedTo,
+        }))
+      }
+
+      let vipList = []
+      if (!VIP_MERCHANTS_COMING_SOON) {
+        if (vipRes?.success && Array.isArray(vipRes.data)) {
+          vipList = vipRes.data
+        } else if (Array.isArray(apiResult.vip_merchants) && apiResult.vip_merchants.length > 0) {
+          vipList = apiResult.vip_merchants
+        } else {
+          const buckets = [
+            ...(apiResult.data?.incubating || []),
+            ...(apiResult.data?.active_shipping || []),
+            ...(apiResult.data?.hot_inactive || []),
+            ...(apiResult.data?.cold_inactive || []),
+          ]
+          const seen = new Set()
+          for (const s of buckets) {
+            const sid = s?.id
+            if (sid == null || seen.has(sid)) continue
+            seen.add(sid)
+            if (!isActiveMerchantStatus(s)) continue
+            if (totalShipments(s) < 300) continue
+            vipList.push(s)
+          }
+        }
+      }
+      setVipMerchants(mergeShipmentsInRange(vipList))
 
       const stateMap = {}
       ;(statesRes.data || []).forEach(s => { stateMap[s.store_id] = s })
@@ -52,10 +124,10 @@ export function StoresProvider({ children }) {
       setCallLogs(callsRes.data || {})
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
-        incubating:      apiResult.data.incubating      || [],
-        active_shipping: apiResult.data.active_shipping || [],
-        hot_inactive:    apiResult.data.hot_inactive    || [],
-        cold_inactive:   apiResult.data.cold_inactive   || [],
+        incubating:      mergeShipmentsInRange(apiResult.data.incubating),
+        active_shipping: mergeShipmentsInRange(apiResult.data.active_shipping),
+        hot_inactive:    mergeShipmentsInRange(apiResult.data.hot_inactive),
+        cold_inactive:   mergeShipmentsInRange(apiResult.data.cold_inactive),
       })
       setCounts(apiResult.counts)
 
@@ -65,8 +137,8 @@ export function StoresProvider({ children }) {
       // جاري/تمت الاستعادة → تُدار في خانة غير النشطة عبر DB
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
-        new_48h:    rawPath.new_48h    || [],
-        incubating: rawPath.incubating || [],
+        new_48h:    mergeShipmentsInRange(rawPath.new_48h    || []),
+        incubating: mergeShipmentsInRange(rawPath.incubating || []),
       }
 
       setIncubationPath(mergedPath)
@@ -98,8 +170,10 @@ export function StoresProvider({ children }) {
   return (
     <StoresContext.Provider value={{
       stores, counts, allStores,
+      vipMerchants,
       incubationPath, incubationCounts,
       storeStates, assignments, callLogs, recoveryCalls,
+      shipmentsRangeMeta,
       loading, error, lastLoaded, reload: load,
     }}>
       {children}

@@ -51,6 +51,8 @@ export default function StoreDrawer({ store, onClose }) {
         old_status:  category,
         user:        user?.fullname,
         user_role:   user?.role,
+        /** من all-stores.php: متجر ظاهر في مسار الاحتضان (جديدة / تحت الاحتضان) */
+        from_incubation_path: store._inc === 'new_48h' || store._inc === 'incubating',
       })
       reload()
       setShowChangeStatus(false)

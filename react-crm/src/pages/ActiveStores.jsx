@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
 export default function ActiveStores() {
-  const { stores, counts, assignments, loading, reload } = useStores()
+  const { stores, counts, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
   const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [users, setUsers]                 = useState([])
@@ -23,7 +23,18 @@ export default function ActiveStores() {
   const [assignFilter, setAssignFilter]   = useState('all')
 
   const isExecutive = user?.role === 'executive'
-  const active = stores.active_shipping || []
+
+  /** متاجر أُخرجت يدوياً من مسار الاحتضان إلى «نشط» وتظهر هنا حتى لو بقيت في دفعة API الاحتضان */
+  const active = useMemo(() => {
+    const base = stores.active_shipping || []
+    const fromInc = (stores.incubating || []).filter(s => {
+      const st = storeStates[s.id]
+      const c = st?.category
+      return c === 'active' || c === 'active_shipping'
+    })
+    const seen = new Set(base.map(s => s.id))
+    return [...base, ...fromInc.filter(s => !seen.has(s.id))]
+  }, [stores.active_shipping, stores.incubating, storeStates])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -198,7 +209,13 @@ export default function ActiveStores() {
             نشط يشحن
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
-            {counts.active_shipping || 0} متجر — شحن خلال آخر 14 يوم
+            {active.length} متجر — عمود الطرود: آخر 30 يومًا
+            {(stores.incubating || []).some(s => {
+              const c = storeStates[s.id]?.category
+              return c === 'active' || c === 'active_shipping'
+            }) && (
+              <span className="text-emerald-600 text-xs"> (يشمل مُخرَّجين من الاحتضان)</span>
+            )}
             {isExecutive && assignedCount > 0 && (
               <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
                 <UserCheck size={11} />
@@ -385,6 +402,11 @@ export default function ActiveStores() {
         onSelectStore={setSelected}
         extraColumns={extraColumns}
         emptyMsg="لا توجد متاجر نشطة"
+        parcelsColumnSub={
+          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+            : undefined
+        }
         selectable={isExecutive}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}

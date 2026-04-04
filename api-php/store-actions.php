@@ -35,6 +35,8 @@ elseif ($action === 'set_status') {
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
     $oldStatus = $input['old_status'] ?? '';
+    /** يُرسل من الواجهة لمتاجر مسار الاحتضان (حتى لو كانت الحالة الحالية «غير نشط» في DB) */
+    $fromIncubationPath = !empty($input['from_incubation_path']);
 
     // Upsert store state
     $stmt = $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, state_reason, freeze_reason, updated_by)
@@ -47,9 +49,18 @@ elseif ($action === 'set_status') {
     if ($category === 'restoring') {
         $pdo->prepare("UPDATE store_states SET restore_date = NOW() WHERE store_id = ?")->execute([$storeId]);
     }
-    // Set graduated date
-    if ($category === 'active' && $oldStatus === 'incubating') {
-        $pdo->prepare("UPDATE store_states SET graduated_at = NOW() WHERE store_id = ?")->execute([$storeId]);
+    // انتقال من مسار الاحتضان إلى نشط: احتضان أو غير نشط على المسار + العلم from_incubation_path
+    $graduateFromIncubation = ($category === 'active' && ($oldStatus === 'incubating' || $fromIncubationPath));
+    if ($graduateFromIncubation) {
+        try {
+            $pdo->prepare("UPDATE store_states SET
+                graduated_at = COALESCE(graduated_at, NOW()),
+                incubation_stage = 'graduated',
+                next_call_date = NULL
+                WHERE store_id = ?")->execute([$storeId]);
+        } catch (Throwable $e) {
+            $pdo->prepare("UPDATE store_states SET graduated_at = COALESCE(graduated_at, NOW()) WHERE store_id = ?")->execute([$storeId]);
+        }
     }
 
     // Audit log
@@ -63,9 +74,18 @@ elseif ($action === 'set_status') {
         'cold' => 'نقل للباردة'
     ][$category] ?? 'تغيير حالة';
 
+    if ($graduateFromIncubation) {
+        $actionName = 'تخريج من مسار الاحتضان — انتقال إلى نشط (مقبول)';
+    }
+
+    $detail = $freezeReason ?: $reason;
+    if ($graduateFromIncubation) {
+        $detail = trim(($detail ? $detail . ' — ' : '') . 'مسار الاحتضان → نشط يشحن (مقبول)');
+    }
+
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, $actionName, $freezeReason ?: $reason, $oldStatus, $category, $user, $userRole]);
+        ->execute([$storeId, $storeName, $actionName, $detail, $oldStatus, $category, $user, $userRole]);
 
     jsonResponse(['success' => true]);
 }
