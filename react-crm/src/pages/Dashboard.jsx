@@ -265,7 +265,7 @@ export default function Dashboard() {
         <StoreTypeCard
           title="نشط يشحن"
           count={counts.active_shipping}
-          sub="آخر 14 يوم"
+          sub="آخر 30 يوم"
           icon={TrendingUp}
           gradient="linear-gradient(135deg, #065f46, #059669)"
           glow="#05966955"

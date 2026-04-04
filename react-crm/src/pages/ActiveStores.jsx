@@ -209,7 +209,7 @@ export default function ActiveStores() {
             نشط يشحن
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
-            {active.length} متجر — شحن خلال آخر 14 يوم
+            {active.length} متجر — عمود الطرود: آخر 30 يومًا
             {(stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
               return c === 'active' || c === 'active_shipping'

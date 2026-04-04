@@ -6,6 +6,14 @@ import StoreDrawer from '../components/StoreDrawer'
 
 const VIP_MIN = 300
 
+/** عدد الأيام شاملاً بين تاريخين (YYYY-MM-DD) */
+function inclusiveDaySpan(fromStr, toStr) {
+  const a = new Date(`${fromStr}T12:00:00`)
+  const b = new Date(`${toStr}T12:00:00`)
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1
+  return Math.max(1, Math.round((b - a) / 86400000) + 1)
+}
+
 function shipmentTrend(current, previous) {
   const c = Number(current) || 0
   const p = Number(previous) || 0
@@ -35,10 +43,11 @@ export default function VipMerchants() {
     ;(async () => {
       setLoadingPrev(true)
       try {
+        const span = inclusiveDaySpan(shipmentsRangeMeta.from, shipmentsRangeMeta.to)
         const prevTo = new Date(`${shipmentsRangeMeta.from}T12:00:00`)
         prevTo.setDate(prevTo.getDate() - 1)
         const prevFrom = new Date(prevTo)
-        prevFrom.setDate(prevFrom.getDate() - 13)
+        prevFrom.setDate(prevFrom.getDate() - (span - 1))
         const f = prevFrom.toISOString().slice(0, 10)
         const t = prevTo.toISOString().slice(0, 10)
         const res = await getOrdersSummaryRange(f, t)
@@ -115,8 +124,8 @@ export default function VipMerchants() {
       </div>
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
-        <strong>المؤشر:</strong> بجانب طردات النطاق الحالي — سهم أخضر إذا زادت الطرود في النطاق الحالي عن{' '}
-        <strong>الفترة السابقة</strong> (14 يوماً سابقة)، وأحمر إذا نقصت، ورمادي عند التساوي.
+        <strong>المؤشر:</strong> بجانب طردات النطاق الحالي — سهم أخضر إذا زادت الطرود عن{' '}
+        <strong>الفترة السابقة</strong> (نفس طول النطاق الحالي مباشرةً قبل بدايته)، وأحمر إذا نقصت، ورمادي عند التساوي.
         {loadingPrev && <span className="mr-2 text-amber-700"> جارٍ جلب الفترة السابقة…</span>}
       </div>
 

@@ -33,7 +33,7 @@ export function StoresProvider({ children }) {
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
   const [error, setError]                 = useState(null)
-  /** نطاق تاريخ طُلبت له أعداد الطرود (آخر 14 يومًا — مطابقة لمنطق «نشط يشحن») */
+  /** نطاق تاريخ طُلبت له أعداد الطرود (آخر 30 يومًا — بدون تقييد 14 يوم) */
   const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
   /** كبار التجار: من الخادم (نشط يشحن + total_shipments ≥ 300 + status = active) */
   const [vipMerchants, setVipMerchants] = useState([])
@@ -44,7 +44,8 @@ export function StoresProvider({ children }) {
     try {
       const toDate = new Date()
       const fromDate = new Date()
-      fromDate.setDate(fromDate.getDate() - 14)
+      const SHIPMENTS_RANGE_DAYS = 30
+      fromDate.setDate(fromDate.getDate() - (SHIPMENTS_RANGE_DAYS - 1))
       const rangeTo = toDate.toISOString().slice(0, 10)
       const rangeFrom = fromDate.toISOString().slice(0, 10)
 
