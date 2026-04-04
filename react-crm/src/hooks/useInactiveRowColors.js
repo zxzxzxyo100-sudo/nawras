@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { inactiveRowStyleForKey } from '../constants/inactiveRowColors'
 
+/** StoreTable يمرّر كائن المتجر؛ نستخرج id */
+function resolveStoreId(storeOrId) {
+  if (storeOrId == null) return null
+  if (typeof storeOrId === 'object' && storeOrId !== null && 'id' in storeOrId) {
+    return storeOrId.id
+  }
+  return storeOrId
+}
+
 function loadMap(storageKey) {
   try {
     if (typeof localStorage === 'undefined') return {}
@@ -27,7 +36,11 @@ export function useInactiveRowColors(scope) {
   }, [storageKey, map])
 
   const styleFor = useCallback(
-    storeId => inactiveRowStyleForKey(map[String(storeId)]),
+    storeOrId => {
+      const id = resolveStoreId(storeOrId)
+      if (id == null) return undefined
+      return inactiveRowStyleForKey(map[String(id)])
+    },
     [map]
   )
 
