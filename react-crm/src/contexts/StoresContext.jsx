@@ -4,6 +4,7 @@ import {
   getOrdersSummaryRange,
 } from '../services/api'
 import { useAuth } from './AuthContext'
+import { totalShipments, isActiveMerchantStatus } from '../utils/storeFields'
 
 const StoresContext = createContext(null)
 
@@ -86,8 +87,8 @@ export function StoresProvider({ children }) {
       } else {
         // خادم قديم بلا مفتاح vip_merchants — نفس المنطق: نشط يشحن + ≥300 + status نشط
         vipList = (apiResult.data?.active_shipping || []).filter(s => {
-          if (s.status != null && s.status !== '' && s.status !== 'active') return false
-          return (parseInt(s.total_shipments, 10) || 0) >= 300
+          if (!isActiveMerchantStatus(s)) return false
+          return totalShipments(s) >= 300
         })
       }
       setVipMerchants(mergeShipmentsInRange(vipList))

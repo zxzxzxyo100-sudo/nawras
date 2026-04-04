@@ -3,6 +3,7 @@ import { Crown, RefreshCw, Search, TrendingUp, TrendingDown, Minus, ExternalLink
 import { useStores } from '../contexts/StoresContext'
 import { getOrdersSummaryRange } from '../services/api'
 import StoreDrawer from '../components/StoreDrawer'
+import { totalShipments } from '../utils/storeFields'
 
 const VIP_MIN = 300
 
@@ -32,9 +33,7 @@ export default function VipMerchants() {
 
   const vipStores = useMemo(() => {
     const list = vipMerchants || []
-    return [...list].sort(
-      (a, b) => (parseInt(b.total_shipments, 10) || 0) - (parseInt(a.total_shipments, 10) || 0)
-    )
+    return [...list].sort((a, b) => totalShipments(b) - totalShipments(a))
   }, [vipMerchants])
 
   useEffect(() => {
@@ -194,7 +193,7 @@ export default function VipMerchants() {
                       </td>
                       <td className="px-4 py-3.5 font-medium text-slate-800">{s.name}</td>
                       <td className="px-4 py-3.5 text-xs font-mono text-slate-600" dir="ltr">{s.phone || '—'}</td>
-                      <td className="px-4 py-3.5 font-bold text-slate-800">{parseInt(s.total_shipments, 10) || 0}</td>
+                      <td className="px-4 py-3.5 font-bold text-slate-800">{totalShipments(s)}</td>
                       <td className="px-4 py-3.5">
                         <span className="font-semibold text-slate-800">{cur}</span>
                       </td>

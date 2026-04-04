@@ -119,6 +119,57 @@ foreach ($inactive as $id => $s) {
     }
 }
 
+/**
+ * إجمالي الطرود من واجهة Nawris — المفتاح المعياري total_shipments مع بدائل شائعة.
+ */
+function nawris_total_shipments(array $s): int {
+    $keys = ['total_shipments', 'totalShipments', 'Total_Shipments'];
+    foreach ($keys as $k) {
+        if (!array_key_exists($k, $s)) {
+            continue;
+        }
+        $v = $s[$k];
+        if ($v === null || $v === '') {
+            continue;
+        }
+        if (is_numeric($v)) {
+            return (int) $v;
+        }
+        if (is_string($v)) {
+            $clean = preg_replace('/[^\d]/u', '', $v);
+            if ($clean !== '') {
+                return (int) $clean;
+            }
+        }
+    }
+    if (!empty($s['stats']) && is_array($s['stats'])) {
+        $st = $s['stats'];
+        $v = $st['total_shipments'] ?? $st['totalShipments'] ?? null;
+        if ($v !== null && $v !== '') {
+            return is_numeric($v) ? (int) $v : (int) preg_replace('/[^\d]/u', '', (string) $v);
+        }
+    }
+
+    return 0;
+}
+
+/** يتوافق مع القيم النصية/الرقمية من الـ API */
+function nawris_is_active_status(array $s): bool {
+    $st = $s['status'] ?? null;
+    if ($st === null || $st === '') {
+        return true;
+    }
+    if (is_bool($st)) {
+        return $st;
+    }
+    if (is_int($st) || is_float($st)) {
+        return ((int) $st) === 1;
+    }
+    $t = strtolower(trim((string) $st));
+
+    return in_array($t, ['active', '1', 'true', 'yes'], true);
+}
+
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
     'incubating'      => [],
@@ -239,19 +290,25 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
-// ── كبار التجار (VIP): نشط يشحن + total_shipments >= 300 + status = active ──
+// ── كبار التجار (VIP): نشط يشحن + total_shipments >= 300 + status نشط ──
 $vip_merchants = [];
 foreach ($result['active_shipping'] as $s) {
-    if (!empty($s['status']) && $s['status'] !== 'active') {
+    $id = $s['id'] ?? null;
+    $merged = ($id !== null && isset($allStores[$id])) ? array_merge($allStores[$id], $s) : $s;
+    if (!nawris_is_active_status($merged)) {
         continue;
     }
-    if (intval($s['total_shipments'] ?? 0) < 300) {
+    $tCat = nawris_total_shipments($s);
+    $tAll = ($id !== null && isset($allStores[$id])) ? nawris_total_shipments($allStores[$id]) : 0;
+    $total = max($tCat, $tAll);
+    if ($total < 300) {
         continue;
     }
-    $vip_merchants[] = $s;
+    $merged['total_shipments'] = $total;
+    $vip_merchants[] = $merged;
 }
 usort($vip_merchants, function ($a, $b) {
-    return intval($b['total_shipments'] ?? 0) - intval($a['total_shipments'] ?? 0);
+    return nawris_total_shipments($b) - nawris_total_shipments($a);
 });
 
 echo json_encode([
