@@ -109,7 +109,7 @@ export default function ColdInactive() {
 
         // تمت الاستعادة — حالة نهائية
         if (dbCat === 'restored') return (
-          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">غير نشط · تمت الاستعادة ✓</span>
+          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
 
         if (dbCat === 'restoring') return (

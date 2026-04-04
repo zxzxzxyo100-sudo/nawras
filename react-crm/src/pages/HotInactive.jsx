@@ -171,7 +171,7 @@ export default function HotInactive() {
         const dbUpdatedBy = storeStates[s.id]?.updated_by
 
         if (dbCat === 'restored') return (
-          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">غير نشط · تمت الاستعادة ✓</span>
+          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (
           <div className="flex flex-col gap-1 max-w-[200px]">
@@ -193,8 +193,8 @@ export default function HotInactive() {
   const titleBlock = isAllTab
     ? { Icon: Flame, iconClass: 'text-amber-500', line: 'غير نشط ساخن' }
     : isRestoredTab
-      ? { Icon: RefreshCw, iconClass: 'text-teal-600', line: 'غير نشط — تمت الاستعادة' }
-      : { Icon: RefreshCw, iconClass: 'text-cyan-600', line: 'غير نشط — جاري الاستعادة' }
+      ? { Icon: RefreshCw, iconClass: 'text-teal-600', line: 'تمت الاستعادة' }
+      : { Icon: RefreshCw, iconClass: 'text-cyan-600', line: 'جاري الاستعادة' }
   const PageIcon = titleBlock.Icon
 
   return (
@@ -208,8 +208,8 @@ export default function HotInactive() {
           <p className="text-slate-500 text-sm mt-0.5">
             {filteredStores.length} متجر في هذا الفرع
             {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
-            {recoverySegment === 'restoring' && ' — غير نشط (ساخن وبارد) بحالة «قيد الاستعادة»'}
-            {isRestoredTab && ' — غير نشط (ساخن وبارد) بتمت الاستعادة'}
+            {recoverySegment === 'restoring' && ' — يشمل الساخن والبارد بحالة «قيد الاستعادة»'}
+            {isRestoredTab && ' — يشمل الساخن والبارد بتمت الاستعادة'}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
@@ -258,8 +258,8 @@ export default function HotInactive() {
           isAllTab
             ? 'لا توجد متاجر في غير نشط ساخن'
             : isRestoredTab
-              ? 'لا توجد متاجر غير نشطة بتمت الاستعادة'
-              : 'لا توجد متاجر غير نشطة بحالة «قيد الاستعادة»'
+              ? 'لا توجد متاجر بتمت الاستعادة'
+              : 'لا توجد متاجر بحالة «قيد الاستعادة»'
         }
       />
 
