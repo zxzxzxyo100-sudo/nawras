@@ -35,6 +35,8 @@ elseif ($action === 'set_status') {
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
     $oldStatus = $input['old_status'] ?? '';
+    /** يُرسل من الواجهة لمتاجر مسار الاحتضان (حتى لو كانت الحالة الحالية «غير نشط» في DB) */
+    $fromIncubationPath = !empty($input['from_incubation_path']);
 
     // Upsert store state
     $stmt = $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, state_reason, freeze_reason, updated_by)
@@ -47,8 +49,9 @@ elseif ($action === 'set_status') {
     if ($category === 'restoring') {
         $pdo->prepare("UPDATE store_states SET restore_date = NOW() WHERE store_id = ?")->execute([$storeId]);
     }
-    // انتقال من مسار الاحتضان إلى نشط: إكمال المسار في DB (مقبول / تخريج)
-    if ($category === 'active' && $oldStatus === 'incubating') {
+    // انتقال من مسار الاحتضان إلى نشط: احتضان أو غير نشط على المسار + العلم from_incubation_path
+    $graduateFromIncubation = ($category === 'active' && ($oldStatus === 'incubating' || $fromIncubationPath));
+    if ($graduateFromIncubation) {
         try {
             $pdo->prepare("UPDATE store_states SET
                 graduated_at = COALESCE(graduated_at, NOW()),
@@ -56,7 +59,6 @@ elseif ($action === 'set_status') {
                 next_call_date = NULL
                 WHERE store_id = ?")->execute([$storeId]);
         } catch (Throwable $e) {
-            // أعمدة قديمة: على الأقل graduated_at
             $pdo->prepare("UPDATE store_states SET graduated_at = COALESCE(graduated_at, NOW()) WHERE store_id = ?")->execute([$storeId]);
         }
     }
@@ -72,12 +74,12 @@ elseif ($action === 'set_status') {
         'cold' => 'نقل للباردة'
     ][$category] ?? 'تغيير حالة';
 
-    if ($category === 'active' && $oldStatus === 'incubating') {
+    if ($graduateFromIncubation) {
         $actionName = 'تخريج من مسار الاحتضان — انتقال إلى نشط (مقبول)';
     }
 
     $detail = $freezeReason ?: $reason;
-    if ($category === 'active' && $oldStatus === 'incubating') {
+    if ($graduateFromIncubation) {
         $detail = trim(($detail ? $detail . ' — ' : '') . 'مسار الاحتضان → نشط يشحن (مقبول)');
     }
 
