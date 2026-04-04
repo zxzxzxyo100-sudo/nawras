@@ -16,12 +16,18 @@ export function totalShipments(s) {
   return Number.isFinite(n) ? n : 0
 }
 
-/** يتوافق مع الخادم: status الفارغ يُعامل كـ نشط */
+/** يتوافق مع الخادم: status الفارغ يُعامل كـ نشط؛ Nawris قد يعيد «نشط» بالعربية */
 export function isActiveMerchantStatus(s) {
-  const st = s?.status
+  const st = s?.status ?? s?.account_status
   if (st == null || st === '') return true
   if (typeof st === 'boolean') return st
   if (typeof st === 'number') return st === 1
-  const t = String(st).trim().toLowerCase()
-  return t === 'active' || t === '1' || t === 'true' || t === 'yes'
+  const raw = String(st).trim()
+  const t = raw.toLowerCase()
+  if (t === 'active' || t === '1' || t === 'true' || t === 'yes') return true
+  if (/غير\s*نشط/u.test(raw) || raw.includes('موقوف') || raw.includes('معطل')) return false
+  if (raw.includes('نشط') && !/غير\s*نشط/u.test(raw)) return true
+  if (raw === 'مفعل' || raw === 'فعال') return true
+  if (['inactive', 'suspended', 'disabled', 'blocked', 'closed'].includes(t)) return false
+  return false
 }

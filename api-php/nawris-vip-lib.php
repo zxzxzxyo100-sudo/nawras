@@ -44,7 +44,7 @@ function nawris_total_shipments(array $s): int {
 }
 
 function nawris_is_active_status(array $s): bool {
-    $st = $s['status'] ?? null;
+    $st = $s['status'] ?? $s['account_status'] ?? null;
     if ($st === null || $st === '') {
         return true;
     }
@@ -54,9 +54,28 @@ function nawris_is_active_status(array $s): bool {
     if (is_int($st) || is_float($st)) {
         return ((int) $st) === 1;
     }
-    $t = strtolower(trim((string) $st));
+    $t = trim((string) $st);
+    $lower = strtolower($t);
 
-    return in_array($t, ['active', '1', 'true', 'yes'], true);
+    if (in_array($lower, ['active', '1', 'true', 'yes'], true)) {
+        return true;
+    }
+    // Nawris يعيد أحياناً حالة بالعربية
+    if (preg_match('/غير\s*نشط/u', $t) || str_contains($t, 'موقوف') || str_contains($t, 'معطل')) {
+        return false;
+    }
+    if (str_contains($t, 'نشط') && !preg_match('/غير\s*نشط/u', $t)) {
+        return true;
+    }
+    if (in_array($t, ['مفعل', 'فعال'], true)) {
+        return true;
+    }
+
+    if (in_array($lower, ['inactive', 'suspended', 'disabled', 'blocked', 'closed'], true)) {
+        return false;
+    }
+
+    return false;
 }
 
 function nawris_best_shipment_total_from_summary_row(array $store): int {
@@ -84,7 +103,8 @@ function nawris_store_map_to_vip_totals_rows(array $storeMap): array {
         if ($sid <= 0) {
             continue;
         }
-        $t = nawris_best_shipment_total_from_summary_row($store);
+        // عتبة VIP من إجمالي الطرود (واجهة Nawris) وليس من shipments_in_range
+        $t = nawris_total_shipments($store);
         $totals[$sid] = $t;
         $rows[$sid] = $store;
     }

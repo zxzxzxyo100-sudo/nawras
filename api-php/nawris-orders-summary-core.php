@@ -91,6 +91,9 @@ function nawris_orders_summary_fetch_all(string $from, string $to, int $maxPages
 
         if (isset($data['data']) && is_array($data['data'])) {
             foreach ($data['data'] as $store) {
+                if (!is_array($store) || !isset($store['id'])) {
+                    continue;
+                }
                 $sid = $store['id'];
                 if (!isset($storeMap[$sid])) {
                     $storeMap[$sid] = $store;
