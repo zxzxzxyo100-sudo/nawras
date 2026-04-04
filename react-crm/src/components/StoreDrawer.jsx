@@ -5,7 +5,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
 import { formatCallOutcome } from '../constants/callOutcomes'
-import { isRecoveryCompletedByShipment } from '../constants/storeCategories'
+import {
+  isRecoveryCompletedByShipment,
+  isRestoredForRecoveryLists,
+} from '../constants/storeCategories'
 
 const CATEGORY_LABELS = {
   incubating: { label: 'تحت الاحتضان', bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -17,16 +20,15 @@ const CATEGORY_LABELS = {
   recovered:  { label: 'تم الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
 }
 
-/** حالات يمكن اختيارها يدوياً — «تمت الاستعادة» تُحدَّث تلقائياً فقط */
-const MANUAL_STATUS_KEYS = ['incubating', 'active', 'inactive', 'frozen', 'restoring']
-
 export default function StoreDrawer({ store, onClose }) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
-  const [showChangeStatus, setShowChangeStatus] = useState(false)
-  const [newCategory, setNewCategory]       = useState('')
+  /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
+  const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
+  const [freezeReason, setFreezeReason]     = useState('')
   const [reason, setReason]                 = useState('')
+  const [actionError, setActionError]       = useState('')
   const [saving, setSaving]                 = useState(false)
   const [auditLog, setAuditLog]             = useState([])
   const [loadingAudit, setLoadingAudit]     = useState(false)
@@ -40,6 +42,20 @@ export default function StoreDrawer({ store, onClose }) {
       : dbCategory
   const catInfo = CATEGORY_LABELS[displayCategory] || CATEGORY_LABELS.incubating
 
+  const merchantBucket = store._cat || store.bucket || ''
+  const canStartRestore =
+    (merchantBucket === 'hot_inactive' || merchantBucket === 'cold_inactive')
+    && dbCategory !== 'frozen'
+    && !isRestoredForRecoveryLists(store, dbState)
+    && dbCategory !== 'restoring'
+
+  function closeManualPanel() {
+    setManualPanel(null)
+    setFreezeReason('')
+    setReason('')
+    setActionError('')
+  }
+
   useEffect(() => {
     setLoadingAudit(true)
     getAuditLog(store.id)
@@ -48,24 +64,73 @@ export default function StoreDrawer({ store, onClose }) {
       .finally(() => setLoadingAudit(false))
   }, [store.id])
 
-  async function handleStatusChange() {
-    if (!newCategory) return
+  async function submitFreeze() {
+    setActionError('')
+    if (!freezeReason.trim()) {
+      setActionError('أدخل سبب التجميد.')
+      return
+    }
     setSaving(true)
     try {
       await setStoreStatus({
-        store_id:    store.id,
-        store_name:  store.name,
-        category:    newCategory,
+        store_id: store.id,
+        store_name: store.name,
+        category: 'frozen',
         state_reason: reason,
-        old_status:  dbCategory,
-        user:        user?.fullname,
-        user_role:   user?.role,
-        /** من all-stores.php: متجر ظاهر في مسار الاحتضان (جديدة / تحت الاحتضان) */
-        from_incubation_path: ['call_1', 'call_2', 'call_3', 'between_calls', 'new_48h', 'incubating'].includes(store._inc),
+        freeze_reason: freezeReason.trim(),
+        old_status: dbCategory,
+        user: user?.fullname,
+        user_role: user?.role,
       })
       reload()
-      setShowChangeStatus(false)
-    } catch { /* ignore */ }
+      closeManualPanel()
+    } catch (e) {
+      setActionError(e.response?.data?.error || 'تعذّر حفظ التجميد.')
+    }
+    setSaving(false)
+  }
+
+  async function submitUnfreeze() {
+    setActionError('')
+    setSaving(true)
+    try {
+      await setStoreStatus({
+        store_id: store.id,
+        store_name: store.name,
+        category: 'active',
+        state_reason: reason,
+        freeze_reason: '',
+        old_status: dbCategory,
+        user: user?.fullname,
+        user_role: user?.role,
+      })
+      reload()
+      closeManualPanel()
+    } catch (e) {
+      setActionError(e.response?.data?.error || 'تعذّر رفع التجميد.')
+    }
+    setSaving(false)
+  }
+
+  async function submitRestore() {
+    setActionError('')
+    setSaving(true)
+    try {
+      await setStoreStatus({
+        store_id: store.id,
+        store_name: store.name,
+        category: 'restoring',
+        state_reason: reason,
+        old_status: dbCategory,
+        merchant_bucket: merchantBucket,
+        user: user?.fullname,
+        user_role: user?.role,
+      })
+      reload()
+      closeManualPanel()
+    } catch (e) {
+      setActionError(e.response?.data?.error || 'تعذّر بدء الاستعادة.')
+    }
     setSaving(false)
   }
 
@@ -98,75 +163,115 @@ export default function StoreDrawer({ store, onClose }) {
             </button>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 mt-4">
+          {/* إجراءات يدوية: تجميد / رفع تجميد / بدء استعادة فقط — باقي الحالات آلياً */}
+          <div className="flex flex-wrap gap-2 mt-4">
             <button
+              type="button"
               onClick={() => setShowCallModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors"
             >
               <Phone size={14} />
               تسجيل مكالمة
             </button>
-            <button
-              onClick={() => setShowChangeStatus(!showChangeStatus)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              <ArrowLeftRight size={14} />
-              تغيير الحالة
-            </button>
-            {dbCategory !== 'frozen' && (
+            {dbCategory === 'frozen' ? (
               <button
-                onClick={() => { setNewCategory('frozen'); setShowChangeStatus(true) }}
+                type="button"
+                onClick={() => { setActionError(''); setManualPanel('unfreeze') }}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600/90 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                <ArrowLeftRight size={14} />
+                رفع التجميد
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setActionError(''); setManualPanel('freeze') }}
                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-xl transition-colors"
               >
                 <Lock size={14} />
                 تجميد
               </button>
             )}
+            {canStartRestore && (
+              <button
+                type="button"
+                onClick={() => { setActionError(''); setManualPanel('restore') }}
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-600/90 hover:bg-cyan-600 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                <ArrowLeftRight size={14} />
+                بدء الاستعادة
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Change status panel */}
-        {showChangeStatus && (
+        {manualPanel && (
           <div className="p-4 bg-amber-50 border-b border-amber-200">
-            <p className="text-sm font-medium text-amber-800 mb-2">تغيير حالة المتجر</p>
-            <p className="text-[11px] text-amber-700 mb-2">لا يمكن تعيين «تمت الاستعادة» يدوياً — تُسجَّل تلقائياً عند اكتمال الشروط في النظام.</p>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {MANUAL_STATUS_KEYS.map(val => {
-                const info = CATEGORY_LABELS[val]
-                if (!info) return null
-                return (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setNewCategory(val)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                      newCategory === val
-                        ? `${info.bg} ${info.text} border-current`
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                    }`}
-                  >
-                    {info.label}
-                  </button>
-                )
-              })}
-            </div>
-            <input
-              type="text"
-              placeholder="سبب التغيير (اختياري)"
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
-            />
+            {manualPanel === 'freeze' && (
+              <>
+                <p className="text-sm font-medium text-amber-900 mb-1">تجميد المتجر</p>
+                <p className="text-[11px] text-amber-800 mb-2">التحويلات الأخرى (احتضان، نشط، غير نشط، تخريج) تتم عبر المكالمات والشحن وقواعد النظام — لا يدوياً من هنا.</p>
+                <textarea
+                  placeholder="سبب التجميد (مطلوب)"
+                  value={freezeReason}
+                  onChange={e => setFreezeReason(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+                <input
+                  type="text"
+                  placeholder="ملاحظة إضافية (اختياري)"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+              </>
+            )}
+            {manualPanel === 'unfreeze' && (
+              <>
+                <p className="text-sm font-medium text-amber-900 mb-1">رفع التجميد</p>
+                <p className="text-[11px] text-amber-800 mb-2">يُعاد المتجر إلى «نشط» وفق السجل. تصنيف الشحن يُحدَّث آلياً لاحقاً.</p>
+                <input
+                  type="text"
+                  placeholder="ملاحظة (اختياري)"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+              </>
+            )}
+            {manualPanel === 'restore' && (
+              <>
+                <p className="text-sm font-medium text-amber-900 mb-1">بدء الاستعادة</p>
+                <p className="text-[11px] text-amber-800 mb-2">مسموح فقط لمتاجر «غير نشط ساخن» أو «غير نشط بارد». اكتمال «تمت الاستعادة» يُحسب آلياً عند الشحن بعد تاريخ البدء.</p>
+                <input
+                  type="text"
+                  placeholder="ملاحظة (اختياري)"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+              </>
+            )}
+            {actionError && (
+              <p className="text-xs text-red-600 mb-2">{actionError}</p>
+            )}
             <div className="flex gap-2">
               <button
-                onClick={handleStatusChange}
-                disabled={!newCategory || saving}
+                type="button"
+                onClick={
+                  manualPanel === 'freeze'
+                    ? submitFreeze
+                    : manualPanel === 'unfreeze'
+                      ? submitUnfreeze
+                      : submitRestore
+                }
+                disabled={saving}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-sm font-medium rounded-xl transition-colors"
               >
-                {saving ? 'جارٍ...' : 'تأكيد التغيير'}
+                {saving ? 'جارٍ...' : 'تأكيد'}
               </button>
-              <button onClick={() => setShowChangeStatus(false)} className="px-4 py-2 border border-amber-200 text-amber-700 text-sm rounded-xl hover:bg-amber-50">
+              <button type="button" onClick={closeManualPanel} className="px-4 py-2 border border-amber-200 text-amber-800 text-sm rounded-xl hover:bg-amber-100/80">
                 إلغاء
               </button>
             </div>

@@ -48,61 +48,80 @@ if ($action === 'get_states') {
 
 // ========== SET STORE STATUS ==========
 elseif ($action === 'set_status') {
-    $storeId = $input['store_id'];
-    $category = $input['category'];
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $category = $input['category'] ?? '';
     $storeName = $input['store_name'] ?? '';
     $reason = $input['state_reason'] ?? '';
-    $freezeReason = $input['freeze_reason'] ?? '';
+    $freezeReason = trim((string) ($input['freeze_reason'] ?? ''));
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
     $oldStatus = $input['old_status'] ?? '';
-    /** يُرسل من الواجهة لمتاجر مسار الاحتضان (حتى لو كانت الحالة الحالية «غير نشط» في DB) */
-    $fromIncubationPath = !empty($input['from_incubation_path']);
+    /** من all-stores: hot_inactive | cold_inactive — مطلوب لبدء الاستعادة */
+    $merchantBucket = $input['merchant_bucket'] ?? '';
 
-    // Upsert store state
+    if ($storeId <= 0) {
+        jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+    }
+
+    $allowedTargets = ['frozen', 'active', 'restoring'];
+    if (!in_array($category, $allowedTargets, true)) {
+        jsonResponse(['success' => false, 'error' => 'التحويل اليدوي مقتصر على التجميد أو رفع التجميد أو بدء الاستعادة فقط.'], 400);
+    }
+
+    $stmtCur = $pdo->prepare('SELECT category FROM store_states WHERE store_id = ?');
+    $stmtCur->execute([$storeId]);
+    $rowCur = $stmtCur->fetch(PDO::FETCH_ASSOC);
+    $currentCat = $rowCur['category'] ?? '';
+
+    $err = '';
+    if ($category === 'frozen') {
+        if ($currentCat === 'frozen') {
+            $err = 'المتجر مجمّد مسبقاً.';
+        } elseif ($freezeReason === '') {
+            $err = 'سبب التجميد مطلوب.';
+        }
+    } elseif ($category === 'active') {
+        if ($currentCat !== 'frozen') {
+            $err = 'رفع التجميد مسموح فقط عندما تكون الحالة «مجمد». باقي الانتقالات تتم آلياً (مكالمات، شحن، قواعد النظام).';
+        }
+    } elseif ($category === 'restoring') {
+        if (in_array($currentCat, ['restoring', 'restored', 'recovered'], true)) {
+            $err = 'حالة الاستعادة محددة مسبقاً أو اكتملت.';
+        } elseif (!in_array($merchantBucket, ['hot_inactive', 'cold_inactive'], true)) {
+            $err = 'بدء الاستعادة يُسمح فقط لمتجر مُصنَّف غير نشط ساخن أو غير نشط بارد.';
+        }
+    }
+
+    if ($err !== '') {
+        jsonResponse(['success' => false, 'error' => $err], 400);
+    }
+
+    // رفع التجميد: إفراغ سبب التجميد في السجل
+    if ($category === 'active' && $currentCat === 'frozen') {
+        $freezeReason = '';
+    }
+
     $stmt = $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, state_reason, freeze_reason, updated_by)
         VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE category=VALUES(category), state_reason=VALUES(state_reason),
         freeze_reason=VALUES(freeze_reason), updated_by=VALUES(updated_by), store_name=VALUES(store_name)");
     $stmt->execute([$storeId, $storeName, $category, $reason, $freezeReason, $user]);
 
-    // Set restore date if restoring
     if ($category === 'restoring') {
-        $pdo->prepare("UPDATE store_states SET restore_date = NOW() WHERE store_id = ?")->execute([$storeId]);
-    }
-    // انتقال من مسار الاحتضان إلى نشط: احتضان أو غير نشط على المسار + العلم from_incubation_path
-    $graduateFromIncubation = ($category === 'active' && ($oldStatus === 'incubating' || $fromIncubationPath));
-    if ($graduateFromIncubation) {
-        try {
-            $pdo->prepare("UPDATE store_states SET
-                graduated_at = COALESCE(graduated_at, NOW()),
-                incubation_stage = 'graduated',
-                next_call_date = NULL
-                WHERE store_id = ?")->execute([$storeId]);
-        } catch (Throwable $e) {
-            $pdo->prepare("UPDATE store_states SET graduated_at = COALESCE(graduated_at, NOW()) WHERE store_id = ?")->execute([$storeId]);
-        }
+        $pdo->prepare('UPDATE store_states SET restore_date = NOW() WHERE store_id = ?')->execute([$storeId]);
     }
 
-    // Audit log
-    $actionName = [
-        'active' => 'تحويل إلى نشط',
-        'inactive' => 'تحويل إلى غير نشط',
-        'frozen' => 'تجميد المتجر',
-        'restoring' => 'بدء استعادة',
-        'recovered' => 'تمت الاستعادة',
-        'incubating' => 'إعادة للاحتضان',
-        'cold' => 'نقل للباردة'
-    ][$category] ?? 'تغيير حالة';
-
-    if ($graduateFromIncubation) {
-        $actionName = 'تخريج من مسار الاحتضان — انتقال إلى نشط (مقبول)';
+    if ($category === 'active' && $currentCat === 'frozen') {
+        $actionName = 'رفع التجميد';
+    } elseif ($category === 'frozen') {
+        $actionName = 'تجميد المتجر';
+    } elseif ($category === 'restoring') {
+        $actionName = 'بدء استعادة';
+    } else {
+        $actionName = 'تغيير حالة';
     }
 
-    $detail = $freezeReason ?: $reason;
-    if ($graduateFromIncubation) {
-        $detail = trim(($detail ? $detail . ' — ' : '') . 'مسار الاحتضان → نشط يشحن (مقبول)');
-    }
+    $detail = $freezeReason !== '' ? $freezeReason : $reason;
 
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
