@@ -5,6 +5,7 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
+import { isRestoredCategory } from '../constants/storeCategories'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
@@ -61,8 +62,8 @@ export default function HotInactive() {
       return hotInactive.filter(() => true)
     }
     if (isRestoredTab) {
-      const hot = hotInactive.filter(s => cat(s.id) === 'restored')
-      const cold = coldInactive.filter(s => cat(s.id) === 'restored')
+      const hot = hotInactive.filter(s => isRestoredCategory(cat(s.id)))
+      const cold = coldInactive.filter(s => isRestoredCategory(cat(s.id)))
       return dedupeById([...hot, ...cold])
     }
     /* جاري الاستعادة: ساخن + بارد بحالة restoring */
@@ -170,7 +171,7 @@ export default function HotInactive() {
         const dbCat = storeStates[s.id]?.category
         const dbUpdatedBy = storeStates[s.id]?.updated_by
 
-        if (dbCat === 'restored') return (
+        if (isRestoredCategory(dbCat)) return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (

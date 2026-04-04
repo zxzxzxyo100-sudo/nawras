@@ -7,6 +7,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreDrawer from '../components/StoreDrawer'
+import { isRestoredCategory } from '../constants/storeCategories'
 
 // ─── إعداد الأعمدة ────────────────────────────────────────────────────────────
 const COLUMNS = [
@@ -73,7 +74,7 @@ function StoreCard({ store, col, storeStates, assignments, callLogs, onClick }) 
 
   const statusBadge = dbCat === 'restoring'
     ? { label: 'جاري الاستعادة', cls: 'bg-teal-100 text-teal-700' }
-    : dbCat === 'restored'
+    : isRestoredCategory(dbCat)
     ? { label: 'تمت الاستعادة', cls: 'bg-teal-100 text-teal-700' }
     : dbCat === 'frozen'
     ? { label: 'مجمد', cls: 'bg-slate-200 text-slate-600' }
