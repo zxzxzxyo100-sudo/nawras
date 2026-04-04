@@ -4,6 +4,7 @@ import { useStores } from '../contexts/StoresContext'
 import { getOrdersSummaryRange } from '../services/api'
 import StoreDrawer from '../components/StoreDrawer'
 import { totalShipments } from '../utils/storeFields'
+import { VIP_MERCHANTS_COMING_SOON } from '../config/features'
 
 const VIP_MIN = 300
 
@@ -23,7 +24,34 @@ function shipmentTrend(current, previous) {
   return 'same'
 }
 
+function VipMerchantsComingSoon() {
+  return (
+    <div className="min-h-[52vh] flex flex-col items-center justify-center text-center px-4 py-16">
+      <div className="rounded-full bg-amber-50 border border-amber-200 p-5 mb-6 shadow-sm">
+        <Crown size={44} className="text-amber-500" strokeWidth={1.75} />
+      </div>
+      <h1 className="text-xl lg:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 flex-wrap">
+        كبار التجار
+        <span className="text-sm font-normal text-slate-500">(VIP)</span>
+      </h1>
+      <p className="mt-4 text-2xl sm:text-3xl font-semibold text-amber-600 tracking-wide">
+        قريباً
+      </p>
+      <p className="mt-4 text-slate-500 text-sm max-w-md leading-relaxed">
+        هذه الخاصية ستُفعَّل بعد ضبط واجهة الـ API. عنصر القائمة يبقى ظاهراً للوصول السريع عند الجاهزية.
+      </p>
+    </div>
+  )
+}
+
 export default function VipMerchants() {
+  if (VIP_MERCHANTS_COMING_SOON) {
+    return <VipMerchantsComingSoon />
+  }
+  return <VipMerchantsFull />
+}
+
+function VipMerchantsFull() {
   const { vipMerchants, loading, reload, shipmentsRangeMeta, lastLoaded } = useStores()
   const [selected, setSelected] = useState(null)
   const [q, setQ] = useState('')

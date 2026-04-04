@@ -5,6 +5,7 @@ import {
 } from '../services/api'
 import { useAuth } from './AuthContext'
 import { totalShipments, isActiveMerchantStatus } from '../utils/storeFields'
+import { VIP_MERCHANTS_COMING_SOON } from '../config/features'
 
 const StoresContext = createContext(null)
 
@@ -52,7 +53,9 @@ export function StoresProvider({ children }) {
 
       const [apiResult, vipRes, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
         getAllStores(),
-        getVipMerchants().catch(() => ({ success: false, data: [] })),
+        VIP_MERCHANTS_COMING_SOON
+          ? Promise.resolve({ success: false, data: [] })
+          : getVipMerchants().catch(() => ({ success: false, data: [] })),
         getStoreStates(),
         getAllCallLogs(),
         getAllRecoveryCalls(),
@@ -88,25 +91,27 @@ export function StoresProvider({ children }) {
       }
 
       let vipList = []
-      if (vipRes?.success && Array.isArray(vipRes.data)) {
-        vipList = vipRes.data
-      } else if (Array.isArray(apiResult.vip_merchants) && apiResult.vip_merchants.length > 0) {
-        vipList = apiResult.vip_merchants
-      } else {
-        const buckets = [
-          ...(apiResult.data?.incubating || []),
-          ...(apiResult.data?.active_shipping || []),
-          ...(apiResult.data?.hot_inactive || []),
-          ...(apiResult.data?.cold_inactive || []),
-        ]
-        const seen = new Set()
-        for (const s of buckets) {
-          const sid = s?.id
-          if (sid == null || seen.has(sid)) continue
-          seen.add(sid)
-          if (!isActiveMerchantStatus(s)) continue
-          if (totalShipments(s) < 300) continue
-          vipList.push(s)
+      if (!VIP_MERCHANTS_COMING_SOON) {
+        if (vipRes?.success && Array.isArray(vipRes.data)) {
+          vipList = vipRes.data
+        } else if (Array.isArray(apiResult.vip_merchants) && apiResult.vip_merchants.length > 0) {
+          vipList = apiResult.vip_merchants
+        } else {
+          const buckets = [
+            ...(apiResult.data?.incubating || []),
+            ...(apiResult.data?.active_shipping || []),
+            ...(apiResult.data?.hot_inactive || []),
+            ...(apiResult.data?.cold_inactive || []),
+          ]
+          const seen = new Set()
+          for (const s of buckets) {
+            const sid = s?.id
+            if (sid == null || seen.has(sid)) continue
+            seen.add(sid)
+            if (!isActiveMerchantStatus(s)) continue
+            if (totalShipments(s) < 300) continue
+            vipList.push(s)
+          }
         }
       }
       setVipMerchants(mergeShipmentsInRange(vipList))
