@@ -13,6 +13,8 @@ import {
 const CATEGORY_LABELS = {
   incubating: { label: 'تحت الاحتضان', bg: 'bg-purple-100', text: 'text-purple-700' },
   active:     { label: 'نشط',         bg: 'bg-green-100',  text: 'text-green-700'  },
+  active_pending_calls: { label: 'نشط قيد المكالمة', bg: 'bg-emerald-50', text: 'text-emerald-800' },
+  completed:  { label: 'منجز',       bg: 'bg-violet-100', text: 'text-violet-800' },
   inactive:   { label: 'غير نشط',     bg: 'bg-red-100',    text: 'text-red-700'    },
   frozen:     { label: 'مجمد',        bg: 'bg-slate-100',  text: 'text-slate-600'  },
   restoring:  { label: 'قيد الاستعادة', bg: 'bg-cyan-100', text: 'text-cyan-700'  },
@@ -40,7 +42,10 @@ export default function StoreDrawer({ store, onClose }) {
     dbCategory === 'restoring' && dbState && isRecoveryCompletedByShipment(store, dbState)
       ? 'restored'
       : dbCategory
-  const catInfo = CATEGORY_LABELS[displayCategory] || CATEGORY_LABELS.incubating
+  const catInfo =
+    CATEGORY_LABELS[displayCategory]
+    || CATEGORY_LABELS[dbCategory]
+    || CATEGORY_LABELS.incubating
 
   const merchantBucket = store._cat || store.bucket || ''
   const canStartRestore =
@@ -97,7 +102,7 @@ export default function StoreDrawer({ store, onClose }) {
       await setStoreStatus({
         store_id: store.id,
         store_name: store.name,
-        category: 'active',
+        category: 'active_pending_calls',
         state_reason: reason,
         freeze_reason: '',
         old_status: dbCategory,

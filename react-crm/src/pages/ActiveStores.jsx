@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter } from 'lucide-react'
+import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns'
+import { ar } from 'date-fns/locale'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
@@ -7,7 +9,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
 export default function ActiveStores() {
-  const { stores, counts, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
+  const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
+
+  function parseDbDate(v) {
+    if (v == null || v === '') return null
+    const s = String(v).trim().replace(' ', 'T')
+    const d = parseISO(s.length >= 19 ? s.slice(0, 19) : s)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
   const { user } = useAuth()
   const [selected, setSelected]           = useState(null)
   const [users, setUsers]                 = useState([])
@@ -24,17 +33,25 @@ export default function ActiveStores() {
 
   const isExecutive = user?.role === 'executive'
 
-  /** متاجر أُخرجت يدوياً من مسار الاحتضان إلى «نشط» وتظهر هنا حتى لو بقيت في دفعة API الاحتضان */
+  /** نشط قيد المكالمة — ليس «منجز» */
   const active = useMemo(() => {
     const base = stores.active_shipping || []
     const fromInc = (stores.incubating || []).filter(s => {
       const st = storeStates[s.id]
       const c = st?.category
-      return c === 'active' || c === 'active_shipping'
+      return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
     })
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
   }, [stores.active_shipping, stores.incubating, storeStates])
+
+  /** منجز — يُعاد تلقائياً إلى قيد المكالمة بعد 30 يوماً من آخر مكالمة */
+  const completed = useMemo(() => {
+    const base = stores.completed_merchants || []
+    const fromInc = (stores.incubating || []).filter(s => storeStates[s.id]?.category === 'completed')
+    const seen = new Set(base.map(s => s.id))
+    return [...base, ...fromInc.filter(s => !seen.has(s.id))]
+  }, [stores.completed_merchants, stores.incubating, storeStates])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -188,6 +205,42 @@ export default function ActiveStores() {
     }]),
   ]
 
+  const completedExtraColumns = [
+    {
+      key: 'last_call_date',
+      label: 'تاريخ المكالمة',
+      render: s => {
+        const raw = s.last_call_date || storeStates[s.id]?.last_call_date
+        const d = parseDbDate(raw)
+        return d ? (
+          <span className="text-xs font-medium text-slate-800">{format(d, 'd MMMM yyyy', { locale: ar })}</span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )
+      },
+    },
+    {
+      key: 'revert_eta',
+      label: 'العودة لقيد المكالمة',
+      render: s => {
+        const raw = s.last_call_date || storeStates[s.id]?.last_call_date
+        const d = parseDbDate(raw)
+        if (!d) return <span className="text-slate-400 text-xs">—</span>
+        const revert = addDays(d, 30)
+        const daysLeft = differenceInCalendarDays(revert, new Date())
+        if (daysLeft <= 0) {
+          return <span className="text-[11px] text-amber-700 font-medium">بانتظار المزامنة (Cron)</span>
+        }
+        return (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-100">
+            بعد {daysLeft.toLocaleString('ar-SA')} يومًا
+          </span>
+        )
+      },
+    },
+    ...extraColumns,
+  ]
+
   const assignedCount   = active.filter(s => assignments[s.id]?.assigned_to).length
   const unassignedCount = active.length - assignedCount
 
@@ -209,10 +262,14 @@ export default function ActiveStores() {
             نشط يشحن
           </h1>
           <p className="text-slate-600 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
-            {active.length} متجر — عمود الطرود: آخر 30 يومًا
+            {active.length} قيد المكالمة
+            {completed.length > 0 && (
+              <span className="text-violet-600 font-medium"> — {completed.length} منجز</span>
+            )}
+            {' '}— عمود الطرود: آخر 30 يومًا
             {(stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
-              return c === 'active' || c === 'active_shipping'
+              return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed'
             }) && (
               <span className="text-emerald-600 text-xs"> (يشمل مُخرَّجين من الاحتضان)</span>
             )}
@@ -402,13 +459,21 @@ export default function ActiveStores() {
         </div>
       )}
 
+      <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-l from-emerald-50/90 to-white px-4 py-3 shadow-sm">
+        <h2 className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+          <TrendingUp size={17} className="text-emerald-600 shrink-0" />
+          المتاجر النشطة — قيد المكالمة
+        </h2>
+        <p className="text-[11px] text-emerald-800/80 mt-0.5">تسجيل مكالمة «عامة» يحرك المتجر إلى «منجز» حتى يمرّ 30 يوماً على تاريخ المكالمة.</p>
+      </div>
+
       <StoreTable
         variant="elite"
         stores={filteredActive}
         onSelectStore={setSelected}
         onRestoreStore={setSelected}
         extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر نشطة"
+        emptyMsg="لا توجد متاجر ضمن قيد المكالمة"
         parcelsColumnSub={
           shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
             ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
@@ -417,6 +482,30 @@ export default function ActiveStores() {
         selectable={isExecutive}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
+      />
+
+      <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm mt-8">
+        <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
+          <BadgeCheck size={17} className="text-violet-600 shrink-0" />
+          المتاجر المنجزة
+        </h2>
+        <p className="text-[11px] text-violet-800/80 mt-0.5">
+          بعد 30 يوماً من تاريخ المكالمة تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
+        </p>
+      </div>
+      <StoreTable
+        variant="elite"
+        stores={completed}
+        onSelectStore={setSelected}
+        onRestoreStore={setSelected}
+        extraColumns={completedExtraColumns}
+        emptyMsg="لا توجد متاجر منجزة — تظهر هنا بعد تسجيل مكالمة عامة لمتجر «قيد المكالمة»"
+        parcelsColumnSub={
+          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+            : undefined
+        }
+        selectable={false}
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
