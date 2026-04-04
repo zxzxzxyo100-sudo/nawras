@@ -344,13 +344,16 @@ export default function StoreTable({
                 const isSelected = selectedIds.has(store.id)
                 const tintStyle = rowTint?.getStyle?.(store)
                 const hasTint = Boolean(tintStyle?.backgroundColor)
+                const paintActive = Boolean(rowTint?.paintMode && rowTint?.onPaintClick)
                 return (
                   <tr
                     key={store.id}
                     style={tintStyle}
+                    title={paintActive ? 'انقر لتطبيق اللون على هذا الصف' : undefined}
                     className={[
                       rowClass(isSelected, hasTint),
                       hasTint ? '[&_td]:!text-inherit' : '',
+                      paintActive ? 'outline outline-1 outline-offset-[-1px] outline-amber-300/40' : '',
                     ].filter(Boolean).join(' ')}
                     onClick={() => handleRowClick(store)}
                   >
@@ -429,15 +432,22 @@ export default function StoreTable({
                     ))}
                     <td
                       className={`${tdPad} ${isElite ? 'text-center' : ''}`}
-                      onClick={e => { e.stopPropagation(); if (!isElite) onSelectStore?.(store) }}
+                      onClick={e => {
+                        if (paintActive) return
+                        e.stopPropagation()
+                        if (!isElite) onSelectStore?.(store)
+                      }}
                     >
                       {isElite ? (
-                        <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             title="اتصال"
                             disabled={!store.phone}
-                            onClick={() => (onCallStore || defaultCall)(store)}
+                            onClick={e => {
+                              e.stopPropagation()
+                              ;(onCallStore || defaultCall)(store)
+                            }}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 transition-all hover:bg-violet-100 hover:shadow-[0_0_14px_-4px_rgba(139,92,246,0.35)] disabled:opacity-35 disabled:pointer-events-none"
                           >
                             <Phone size={16} strokeWidth={2} className="text-violet-600 drop-shadow-[0_0_4px_rgba(139,92,246,0.2)]" />
@@ -445,7 +455,10 @@ export default function StoreTable({
                           <button
                             type="button"
                             title="استعادة / تفاصيل"
-                            onClick={() => handleRestoreClick(store)}
+                            onClick={e => {
+                              e.stopPropagation()
+                              handleRestoreClick(store)
+                            }}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-700 transition-all hover:bg-violet-50 hover:shadow-[0_0_12px_-4px_rgba(139,92,246,0.25)]"
                           >
                             <RotateCcw size={16} strokeWidth={2} />

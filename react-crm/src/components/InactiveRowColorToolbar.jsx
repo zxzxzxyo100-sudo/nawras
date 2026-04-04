@@ -86,8 +86,9 @@ export default function InactiveRowColorToolbar({
       </button>
 
       {paintMode && (
-        <span className="text-xs text-amber-900/90 max-w-[min(100%,14rem)] leading-snug">
-          انقر على صف المتجر لتطبيق <strong>{active.label}</strong>. أوقف الوضع لفتح التفاصيل.
+        <span className="text-xs text-amber-900/90 max-w-[min(100%,18rem)] leading-snug">
+          انقر على <strong>أي خلية في الصف</strong> (الاسم، الهاتف، الأعمدة…) لتطبيق <strong>{active.label}</strong>.
+          أزرار الاتصال والاستعادة لا تلوّن — أوقف التلوين لفتح تفاصيل المتجر بالنقر.
         </span>
       )}
 
