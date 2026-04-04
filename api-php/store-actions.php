@@ -580,7 +580,7 @@ elseif ($action === 'get_leaderboard') {
 // ========== GET MY STATS (إحصائياتي الشخصية) ==========
 elseif ($action === 'get_my_stats') {
     $username = $input['username'] ?? ($_GET['username'] ?? '');
-    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400); }
+    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب']); }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
         id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
