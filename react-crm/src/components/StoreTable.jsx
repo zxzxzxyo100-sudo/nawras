@@ -34,6 +34,10 @@ export default function StoreTable({
   onCallStore,
   /** فتح الاستعادة / التفاصيل (وضع elite) */
   onRestoreStore,
+  /**
+   * تلوين صفوف (غير نشط ساخن/بارد): getStyle يعيد خلفية/لون نص؛ paintMode + onPaintClick للتلوين بالنقر
+   */
+  rowTint = null,
 }) {
   const isElite = variant === 'elite'
 
@@ -143,7 +147,14 @@ export default function StoreTable({
     ? 'bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200'
     : 'bg-slate-50 text-slate-500 text-xs font-semibold'
 
-  const rowClass = (isSelected) => {
+  const rowClass = (isSelected, hasCustomTint) => {
+    if (hasCustomTint) {
+      return [
+        'border-b border-black/10 transition-all duration-200 cursor-pointer',
+        isSelected ? 'ring-2 ring-white/60 ring-inset' : '',
+        'hover:brightness-[0.97]',
+      ].join(' ')
+    }
     if (isElite) {
       return [
         'border-b border-slate-100 transition-all duration-300 cursor-pointer',
@@ -164,6 +175,10 @@ export default function StoreTable({
   const thPad = isElite ? 'px-5 py-3.5' : 'px-4 py-3'
 
   function handleRowClick(store) {
+    if (rowTint?.paintMode && rowTint?.onPaintClick) {
+      rowTint.onPaintClick(store)
+      return
+    }
     if (selectable) toggleRow(store.id)
     else onSelectStore?.(store)
   }
@@ -327,10 +342,16 @@ export default function StoreTable({
             ) : (
               paginated.map(store => {
                 const isSelected = selectedIds.has(store.id)
+                const tintStyle = rowTint?.getStyle?.(store)
+                const hasTint = Boolean(tintStyle?.backgroundColor)
                 return (
                   <tr
                     key={store.id}
-                    className={rowClass(isSelected)}
+                    style={tintStyle}
+                    className={[
+                      rowClass(isSelected, hasTint),
+                      hasTint ? '[&_td]:!text-inherit' : '',
+                    ].filter(Boolean).join(' ')}
                     onClick={() => handleRowClick(store)}
                   >
                     {selectable && (
