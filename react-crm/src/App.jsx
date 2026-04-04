@@ -13,6 +13,7 @@ import IncubationPath from './pages/IncubationPath'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 import Kanban from './pages/Kanban'
+import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
         <Route path="/hot-inactive" element={<PrivateRoute view="hot_inactive"><HotInactive /></PrivateRoute>} />
         <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
+        <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
         <Route path="/incubation"   element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>} />
         <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route path="/performance"  element={<PrivateRoute view="tasks"><MyPerformance /></PrivateRoute>} />
