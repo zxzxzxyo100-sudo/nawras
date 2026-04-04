@@ -1,38 +1,62 @@
-import { useState } from 'react'
-import { Flame, RefreshCw, CheckCircle2, Phone, PhoneOff } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { useParams, Navigate } from 'react-router-dom'
+import { Flame, RefreshCw, Phone, PhoneOff, Users } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
-import { useAuth } from '../contexts/AuthContext'
-import { setStoreStatus } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 
+const SEGMENTS = new Set(['all', 'restoring', 'restored'])
+
+function aggregateUserStats(stores, storeStates, callLogs) {
+  const today = new Date().toISOString().slice(0, 10)
+  const weekAgo = Date.now() - 7 * 86400000
+  const map = {}
+  for (const s of stores) {
+    const uid = (storeStates[s.id]?.updated_by || '').trim() || 'غير محدد'
+    if (!map[uid]) {
+      map[uid] = { label: uid, storeCount: 0, callsToday: 0, callsWeek: 0 }
+    }
+    map[uid].storeCount += 1
+    const log = callLogs[s.id] || {}
+    for (const c of Object.values(log)) {
+      if (!c?.date) continue
+      if (c.date.startsWith(today)) map[uid].callsToday += 1
+      const t = new Date(c.date).getTime()
+      if (!Number.isNaN(t) && t >= weekAgo) map[uid].callsWeek += 1
+    }
+  }
+  return Object.values(map).sort((a, b) => b.storeCount - a.storeCount)
+}
+
 export default function HotInactive() {
+  const { recoverySegment } = useParams()
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
-  const { user } = useAuth()
-  const [selected, setSelected]           = useState(null)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [selected, setSelected] = useState(null)
+
+  if (!SEGMENTS.has(recoverySegment || '')) {
+    return <Navigate to="/hot-inactive/all" replace />
+  }
+
+  const isAllTab = recoverySegment === 'all'
+  const isRestoredTab = recoverySegment === 'restored'
 
   const hotInactive = stores.hot_inactive || []
 
-  async function markAs(store, category) {
-    setActionLoading(true)
-    try {
-      await setStoreStatus({
-        store_id:   store.id,
-        store_name: store.name,
-        category,
-        old_status: storeStates[store.id]?.category || 'hot_inactive',
-        user:       user?.fullname,
-        user_role:  user?.role,
-      })
-      await reload()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setActionLoading(false)
-    }
-  }
+  const filteredStores = useMemo(() => {
+    return hotInactive.filter(s => {
+      const dbCat = storeStates[s.id]?.category
+      if (isAllTab) return true
+      if (isRestoredTab) return dbCat === 'restored'
+      /* جاري الاستعادة: فقط من علِقت حالته بـ restoring في النظام */
+      return dbCat === 'restoring'
+    })
+  }, [hotInactive, storeStates, isAllTab, isRestoredTab])
+
+  const userStats = useMemo(
+    () => aggregateUserStats(filteredStores, storeStates, callLogs),
+    [filteredStores, storeStates, callLogs]
+  )
 
   const extraColumns = [
     {
@@ -114,43 +138,44 @@ export default function HotInactive() {
       render: s => {
         const dbCat = storeStates[s.id]?.category
         const dbUpdatedBy = storeStates[s.id]?.updated_by
-        const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
 
         if (dbCat === 'restored') return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={e => { e.stopPropagation(); markAs(s, 'restored') }}
-              className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium flex items-center gap-1"
-            >
-              <CheckCircle2 size={11} /> تأكيد الاستعادة
-            </button>
+          <div className="flex flex-col gap-1 max-w-[200px]">
+            <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full font-medium w-fit">قيد الاستعادة</span>
             {dbUpdatedBy && (
-              <span className="text-[10px] text-slate-400">{dbUpdatedBy}</span>
+              <span className="text-[10px] text-slate-500">{dbUpdatedBy}</span>
             )}
+            <span className="text-[10px] text-slate-400 leading-snug">تمت الاستعادة تُحدَّث تلقائياً — لا يمكن اختيارها يدوياً</span>
           </div>
         )
         if (dbCat === 'frozen') return (
           <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">مجمد</span>
         )
-        // لا حالة مخصصة — العمود فارغ
         return null
       },
     },
   ]
 
+  const subTitle = isAllTab
+    ? 'غير نشطة ساخنة'
+    : isRestoredTab
+      ? 'تمت الاستعادة'
+      : 'جاري الاستعادة'
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
             <Flame size={24} className="text-amber-500" />
             غير نشط ساخن
+            <span className="text-slate-400 font-medium text-lg">— {subTitle}</span>
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {counts.hot_inactive || 0} متجر — انقطع من 15 إلى 60 يوم
+            {filteredStores.length} متجر في هذا الفرع — إجمالي الفئة {counts.hot_inactive || 0}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
@@ -159,23 +184,52 @@ export default function HotInactive() {
         </button>
       </div>
 
-      <StoreTable
-        stores={hotInactive}
-        onSelectStore={setSelected}
-        extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر في هذه الفئة"
-      />
-
-      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
-
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl flex items-center gap-3">
-            <RefreshCw size={20} className="animate-spin text-orange-500" />
-            <span className="text-sm font-medium text-slate-700">جاري التحديث...</span>
+      {/* إحصاءات حسب آخر من حدّث حالة المتجر في النظام */}
+      {userStats.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-white/80 flex items-center gap-2">
+            <Users size={18} className="text-violet-600" />
+            <h2 className="text-sm font-bold text-slate-800">إحصاءات حسب المسؤول (آخر تحديث للحالة)</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-right text-xs text-slate-500 border-b border-slate-200 bg-white">
+                  <th className="px-4 py-2.5 font-semibold">المسؤول</th>
+                  <th className="px-4 py-2.5 font-semibold">عدد المتاجر</th>
+                  <th className="px-4 py-2.5 font-semibold">مكالمات اليوم</th>
+                  <th className="px-4 py-2.5 font-semibold">مكالمات 7 أيام</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userStats.map(row => (
+                  <tr key={row.label} className="border-b border-slate-100 bg-white hover:bg-slate-50/80">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{row.label}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-700">{row.storeCount}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-emerald-700 font-medium">{row.callsToday}</td>
+                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{row.callsWeek}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
+
+      <StoreTable
+        stores={filteredStores}
+        onSelectStore={setSelected}
+        extraColumns={extraColumns}
+        emptyMsg={
+          isAllTab
+            ? 'لا توجد متاجر في غير نشط ساخن'
+            : isRestoredTab
+              ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة'
+              : 'لا توجد متاجر بحالة «قيد الاستعادة» — تُعرض هنا فقط بعد تغيير الحالة إلى استعادة من النظام'
+        }
+      />
+
+      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

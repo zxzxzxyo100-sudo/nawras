@@ -1,27 +1,13 @@
 import { useState } from 'react'
-import { Snowflake, RefreshCw, CheckCircle2, Phone, PhoneOff } from 'lucide-react'
+import { Snowflake, RefreshCw, Phone, PhoneOff } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
-import { setStoreStatus } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 
 export default function ColdInactive() {
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
-  const [selected, setSelected]           = useState(null)
-  const [actionLoading, setActionLoading] = useState(false)
-
-  async function markAs(store, category) {
-    setActionLoading(true)
-    try {
-      await setStoreStatus(store.id, category)
-      await reload()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setActionLoading(false)
-    }
-  }
+  const [selected, setSelected] = useState(null)
 
   const coldInactive = stores.cold_inactive || []
 
@@ -126,14 +112,11 @@ export default function ColdInactive() {
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
 
-        // قيد الاستعادة — زر تأكيد فقط (لا بادج ولا زر آخر)
         if (dbCat === 'restoring') return (
-          <button
-            onClick={e => { e.stopPropagation(); markAs(s, 'restored') }}
-            className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 transition-colors font-medium flex items-center gap-1"
-          >
-            <CheckCircle2 size={11} /> تأكيد الاستعادة
-          </button>
+          <div className="flex flex-col gap-1 max-w-[200px]">
+            <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full font-medium w-fit">قيد الاستعادة</span>
+            <span className="text-[10px] text-slate-400 leading-snug">تمت الاستعادة تُحدَّث تلقائياً</span>
+          </div>
         )
 
         // مجمد
@@ -178,15 +161,6 @@ export default function ColdInactive() {
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
-
-      {actionLoading && (
-        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl flex items-center gap-3">
-            <RefreshCw size={20} className="animate-spin text-orange-500" />
-            <span className="text-sm font-medium text-slate-700">جاري التحديث...</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

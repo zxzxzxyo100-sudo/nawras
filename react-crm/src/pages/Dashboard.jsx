@@ -278,7 +278,7 @@ export default function Dashboard() {
           icon={Flame}
           gradient="linear-gradient(135deg, #92400e, #d97706)"
           glow="#d9770655"
-          onClick={() => navigate('/hot-inactive')}
+          onClick={() => navigate('/hot-inactive/all')}
         />
         <StoreTypeCard
           title="غير نشط بارد"

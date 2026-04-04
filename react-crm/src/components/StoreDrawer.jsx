@@ -12,8 +12,12 @@ const CATEGORY_LABELS = {
   inactive:   { label: 'غير نشط',     bg: 'bg-red-100',    text: 'text-red-700'    },
   frozen:     { label: 'مجمد',        bg: 'bg-slate-100',  text: 'text-slate-600'  },
   restoring:  { label: 'قيد الاستعادة', bg: 'bg-cyan-100', text: 'text-cyan-700'  },
+  restored:   { label: 'تمت الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
   recovered:  { label: 'تم الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
 }
+
+/** حالات يمكن اختيارها يدوياً — «تمت الاستعادة» تُحدَّث تلقائياً فقط */
+const MANUAL_STATUS_KEYS = ['incubating', 'active', 'inactive', 'frozen', 'restoring']
 
 export default function StoreDrawer({ store, onClose }) {
   const { user } = useAuth()
@@ -121,20 +125,26 @@ export default function StoreDrawer({ store, onClose }) {
         {showChangeStatus && (
           <div className="p-4 bg-amber-50 border-b border-amber-200">
             <p className="text-sm font-medium text-amber-800 mb-2">تغيير حالة المتجر</p>
+            <p className="text-[11px] text-amber-700 mb-2">لا يمكن تعيين «تمت الاستعادة» يدوياً — تُسجَّل تلقائياً عند اكتمال الشروط في النظام.</p>
             <div className="flex gap-2 flex-wrap mb-2">
-              {Object.entries(CATEGORY_LABELS).map(([val, info]) => (
-                <button
-                  key={val}
-                  onClick={() => setNewCategory(val)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                    newCategory === val
-                      ? `${info.bg} ${info.text} border-current`
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                  }`}
-                >
-                  {info.label}
-                </button>
-              ))}
+              {MANUAL_STATUS_KEYS.map(val => {
+                const info = CATEGORY_LABELS[val]
+                if (!info) return null
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setNewCategory(val)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                      newCategory === val
+                        ? `${info.bg} ${info.text} border-current`
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    {info.label}
+                  </button>
+                )
+              })}
             </div>
             <input
               type="text"
