@@ -6,7 +6,7 @@ if (!defined('NAWRIS_BASE')) {
     require_once __DIR__ . '/config.php';
 }
 
-/** أقصى صفحات لـ orders-summary في مسار VIP فقط (التاجر الكبير قد يكون في آخر الصفحات) */
+/** أقصى صفحات لـ orders-summary في مسار VIP فقط */
 if (!defined('VIP_ORDERS_SUMMARY_MAX_PAGES')) {
     define('VIP_ORDERS_SUMMARY_MAX_PAGES', 2000);
 }
@@ -70,11 +70,11 @@ function nawris_best_shipment_total_from_summary_row(array $store): int {
 }
 
 /**
- * جلب كامل لـ orders-summary — حتى نفاد cursor أو VIP_ORDERS_SUMMARY_MAX_PAGES.
+ * جلب orders-summary لنطاق تاريخ واحد — حتى نفاد cursor.
  *
  * @return array{totals: array<int,int>, rows: array<int,array>, meta: array}
  */
-function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
+function nawris_fetch_orders_summary_single_range(string $from, string $to): array {
     $totals = [];
     $rows = [];
     $cursor = null;
@@ -113,6 +113,7 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
                     'curl_errno' => $curlErr,
                     'http_code'  => $lastHttp,
                     'pages'      => $page,
+                    'range'      => ['from' => $from, 'to' => $to],
                 ],
             ];
         }
@@ -124,6 +125,7 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
                     'ok' => false,
                     'http_code' => $lastHttp,
                     'pages'     => $page,
+                    'range'     => ['from' => $from, 'to' => $to],
                 ],
             ];
         }
@@ -137,6 +139,7 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
                     'json_error' => true,
                     'http_code'  => $lastHttp,
                     'pages'      => $page,
+                    'range'      => ['from' => $from, 'to' => $to],
                 ],
             ];
         }
@@ -165,11 +168,97 @@ function nawris_fetch_orders_summary_for_vip(string $from, string $to): array {
         'totals' => $totals,
         'rows'   => $rows,
         'meta'   => [
-            'ok'                => true,
-            'http_code'         => $lastHttp,
-            'pages'             => $page,
-            'curl_errno'        => $curlErr,
-            'truncated_by_page_cap' => $cursor !== null && $page >= VIP_ORDERS_SUMMARY_MAX_PAGES,
+            'ok'                     => true,
+            'http_code'              => $lastHttp,
+            'pages'                  => $page,
+            'curl_errno'             => $curlErr,
+            'range'                  => ['from' => $from, 'to' => $to],
+            'truncated_by_page_cap'  => $cursor !== null && $page >= VIP_ORDERS_SUMMARY_MAX_PAGES,
         ],
     ];
+}
+
+/**
+ * تقسيم سنوي إذا فشل الطلب الواسع (يقلل احتمال 500 من خادم Nawris).
+ */
+function nawris_fetch_orders_summary_by_years(string $to): array {
+    $endY = (int) substr($to, 0, 4);
+    $totals = [];
+    $rows = [];
+    $chunks = [];
+    $anyOk = false;
+    for ($y = 2020; $y <= $endY; $y++) {
+        $from = sprintf('%04d-01-01', $y);
+        $chunkTo = ($y === $endY) ? $to : sprintf('%04d-12-31', $y);
+        $part = nawris_fetch_orders_summary_single_range($from, $chunkTo);
+        $chunks[] = [
+            'from' => $from,
+            'to'   => $chunkTo,
+            'ok'   => !empty($part['meta']['ok']),
+            'http' => $part['meta']['http_code'] ?? null,
+            'pages'=> $part['meta']['pages'] ?? 0,
+        ];
+        if (empty($part['meta']['ok'])) {
+            continue;
+        }
+        $anyOk = true;
+        foreach ($part['totals'] as $id => $t) {
+            $id = (int) $id;
+            if (!isset($totals[$id]) || $t > $totals[$id]) {
+                $totals[$id] = $t;
+                $rows[$id] = $part['rows'][$id] ?? [];
+            }
+        }
+    }
+
+    return [
+        'totals' => $totals,
+        'rows'   => $rows,
+        'meta'   => [
+            'ok'        => $anyOk,
+            'strategy'  => 'year_chunks',
+            'chunks'    => $chunks,
+            'http_code' => 200,
+            'range'     => ['from' => '2020-01-01', 'to' => $to],
+        ],
+    ];
+}
+
+/**
+ * جلب لـ VIP: محاولات بنطاق أضيق إذا أعاد Nawris 500 على النطاق الواسع، ثم تقسيم سنوي.
+ */
+function nawris_fetch_orders_summary_for_vip(string $to): array {
+    $to = $to ?: date('Y-m-d');
+    $attempts = [
+        ['2023-01-01', $to],
+        [date('Y-m-d', strtotime('-730 days')), $to],
+        [date('Y-m-d', strtotime('-365 days')), $to],
+        ['2020-01-01', $to],
+    ];
+    $seen = [];
+    $last = null;
+    foreach ($attempts as $pair) {
+        $k = $pair[0] . '|' . $pair[1];
+        if (isset($seen[$k])) {
+            continue;
+        }
+        $seen[$k] = true;
+        $last = nawris_fetch_orders_summary_single_range($pair[0], $pair[1]);
+        $last['meta']['attempt'] = ['from' => $pair[0], 'to' => $pair[1]];
+        $code = (int) ($last['meta']['http_code'] ?? 0);
+        if (!empty($last['meta']['ok'])) {
+            return $last;
+        }
+        if ($code !== 500 && $code !== 502 && $code !== 503 && $code !== 504) {
+            return $last;
+        }
+    }
+
+    $yearly = nawris_fetch_orders_summary_by_years($to);
+    $yearly['meta']['attempt'] = ['strategy' => 'year_chunks_fallback', 'to' => $to];
+    if (!empty($yearly['totals']) || !empty($yearly['meta']['ok'])) {
+        return $yearly;
+    }
+
+    return $last ?? ['totals' => [], 'rows' => [], 'meta' => ['ok' => false, 'note' => 'all_attempts_failed']];
 }

@@ -13,13 +13,14 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-$from = '2020-01-01';
 $to = date('Y-m-d');
 
-$os = nawris_fetch_orders_summary_for_vip($from, $to);
+$os = nawris_fetch_orders_summary_for_vip($to);
 $totals = $os['totals'];
 $rows = $os['rows'];
 $fetchMeta = $os['meta'] ?? [];
+$usedFrom = $fetchMeta['range']['from'] ?? $fetchMeta['attempt']['from'] ?? null;
+$usedTo = $fetchMeta['range']['to'] ?? $fetchMeta['attempt']['to'] ?? $to;
 
 $vip = [];
 foreach ($totals as $id => $t) {
@@ -44,8 +45,9 @@ echo json_encode([
     'data'    => $vip,
     'count'   => count($vip),
     'range'   => [
-        'from' => $from,
-        'to'   => $to,
+        'from' => $usedFrom,
+        'to'   => $usedTo,
+        'strategy' => $fetchMeta['attempt']['strategy'] ?? null,
     ],
     'fetch'   => $fetchMeta,
     'stores_in_summary' => count($totals),
