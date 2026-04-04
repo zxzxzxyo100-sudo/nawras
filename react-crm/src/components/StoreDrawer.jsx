@@ -8,7 +8,7 @@ import { formatCallOutcome } from '../constants/callOutcomes'
 import { isRecoveryCompletedByShipment } from '../constants/storeCategories'
 
 const CATEGORY_LABELS = {
-  incubating: { label: 'احتضان',      bg: 'bg-purple-100', text: 'text-purple-700' },
+  incubating: { label: 'تحت الاحتضان', bg: 'bg-purple-100', text: 'text-purple-700' },
   active:     { label: 'نشط',         bg: 'bg-green-100',  text: 'text-green-700'  },
   inactive:   { label: 'غير نشط',     bg: 'bg-red-100',    text: 'text-red-700'    },
   frozen:     { label: 'مجمد',        bg: 'bg-slate-100',  text: 'text-slate-600'  },

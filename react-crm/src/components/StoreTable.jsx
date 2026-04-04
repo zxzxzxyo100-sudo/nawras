@@ -41,6 +41,8 @@ export default function StoreTable({
   rowTint = null,
   /** تصفية بحسب خانة المتجر (احتضان / نشط يشحن / …) — يتطلب أن يكون لكل عنصر في stores حقل bucket */
   enableBucketFilter = false,
+  /** عند التصفية: كل الخانات (افتراضي) أو احتضان فقط — يُزامَن مع مسار ?bucket=incubating */
+  bucketPreset = 'all',
 }) {
   const isElite = variant === 'elite'
 
@@ -54,7 +56,14 @@ export default function StoreTable({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => [...STORE_BUCKET_KEYS])
+  const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => (
+    bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS]
+  ))
+
+  useEffect(() => {
+    if (!enableBucketFilter) return
+    setSelectedBucketKeys(bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+  }, [bucketPreset, enableBucketFilter])
 
   const filterPayload = useMemo(
     () => ({
@@ -93,7 +102,9 @@ export default function StoreTable({
     setRegTo('')
     setShipFrom('')
     setShipTo('')
-    if (enableBucketFilter) setSelectedBucketKeys([...STORE_BUCKET_KEYS])
+    if (enableBucketFilter) {
+      setSelectedBucketKeys(bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+    }
   }
 
   const hasActiveFilters = useMemo(
