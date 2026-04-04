@@ -273,7 +273,7 @@ export default function Dashboard() {
           icon={TrendingUp}
           gradient="linear-gradient(135deg, #065f46, #059669)"
           glow="#05966955"
-          onClick={() => navigate('/active')}
+          onClick={() => navigate('/active/pending')}
         />
         <StoreTypeCard
           title="غير نشط ساخن"

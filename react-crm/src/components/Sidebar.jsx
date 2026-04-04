@@ -12,7 +12,6 @@ const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
-  { to: '/active',        label: 'نشط يشحن',           icon: TrendingUp,      view: 'active'       },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
@@ -24,6 +23,12 @@ const STORES_SUB = [
   { to: '/new', label: 'كل المتاجر', kind: 'all' },
   { to: '/new?view=new48', label: 'جديدة', kind: 'new48' },
   { to: '/new?bucket=incubating', label: 'تحت الاحتضان', kind: 'new_inc' },
+]
+
+/** نشط يشحن — قيد المكالمة / المنجزة (مثل مسار الاحتضان) */
+const ACTIVE_SUB = [
+  { to: '/active/pending', label: 'قيد المكالمة', kind: 'pending' },
+  { to: '/active/completed', label: 'المتاجر المنجزة', kind: 'completed' },
 ]
 
 /** مسار الاحتضان — أسفل المتاجر */
@@ -59,6 +64,17 @@ function storesSubLinkActive(kind, pathname, search) {
       return view === 'new48'
     case 'new_inc':
       return bucket === 'incubating'
+    default:
+      return false
+  }
+}
+
+function activeSubLinkActive(kind, pathname) {
+  switch (kind) {
+    case 'pending':
+      return pathname === '/active/pending' || pathname === '/active'
+    case 'completed':
+      return pathname === '/active/completed'
     default:
       return false
   }
@@ -141,6 +157,66 @@ function StoresNavGroup({ can, onClose }) {
   )
 }
 
+/** نشط يشحن — أسفل مسار الاحتضان */
+function ActiveNavGroup({ can, onClose }) {
+  const location = useLocation()
+  const pathname = location.pathname
+  const isActiveSection = pathname.startsWith('/active')
+  const [open, setOpen] = useState(isActiveSection)
+
+  useEffect(() => {
+    if (isActiveSection) setOpen(true)
+  }, [isActiveSection])
+
+  if (!can('active')) return null
+
+  return (
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
+          isActiveSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+        }`}
+        style={isActiveSection ? {
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
+          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
+        } : {}}
+      >
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isActiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+        }`}>
+          <TrendingUp size={14} className={isActiveSection ? 'text-white' : 'text-white/50'} />
+        </div>
+        <span className="flex-1 truncate">نشط يشحن</span>
+        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
+          {ACTIVE_SUB.map(sub => {
+            const subActive = activeSubLinkActive(sub.kind, pathname)
+            return (
+              <NavLink
+                key={sub.kind}
+                to={sub.to}
+                onClick={() => { if (onClose) onClose() }}
+                className={
+                  `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
+                    subActive ? 'text-cyan-300 bg-white/10' : 'text-cyan-200/40 hover:text-cyan-200/85 hover:bg-white/5'
+                  }`
+                }
+              >
+                <Circle size={6} className={subActive ? 'text-cyan-400 fill-cyan-400' : 'text-white/20'} />
+                <span>{sub.label}</span>
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** مسار الاحتضان — أسفل المتاجر */
 function IncubationNavGroup({ can, onClose }) {
   const location = useLocation()
@@ -187,11 +263,11 @@ function IncubationNavGroup({ can, onClose }) {
                 onClick={() => { if (onClose) onClose() }}
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
-                    active ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
+                    active ? 'text-cyan-300 bg-white/10' : 'text-cyan-200/40 hover:text-cyan-200/85 hover:bg-white/5'
                   }`
                 }
               >
-                <Circle size={6} className={active ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
+                <Circle size={6} className={active ? 'text-cyan-400 fill-cyan-400' : 'text-white/20'} />
                 <span>{sub.label}</span>
               </NavLink>
             )
@@ -203,7 +279,7 @@ function IncubationNavGroup({ can, onClose }) {
 }
 
 const STORE_NAV_ORDER = [
-  '__stores_group__', '__incubation_group__', '/active', '__inactive_group__', '/vip',
+  '__stores_group__', '__incubation_group__', '__active_group__', '__inactive_group__', '/vip',
 ]
 
 function InactiveNavGroup({ can, onClose }) {
@@ -335,6 +411,9 @@ export default function Sidebar({ isOpen, onClose }) {
               }
               if (key === '__incubation_group__') {
                 return <IncubationNavGroup key="incubation" can={can} onClose={onClose} />
+              }
+              if (key === '__active_group__') {
+                return <ActiveNavGroup key="active" can={can} onClose={onClose} />
               }
               if (key === '__inactive_group__') {
                 return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />
