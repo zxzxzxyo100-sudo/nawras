@@ -162,7 +162,7 @@ function incubation_cycle_day($regTs, $now) {
     return min(14, max(1, $d + 1));
 }
 
-/** بيانات عرض لصفحة «بين المكالمات» + مفاتيح تصفية «تأخير المكالمة» */
+/** مرحلة المسار + أيام التأخير (عرض وبين المكالمات وتأخير المكالمة وجميع خانات المكالمات) */
 function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped) {
     $cd = min(14, max(1, (int) $cycleDay));
     $s['_cycle_day'] = $cd;
@@ -320,10 +320,11 @@ foreach ($new as $id => $s) {
     $cycleDay = incubation_cycle_day($regTs, $now);
     $s['_cycle_day'] = $cycleDay;
 
-    // المكالمة الثالثة — يوم 10 من أصل 14
-    if ($inc2 && !$inc3 && $cycleDay === 10) {
+    // المكالمة الثالثة — من يوم 10 حتى تسجيل المكالمة (يشمل المتأخرين عن يوم 10)
+    if ($inc2 && !$inc3 && $cycleDay >= 10) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_3';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -333,28 +334,16 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // المكالمة الثانية — يوم 3 من أصل 14
-    if ($inc1 && !$inc2 && $cycleDay === 3) {
+    // المكالمة الثانية — من يوم 3 حتى تسجيل المكالمة (يشمل المتأخرين عن يوم 3)
+    if ($inc1 && !$inc2 && $cycleDay >= 3) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_2';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
         $incubation_path['call_2'][] = $s;
         $incubation_counts['call_2']++;
-        $incubation_counts['total']++;
-        continue;
-    }
-
-    // المكالمة الأولى — يوم 1 من أصل 14
-    if (!$inc1 && $cycleDay === 1) {
-        $s['_cat'] = 'incubating';
-        $s['_inc'] = 'call_1';
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['call_1'][] = $s;
-        $incubation_counts['call_1']++;
         $incubation_counts['total']++;
         continue;
     }
@@ -400,8 +389,22 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // بين المكالمات — لم تُعرَض في خانة يوم 1 أو 3 أو 10 (ضمن دورة 14 يومًا)
-    if (!$inc3) {
+    // المكالمة الأولى — أي متجر لم تُسجَّل مكالمته الأولى بعد (ضمن المسار قبل الترحيل)
+    if (!$inc1) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_1';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_1'][] = $s;
+        $incubation_counts['call_1']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // بين المكالمات — انتظار يوم 3 أو 10 فقط (بعد تسجيل المكالمة السابقة، بدون تأخير ولا غياب أولى)
+    if (($inc1 && !$inc2 && $cycleDay < 3) || ($inc2 && !$inc3 && $cycleDay < 10)) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'between_calls';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
