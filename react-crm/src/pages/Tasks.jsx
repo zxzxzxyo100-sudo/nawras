@@ -24,16 +24,19 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
 
-    if (['call_1', 'call_2', 'call_3'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
+    if (['call_1', 'call_2', 'call_3', 'between_calls'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
       tasks.push({
         id: `${store.id}-inc-${incBucket}`, store,
         priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
         label:
-          incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
-            : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
-              : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
-        desc: 'سجّل المكالمة من صفحة مسار الاحتضان',
+          incBucket === 'between_calls' ? 'مسار الاحتضان — بين المكالمات'
+            : incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
+              : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
+                : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
+        desc: incBucket === 'between_calls'
+          ? 'راجع المرحلة والمتبقي للنافذة التالية من صفحة بين المكالمات'
+          : 'سجّل المكالمة من صفحة مسار الاحتضان',
       })
     }
 
