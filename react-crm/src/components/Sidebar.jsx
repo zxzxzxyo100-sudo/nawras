@@ -19,12 +19,17 @@ const NAV_ALL = [
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
 ]
 
-/** مسار الاحتضان — ثلاث مكالمات (نفس أسلوب القائمة الفرعية لـ «غير نشطة») */
-const INCUBATION_SUB = [
-  { to: '/incubation/call-1', label: 'المكالمة الأولى' },
-  { to: '/incubation/call-2', label: 'المكالمة الثانية' },
-  { to: '/incubation/call-3', label: 'المكالمة الثالثة' },
-  { to: '/incubation/between-calls', label: 'بين المكالمات' },
+/**
+ * ترتيب واحد: جديدة → تحت الاحتضان → بين المكالمات → المكالمات الثلاث
+ * (صلاحية new للبندين الأولين، incubation للباقي)
+ */
+const STORES_INCUBATION_ORDERED = [
+  { to: '/new', label: 'جديدة', kind: 'new_all', need: 'new' },
+  { to: '/new?bucket=incubating', label: 'تحت الاحتضان', kind: 'new_inc', need: 'new' },
+  { to: '/incubation/between-calls', label: 'بين المكالمات', kind: 'between', need: 'incubation' },
+  { to: '/incubation/call-1', label: 'المكالمة الأولى', kind: 'call1', need: 'incubation' },
+  { to: '/incubation/call-2', label: 'المكالمة الثانية', kind: 'call2', need: 'incubation' },
+  { to: '/incubation/call-3', label: 'المكالمة الثالثة', kind: 'call3', need: 'incubation' },
 ]
 
 /** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */
@@ -40,25 +45,42 @@ function canInactiveSub(item, canFn) {
   return canFn(item.view)
 }
 
-/** المتاجر — جديدة (كل الخانات) وتحت الاحتضان */
-const STORES_SUB = [
-  { to: '/new', label: 'جديدة', match: 'all' },
-  { to: '/new?bucket=incubating', label: 'تحت الاحتضان', match: 'incubating' },
-]
+function storesIncubationLinkActive(kind, pathname, bucket) {
+  switch (kind) {
+    case 'new_all':
+      return pathname === '/new' && bucket !== 'incubating'
+    case 'new_inc':
+      return pathname === '/new' && bucket === 'incubating'
+    case 'between':
+      return pathname.startsWith('/incubation/between-calls')
+    case 'call1':
+      return pathname.startsWith('/incubation/call-1')
+    case 'call2':
+      return pathname.startsWith('/incubation/call-2')
+    case 'call3':
+      return pathname.startsWith('/incubation/call-3')
+    default:
+      return false
+  }
+}
 
-function StoresNavGroup({ can, onClose }) {
+/** قائمة واحدة تحت «مسار الاحتضان»: جديدة → تحت الاحتضان → بين المكالمات → المكالمات الثلاث */
+function StoresIncubationNavGroup({ can, onClose }) {
   const location = useLocation()
-  const isStoresSection = location.pathname === '/new'
-  const [open, setOpen] = useState(isStoresSection)
+  const pathname = location.pathname
+  const bucket = new URLSearchParams(location.search).get('bucket')
+  const isSectionActive = pathname === '/new' || pathname.startsWith('/incubation')
+  const [open, setOpen] = useState(isSectionActive)
 
   useEffect(() => {
-    if (isStoresSection) setOpen(true)
-  }, [isStoresSection])
+    if (isSectionActive) setOpen(true)
+  }, [isSectionActive])
 
-  const bucket = new URLSearchParams(location.search).get('bucket')
-  const isIncubatingView = bucket === 'incubating'
+  const items = STORES_INCUBATION_ORDERED.filter(e =>
+    e.need === 'new' ? can('new') : can('incubation')
+  )
 
-  if (!can('new')) return null
+  if (items.length === 0) return null
 
   return (
     <div className="mb-0.5">
@@ -66,31 +88,30 @@ function StoresNavGroup({ can, onClose }) {
         type="button"
         onClick={() => setOpen(o => !o)}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
-          isStoresSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+          isSectionActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isStoresSection ? {
+        style={isSectionActive ? {
           background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
           boxShadow: '0 0 20px rgba(139,92,246,0.15)',
         } : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isStoresSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isSectionActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
         }`}>
-          <Store size={14} className={isStoresSection ? 'text-white' : 'text-white/50'} />
+          <Baby size={14} className={isSectionActive ? 'text-white' : 'text-white/50'} />
         </div>
-        <span className="flex-1 truncate">المتاجر</span>
+        <span className="flex-1 truncate">مسار الاحتضان</span>
         <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
-          {STORES_SUB.map(sub => {
-            const active = sub.match === 'incubating'
-              ? isStoresSection && isIncubatingView
-              : isStoresSection && !isIncubatingView
+          {items.map(entry => {
+            const active = storesIncubationLinkActive(entry.kind, pathname, bucket)
             return (
               <NavLink
-                key={sub.to}
-                to={sub.to}
+                key={entry.kind}
+                to={entry.to}
+                end={entry.kind === 'between' || entry.kind.startsWith('call')}
                 onClick={() => { if (onClose) onClose() }}
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
@@ -99,7 +120,7 @@ function StoresNavGroup({ can, onClose }) {
                 }
               >
                 <Circle size={6} className={active ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
-                <span>{sub.label}</span>
+                <span>{entry.label}</span>
               </NavLink>
             )
           })}
@@ -109,70 +130,10 @@ function StoresNavGroup({ can, onClose }) {
   )
 }
 
-/** ترتيب عناصر مجموعة المتاجر — «مسار الاحتضان» و«غير نشطة» قوائم فرعية */
+/** مسار الاحتضان (قائمة موحّدة) ثم بقية المتاجر */
 const STORE_NAV_ORDER = [
-  '__stores_group__', '__incubation_group__', '/active', '__inactive_group__', '/vip',
+  '__stores_incubation_group__', '/active', '__inactive_group__', '/vip',
 ]
-
-function IncubationNavGroup({ can, onClose }) {
-  const location = useLocation()
-  const isIncubationSection = location.pathname.startsWith('/incubation')
-  const [open, setOpen] = useState(isIncubationSection)
-
-  useEffect(() => {
-    if (isIncubationSection) setOpen(true)
-  }, [isIncubationSection])
-
-  if (!can('incubation')) return null
-
-  return (
-    <div className="mb-0.5">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
-          isIncubationSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-        }`}
-        style={isIncubationSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
-      >
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isIncubationSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
-        }`}>
-          <Baby size={14} className={isIncubationSection ? 'text-white' : 'text-white/50'} />
-        </div>
-        <span className="flex-1 truncate">مسار الاحتضان</span>
-        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
-          {INCUBATION_SUB.map(sub => (
-            <NavLink
-              key={sub.to}
-              to={sub.to}
-              end
-              onClick={() => { if (onClose) onClose() }}
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
-                  isActive ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <Circle size={6} className={isActive ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
-                  <span>{sub.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function InactiveNavGroup({ can, onClose }) {
   const location = useLocation()
@@ -298,11 +259,8 @@ export default function Sidebar({ isOpen, onClose }) {
         {NAV_GROUPS.map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
-              if (key === '__stores_group__') {
-                return <StoresNavGroup key="stores" can={can} onClose={onClose} />
-              }
-              if (key === '__incubation_group__') {
-                return <IncubationNavGroup key="incubation" can={can} onClose={onClose} />
+              if (key === '__stores_incubation_group__') {
+                return <StoresIncubationNavGroup key="stores-incubation" can={can} onClose={onClose} />
               }
               if (key === '__inactive_group__') {
                 return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />
