@@ -64,6 +64,7 @@ const COLOR_CLASSES = {
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
 function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [nameQuery, setNameQuery] = useState('')
+  const [namePickedStoreId, setNamePickedStoreId] = useState(null)
   const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
@@ -76,13 +77,14 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     () => ({
       nameQuery,
       nameMatchMode,
+      namePickedStoreId,
       idQuery,
       regFrom,
       regTo,
       shipFrom,
       shipTo,
     }),
-    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, nameMatchMode, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -92,6 +94,8 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
 
   function clearFilters() {
     setNameQuery('')
+    setNamePickedStoreId(null)
+    setNameMatchMode(NAME_MATCH_MODES.contains)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -103,6 +107,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     () =>
       Boolean(
         nameQuery.trim()
+        || namePickedStoreId != null
         || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
@@ -110,7 +115,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         || shipFrom
         || shipTo
       ),
-    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   if (!stores.length) {
@@ -159,6 +164,8 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         onClose={() => setFilterOpen(false)}
         isElite
         nameQuery={nameQuery}
+        namePickedStoreId={namePickedStoreId}
+        onNamePickedStoreIdChange={setNamePickedStoreId}
         nameMatchMode={nameMatchMode}
         onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}

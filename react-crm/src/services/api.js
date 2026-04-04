@@ -25,6 +25,10 @@ export const deleteUser = (id) =>
 export const getAllStores = () =>
   http.get('/all-stores.php').then(r => r.data)
 
+/** بحث متاجر للـ Autocomplete (يُغذّى من cache بعد تشغيل all-stores.php) */
+export const searchStores = (q, axiosConfig = {}) =>
+  http.get('/search-stores.php', { params: { q }, ...axiosConfig }).then(r => r.data)
+
 /** كبار التجار — مسار مستقل (جلب كامل orders-summary) */
 export const getVipMerchants = () =>
   http.get('/vip-merchants.php').then(r => r.data)

@@ -1,5 +1,6 @@
 import { Filter } from 'lucide-react'
 import { NAME_MATCH_MODES } from '../utils/storeFilters'
+import StoreNameAutocomplete from './StoreNameAutocomplete'
 
 const NAME_MODE_OPTIONS = [
   {
@@ -27,6 +28,8 @@ export default function StoreFilterPanel({
   /** إخفاء صف العنوان + «مسح التصفية» (للاستخدام داخل لوحة جانبية) */
   showHeaderRow = true,
   nameQuery,
+  namePickedStoreId = null,
+  onNamePickedStoreIdChange,
   nameMatchMode = NAME_MATCH_MODES.contains,
   onNameMatchModeChange,
   idQuery,
@@ -82,14 +85,32 @@ export default function StoreFilterPanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="space-y-2 sm:col-span-2 xl:col-span-1">
           <label className={label}>اسم المتجر أو رقم الهاتف</label>
-          <input
-            type="text"
-            value={nameQuery}
-            onChange={e => onNameChange(e.target.value)}
-            placeholder="اسم، أو أرقام الهاتف (أي جزء من الرقم، بلا شرط البداية)..."
-            className={inp}
-            dir="rtl"
-          />
+          {onNamePickedStoreIdChange ? (
+            <>
+              <StoreNameAutocomplete
+                value={nameQuery}
+                onChange={onNameChange}
+                selectedStoreId={namePickedStoreId}
+                onSelectedStoreIdChange={onNamePickedStoreIdChange}
+                isElite={isElite}
+                placeholder="ابدأ الكتابة للبحث عن متجر (اقتراحات من الخادم)…"
+              />
+              {namePickedStoreId != null && (
+                <p className="text-[10px] text-emerald-700 font-mono tabular-nums" dir="ltr">
+                  تم اختيار المعرف: {String(namePickedStoreId)}
+                </p>
+              )}
+            </>
+          ) : (
+            <input
+              type="text"
+              value={nameQuery}
+              onChange={e => onNameChange(e.target.value)}
+              placeholder="اسم، أو أرقام الهاتف (أي جزء من الرقم، بلا شرط البداية)..."
+              className={inp}
+              dir="rtl"
+            />
+          )}
           {onNameMatchModeChange && (
             <div className="space-y-2">
               <span className={label}>طريقة البحث في الاسم</span>

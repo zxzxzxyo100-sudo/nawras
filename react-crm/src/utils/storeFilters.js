@@ -61,6 +61,8 @@ export function filterStoresByToolbar(stores, filters) {
   const {
     nameQuery = '',
     nameMatchMode = NAME_MATCH_MODES.contains,
+    /** عند الاختيار من Autocomplete: تصفية بحسب المعرّف فقط */
+    namePickedStoreId = null,
     idQuery = '',
     regFrom = '',
     regTo = '',
@@ -69,7 +71,9 @@ export function filterStoresByToolbar(stores, filters) {
   } = filters
 
   return stores.filter(s => {
-    if (nameQuery.trim()) {
+    if (namePickedStoreId != null && namePickedStoreId !== '') {
+      if (String(s.id) !== String(namePickedStoreId)) return false
+    } else if (nameQuery.trim()) {
       const n = nameQuery.trim().toLowerCase()
       if (!nameOrPhoneMatches(s.name, s.phone, n, nameMatchMode)) return false
     }

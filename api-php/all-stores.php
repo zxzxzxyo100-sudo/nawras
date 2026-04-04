@@ -242,6 +242,44 @@ $counts['check'] = (
 // كبار التجار: يُجلب عبر vip-merchants.php (جلب كامل الصفحات) — يُترك هنا فارغاً للتوافق
 $vip_merchants = [];
 
+// ذاكرة بحث خفيفة لـ search-stores.php
+function nawras_lite_store_row($s, $fallbackId = null) {
+    $id = $s['id'] ?? $fallbackId;
+    return [
+        'id'    => $id,
+        'name'  => isset($s['name']) ? (string) $s['name'] : '',
+        'phone' => isset($s['phone']) ? (string) $s['phone'] : '',
+    ];
+}
+$search_lite_map = [];
+foreach ($new as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+foreach ($allStores as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+foreach ($inactive as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+$search_lite = array_values($search_lite_map);
+$cacheDir = __DIR__ . '/cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0755, true);
+}
+@file_put_contents(
+    $cacheDir . '/stores_search_lite.json',
+    json_encode($search_lite, JSON_UNESCAPED_UNICODE)
+);
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,

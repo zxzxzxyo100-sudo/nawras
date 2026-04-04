@@ -38,6 +38,7 @@ export default function StoreTable({
   const isElite = variant === 'elite'
 
   const [nameQuery, setNameQuery] = useState('')
+  const [namePickedStoreId, setNamePickedStoreId] = useState(null)
   const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
@@ -52,13 +53,14 @@ export default function StoreTable({
     () => ({
       nameQuery,
       nameMatchMode,
+      namePickedStoreId,
       idQuery,
       regFrom,
       regTo,
       shipFrom,
       shipTo,
     }),
-    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, nameMatchMode, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -78,6 +80,7 @@ export default function StoreTable({
 
   function clearFilters() {
     setNameQuery('')
+    setNamePickedStoreId(null)
     setNameMatchMode(NAME_MATCH_MODES.contains)
     setIdQuery('')
     setRegFrom('')
@@ -90,6 +93,7 @@ export default function StoreTable({
     () =>
       Boolean(
         nameQuery.trim()
+        || namePickedStoreId != null
         || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
@@ -97,7 +101,7 @@ export default function StoreTable({
         || shipFrom
         || shipTo
       ),
-    [nameQuery, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   // multi-select helpers
@@ -260,6 +264,8 @@ export default function StoreTable({
         onClose={() => setFilterOpen(false)}
         isElite={isElite}
         nameQuery={nameQuery}
+        namePickedStoreId={namePickedStoreId}
+        onNamePickedStoreIdChange={setNamePickedStoreId}
         nameMatchMode={nameMatchMode}
         onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}
