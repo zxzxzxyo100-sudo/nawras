@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Baby, Clock, Filter, RefreshCw, Phone, PhoneCall,
+  Baby, Clock, Filter, RefreshCw, Phone, PhoneCall, Layers,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
@@ -25,7 +25,7 @@ function shipDays(s) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// مسار الاحتضان: ثلاث مكالمات — بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج حسب الشحن
+// مسار الاحتضان: دورة 14 يومًا — المكالمات في الأيام 1 و 3 و 10؛ الباقي في «بين المكالمات»
 // ══════════════════════════════════════════════════════════════════
 const TABS = [
   {
@@ -33,9 +33,9 @@ const TABS = [
     label: 'المكالمة الأولى',
     icon:  Baby,
     color: 'blue',
-    desc:  'متاجر جديدة (أقل من 48 ساعة). بعد تسجيل المكالمة تختفي من القائمة؛ بعد 3 أيام تظهر في المكالمة الثانية.',
+    desc:  'يظهر المتجر هنا في يوم 1 من 14 يومًا منذ التسجيل إذا لم تُسجَّل المكالمة الأولى بعد.',
     badge: () => (
-      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">جديد</span>
+      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">يوم 1</span>
     ),
   },
   {
@@ -43,9 +43,9 @@ const TABS = [
     label: 'المكالمة الثانية',
     icon:  Clock,
     color: 'indigo',
-    desc:  'تحت الاحتضان — بلا شرط شحن. بعد المكالمة تختفي؛ بعد 3 أيام تظهر في المكالمة الثالثة.',
+    desc:  'يظهر المتجر هنا في يوم 3 من 14 بعد تسجيل المكالمة الأولى وقبل الثانية.',
     badge: () => (
-      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">متابعة</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يوم 3</span>
     ),
   },
   {
@@ -53,9 +53,19 @@ const TABS = [
     label: 'المكالمة الثالثة',
     icon:  PhoneCall,
     color: 'amber',
-    desc:  'التخريج — بعد المكالمة يُصنَّف المتجر نشطًا يشحن أو غير نشط حسب وجود شحنات.',
+    desc:  'يظهر المتجر هنا في يوم 10 من 14 بعد المكالمة الثانية — التخريج بعد المكالمة حسب الشحن.',
     badge: () => (
-      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">تخريج</span>
+      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">يوم 10</span>
+    ),
+  },
+  {
+    key:   'between_calls',
+    label: 'بين المكالمات',
+    icon:  Layers,
+    color: 'slate',
+    desc:  'متاجر تحت الاحتضان لم تُعرَض بعد في خانة يوم 1 أو 3 أو 10 — يُعرض يوم الدورة والمرحلة والمتبقي للنافذة التالية.',
+    badge: () => (
+      <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">انتظار</span>
     ),
   },
 ]
@@ -65,11 +75,12 @@ const ROUTE_TAB = {
   'call-1': 'call_1',
   'call-2': 'call_2',
   'call-3': 'call_3',
+  'between-calls': 'between_calls',
 }
 
 
 // ── جدول المتاجر الداخلي ────────────────────────────────────────
-function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
+function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false }) {
   const [nameQuery, setNameQuery] = useState('')
   const [namePickedStoreId, setNamePickedStoreId] = useState(null)
   const [idQuery, setIdQuery] = useState('')
@@ -188,17 +199,27 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
           <thead>
             <tr className="bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200 text-right">
               <th className="px-5 py-3.5 font-semibold">المتجر</th>
-              <th className="px-5 py-3.5 font-semibold">أيام التسجيل</th>
+              {betweenMode ? (
+                <>
+                  <th className="px-5 py-3.5 font-semibold whitespace-nowrap">يوم من 14</th>
+                  <th className="px-5 py-3.5 font-semibold">المرحلة الحالية</th>
+                  <th className="px-5 py-3.5 font-semibold">المتبقي للظهور</th>
+                </>
+              ) : (
+                <>
+                  <th className="px-5 py-3.5 font-semibold">أيام التسجيل</th>
+                  <th className="px-5 py-3.5 font-semibold">الحالة</th>
+                </>
+              )}
               <th className="px-5 py-3.5 font-semibold">الطلبيات</th>
               <th className="px-5 py-3.5 font-semibold">آخر شحنة</th>
-              <th className="px-5 py-3.5 font-semibold">الحالة</th>
               <th className="px-5 py-3.5 font-semibold">التواصل</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-slate-500">
+                <td colSpan={betweenMode ? 7 : 6} className="px-5 py-12 text-center text-slate-500">
                   لا توجد نتائج تطابق التصفية الحالية
                 </td>
               </tr>
@@ -209,6 +230,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
               const sdays   = shipDays(s)
               const parcels = parcelsInRangeDisplay(s)
               const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
+              const cycleD = s._cycle_day != null ? s._cycle_day : '—'
               return (
                 <tr
                   key={s.id ?? i}
@@ -219,13 +241,35 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
                     <div className="font-semibold text-slate-900">{s.name || '—'}</div>
                     <div className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">{s.id}</div>
                   </td>
-                  <td className="px-5 py-4 text-slate-700">
-                    {days !== null ? (
-                      hours < 48
-                        ? <span className="text-blue-700 font-medium">{hours} ساعة</span>
-                        : <span>{days} يوم</span>
-                    ) : '—'}
-                  </td>
+                  {betweenMode ? (
+                    <>
+                      <td className="px-5 py-4 text-slate-800 tabular-nums font-medium">
+                        {cycleD}
+                      </td>
+                      <td className="px-5 py-4 text-slate-700 text-xs leading-relaxed max-w-[14rem]">
+                        {s._inc_phase || '—'}
+                      </td>
+                      <td className="px-5 py-4 text-slate-700 text-xs leading-relaxed max-w-[16rem]">
+                        <span className="tabular-nums font-medium">{s._days_until_window != null ? `${s._days_until_window} يوم` : '—'}</span>
+                        {s._next_window_hint ? (
+                          <span className="block text-slate-500 mt-1">{s._next_window_hint}</span>
+                        ) : null}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-5 py-4 text-slate-700">
+                        {days !== null ? (
+                          hours < 48
+                            ? <span className="text-blue-700 font-medium">{hours} ساعة</span>
+                            : <span>{days} يوم</span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {tab.badge(s)}
+                      </td>
+                    </>
+                  )}
                   <td className="px-5 py-4 text-slate-700">
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${
                       parcels > 0
@@ -239,9 +283,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
                     {s.last_shipment_date && s.last_shipment_date !== 'لا يوجد'
                       ? sdays !== null ? `${sdays} يوم` : s.last_shipment_date
                       : <span className="text-slate-400">لا يوجد</span>}
-                  </td>
-                  <td className="px-5 py-4 text-slate-700">
-                    {tab.badge(s)}
                   </td>
                   <td className="px-5 py-4 text-slate-700">
                     <button
@@ -305,13 +346,16 @@ export default function IncubationPath() {
     call_1: (incubationPath.call_1 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
     call_2: (incubationPath.call_2 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
     call_3: (incubationPath.call_3 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
+    between_calls: (incubationPath.between_calls || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
   }), [incubationPath, storeStates])
 
   const filteredCounts = useMemo(() => ({
     call_1: filteredPath.call_1.length,
     call_2: filteredPath.call_2.length,
     call_3: filteredPath.call_3.length,
-    total: filteredPath.call_1.length + filteredPath.call_2.length + filteredPath.call_3.length,
+    between_calls: filteredPath.between_calls.length,
+    total: filteredPath.call_1.length + filteredPath.call_2.length + filteredPath.call_3.length
+      + filteredPath.between_calls.length,
   }), [filteredPath])
 
   const tabStores = useMemo(
@@ -321,16 +365,26 @@ export default function IncubationPath() {
 
   const currentTab = TABS.find(t => t.key === activeTab)
 
-  const callTypeForTab =
-    activeTab === 'call_1' ? 'inc_call1'
-      : activeTab === 'call_2' ? 'inc_call2'
-        : 'inc_call3'
+  const callTypeForModal = useMemo(() => {
+    if (activeTab !== 'between_calls') {
+      return activeTab === 'call_1' ? 'inc_call1'
+        : activeTab === 'call_2' ? 'inc_call2'
+          : 'inc_call3'
+    }
+    if (!callStore) return 'inc_call1'
+    const st = storeStates[callStore.id]
+    if (!st?.inc_call1_at) return 'inc_call1'
+    if (!st?.inc_call2_at) return 'inc_call2'
+    return 'inc_call3'
+  }, [activeTab, callStore, storeStates])
 
   const tabDescClass = currentTab?.color === 'blue'
     ? 'bg-blue-50 text-blue-800 border-blue-200'
     : currentTab?.color === 'indigo'
       ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-      : 'bg-amber-50 text-amber-900 border-amber-200'
+      : currentTab?.color === 'slate'
+        ? 'bg-slate-50 text-slate-800 border-slate-200'
+        : 'bg-amber-50 text-amber-900 border-amber-200'
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -386,6 +440,7 @@ export default function IncubationPath() {
           callLogs={callLogs}
           onSelect={setSelected}
           onCall={setCallStore}
+          betweenMode={activeTab === 'between_calls'}
         />
       )}
 
@@ -396,7 +451,7 @@ export default function IncubationPath() {
       {callStore && (
         <CallModal
           store={callStore}
-          callType={callTypeForTab}
+          callType={callTypeForModal}
           onClose={() => setCallStore(null)}
           onSaved={reload}
         />

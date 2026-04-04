@@ -24,6 +24,7 @@ const INCUBATION_SUB = [
   { to: '/incubation/call-1', label: 'المكالمة الأولى' },
   { to: '/incubation/call-2', label: 'المكالمة الثانية' },
   { to: '/incubation/call-3', label: 'المكالمة الثالثة' },
+  { to: '/incubation/between-calls', label: 'بين المكالمات' },
 ]
 
 /** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */

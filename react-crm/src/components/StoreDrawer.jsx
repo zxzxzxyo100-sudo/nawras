@@ -61,7 +61,7 @@ export default function StoreDrawer({ store, onClose }) {
         user:        user?.fullname,
         user_role:   user?.role,
         /** من all-stores.php: متجر ظاهر في مسار الاحتضان (جديدة / تحت الاحتضان) */
-        from_incubation_path: ['call_1', 'call_2', 'call_3', 'new_48h', 'incubating'].includes(store._inc),
+        from_incubation_path: ['call_1', 'call_2', 'call_3', 'between_calls', 'new_48h', 'incubating'].includes(store._inc),
       })
       reload()
       setShowChangeStatus(false)
