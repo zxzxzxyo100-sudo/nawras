@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react'
 import {
-  Baby, Clock, RefreshCw, Phone,
+  Baby, Clock, Filter, RefreshCw, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
-import StoreFilterPanel from '../components/StoreFilterPanel'
+import StoreFilterDrawer from '../components/StoreFilterDrawer'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
 function regDays(s) {
@@ -69,6 +69,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [regTo, setRegTo] = useState('')
   const [shipFrom, setShipFrom] = useState('')
   const [shipTo, setShipTo] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
 
   const filterPayload = useMemo(
     () => ({ nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo }),
@@ -88,6 +89,19 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
     setShipFrom('')
     setShipTo('')
   }
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        nameQuery.trim()
+        || idQuery.trim()
+        || regFrom
+        || regTo
+        || shipFrom
+        || shipTo
+      ),
+    [nameQuery, idQuery, regFrom, regTo, shipFrom, shipTo]
+  )
 
   if (!stores.length) {
     return (
@@ -111,24 +125,43 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
       className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90"
       dir="rtl"
     >
-      <div className="p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm space-y-4">
-        <StoreFilterPanel
-          isElite
-          nameQuery={nameQuery}
-          idQuery={idQuery}
-          regFrom={regFrom}
-          regTo={regTo}
-          shipFrom={shipFrom}
-          shipTo={shipTo}
-          onNameChange={setNameQuery}
-          onIdChange={setIdQuery}
-          onRegFromChange={setRegFrom}
-          onRegToChange={setRegTo}
-          onShipFromChange={setShipFrom}
-          onShipToChange={setShipTo}
-          onClear={clearFilters}
-        />
+      <div className="p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setFilterOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-blue-500 bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition-colors hover:bg-blue-700"
+          >
+            <Filter size={18} strokeWidth={2.5} className="shrink-0" />
+            تصفية
+            {hasActiveFilters && (
+              <span className="flex h-2 w-2 rounded-full bg-amber-300 ring-2 ring-white" title="تصفية نشطة" />
+            )}
+          </button>
+          <span className="tabular-nums text-sm font-medium text-slate-700">
+            {filtered.length.toLocaleString('ar-SA')} من {stores.length.toLocaleString('ar-SA')} متجر
+          </span>
+        </div>
       </div>
+
+      <StoreFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        isElite
+        nameQuery={nameQuery}
+        idQuery={idQuery}
+        regFrom={regFrom}
+        regTo={regTo}
+        shipFrom={shipFrom}
+        shipTo={shipTo}
+        onNameChange={setNameQuery}
+        onIdChange={setIdQuery}
+        onRegFromChange={setRegFrom}
+        onRegToChange={setRegTo}
+        onShipFromChange={setShipFrom}
+        onShipToChange={setShipTo}
+        onClear={clearFilters}
+      />
 
       <div className="rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner">
         <table className="w-full text-sm">
@@ -211,7 +244,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         </table>
       </div>
       <div className="mt-0 rounded-b-2xl px-4 py-3 border-t border-slate-200 bg-slate-50/80 text-xs text-slate-600">
-        {filtered.length} من {stores.length} متجر
+        عرض {filtered.length.toLocaleString('ar-SA')} من أصل {stores.length.toLocaleString('ar-SA')} متجر
       </div>
     </div>
   )
