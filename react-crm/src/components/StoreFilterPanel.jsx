@@ -53,31 +53,31 @@ export default function StoreFilterPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="space-y-2 sm:col-span-2 xl:col-span-1">
-          <label className={label}>اسم المتجر</label>
+          <label className={label}>اسم المتجر أو رقم الهاتف</label>
           <input
             type="text"
             value={nameQuery}
             onChange={e => onNameChange(e.target.value)}
-            placeholder="اكتب اسماً أو حرفاً أو كلمة..."
+            placeholder="اسم، أو أرقام الهاتف (أي جزء من الرقم، بلا شرط البداية)..."
             className={inp}
             dir="rtl"
           />
           {onNameMatchModeChange && (
             <div>
-              <label className={label}>طريقة البحث في الاسم</label>
+              <label className={label}>طريقة البحث في الاسم (الهاتف: أي جزء من الرقم)</label>
               <select
                 value={nameMatchMode}
                 onChange={e => onNameMatchModeChange(e.target.value)}
                 className={`${inp} cursor-pointer`}
               >
                 <option value={NAME_MATCH_MODES.contains}>
-                  يحتوي على النص — في أي مكان بالاسم أو الهاتف
+                  يحتوي — الاسم في أي موضع؛ الهاتف أي تسلسل أرقام (وسط/آخر/أول)
                 </option>
                 <option value={NAME_MATCH_MODES.startsWith}>
-                  يبدأ الاسم بهذا النص أو الحرف الأول
+                  يبدأ الاسم بهذا النص — الهاتف كما سبق (ليس من بداية الرقم فقط)
                 </option>
                 <option value={NAME_MATCH_MODES.word}>
-                  كلمة من اسم المتجر (أي كلمة تضمّ النص)
+                  كلمة من اسم المتجر — والهاتف: أي جزء أرقام كما فوق
                 </option>
               </select>
             </div>

@@ -1,21 +1,34 @@
-/** أوضاع البحث في حقل الاسم */
+/** أوضاع البحث في حقل الاسم (الهاتف يُطابق دائماً بأي جزء من الأرقام) */
 export const NAME_MATCH_MODES = {
-  /** النص يظهر في أي مكان في الاسم أو الهاتف */
+  /** النص في أي مكان بالاسم؛ الهاتف: أي تسلسل أرقام بلا شرط البداية */
   contains: 'contains',
-  /** اسم المتجر يبدأ بهذا النص أو الحرف (الهاتف: يحتوي) */
+  /** اسم المتجر يبدأ بهذا النص؛ الهاتف: أي جزء من الأرقام (وسط/نهاية/بداية) */
   startsWith: 'startsWith',
-  /** أي «كلمة» في اسم المتجر تحتوي النص (مثل البحث بالكلمة في القوائم) */
+  /** أي «كلمة» في اسم المتجر؛ الهاتف: أي جزء من الأرقام */
   word: 'word',
+}
+
+/** مطابقة الهاتف: نص كما هو، أو أرقام فقط في أي موضع (حتى لو لم يُكتب أول الرقم) */
+function phoneMatches(phone, queryLower) {
+  const raw = String(phone || '')
+  const phoneLower = raw.toLowerCase()
+  const q = queryLower.trim()
+  if (!q) return true
+
+  const digits = raw.replace(/\D/g, '')
+  const qDigits = q.replace(/\D/g, '')
+  if (qDigits.length > 0 && digits.includes(qDigits)) return true
+
+  return phoneLower.includes(q)
 }
 
 function nameOrPhoneMatches(name, phone, queryLower, mode) {
   const nameStr = String(name || '')
   const nameLower = nameStr.toLowerCase()
-  const phoneLower = String(phone || '').toLowerCase()
   const q = queryLower.trim()
   if (!q) return true
 
-  const phoneOk = phoneLower.includes(q)
+  const phoneOk = phoneMatches(phone, queryLower)
 
   if (mode === NAME_MATCH_MODES.startsWith) {
     return nameLower.startsWith(q) || phoneOk
