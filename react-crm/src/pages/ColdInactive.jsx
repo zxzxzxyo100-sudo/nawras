@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Snowflake, RefreshCw, Phone, PhoneOff } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
+import InactiveRowColorToolbar from '../components/InactiveRowColorToolbar'
+import { useInactiveRowColors } from '../hooks/useInactiveRowColors'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
@@ -9,6 +11,16 @@ import { isRestoredCategory } from '../constants/storeCategories'
 export default function ColdInactive() {
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
   const [selected, setSelected] = useState(null)
+  const inactiveRowColors = useInactiveRowColors('cold')
+  const [rowPaintMode, setRowPaintMode] = useState(false)
+  const [rowColorKey, setRowColorKey] = useState('1')
+
+  const handlePaintClick = useCallback(
+    store => {
+      inactiveRowColors.apply(store.id, rowColorKey)
+    },
+    [inactiveRowColors, rowColorKey]
+  )
 
   const coldInactive = stores.cold_inactive || []
 
@@ -132,7 +144,7 @@ export default function ColdInactive() {
   ]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" dir="rtl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -154,10 +166,23 @@ export default function ColdInactive() {
         </button>
       </div>
 
+      <InactiveRowColorToolbar
+        activeColorKey={rowColorKey}
+        onSelectColorKey={setRowColorKey}
+        paintMode={rowPaintMode}
+        onTogglePaintMode={() => setRowPaintMode(p => !p)}
+        onClearAll={inactiveRowColors.clearAll}
+      />
+
       <StoreTable
         stores={coldInactive}
         onSelectStore={setSelected}
         extraColumns={extraColumns}
+        rowTint={{
+          getStyle: inactiveRowColors.styleFor,
+          paintMode: rowPaintMode,
+          onPaintClick: handlePaintClick,
+        }}
         emptyMsg="لا توجد متاجر في هذه الفئة"
       />
 

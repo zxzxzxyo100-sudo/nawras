@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { Flame, RefreshCw, Phone, PhoneOff, Users } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
+import InactiveRowColorToolbar from '../components/InactiveRowColorToolbar'
+import { useInactiveRowColors } from '../hooks/useInactiveRowColors'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
@@ -75,6 +77,16 @@ export default function HotInactive() {
   const { recoverySegment } = useParams()
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
   const [selected, setSelected] = useState(null)
+  const inactiveRowColors = useInactiveRowColors('hot')
+  const [rowPaintMode, setRowPaintMode] = useState(false)
+  const [rowColorKey, setRowColorKey] = useState('1')
+
+  const handlePaintClick = useCallback(
+    store => {
+      inactiveRowColors.apply(store.id, rowColorKey)
+    },
+    [inactiveRowColors, rowColorKey]
+  )
 
   if (!SEGMENTS.has(recoverySegment || '')) {
     return <Navigate to="/hot-inactive/all" replace />
@@ -314,6 +326,14 @@ export default function HotInactive() {
         </div>
       )}
 
+      <InactiveRowColorToolbar
+        activeColorKey={rowColorKey}
+        onSelectColorKey={setRowColorKey}
+        paintMode={rowPaintMode}
+        onTogglePaintMode={() => setRowPaintMode(p => !p)}
+        onClearAll={inactiveRowColors.clearAll}
+      />
+
       <StoreTable
         variant="elite"
         stores={filteredStores}
@@ -321,6 +341,11 @@ export default function HotInactive() {
         onRestoreStore={setSelected}
         renderIdBadge={s => recoveryIdBadge(s, storeStates)}
         extraColumns={extraColumns}
+        rowTint={{
+          getStyle: inactiveRowColors.styleFor,
+          paintMode: rowPaintMode,
+          onPaintClick: handlePaintClick,
+        }}
         emptyMsg={
           isAllTab
             ? 'لا توجد متاجر في غير نشط ساخن'
