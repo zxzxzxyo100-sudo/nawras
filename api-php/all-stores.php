@@ -239,11 +239,28 @@ $counts['check'] = (
     === $counts['total_active']
 );
 
+// ── كبار التجار (VIP): نشط يشحن + total_shipments >= 300 + status = active ──
+$vip_merchants = [];
+foreach ($result['active_shipping'] as $s) {
+    if (!empty($s['status']) && $s['status'] !== 'active') {
+        continue;
+    }
+    if (intval($s['total_shipments'] ?? 0) < 300) {
+        continue;
+    }
+    $vip_merchants[] = $s;
+}
+usort($vip_merchants, function ($a, $b) {
+    return intval($b['total_shipments'] ?? 0) - intval($a['total_shipments'] ?? 0);
+});
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
     'incubation_counts' => $incubation_counts,
     'data'              => $result,
+    'vip_merchants'     => $vip_merchants,
+    'vip_merchants_count' => count($vip_merchants),
     'incubation_path'   => $incubation_path,
     'meta'              => [
         'sources'           => ['new_90d', 'new_since_2020', 'inactive_365'],

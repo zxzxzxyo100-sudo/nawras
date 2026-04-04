@@ -35,6 +35,8 @@ export function StoresProvider({ children }) {
   const [error, setError]                 = useState(null)
   /** نطاق تاريخ طُلبت له أعداد الطرود (آخر 14 يومًا — مطابقة لمنطق «نشط يشحن») */
   const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
+  /** كبار التجار: من الخادم (نشط يشحن + total_shipments ≥ 300 + status = active) */
+  const [vipMerchants, setVipMerchants] = useState([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,6 +78,18 @@ export function StoresProvider({ children }) {
           shipments_range_to: rangeTo,
         }))
       }
+
+      let vipList = []
+      if (Array.isArray(apiResult.vip_merchants)) {
+        vipList = apiResult.vip_merchants
+      } else {
+        // خادم قديم بلا مفتاح vip_merchants — نفس المنطق: نشط يشحن + ≥300 + status نشط
+        vipList = (apiResult.data?.active_shipping || []).filter(s => {
+          if (s.status != null && s.status !== '' && s.status !== 'active') return false
+          return (parseInt(s.total_shipments, 10) || 0) >= 300
+        })
+      }
+      setVipMerchants(mergeShipmentsInRange(vipList))
 
       const stateMap = {}
       ;(statesRes.data || []).forEach(s => { stateMap[s.store_id] = s })
@@ -131,6 +145,7 @@ export function StoresProvider({ children }) {
   return (
     <StoresContext.Provider value={{
       stores, counts, allStores,
+      vipMerchants,
       incubationPath, incubationCounts,
       storeStates, assignments, callLogs, recoveryCalls,
       shipmentsRangeMeta,

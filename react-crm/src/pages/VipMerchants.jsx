@@ -15,7 +15,7 @@ function shipmentTrend(current, previous) {
 }
 
 export default function VipMerchants() {
-  const { allStores, loading, reload, shipmentsRangeMeta, lastLoaded } = useStores()
+  const { vipMerchants, loading, reload, shipmentsRangeMeta, lastLoaded } = useStores()
   const [selected, setSelected] = useState(null)
   const [q, setQ] = useState('')
   const [prevMap, setPrevMap] = useState({})
@@ -23,17 +23,11 @@ export default function VipMerchants() {
   const [loadingPrev, setLoadingPrev] = useState(false)
 
   const vipStores = useMemo(() => {
-    const seen = new Set()
-    const list = []
-    for (const s of allStores) {
-      if (!s || seen.has(s.id)) continue
-      const total = parseInt(s.total_shipments, 10) || 0
-      if (total < VIP_MIN) continue
-      seen.add(s.id)
-      list.push(s)
-    }
-    return list.sort((a, b) => (parseInt(b.total_shipments, 10) || 0) - (parseInt(a.total_shipments, 10) || 0))
-  }, [allStores])
+    const list = vipMerchants || []
+    return [...list].sort(
+      (a, b) => (parseInt(b.total_shipments, 10) || 0) - (parseInt(a.total_shipments, 10) || 0)
+    )
+  }, [vipMerchants])
 
   useEffect(() => {
     if (!shipmentsRangeMeta?.from) return
@@ -82,6 +76,10 @@ export default function VipMerchants() {
     )
   }, [vipStores, q])
 
+  const hasSearch = Boolean(q.trim())
+  const emptyBecauseSearch = hasSearch && vipStores.length > 0 && filtered.length === 0
+  const emptyNoVip = !loading && vipStores.length === 0
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -92,7 +90,8 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            يظهر التاجر هنا عندما يكون إجمالي الطرود <span className="font-semibold text-slate-700">total_shipments ≥ {VIP_MIN}</span>
+            يظهر التاجر هنا عندما يكون <span className="font-semibold text-slate-700">نشطًا (status = active)</span> ضمن خانة «نشط يشحن»، وإجمالي الطرود{' '}
+            <span className="font-semibold text-slate-700">≥ {VIP_MIN}</span>
             — للمدير التنفيذي فقط
           </p>
           {shipmentsRangeMeta?.from && shipmentsRangeMeta?.to && (
@@ -132,7 +131,9 @@ export default function VipMerchants() {
               className="w-full pr-9 pl-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400/30"
             />
           </div>
-          <span className="text-sm text-slate-500 whitespace-nowrap">{filtered.length} تاجر</span>
+          <span className="text-sm text-slate-500 whitespace-nowrap">
+            {hasSearch ? `${filtered.length} من ${vipStores.length}` : `${vipStores.length} تاجر`}
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -154,10 +155,16 @@ export default function VipMerchants() {
                 <tr>
                   <td colSpan={8} className="text-center py-16 text-slate-400">جارٍ التحميل…</td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : emptyBecauseSearch ? (
                 <tr>
                   <td colSpan={8} className="text-center py-16 text-slate-400">
-                    لا يوجد تجار يطابقون الشرط (≥ {VIP_MIN} طرد) أو لا نتائج للبحث
+                    لا نتائج للبحث — جرّب كلمات أخرى
+                  </td>
+                </tr>
+              ) : emptyNoVip ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-16 text-slate-400">
+                    لا يوجد تجار نشطين يطابقون الشرط (حالة نشط، ≥ {VIP_MIN} طرد)
                   </td>
                 </tr>
               ) : (
