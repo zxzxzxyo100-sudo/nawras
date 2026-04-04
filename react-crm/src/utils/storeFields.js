@@ -17,27 +17,18 @@ export function totalShipments(s) {
 }
 
 /**
- * طرود ضمن نطاق orders-summary (يُحقَن في StoresContext كـ shipments_in_range).
- * إذا وُجدت تواريخ النطاق في الكائن فلا نعرض total_shipments (إجمالي الحياة من all-stores).
+ * طرود ضمن نطاق orders-summary (يُحقَن في StoresContext بعد الدمج).
+ * يجب أن يعتمد على الخاصية المدمجة shipments_in_range فقط — لا total_shipments (إجمالي الحياة من all-stores).
  */
 export function parcelsInRangeDisplay(store) {
   if (!store || typeof store !== 'object') return 0
-  const hasRangeMeta =
-    store.shipments_range_from != null &&
-    store.shipments_range_to != null &&
-    String(store.shipments_range_from).trim() !== '' &&
-    String(store.shipments_range_to).trim() !== ''
-  if (hasRangeMeta) {
+  if (Object.prototype.hasOwnProperty.call(store, 'shipments_in_range')) {
     const v = store.shipments_in_range
     if (v !== undefined && v !== null && v !== '') {
       const n = Number(v)
       return Number.isFinite(n) ? n : 0
     }
     return 0
-  }
-  if (store.shipments_in_range !== undefined && store.shipments_in_range !== null && store.shipments_in_range !== '') {
-    const n = Number(store.shipments_in_range)
-    return Number.isFinite(n) ? n : 0
   }
   return totalShipments(store)
 }

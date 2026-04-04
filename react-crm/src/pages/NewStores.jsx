@@ -5,7 +5,7 @@ import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 
 export default function NewStores() {
-  const { stores, callLogs, loading, reload } = useStores()
+  const { stores, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
   const [selected, setSelected] = useState(null)
 
   const incubating = stores.incubating || []
@@ -52,6 +52,11 @@ export default function NewStores() {
         onSelectStore={setSelected}
         extraColumns={extraColumns}
         emptyMsg="لا توجد متاجر جديدة"
+        parcelsColumnSub={
+          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+            : undefined
+        }
       />
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}

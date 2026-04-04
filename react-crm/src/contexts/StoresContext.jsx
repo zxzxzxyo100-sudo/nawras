@@ -92,16 +92,22 @@ export function StoresProvider({ children }) {
       }
 
       function mergeShipmentsInRange(arr) {
-        return (arr || []).map(s => ({
-          ...s,
-          shipments_in_range:
-            rangeMap[s.id] ??
-            rangeMap[String(s.id)] ??
-            rangeMap[Number(s.id)] ??
-            0,
-          shipments_range_from: resolvedFrom,
-          shipments_range_to: resolvedTo,
-        }))
+        return (arr || []).map(s => {
+          const sid = s.id
+          const inRange =
+            rangeMap[sid] ??
+            rangeMap[String(sid)] ??
+            rangeMap[Number(sid)] ??
+            0
+          /* نسخ بدون الاعتماد على حقول قديمة بنفس الاسم من واجهة Nawris */
+          const { shipments_in_range: _drop, ...rest } = s
+          return {
+            ...rest,
+            shipments_in_range: inRange,
+            shipments_range_from: resolvedFrom,
+            shipments_range_to: resolvedTo,
+          }
+        })
       }
 
       let vipList = []

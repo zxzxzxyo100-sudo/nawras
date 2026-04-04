@@ -3,6 +3,7 @@ import {
   Baby, Clock, RefreshCw, Search, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 
@@ -112,6 +113,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
               const hours   = regHours(s)
               const days    = regDays(s)
               const sdays   = shipDays(s)
+              const parcels = parcelsInRangeDisplay(s)
               const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
               return (
                 <tr
@@ -132,11 +134,11 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      (s.total_shipments ?? 0) > 0
+                      parcels > 0
                         ? 'bg-green-100 text-green-700'
                         : 'bg-slate-100 text-slate-500'
                     }`}>
-                      {s.total_shipments ?? 0}
+                      {parcels}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-600 text-xs">
