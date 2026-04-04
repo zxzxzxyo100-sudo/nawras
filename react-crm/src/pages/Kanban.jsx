@@ -8,6 +8,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreDrawer from '../components/StoreDrawer'
 import { isRestoredCategory } from '../constants/storeCategories'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 
 // ─── إعداد الأعمدة ────────────────────────────────────────────────────────────
 const COLUMNS = [
@@ -120,7 +121,7 @@ function StoreCard({ store, col, storeStates, assignments, callLogs, onClick }) 
           <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">لا شحنة</span>
         )}
         <span className={`text-xs px-2 py-0.5 rounded-full ${col.badge} font-medium`}>
-          {parseInt(store.total_shipments) || 0} طرد
+          {parcelsInRangeDisplay(store)} طرد
         </span>
         {statusBadge && (
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge.cls}`}>

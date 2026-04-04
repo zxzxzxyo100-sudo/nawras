@@ -24,6 +24,32 @@ function dedupeById(list) {
   })
 }
 
+function recoveryIdBadge(store, storeStates) {
+  const st = storeStates[store.id]
+  const cat = st?.category
+  if (isRestoredCategory(cat) || isRecoveryCompletedByShipment(store, st)) {
+    return (
+      <span
+        title="تمت الاستعادة"
+        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-teal-200 bg-teal-50 px-1 text-[10px] font-semibold text-teal-800"
+      >
+        ✓
+      </span>
+    )
+  }
+  if (cat === 'restoring') {
+    return (
+      <span
+        title="قيد الاستعادة"
+        className="inline-flex h-5 min-w-[1.1rem] shrink-0 items-center justify-center rounded-md border border-cyan-200 bg-cyan-50 px-1 text-[10px] font-medium text-cyan-800"
+      >
+        ↻
+      </span>
+    )
+  }
+  return null
+}
+
 function aggregateUserStats(stores, storeStates, callLogs) {
   const today = new Date().toISOString().slice(0, 10)
   const weekAgo = Date.now() - 7 * 86400000
@@ -101,18 +127,18 @@ export default function HotInactive() {
         label: 'المسار',
         render: s => {
           if (coldInactive.some(c => c.id === s.id)) {
-            return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">غير نشط بارد</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-900 font-medium">غير نشط بارد</span>
           }
           if (hotInactive.some(c => c.id === s.id)) {
-            return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium">غير نشط ساخن</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-amber-200 bg-amber-50/90 text-amber-900 font-medium">غير نشط ساخن</span>
           }
           if (activeShipping.some(x => x.id === s.id)) {
-            return <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">نشط يشحن (بعد الاستعادة)</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 font-medium">نشط يشحن (بعد الاستعادة)</span>
           }
           if (incubating.some(x => x.id === s.id)) {
-            return <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 font-medium">مسار الاحتضان</span>
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-900 font-medium">مسار الاحتضان</span>
           }
-          return <span className="text-xs text-slate-400">—</span>
+          return <span className="text-xs text-slate-500">—</span>
         },
       }]
     : []
@@ -126,7 +152,7 @@ export default function HotInactive() {
         if (!s.last_shipment_date || s.last_shipment_date === 'لا يوجد') return '—'
         const days = Math.floor((new Date() - new Date(s.last_shipment_date)) / 86400000)
         return (
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-900">
             {days} يوم
           </span>
         )
@@ -139,8 +165,8 @@ export default function HotInactive() {
         const log = callLogs[s.id] || {}
         const entries = Object.values(log).filter(c => c?.date)
         if (!entries.length) return (
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <PhoneOff size={11} /> لا يوجد
+          <span className="flex items-center gap-1 text-xs text-slate-500">
+            <PhoneOff size={11} className="opacity-70" /> لا يوجد
           </span>
         )
         const latest = entries.sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -148,15 +174,15 @@ export default function HotInactive() {
         const noteText = latest.note?.trim()
         if (!outcomeLabel && !noteText) {
           return (
-            <span className="flex items-center gap-1 text-xs text-slate-400">
-              <PhoneOff size={11} /> لا يوجد
+            <span className="flex items-center gap-1 text-xs text-slate-500">
+              <PhoneOff size={11} className="opacity-70" /> لا يوجد
             </span>
           )
         }
         return (
           <div className="flex flex-col gap-0.5 min-w-0 max-w-[220px]">
             {outcomeLabel && (
-              <span className="text-xs font-semibold text-violet-700">{outcomeLabel}</span>
+              <span className="text-xs font-semibold text-violet-800">{outcomeLabel}</span>
             )}
             {noteText && (
               <span className="text-[11px] text-slate-600 leading-snug line-clamp-2">{noteText}</span>
@@ -172,8 +198,8 @@ export default function HotInactive() {
         const log = callLogs[s.id] || {}
         const entries = Object.values(log).filter(c => c?.date)
         if (!entries.length) return (
-          <span className="flex items-center gap-1 text-xs text-slate-400">
-            <PhoneOff size={11} /> لا يوجد
+          <span className="flex items-center gap-1 text-xs text-slate-500">
+            <PhoneOff size={11} className="opacity-70" /> لا يوجد
           </span>
         )
         const latest = entries.sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -182,11 +208,11 @@ export default function HotInactive() {
         const dateLabel = isToday ? 'اليوم' : latest.date?.slice(0, 10) || '—'
 
         return (
-          <span className={`flex items-center gap-1 text-xs font-medium ${isToday ? 'text-green-600' : 'text-slate-500'}`}>
-            <Phone size={10} />
+          <span className={`flex items-center gap-1.5 text-xs font-medium ${isToday ? 'text-emerald-700' : 'text-slate-600'}`}>
+            <Phone size={12} strokeWidth={2} className="text-violet-600 shrink-0 opacity-90" />
             {dateLabel}
             {latest.performed_by && (
-              <span className="text-slate-400 font-normal">· {latest.performed_by}</span>
+              <span className="text-slate-500 font-normal">· {latest.performed_by}</span>
             )}
           </span>
         )
@@ -201,22 +227,22 @@ export default function HotInactive() {
         const st = storeStates[s.id]
 
         if (isRestoredCategory(dbCat)) return (
-          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
+          <span className="text-[11px] border border-teal-200 bg-teal-50 text-teal-900 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
         )
         if (isRecoveryCompletedByShipment(s, st)) return (
-          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
+          <span className="text-[11px] border border-teal-200 bg-teal-50 text-teal-900 px-2 py-0.5 rounded-lg font-medium">تمت ✓</span>
         )
         if (dbCat === 'restoring') return (
           <div className="flex flex-col gap-1 max-w-[200px]">
-            <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full font-medium w-fit">قيد الاستعادة</span>
+            <span className="text-[11px] border border-cyan-200 bg-cyan-50 text-cyan-900 px-2 py-0.5 rounded-lg font-medium w-fit">قيد الاستعادة</span>
             {dbUpdatedBy && (
-              <span className="text-[10px] text-slate-500">{dbUpdatedBy}</span>
+              <span className="text-[10px] text-slate-600">{dbUpdatedBy}</span>
             )}
-            <span className="text-[10px] text-slate-400 leading-snug">تمت الاستعادة تُحدَّث تلقائياً — لا يمكن اختيارها يدوياً</span>
+            <span className="text-[10px] text-slate-500 leading-snug">تُحدَّث تلقائياً</span>
           </div>
         )
         if (dbCat === 'frozen') return (
-          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">مجمد</span>
+          <span className="text-[11px] border border-slate-200 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">مجمد</span>
         )
         return null
       },
@@ -231,21 +257,26 @@ export default function HotInactive() {
   const PageIcon = titleBlock.Icon
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
+    <div className="space-y-5" dir="rtl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
             <PageIcon size={24} className={titleBlock.iconClass} />
             {titleBlock.line}
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-slate-600 text-sm mt-0.5">
             {filteredStores.length} متجر في هذا الفرع
             {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
             {recoverySegment === 'restoring' && ' — ساخن وبارد ونشط إن بقيت الحالة «قيد الاستعادة» في السجل'}
             {isRestoredTab && ' — يشمل من اكتملت شحنياً أو حالة recovered في السجل'}
           </p>
         </div>
-        <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
+        <button
+          type="button"
+          onClick={reload}
+          disabled={loading}
+          className="flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 border border-white/40 bg-white/50 hover:bg-white/80 shadow-sm backdrop-blur-sm transition-colors disabled:opacity-60"
+        >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           تحديث
         </button>
@@ -284,8 +315,11 @@ export default function HotInactive() {
       )}
 
       <StoreTable
+        variant="elite"
         stores={filteredStores}
         onSelectStore={setSelected}
+        onRestoreStore={setSelected}
+        renderIdBadge={s => recoveryIdBadge(s, storeStates)}
         extraColumns={extraColumns}
         emptyMsg={
           isAllTab

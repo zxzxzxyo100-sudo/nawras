@@ -16,6 +16,23 @@ export function totalShipments(s) {
   return Number.isFinite(n) ? n : 0
 }
 
+/**
+ * طرود ضمن نطاق orders-summary (يُحقَن في StoresContext بعد الدمج).
+ * يجب أن يعتمد على الخاصية المدمجة shipments_in_range فقط — لا total_shipments (إجمالي الحياة من all-stores).
+ */
+export function parcelsInRangeDisplay(store) {
+  if (!store || typeof store !== 'object') return 0
+  if (Object.prototype.hasOwnProperty.call(store, 'shipments_in_range')) {
+    const v = store.shipments_in_range
+    if (v !== undefined && v !== null && v !== '') {
+      const n = Number(v)
+      return Number.isFinite(n) ? n : 0
+    }
+    return 0
+  }
+  return totalShipments(store)
+}
+
 /** يتوافق مع الخادم: status الفارغ يُعامل كـ نشط؛ Nawris قد يعيد «نشط» بالعربية */
 export function isActiveMerchantStatus(s) {
   const st = s?.status ?? s?.account_status

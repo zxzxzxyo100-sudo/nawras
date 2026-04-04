@@ -200,15 +200,15 @@ export default function ActiveStores() {
   }, [active, assignments, assignFilter])
 
   return (
-    <div className="space-y-4 lg:space-y-5">
+    <div className="space-y-4 lg:space-y-5" dir="rtl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
+        <div className="min-w-0">
           <h1 className="text-xl lg:text-2xl font-bold text-slate-800 flex items-center gap-2">
             <TrendingUp size={22} className="text-green-600" />
             نشط يشحن
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
+          <p className="text-slate-600 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
             {active.length} متجر — عمود الطرود: آخر 30 يومًا
             {(stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
@@ -224,7 +224,12 @@ export default function ActiveStores() {
             )}
           </p>
         </div>
-        <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
+        <button
+          type="button"
+          onClick={reload}
+          disabled={loading}
+          className="flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 border border-white/40 bg-white/50 hover:bg-white/80 shadow-sm backdrop-blur-sm transition-colors disabled:opacity-60"
+        >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           تحديث
         </button>
@@ -398,8 +403,10 @@ export default function ActiveStores() {
       )}
 
       <StoreTable
+        variant="elite"
         stores={filteredActive}
         onSelectStore={setSelected}
+        onRestoreStore={setSelected}
         extraColumns={extraColumns}
         emptyMsg="لا توجد متاجر نشطة"
         parcelsColumnSub={

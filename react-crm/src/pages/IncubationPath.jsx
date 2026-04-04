@@ -3,6 +3,7 @@ import {
   Baby, Clock, RefreshCw, Search, Phone,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 
@@ -73,87 +74,105 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
 
   if (!stores.length) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center text-slate-400">
-        <div className="text-5xl mb-3">📭</div>
-        <div className="text-sm">لا توجد متاجر في هذه الفئة</div>
+      <div
+        className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90"
+        dir="rtl"
+      >
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-16 text-center text-slate-500">
+          <div className="text-5xl mb-3">📭</div>
+          <div className="text-sm">لا توجد متاجر في هذه الفئة</div>
+        </div>
       </div>
     )
   }
 
+  const searchInputClass =
+    'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-white to-violet-50/50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
+  const rowElite =
+    'border-b border-slate-100 transition-all duration-300 cursor-pointer bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)] hover:bg-amber-50/50 hover:shadow-[inset_0_0_0_1px_rgba(234,179,8,0.28),0_6px_24px_-12px_rgba(234,179,8,0.18)]'
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      {/* شريط البحث */}
-      <div className="p-4 border-b border-slate-100">
-        <div className="relative max-w-xs">
-          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+    <div
+      className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90"
+      dir="rtl"
+    >
+      <div className="p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm">
+        <div className="relative w-full max-w-full sm:max-w-md">
+          <Search
+            size={16}
+            strokeWidth={2}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 drop-shadow-[0_0_8px_rgba(139,92,246,0.25)]"
+          />
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="بحث باسم أو رقم..."
-            className="w-full pr-9 pl-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-slate-50"
+            className={searchInputClass}
           />
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr className="text-right">
-              <th className="px-4 py-3 text-slate-500 font-medium">المتجر</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">أيام التسجيل</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">الطلبيات</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">آخر شحنة</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">الحالة</th>
-              <th className="px-4 py-3 text-slate-500 font-medium">التواصل</th>
+          <thead>
+            <tr className="bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200 text-right">
+              <th className="px-5 py-3.5 font-semibold">المتجر</th>
+              <th className="px-5 py-3.5 font-semibold">أيام التسجيل</th>
+              <th className="px-5 py-3.5 font-semibold">الطلبيات</th>
+              <th className="px-5 py-3.5 font-semibold">آخر شحنة</th>
+              <th className="px-5 py-3.5 font-semibold">الحالة</th>
+              <th className="px-5 py-3.5 font-semibold">التواصل</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody>
             {filtered.map((s, i) => {
               const hours   = regHours(s)
               const days    = regDays(s)
               const sdays   = shipDays(s)
+              const parcels = parcelsInRangeDisplay(s)
               const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
               return (
                 <tr
                   key={s.id ?? i}
                   onClick={() => onSelect(s)}
-                  className="hover:bg-slate-50 cursor-pointer transition-colors"
+                  className={rowElite}
                 >
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">{s.name || '—'}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{s.id}</div>
+                  <td className="px-5 py-4 text-slate-700">
+                    <div className="font-semibold text-slate-900">{s.name || '—'}</div>
+                    <div className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">{s.id}</div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-5 py-4 text-slate-700">
                     {days !== null ? (
                       hours < 48
-                        ? <span className="text-blue-600 font-medium">{hours} ساعة</span>
+                        ? <span className="text-blue-700 font-medium">{hours} ساعة</span>
                         : <span>{days} يوم</span>
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      (s.total_shipments ?? 0) > 0
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-slate-100 text-slate-500'
+                  <td className="px-5 py-4 text-slate-700">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${
+                      parcels > 0
+                        ? 'bg-green-50 text-green-800 border-green-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
                     }`}>
-                      {s.total_shipments ?? 0}
+                      {parcels}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">
+                  <td className="px-5 py-4 text-slate-600 text-xs">
                     {s.last_shipment_date && s.last_shipment_date !== 'لا يوجد'
                       ? sdays !== null ? `${sdays} يوم` : s.last_shipment_date
                       : <span className="text-slate-400">لا يوجد</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-4 text-slate-700">
                     {tab.badge(s)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-4 text-slate-700">
                     <button
+                      type="button"
                       onClick={e => { e.stopPropagation(); onCall(s) }}
                       className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
                         hasCalls
-                          ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                          ? 'bg-green-50 text-green-800 border border-green-200 hover:bg-green-100'
+                          : 'bg-violet-50 text-violet-800 border border-violet-200 hover:bg-violet-100'
                       }`}
                     >
                       <Phone size={12} />
@@ -166,7 +185,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-3 border-t border-slate-100 text-xs text-slate-400 bg-slate-50/50">
+      <div className="mt-0 rounded-b-2xl px-4 py-3 border-t border-slate-200 bg-slate-50/80 text-xs text-slate-600">
         {filtered.length} من {stores.length} متجر
       </div>
     </div>
@@ -217,22 +236,23 @@ export default function IncubationPath() {
   const currentTab = TABS.find(t => t.key === activeTab)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" dir="rtl">
       {/* ── رأس الصفحة ── */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Baby size={24} className="text-indigo-500" />
             مسار الاحتضان
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <p className="text-slate-600 text-sm mt-0.5">
             {filteredCounts.total || 0} متجر في مسار الاحتضان
           </p>
         </div>
         <button
+          type="button"
           onClick={reload}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm disabled:opacity-50"
+          className="flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 border border-white/40 bg-white/50 hover:bg-white/80 shadow-sm backdrop-blur-sm transition-colors disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           تحديث
@@ -285,9 +305,11 @@ export default function IncubationPath() {
 
       {/* ── جدول البيانات ── */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center text-slate-400">
-          <RefreshCw size={32} className="animate-spin mx-auto mb-3 text-blue-400" />
-          <div className="text-sm">جاري تحميل البيانات...</div>
+        <div className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg border border-slate-200/90">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-16 text-center text-slate-500">
+            <RefreshCw size={32} className="animate-spin mx-auto mb-3 text-violet-500" />
+            <div className="text-sm">جاري تحميل البيانات...</div>
+          </div>
         </div>
       ) : (
         <IncTable

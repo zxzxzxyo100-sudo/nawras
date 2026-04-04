@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { Search, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Phone,
+  RotateCcw,
+} from 'lucide-react'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 
 const PAGE_SIZES = [10, 50, 100, 'الكل']
 
@@ -14,9 +22,19 @@ export default function StoreTable({
   selectable = false,
   selectedIds = new Set(),
   onSelectionChange,
+  /** واجهة فاخرة: خلفية متدرجة، صفوف زجاجية، شريط بحث متدرج */
+  variant = 'default',
+  /** يُعرض بجانب رقم المتجر (مثل وسام الاستعادة) */
+  renderIdBadge,
+  /** اتصال من صف الجدول (وضع elite) */
+  onCallStore,
+  /** فتح الاستعادة / التفاصيل (وضع elite) */
+  onRestoreStore,
 }) {
-  const [search, setSearch]     = useState('')
-  const [page, setPage]         = useState(1)
+  const isElite = variant === 'elite'
+
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
 
   const filtered = stores.filter(s =>
@@ -52,81 +70,194 @@ export default function StoreTable({
 
   const extraColCount = selectable ? 1 : 0
 
+  const shellClass = isElite
+    ? 'rounded-3xl overflow-hidden bg-gradient-to-br from-slate-50 via-violet-50/35 to-slate-100/90 p-2 sm:p-3 shadow-lg shadow-slate-200/60 border border-slate-200/90'
+    : 'bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden'
+
+  const toolbarClass = isElite
+    ? 'p-4 md:p-5 backdrop-blur-md bg-white/85 border border-slate-200/80 rounded-2xl mb-3 shadow-sm'
+    : 'p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap'
+
+  const searchInputClass = isElite
+    ? 'w-full pr-10 pl-4 py-3 text-sm rounded-xl border transition-all bg-gradient-to-l from-white to-violet-50/50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
+    : 'w-full pr-9 pl-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+
+  const searchIconClass = isElite
+    ? 'absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 drop-shadow-[0_0_8px_rgba(139,92,246,0.25)]'
+    : 'absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
+
+  const pageBtn = (sz, active) =>
+    isElite
+      ? `px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+          active
+            ? 'border-violet-300 bg-violet-100 text-violet-900 shadow-sm'
+            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+        }`
+      : `px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+          active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+        }`
+
+  const tableWrapClass = isElite
+    ? 'rounded-2xl border border-slate-200/90 bg-white overflow-x-auto shadow-inner'
+    : 'overflow-x-auto'
+
+  const theadTrClass = isElite
+    ? 'bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200'
+    : 'bg-slate-50 text-slate-500 text-xs font-semibold'
+
+  const rowClass = (isSelected) => {
+    if (isElite) {
+      return [
+        'border-b border-slate-100 transition-all duration-300 cursor-pointer',
+        'bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.9)]',
+        isSelected ? 'bg-violet-50 ring-1 ring-violet-200/80' : '',
+        'hover:bg-amber-50/50 hover:shadow-[inset_0_0_0_1px_rgba(234,179,8,0.28),0_6px_24px_-12px_rgba(234,179,8,0.18)]',
+      ].join(' ')
+    }
+    return `border-t border-slate-50 transition-colors cursor-pointer ${
+      isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+    }`
+  }
+
+  /** نص موحّد لخلايا الجدول في الوضع الفاتح */
+  const eliteCell = 'text-slate-700'
+
+  const tdPad = isElite ? `px-5 py-4 ${eliteCell}` : 'px-4 py-3.5'
+  const thPad = isElite ? 'px-5 py-3.5' : 'px-4 py-3'
+
+  function handleRowClick(store) {
+    if (selectable) toggleRow(store.id)
+    else onSelectStore?.(store)
+  }
+
+  function defaultCall(store) {
+    const p = store.phone?.replace(/\s/g, '')
+    if (p) window.open(`tel:${p}`, '_self')
+  }
+
+  function handleRestoreClick(store) {
+    const fn = onRestoreStore || onSelectStore
+    fn?.(store)
+  }
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      {/* Search bar */}
-      <div className="p-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-            placeholder="بحث بالاسم أو الرقم..."
-            className="w-full pr-9 pl-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        {/* Page size selector */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-400 whitespace-nowrap">عرض:</span>
-          <div className="flex gap-1">
-            {PAGE_SIZES.map(sz => (
-              <button
-                key={sz}
-                onClick={() => handlePageSize(sz)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {sz}
-              </button>
-            ))}
+    <div className={shellClass} dir="rtl">
+      {/* Search + page size */}
+      <div className={toolbarClass}>
+        {isElite ? (
+          <div className="flex flex-wrap items-stretch gap-3 md:gap-4">
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0 order-1">
+              <span className="text-[11px] text-slate-500 whitespace-nowrap hidden sm:inline">عرض:</span>
+              <div className="flex flex-wrap gap-1">
+                {PAGE_SIZES.map(sz => {
+                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => handlePageSize(sz)}
+                      className={pageBtn(sz, active)}
+                    >
+                      {sz}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="relative flex-1 min-w-[200px] order-2">
+              <Search size={16} className={searchIconClass} strokeWidth={2} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="بحث بالاسم أو الرقم..."
+                className={searchInputClass}
+              />
+            </div>
+            <span className="text-xs text-slate-500 whitespace-nowrap self-center order-3 tabular-nums">
+              {filtered.length} متجر
+            </span>
           </div>
-        </div>
-        <span className="text-sm text-slate-500 whitespace-nowrap">{filtered.length} متجر</span>
+        ) : (
+          <>
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={15} className={searchIconClass} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="بحث بالاسم أو الرقم..."
+                className={searchInputClass}
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400 whitespace-nowrap">عرض:</span>
+              <div className="flex gap-1">
+                {PAGE_SIZES.map(sz => {
+                  const active = pageSize === sz || (sz === 'الكل' && pageSize === 'الكل')
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => handlePageSize(sz)}
+                      className={pageBtn(sz, active)}
+                    >
+                      {sz}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <span className="text-sm text-slate-500 whitespace-nowrap">{filtered.length} متجر</span>
+          </>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      <div className={tableWrapClass}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
+            <tr className={theadTrClass}>
               {selectable && (
-                <th className="px-4 py-3 w-10">
+                <th className={`${thPad} w-10 ${isElite ? 'bg-slate-50/95' : ''}`}>
                   <input
                     type="checkbox"
                     checked={allPageSelected}
                     ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected }}
                     onChange={toggleAll}
-                    className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                    className={`w-4 h-4 rounded cursor-pointer ${isElite ? 'accent-violet-500' : 'accent-blue-600'}`}
                   />
                 </th>
               )}
-              <th className="text-right px-4 py-3">رقم المتجر</th>
-              <th className="text-right px-4 py-3">اسم المتجر</th>
-              <th className="text-right px-4 py-3">رقم الهاتف</th>
-              <th className="text-right px-4 py-3">تاريخ التسجيل</th>
-              <th className="text-right px-4 py-3">آخر شحنة</th>
-              <th className="text-right px-4 py-3">
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>رقم المتجر</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>اسم المتجر</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>رقم الهاتف</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>تاريخ التسجيل</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>آخر شحنة</th>
+              <th className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>
                 <span className="block">الطرود</span>
                 {parcelsColumnSub && (
-                  <span className="block text-[10px] font-normal text-slate-400 mt-0.5" dir="ltr">
+                  <span className="block text-[10px] font-normal text-slate-500 mt-0.5" dir="ltr">
                     {parcelsColumnSub}
                   </span>
                 )}
               </th>
               {extraColumns.map(col => (
-                <th key={col.key} className="text-right px-4 py-3">{col.label}</th>
+                <th key={col.key} className={`text-right ${thPad} ${isElite ? 'bg-slate-50/95' : ''}`}>{col.label}</th>
               ))}
-              <th className="px-4 py-3" />
+              <th className={`${thPad} w-24 ${isElite ? 'text-center text-slate-500 text-[10px] font-medium bg-slate-50/95' : ''}`}>
+                {isElite ? 'إجراءات' : ''}
+              </th>
             </tr>
           </thead>
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={7 + extraColumns.length + extraColCount + 1} className="text-center py-12 text-slate-400">{emptyMsg}</td>
+                <td
+                  colSpan={7 + extraColumns.length + extraColCount + 1}
+                  className={`text-center py-12 ${isElite ? 'text-slate-500 bg-white' : 'text-slate-400'}`}
+                >
+                  {emptyMsg}
+                </td>
               </tr>
             ) : (
               paginated.map(store => {
@@ -134,60 +265,109 @@ export default function StoreTable({
                 return (
                   <tr
                     key={store.id}
-                    className={`border-t border-slate-50 transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
-                    }`}
-                    onClick={() => selectable ? toggleRow(store.id) : onSelectStore?.(store)}
+                    className={rowClass(isSelected)}
+                    onClick={() => handleRowClick(store)}
                   >
                     {selectable && (
-                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      <td className={tdPad} onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRow(store.id)}
-                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                          className={`w-4 h-4 rounded cursor-pointer ${isElite ? 'accent-violet-500' : 'accent-blue-600'}`}
                         />
                       </td>
                     )}
-                    <td className="px-4 py-3.5">
-                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{store.id}</span>
+                    <td className={tdPad}>
+                      <div className="flex items-center justify-end gap-2 flex-wrap">
+                        <span
+                          className={
+                            isElite
+                              ? 'text-xs font-mono tabular-nums text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/90'
+                              : 'text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg'
+                          }
+                        >
+                          {store.id}
+                        </span>
+                        {renderIdBadge?.(store)}
+                      </div>
                     </td>
-                    <td className="px-4 py-3.5 font-medium text-slate-800">{store.name}</td>
-                    <td className="px-4 py-3.5">
+                    <td className={`${tdPad} ${isElite ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}`}>
+                      {store.name}
+                    </td>
+                    <td className={tdPad}>
                       {store.phone
-                        ? <span className="text-xs font-mono text-slate-600" dir="ltr">{store.phone}</span>
-                        : <span className="text-xs text-slate-300">—</span>}
+                        ? (
+                          <span
+                            className={
+                              isElite
+                                ? 'text-sm font-mono tabular-nums tracking-tight text-slate-800'
+                                : 'text-xs font-mono text-slate-600'
+                            }
+                            dir="ltr"
+                          >
+                            {store.phone}
+                          </span>
+                        )
+                        : <span className={`text-xs ${isElite ? 'text-slate-400' : 'text-slate-300'}`}>—</span>}
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">
+                    <td className={`${tdPad} ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
                       {store.registered_at ? new Date(store.registered_at).toLocaleDateString('ar-SA') : '—'}
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500">
+                    <td className={`${tdPad} ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
                       {store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
                         ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA')
-                        : <span className="text-red-400 text-xs">لا يوجد</span>
+                        : <span className={`text-xs ${isElite ? 'text-rose-600' : 'text-red-400'}`}>لا يوجد</span>
                       }
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className={tdPad}>
                       <span
-                        className="font-bold text-slate-700"
+                        className={
+                          isElite
+                            ? 'font-bold text-slate-900'
+                            : 'font-bold text-slate-700'
+                        }
                         title={
                           store.shipments_range_from && store.shipments_range_to
                             ? `طرود في النطاق (${store.shipments_range_from} — ${store.shipments_range_to})`
                             : undefined
                         }
                       >
-                        {store.shipments_in_range !== undefined && store.shipments_in_range !== null
-                          ? store.shipments_in_range
-                          : (parseInt(store.total_shipments, 10) || 0)}
+                        {parcelsInRangeDisplay(store)}
                       </span>
                     </td>
                     {extraColumns.map(col => (
-                      <td key={col.key} className="px-4 py-3.5 text-slate-500">
+                      <td key={col.key} className={`${tdPad} ${isElite ? eliteCell : 'text-slate-500'}`}>
                         {col.render ? col.render(store) : store[col.key] ?? '—'}
                       </td>
                     ))}
-                    <td className="px-4 py-3.5" onClick={e => { e.stopPropagation(); onSelectStore?.(store) }}>
-                      <ExternalLink size={14} className="text-slate-300 hover:text-blue-500 transition-colors" />
+                    <td
+                      className={`${tdPad} ${isElite ? 'text-center' : ''}`}
+                      onClick={e => { e.stopPropagation(); if (!isElite) onSelectStore?.(store) }}
+                    >
+                      {isElite ? (
+                        <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            title="اتصال"
+                            disabled={!store.phone}
+                            onClick={() => (onCallStore || defaultCall)(store)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 transition-all hover:bg-violet-100 hover:shadow-[0_0_14px_-4px_rgba(139,92,246,0.35)] disabled:opacity-35 disabled:pointer-events-none"
+                          >
+                            <Phone size={16} strokeWidth={2} className="text-violet-600 drop-shadow-[0_0_4px_rgba(139,92,246,0.2)]" />
+                          </button>
+                          <button
+                            type="button"
+                            title="استعادة / تفاصيل"
+                            onClick={() => handleRestoreClick(store)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-700 transition-all hover:bg-violet-50 hover:shadow-[0_0_12px_-4px_rgba(139,92,246,0.25)]"
+                          >
+                            <RotateCcw size={16} strokeWidth={2} />
+                          </button>
+                        </div>
+                      ) : (
+                        <ExternalLink size={14} className="text-slate-300 hover:text-blue-500 transition-colors cursor-pointer" />
+                      )}
                     </td>
                   </tr>
                 )
@@ -199,22 +379,38 @@ export default function StoreTable({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+        <div
+          className={
+            isElite
+              ? 'flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50/80'
+              : 'flex items-center justify-between px-4 py-3 border-t border-slate-100'
+          }
+        >
           <button
+            type="button"
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+            className={
+              isElite
+                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 disabled:opacity-40 hover:bg-white transition-colors'
+                : 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors'
+            }
           >
             <ChevronRight size={14} />
             السابق
           </button>
-          <span className="text-xs text-slate-500">
+          <span className={`text-xs ${isElite ? 'text-slate-600' : 'text-slate-500'}`}>
             صفحة {page} من {totalPages}
           </span>
           <button
+            type="button"
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+            className={
+              isElite
+                ? 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 disabled:opacity-40 hover:bg-white transition-colors'
+                : 'flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors'
+            }
           >
             التالي
             <ChevronLeft size={14} />
