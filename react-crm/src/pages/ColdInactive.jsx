@@ -4,6 +4,7 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
+import { isRestoredCategory } from '../constants/storeCategories'
 
 export default function ColdInactive() {
   const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
@@ -108,7 +109,7 @@ export default function ColdInactive() {
         const dbCat = storeStates[s.id]?.category
 
         // تمت الاستعادة — حالة نهائية
-        if (dbCat === 'restored') return (
+        if (isRestoredCategory(dbCat)) return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
 

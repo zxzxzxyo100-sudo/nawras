@@ -5,8 +5,24 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { formatCallOutcome } from '../constants/callOutcomes'
+import {
+  isRestoredCategory,
+  isRestoredForRecoveryLists,
+  isStillRestoringStore,
+  isRecoveryCompletedByShipment,
+} from '../constants/storeCategories'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
+
+function dedupeById(list) {
+  const seen = new Set()
+  return list.filter(s => {
+    const id = s?.id
+    if (id == null || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
 
 function aggregateUserStats(stores, storeStates, callLogs) {
   const today = new Date().toISOString().slice(0, 10)
@@ -40,25 +56,69 @@ export default function HotInactive() {
 
   const isAllTab = recoverySegment === 'all'
   const isRestoredTab = recoverySegment === 'restored'
+  const isRecoveryTab = recoverySegment === 'restoring' || recoverySegment === 'restored'
 
   const hotInactive = stores.hot_inactive || []
+  const coldInactive = stores.cold_inactive || []
+  const activeShipping = stores.active_shipping || []
+  const incubating = stores.incubating || []
 
   const filteredStores = useMemo(() => {
-    return hotInactive.filter(s => {
-      const dbCat = storeStates[s.id]?.category
-      if (isAllTab) return true
-      if (isRestoredTab) return dbCat === 'restored'
-      /* جاري الاستعادة: فقط من علِقت حالته بـ restoring في النظام */
-      return dbCat === 'restoring'
-    })
-  }, [hotInactive, storeStates, isAllTab, isRestoredTab])
+    const matchRestored = s => isRestoredForRecoveryLists(s, storeStates[s.id])
+    const matchRestoring = s => isStillRestoringStore(s, storeStates[s.id])
+
+    if (isAllTab) {
+      return hotInactive.filter(() => true)
+    }
+    if (isRestoredTab) {
+      /* + متاجر بقيت restoring في DB لكن الشحنة بعد restore_date (تظهر في نشط يشحن) */
+      const inactiveRows = [
+        ...hotInactive.filter(matchRestored),
+        ...coldInactive.filter(matchRestored),
+      ]
+      const afterRecovery = [
+        ...activeShipping.filter(matchRestored),
+        ...incubating.filter(matchRestored),
+      ]
+      return dedupeById([...inactiveRows, ...afterRecovery])
+    }
+    /* جاري الاستعادة: كل القوائم — بما فيها نشط/احتضان إذا لم تكتمل الشحنة بعد */
+    const hot = hotInactive.filter(matchRestoring)
+    const cold = coldInactive.filter(matchRestoring)
+    const activeR = activeShipping.filter(matchRestoring)
+    const incR = incubating.filter(matchRestoring)
+    return dedupeById([...hot, ...cold, ...activeR, ...incR])
+  }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab])
 
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
     [filteredStores, storeStates, callLogs]
   )
 
+  const bucketColumn = isRecoveryTab
+    ? [{
+        key: 'list_bucket',
+        label: 'المسار',
+        render: s => {
+          if (coldInactive.some(c => c.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">غير نشط بارد</span>
+          }
+          if (hotInactive.some(c => c.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-medium">غير نشط ساخن</span>
+          }
+          if (activeShipping.some(x => x.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium">نشط يشحن (بعد الاستعادة)</span>
+          }
+          if (incubating.some(x => x.id === s.id)) {
+            return <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 font-medium">مسار الاحتضان</span>
+          }
+          return <span className="text-xs text-slate-400">—</span>
+        },
+      }]
+    : []
+
   const extraColumns = [
+    ...bucketColumn,
     {
       key: 'inactive_days',
       label: 'أيام الانقطاع',
@@ -138,8 +198,12 @@ export default function HotInactive() {
       render: s => {
         const dbCat = storeStates[s.id]?.category
         const dbUpdatedBy = storeStates[s.id]?.updated_by
+        const st = storeStates[s.id]
 
-        if (dbCat === 'restored') return (
+        if (isRestoredCategory(dbCat)) return (
+          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
+        )
+        if (isRecoveryCompletedByShipment(s, st)) return (
           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">تمت الاستعادة ✓</span>
         )
         if (dbCat === 'restoring') return (
@@ -159,23 +223,26 @@ export default function HotInactive() {
     },
   ]
 
-  const subTitle = isAllTab
-    ? 'غير نشطة ساخنة'
+  const titleBlock = isAllTab
+    ? { Icon: Flame, iconClass: 'text-amber-500', line: 'غير نشط ساخن' }
     : isRestoredTab
-      ? 'تمت الاستعادة'
-      : 'جاري الاستعادة'
+      ? { Icon: RefreshCw, iconClass: 'text-teal-600', line: 'تمت الاستعادة' }
+      : { Icon: RefreshCw, iconClass: 'text-cyan-600', line: 'جاري الاستعادة' }
+  const PageIcon = titleBlock.Icon
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
-            <Flame size={24} className="text-amber-500" />
-            غير نشط ساخن
-            <span className="text-slate-400 font-medium text-lg">— {subTitle}</span>
+            <PageIcon size={24} className={titleBlock.iconClass} />
+            {titleBlock.line}
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {filteredStores.length} متجر في هذا الفرع — إجمالي الفئة {counts.hot_inactive || 0}
+            {filteredStores.length} متجر في هذا الفرع
+            {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
+            {recoverySegment === 'restoring' && ' — ساخن وبارد ونشط إن بقيت الحالة «قيد الاستعادة» في السجل'}
+            {isRestoredTab && ' — يشمل من اكتملت شحنياً أو حالة recovered في السجل'}
           </p>
         </div>
         <button onClick={reload} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
@@ -224,8 +291,8 @@ export default function HotInactive() {
           isAllTab
             ? 'لا توجد متاجر في غير نشط ساخن'
             : isRestoredTab
-              ? 'لا توجد متاجر بتمت الاستعادة في هذه الفئة'
-              : 'لا توجد متاجر بحالة «قيد الاستعادة» — تُعرض هنا فقط بعد تغيير الحالة إلى استعادة من النظام'
+              ? 'لا توجد متاجر بتمت الاستعادة'
+              : 'لا توجد متاجر بحالة «قيد الاستعادة»'
         }
       />
 

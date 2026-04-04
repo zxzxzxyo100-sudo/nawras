@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
 import { formatCallOutcome } from '../constants/callOutcomes'
+import { isRecoveryCompletedByShipment } from '../constants/storeCategories'
 
 const CATEGORY_LABELS = {
   incubating: { label: 'احتضان',      bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -32,8 +33,12 @@ export default function StoreDrawer({ store, onClose }) {
 
   const storeLog = callLogs[store.id] || {}
   const dbState  = storeStates[store.id]
-  const category = dbState?.category || store.category || 'incubating'
-  const catInfo  = CATEGORY_LABELS[category] || CATEGORY_LABELS.incubating
+  const dbCategory = dbState?.category || store.category || 'incubating'
+  const displayCategory =
+    dbCategory === 'restoring' && dbState && isRecoveryCompletedByShipment(store, dbState)
+      ? 'restored'
+      : dbCategory
+  const catInfo = CATEGORY_LABELS[displayCategory] || CATEGORY_LABELS.incubating
 
   useEffect(() => {
     setLoadingAudit(true)
@@ -52,7 +57,7 @@ export default function StoreDrawer({ store, onClose }) {
         store_name:  store.name,
         category:    newCategory,
         state_reason: reason,
-        old_status:  category,
+        old_status:  dbCategory,
         user:        user?.fullname,
         user_role:   user?.role,
         /** من all-stores.php: متجر ظاهر في مسار الاحتضان (جديدة / تحت الاحتضان) */
@@ -109,7 +114,7 @@ export default function StoreDrawer({ store, onClose }) {
               <ArrowLeftRight size={14} />
               تغيير الحالة
             </button>
-            {category !== 'frozen' && (
+            {dbCategory !== 'frozen' && (
               <button
                 onClick={() => { setNewCategory('frozen'); setShowChangeStatus(true) }}
                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-xl transition-colors"
