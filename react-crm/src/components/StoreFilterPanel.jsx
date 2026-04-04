@@ -1,24 +1,5 @@
 import { Filter } from 'lucide-react'
-import { NAME_MATCH_MODES } from '../utils/storeFilters'
 import StoreNameAutocomplete from './StoreNameAutocomplete'
-
-const NAME_MODE_OPTIONS = [
-  {
-    value: NAME_MATCH_MODES.contains,
-    title: 'يحتوي على النص',
-    hint: 'الاسم في أي موضع؛ الهاتف: أي تسلسل أرقام',
-  },
-  {
-    value: NAME_MATCH_MODES.startsWith,
-    title: 'يبدأ الاسم بهذا النص',
-    hint: 'من أول الاسم أو الحرف؛ الهاتف: أي جزء من الرقم',
-  },
-  {
-    value: NAME_MATCH_MODES.word,
-    title: 'كلمة من اسم المتجر',
-    hint: 'كل كلمة لوحدها؛ الهاتف: أي جزء أرقام',
-  },
-]
 
 /**
  * شريط تصفية موحّد: اسم، رقم المتجر، نطاق تاريخ التسجيل، نطاق آخر شحنة
@@ -30,8 +11,6 @@ export default function StoreFilterPanel({
   nameQuery,
   namePickedStoreId = null,
   onNamePickedStoreIdChange,
-  nameMatchMode = NAME_MATCH_MODES.contains,
-  onNameMatchModeChange,
   idQuery,
   regFrom,
   regTo,
@@ -57,16 +36,6 @@ export default function StoreFilterPanel({
   const clearBtn = isElite
     ? 'text-xs font-medium text-violet-700 hover:text-violet-900 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50/80 hover:bg-violet-100 transition-colors'
     : 'text-xs font-medium text-slate-600 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100'
-
-  const modeCardBase = isElite
-    ? 'w-full rounded-xl border px-3 py-2.5 text-start transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-1'
-    : 'w-full rounded-lg border px-3 py-2.5 text-start transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-1'
-  const modeCardOn = isElite
-    ? 'border-violet-400 bg-violet-50/90 shadow-sm ring-1 ring-violet-200/80'
-    : 'border-blue-500 bg-blue-50/90 ring-1 ring-blue-200/80'
-  const modeCardOff = isElite
-    ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/90'
-    : 'border-slate-200 bg-white hover:bg-slate-50'
 
   return (
     <div className="w-full space-y-3">
@@ -110,44 +79,6 @@ export default function StoreFilterPanel({
               className={inp}
               dir="rtl"
             />
-          )}
-          {onNameMatchModeChange && (
-            <div className="space-y-2">
-              <span className={label}>طريقة البحث في الاسم</span>
-              <p className="text-[10px] text-slate-400 leading-snug -mt-0.5 mb-1">
-                الهاتف يُطابق دائماً بأي جزء من الأرقام بغضّ النظر عن الخيار
-              </p>
-              <div
-                className="flex flex-col gap-2"
-                role="radiogroup"
-                aria-label="طريقة البحث في اسم المتجر"
-              >
-                {NAME_MODE_OPTIONS.map(opt => {
-                  const sel = nameMatchMode === opt.value
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={sel}
-                      onClick={() => onNameMatchModeChange(opt.value)}
-                      className={`${modeCardBase} ${sel ? modeCardOn : modeCardOff}`}
-                    >
-                      <span
-                        className={`block text-sm font-semibold ${
-                          sel ? (isElite ? 'text-violet-900' : 'text-blue-900') : 'text-slate-800'
-                        }`}
-                      >
-                        {opt.title}
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-slate-500 leading-snug">
-                        {opt.hint}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
           )}
         </div>
         <div>

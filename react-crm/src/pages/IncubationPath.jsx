@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar, NAME_MATCH_MODES } from '../utils/storeFilters'
+import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 import StoreFilterDrawer from '../components/StoreFilterDrawer'
@@ -65,7 +65,6 @@ const COLOR_CLASSES = {
 function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const [nameQuery, setNameQuery] = useState('')
   const [namePickedStoreId, setNamePickedStoreId] = useState(null)
-  const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -76,7 +75,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   const filterPayload = useMemo(
     () => ({
       nameQuery,
-      nameMatchMode,
       namePickedStoreId,
       idQuery,
       regFrom,
@@ -84,7 +82,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
       shipFrom,
       shipTo,
     }),
-    [nameQuery, nameMatchMode, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -95,7 +93,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
   function clearFilters() {
     setNameQuery('')
     setNamePickedStoreId(null)
-    setNameMatchMode(NAME_MATCH_MODES.contains)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -108,14 +105,13 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
       Boolean(
         nameQuery.trim()
         || namePickedStoreId != null
-        || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, namePickedStoreId, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   if (!stores.length) {
@@ -166,8 +162,6 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall }) {
         nameQuery={nameQuery}
         namePickedStoreId={namePickedStoreId}
         onNamePickedStoreIdChange={setNamePickedStoreId}
-        nameMatchMode={nameMatchMode}
-        onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}

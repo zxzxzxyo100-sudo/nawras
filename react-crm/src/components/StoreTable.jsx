@@ -9,7 +9,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar, NAME_MATCH_MODES } from '../utils/storeFilters'
+import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreFilterDrawer from './StoreFilterDrawer'
 
 /** خيارات عدد الصفوف في الصفحة (قائمة منسدلة مثل واجهات الإدارة) */
@@ -39,7 +39,6 @@ export default function StoreTable({
 
   const [nameQuery, setNameQuery] = useState('')
   const [namePickedStoreId, setNamePickedStoreId] = useState(null)
-  const [nameMatchMode, setNameMatchMode] = useState(NAME_MATCH_MODES.contains)
   const [idQuery, setIdQuery] = useState('')
   const [regFrom, setRegFrom] = useState('')
   const [regTo, setRegTo] = useState('')
@@ -52,7 +51,6 @@ export default function StoreTable({
   const filterPayload = useMemo(
     () => ({
       nameQuery,
-      nameMatchMode,
       namePickedStoreId,
       idQuery,
       regFrom,
@@ -60,7 +58,7 @@ export default function StoreTable({
       shipFrom,
       shipTo,
     }),
-    [nameQuery, nameMatchMode, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   const filtered = useMemo(
@@ -81,7 +79,6 @@ export default function StoreTable({
   function clearFilters() {
     setNameQuery('')
     setNamePickedStoreId(null)
-    setNameMatchMode(NAME_MATCH_MODES.contains)
     setIdQuery('')
     setRegFrom('')
     setRegTo('')
@@ -94,14 +91,13 @@ export default function StoreTable({
       Boolean(
         nameQuery.trim()
         || namePickedStoreId != null
-        || nameMatchMode !== NAME_MATCH_MODES.contains
         || idQuery.trim()
         || regFrom
         || regTo
         || shipFrom
         || shipTo
       ),
-    [nameQuery, namePickedStoreId, nameMatchMode, idQuery, regFrom, regTo, shipFrom, shipTo]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo]
   )
 
   // multi-select helpers
@@ -266,8 +262,6 @@ export default function StoreTable({
         nameQuery={nameQuery}
         namePickedStoreId={namePickedStoreId}
         onNamePickedStoreIdChange={setNamePickedStoreId}
-        nameMatchMode={nameMatchMode}
-        onNameMatchModeChange={setNameMatchMode}
         idQuery={idQuery}
         regFrom={regFrom}
         regTo={regTo}

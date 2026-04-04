@@ -1,13 +1,3 @@
-/** أوضاع البحث في حقل الاسم (الهاتف يُطابق دائماً بأي جزء من الأرقام) */
-export const NAME_MATCH_MODES = {
-  /** النص في أي مكان بالاسم؛ الهاتف: أي تسلسل أرقام بلا شرط البداية */
-  contains: 'contains',
-  /** اسم المتجر يبدأ بهذا النص؛ الهاتف: أي جزء من الأرقام (وسط/نهاية/بداية) */
-  startsWith: 'startsWith',
-  /** أي «كلمة» في اسم المتجر؛ الهاتف: أي جزء من الأرقام */
-  word: 'word',
-}
-
 /** مطابقة الهاتف: نص كما هو، أو أرقام فقط في أي موضع (حتى لو لم يُكتب أول الرقم) */
 function phoneMatches(phone, queryLower) {
   const raw = String(phone || '')
@@ -22,24 +12,12 @@ function phoneMatches(phone, queryLower) {
   return phoneLower.includes(q)
 }
 
-function nameOrPhoneMatches(name, phone, queryLower, mode) {
-  const nameStr = String(name || '')
-  const nameLower = nameStr.toLowerCase()
+/** الاسم يحتوي النص أو الهاتف يطابق */
+function nameOrPhoneMatches(name, phone, queryLower) {
+  const nameLower = String(name || '').toLowerCase()
   const q = queryLower.trim()
   if (!q) return true
-
   const phoneOk = phoneMatches(phone, queryLower)
-
-  if (mode === NAME_MATCH_MODES.startsWith) {
-    return nameLower.startsWith(q) || phoneOk
-  }
-
-  if (mode === NAME_MATCH_MODES.word) {
-    const words = nameLower.split(/\s+/).filter(Boolean)
-    const nameOk = words.some(w => w.includes(q))
-    return nameOk || phoneOk
-  }
-
   const nameOk = nameLower.includes(q)
   return nameOk || phoneOk
 }
@@ -60,7 +38,6 @@ export function dateOnlyFromStoreField(val) {
 export function filterStoresByToolbar(stores, filters) {
   const {
     nameQuery = '',
-    nameMatchMode = NAME_MATCH_MODES.contains,
     /** عند الاختيار من Autocomplete: تصفية بحسب المعرّف فقط */
     namePickedStoreId = null,
     idQuery = '',
@@ -75,7 +52,7 @@ export function filterStoresByToolbar(stores, filters) {
       if (String(s.id) !== String(namePickedStoreId)) return false
     } else if (nameQuery.trim()) {
       const n = nameQuery.trim().toLowerCase()
-      if (!nameOrPhoneMatches(s.name, s.phone, n, nameMatchMode)) return false
+      if (!nameOrPhoneMatches(s.name, s.phone, n)) return false
     }
 
     if (idQuery.trim()) {
