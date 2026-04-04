@@ -50,9 +50,18 @@ export function filterStoresByToolbar(stores, filters) {
      * مصفوفة فارغة = لا يمر أي متجر.
      */
     bucketKeys = null,
+    /** إن وُجد رقم > 0: يبقى المتجر إن كان تسجيله خلال آخر N ساعة */
+    registeredWithinHours = null,
   } = filters
 
   return stores.filter(s => {
+    if (registeredWithinHours != null && registeredWithinHours > 0) {
+      if (!s.registered_at) return false
+      const t = new Date(s.registered_at).getTime()
+      if (Number.isNaN(t)) return false
+      const hours = (Date.now() - t) / 3600000
+      if (hours > registeredWithinHours) return false
+    }
     if (bucketKeys != null) {
       if (bucketKeys.length === 0) return false
       const b = s.bucket
