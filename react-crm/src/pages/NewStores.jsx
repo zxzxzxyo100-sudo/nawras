@@ -6,19 +6,52 @@ import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
 
+/** يُستخرج من الرابط: كل المتاجر | جديدة 48 ساعة | تحت الاحتضان */
+function useListPreset(searchParams) {
+  if (searchParams.get('bucket') === 'incubating') return 'incubating'
+  if (searchParams.get('view') === 'new48') return 'new48'
+  return 'all'
+}
+
 export default function NewStores() {
   const [searchParams] = useSearchParams()
-  const bucketPreset = searchParams.get('bucket') === 'incubating' ? 'incubating' : 'all'
+  const listPreset = useListPreset(searchParams)
 
   const { allStores, counts, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
   const [selected, setSelected] = useState(null)
 
   const filteredForCount = useMemo(() => {
-    if (bucketPreset !== 'incubating') return allStores
-    return allStores.filter(s => s.bucket === 'incubating')
-  }, [allStores, bucketPreset])
+    if (listPreset === 'incubating') return allStores.filter(s => s.bucket === 'incubating')
+    if (listPreset === 'new48') {
+      return allStores.filter(s => {
+        if (!s.registered_at) return false
+        const h = (Date.now() - new Date(s.registered_at).getTime()) / 3600000
+        return h <= 48
+      })
+    }
+    return allStores
+  }, [allStores, listPreset])
 
   const totalCount = counts?.total ?? allStores.length
+
+  const { title, subtitle } = useMemo(() => {
+    if (listPreset === 'incubating') {
+      return {
+        title: 'تحت الاحتضان',
+        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — خانة الاحتضان فقط`,
+      }
+    }
+    if (listPreset === 'new48') {
+      return {
+        title: 'جديدة',
+        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — مسجّل خلال آخر 48 ساعة`,
+      }
+    }
+    return {
+      title: 'المتاجر',
+      subtitle: `${totalCount.toLocaleString('ar-SA')} متجر — كل الخانات (جميع المتاجر)`,
+    }
+  }, [listPreset, filteredForCount.length, totalCount])
 
   const extraColumns = [
     {
@@ -35,7 +68,7 @@ export default function NewStores() {
       label: 'عمر المتجر',
       render: s => {
         if (!s.registered_at) return '—'
-        const days = Math.floor((new Date() - new Date(s.registered_at)) / 86400000)
+        const days = Math.floor((Date.now() - new Date(s.registered_at)) / 86400000)
         return <span className="text-xs font-medium">{days} يوم</span>
       },
     },
@@ -56,13 +89,9 @@ export default function NewStores() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Store size={24} className="text-purple-600" />
-            {bucketPreset === 'incubating' ? 'تحت الاحتضان' : 'المتاجر'}
+            {title}
           </h1>
-          <p className="text-slate-600 text-sm mt-0.5">
-            {bucketPreset === 'incubating'
-              ? `${filteredForCount.length.toLocaleString('ar-SA')} متجر — خانة الاحتضان فقط`
-              : `${totalCount.toLocaleString('ar-SA')} متجر — جميع الخانات (جديدة)`}
-          </p>
+          <p className="text-slate-600 text-sm mt-0.5">{subtitle}</p>
         </div>
         <button
           type="button"
@@ -78,7 +107,7 @@ export default function NewStores() {
       <StoreTable
         variant="elite"
         stores={allStores}
-        bucketPreset={bucketPreset === 'incubating' ? 'incubating' : 'all'}
+        listPreset={listPreset}
         enableBucketFilter
         onSelectStore={setSelected}
         onRestoreStore={setSelected}

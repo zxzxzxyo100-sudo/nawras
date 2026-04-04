@@ -41,8 +41,10 @@ export default function StoreTable({
   rowTint = null,
   /** تصفية بحسب خانة المتجر (احتضان / نشط يشحن / …) — يتطلب أن يكون لكل عنصر في stores حقل bucket */
   enableBucketFilter = false,
-  /** عند التصفية: كل الخانات (افتراضي) أو احتضان فقط — يُزامَن مع مسار ?bucket=incubating */
-  bucketPreset = 'all',
+  /**
+   * all = كل المتاجر وجميع الخانات | incubating = ?bucket=incubating | new48 = ?view=new48 (مسجّل خلال 48 ساعة)
+   */
+  listPreset = 'all',
 }) {
   const isElite = variant === 'elite'
 
@@ -57,13 +59,13 @@ export default function StoreTable({
   const [pageSize, setPageSize] = useState(50)
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => (
-    bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS]
+    listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS]
   ))
 
   useEffect(() => {
     if (!enableBucketFilter) return
-    setSelectedBucketKeys(bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
-  }, [bucketPreset, enableBucketFilter])
+    setSelectedBucketKeys(listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+  }, [listPreset, enableBucketFilter])
 
   const filterPayload = useMemo(
     () => ({
@@ -75,8 +77,9 @@ export default function StoreTable({
       shipFrom,
       shipTo,
       ...(enableBucketFilter ? { bucketKeys: selectedBucketKeys } : {}),
+      ...(listPreset === 'new48' ? { registeredWithinHours: 48 } : {}),
     }),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, listPreset]
   )
 
   const filtered = useMemo(
@@ -103,7 +106,7 @@ export default function StoreTable({
     setShipFrom('')
     setShipTo('')
     if (enableBucketFilter) {
-      setSelectedBucketKeys(bucketPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+      setSelectedBucketKeys(listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
     }
   }
 
