@@ -41,7 +41,11 @@ function AppRoutes() {
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<Dashboard />} />
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
-        <Route path="/active"       element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>} />
+        <Route path="/active"       element={<Navigate to="/active/pending" replace />} />
+        <Route
+          path="/active/:activeSegment"
+          element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>}
+        />
         <Route path="/hot-inactive" element={<Navigate to="/hot-inactive/all" replace />} />
         <Route
           path="/hot-inactive/:recoverySegment"

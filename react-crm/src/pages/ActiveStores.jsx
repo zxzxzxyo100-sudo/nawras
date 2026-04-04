@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useParams, Navigate } from 'react-router-dom'
 import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck } from 'lucide-react'
@@ -8,8 +9,16 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
+const ACTIVE_SEGMENTS = new Set(['pending', 'completed'])
+
 export default function ActiveStores() {
+  const { activeSegment } = useParams()
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
+
+  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
+    return <Navigate to="/active/pending" replace />
+  }
+  const isPendingTab = activeSegment === 'pending'
 
   function parseDbDate(v) {
     if (v == null || v === '') return null
@@ -258,22 +267,31 @@ export default function ActiveStores() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
         <div className="min-w-0">
           <h1 className="text-xl lg:text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <TrendingUp size={22} className="text-green-600" />
-            نشط يشحن
+            {isPendingTab ? (
+              <TrendingUp size={22} className="text-green-600" />
+            ) : (
+              <BadgeCheck size={22} className="text-violet-600" />
+            )}
+            {isPendingTab ? 'نشط يشحن — قيد المكالمة' : 'نشط يشحن — المتاجر المنجزة'}
           </h1>
           <p className="text-slate-600 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
-            {active.length} قيد المكالمة
-            {completed.length > 0 && (
-              <span className="text-violet-600 font-medium"> — {completed.length} منجز</span>
+            {isPendingTab ? (
+              <>
+                {active.length} متجر — عمود الطرود: آخر 30 يومًا
+                {completed.length > 0 && (
+                  <span className="text-violet-600 font-medium"> — إجمالي منجز: {completed.length}</span>
+                )}
+              </>
+            ) : (
+              <span>{completed.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة</span>
             )}
-            {' '}— عمود الطرود: آخر 30 يومًا
-            {(stores.incubating || []).some(s => {
+            {isPendingTab && (stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
               return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed'
             }) && (
               <span className="text-emerald-600 text-xs"> (يشمل مُخرَّجين من الاحتضان)</span>
             )}
-            {isExecutive && assignedCount > 0 && (
+            {isPendingTab && isExecutive && assignedCount > 0 && (
               <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
                 <UserCheck size={11} />
                 {assignedCount} معيّن
@@ -300,8 +318,8 @@ export default function ActiveStores() {
         </div>
       )}
 
-      {/* شريط الفلتر */}
-      {isExecutive && (
+      {/* شريط الفلتر — قيد المكالمة فقط */}
+      {isPendingTab && isExecutive && (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
             <Filter size={13} />
@@ -345,8 +363,8 @@ export default function ActiveStores() {
         </div>
       )}
 
-      {/* شريط التعيين الجماعي */}
-      {isExecutive && selectedIds.size > 0 && (
+      {/* شريط التعيين الجماعي — قيد المكالمة فقط */}
+      {isPendingTab && isExecutive && selectedIds.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
 
           {/* العنوان وعدد المحددين وزر الإغلاق */}
@@ -459,54 +477,62 @@ export default function ActiveStores() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-l from-emerald-50/90 to-white px-4 py-3 shadow-sm">
-        <h2 className="text-sm font-bold text-emerald-900 flex items-center gap-2">
-          <TrendingUp size={17} className="text-emerald-600 shrink-0" />
-          المتاجر النشطة — قيد المكالمة
-        </h2>
-        <p className="text-[11px] text-emerald-800/80 mt-0.5">تسجيل مكالمة «عامة» يحرك المتجر إلى «منجز» حتى يمرّ 30 يوماً على تاريخ المكالمة.</p>
-      </div>
+      {isPendingTab && (
+        <>
+          <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-l from-emerald-50/90 to-white px-4 py-3 shadow-sm">
+            <h2 className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+              <TrendingUp size={17} className="text-emerald-600 shrink-0" />
+              المتاجر النشطة — قيد المكالمة
+            </h2>
+            <p className="text-[11px] text-emerald-800/80 mt-0.5">تسجيل مكالمة «عامة» يحرك المتجر إلى «منجز» حتى يمرّ 30 يوماً على تاريخ المكالمة.</p>
+          </div>
 
-      <StoreTable
-        variant="elite"
-        stores={filteredActive}
-        onSelectStore={setSelected}
-        onRestoreStore={setSelected}
-        extraColumns={extraColumns}
-        emptyMsg="لا توجد متاجر ضمن قيد المكالمة"
-        parcelsColumnSub={
-          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
-            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
-            : undefined
-        }
-        selectable={isExecutive}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-      />
+          <StoreTable
+            variant="elite"
+            stores={filteredActive}
+            onSelectStore={setSelected}
+            onRestoreStore={setSelected}
+            extraColumns={extraColumns}
+            emptyMsg="لا توجد متاجر ضمن قيد المكالمة"
+            parcelsColumnSub={
+              shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+                ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+                : undefined
+            }
+            selectable={isExecutive}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+          />
+        </>
+      )}
 
-      <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm mt-8">
-        <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
-          <BadgeCheck size={17} className="text-violet-600 shrink-0" />
-          المتاجر المنجزة
-        </h2>
-        <p className="text-[11px] text-violet-800/80 mt-0.5">
-          بعد 30 يوماً من تاريخ المكالمة تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
-        </p>
-      </div>
-      <StoreTable
-        variant="elite"
-        stores={completed}
-        onSelectStore={setSelected}
-        onRestoreStore={setSelected}
-        extraColumns={completedExtraColumns}
-        emptyMsg="لا توجد متاجر منجزة — تظهر هنا بعد تسجيل مكالمة عامة لمتجر «قيد المكالمة»"
-        parcelsColumnSub={
-          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
-            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
-            : undefined
-        }
-        selectable={false}
-      />
+      {!isPendingTab && (
+        <>
+          <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm">
+            <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
+              <BadgeCheck size={17} className="text-violet-600 shrink-0" />
+              المتاجر المنجزة
+            </h2>
+            <p className="text-[11px] text-violet-800/80 mt-0.5">
+              بعد 30 يوماً من تاريخ المكالمة تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
+            </p>
+          </div>
+          <StoreTable
+            variant="elite"
+            stores={completed}
+            onSelectStore={setSelected}
+            onRestoreStore={setSelected}
+            extraColumns={completedExtraColumns}
+            emptyMsg="لا توجد متاجر منجزة — تظهر هنا بعد تسجيل مكالمة عامة لمتجر «قيد المكالمة»"
+            parcelsColumnSub={
+              shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+                ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+                : undefined
+            }
+            selectable={false}
+          />
+        </>
+      )}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
     </div>
