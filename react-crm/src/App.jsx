@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
+import FrozenStores from './pages/FrozenStores'
 import HotInactive from './pages/HotInactive'
 import ColdInactive from './pages/ColdInactive'
 import IncubationPath from './pages/IncubationPath'
@@ -42,6 +43,8 @@ function AppRoutes() {
         <Route path="/"             element={<Dashboard />} />
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
         <Route path="/active"       element={<Navigate to="/active/pending" replace />} />
+        <Route path="/active/frozen" element={<Navigate to="/frozen" replace />} />
+        <Route path="/frozen"       element={<PrivateRoute view="active"><FrozenStores /></PrivateRoute>} />
         <Route
           path="/active/:activeSegment"
           element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>}
