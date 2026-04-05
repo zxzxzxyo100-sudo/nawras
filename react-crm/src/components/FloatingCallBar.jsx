@@ -13,6 +13,8 @@ const CAT_COLORS = {
   completed_merchants:  { bg: '#7c3aed', label: 'منجز' },
   unreachable:          { bg: '#d97706', label: 'لم يُصل' },
   unreachable_merchants: { bg: '#d97706', label: 'لم يُصل' },
+  frozen:               { bg: '#475569', label: 'مجمد' },
+  frozen_merchants:     { bg: '#475569', label: 'مجمد' },
   hot_inactive:         { bg: '#f59e0b', label: 'ساخن' },
   cold_inactive:        { bg: '#6b7280', label: 'بارد' },
   incubating:           { bg: '#8b5cf6', label: 'تحت الاحتضان' },

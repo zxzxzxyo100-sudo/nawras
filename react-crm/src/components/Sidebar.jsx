@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
-  ChevronDown, Circle, Layers,
+  ChevronDown, Circle, Layers, Lock,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -281,8 +281,45 @@ function IncubationNavGroup({ can, onClose }) {
   )
 }
 
+/** رابط مستقل — ليس ضمن «نشط يشحن» ولا «غير نشطة» */
+function FrozenNavLink({ can, onClose }) {
+  const location = useLocation()
+  if (!can('active')) return null
+  const isFrozen = location.pathname === '/frozen'
+  return (
+    <NavLink
+      to="/frozen"
+      onClick={() => { if (onClose) onClose() }}
+      className={
+        `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
+          isFrozen ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+        }`
+      }
+      style={isFrozen ? {
+        background: 'linear-gradient(135deg, rgba(71,85,105,0.45), rgba(51,65,85,0.2))',
+        boxShadow: '0 0 20px rgba(100,116,139,0.2)',
+      } : {}}
+    >
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        isFrozen ? 'bg-slate-500 shadow-lg shadow-slate-500/25' : 'bg-white/5 group-hover:bg-white/10'
+      }`}>
+        <Lock size={14} className={isFrozen ? 'text-white' : 'text-white/50'} />
+      </div>
+      <span className="flex-1 truncate">المتاجر المجمدة</span>
+      {isFrozen && (
+        <div className="mr-auto w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0" />
+      )}
+    </NavLink>
+  )
+}
+
 const STORE_NAV_ORDER = [
-  '__stores_group__', '__incubation_group__', '__active_group__', '__inactive_group__', '/vip',
+  '__stores_group__',
+  '__incubation_group__',
+  '__active_group__',
+  '__frozen_link__',
+  '__inactive_group__',
+  '/vip',
 ]
 
 function InactiveNavGroup({ can, onClose }) {
@@ -417,6 +454,9 @@ export default function Sidebar({ isOpen, onClose }) {
               }
               if (key === '__active_group__') {
                 return <ActiveNavGroup key="active" can={can} onClose={onClose} />
+              }
+              if (key === '__frozen_link__') {
+                return <FrozenNavLink key="frozen" can={can} onClose={onClose} />
               }
               if (key === '__inactive_group__') {
                 return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />

@@ -17,6 +17,7 @@ export function StoresProvider({ children }) {
     active_shipping:        [],
     completed_merchants:    [],
     unreachable_merchants:  [],
+    frozen_merchants:       [],
     hot_inactive:           [],
     cold_inactive:          [],
   })
@@ -27,7 +28,7 @@ export function StoresProvider({ children }) {
     call_1: 0, call_2: 0, call_3: 0, between_calls: 0, total: 0,
   })
   const [counts, setCounts]               = useState({
-    incubating: 0, active_shipping: 0, completed_merchants: 0, unreachable_merchants: 0,
+    incubating: 0, active_shipping: 0, completed_merchants: 0, unreachable_merchants: 0, frozen_merchants: 0,
     hot_inactive: 0, cold_inactive: 0, total_active: 0, total: 0,
   })
   const [storeStates, setStoreStates]     = useState({})
@@ -124,6 +125,7 @@ export function StoresProvider({ children }) {
             ...(apiResult.data?.active_shipping || []),
             ...(apiResult.data?.completed_merchants || []),
             ...(apiResult.data?.unreachable_merchants || []),
+            ...(apiResult.data?.frozen_merchants || []),
             ...(apiResult.data?.hot_inactive || []),
             ...(apiResult.data?.cold_inactive || []),
           ]
@@ -152,6 +154,7 @@ export function StoresProvider({ children }) {
         active_shipping:       mergeShipmentsInRange(apiResult.data.active_shipping),
         completed_merchants:     mergeShipmentsInRange(apiResult.data.completed_merchants || []),
         unreachable_merchants: mergeShipmentsInRange(apiResult.data.unreachable_merchants || []),
+        frozen_merchants:      mergeShipmentsInRange(apiResult.data.frozen_merchants || []),
         hot_inactive:          mergeShipmentsInRange(apiResult.data.hot_inactive),
         cold_inactive:         mergeShipmentsInRange(apiResult.data.cold_inactive),
       })
@@ -195,6 +198,7 @@ export function StoresProvider({ children }) {
     ...stores.active_shipping.map(s => ({ ...s, bucket: 'active_shipping', category: storeStates[s.id]?.category || 'active_shipping' })),
     ...stores.completed_merchants.map(s => ({ ...s, bucket: 'completed_merchants', category: storeStates[s.id]?.category || 'completed' })),
     ...stores.unreachable_merchants.map(s => ({ ...s, bucket: 'unreachable_merchants', category: storeStates[s.id]?.category || 'unreachable' })),
+    ...stores.frozen_merchants.map(s => ({ ...s, bucket: 'frozen_merchants', category: storeStates[s.id]?.category || 'frozen' })),
     ...stores.hot_inactive.map(s =>    ({ ...s, bucket: 'hot_inactive',    category: storeStates[s.id]?.category || 'hot_inactive'    })),
     ...stores.cold_inactive.map(s =>   ({ ...s, bucket: 'cold_inactive',   category: storeStates[s.id]?.category || 'cold_inactive'   })),
   ]

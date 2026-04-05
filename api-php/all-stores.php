@@ -125,6 +125,7 @@ $result = [
     'active_shipping'       => [],
     'completed_merchants'   => [],
     'unreachable_merchants' => [],
+    'frozen_merchants'      => [],
     'hot_inactive'          => [],
     'cold_inactive'         => [],
 ];
@@ -133,6 +134,7 @@ $counts = [
     'active_shipping'       => 0,
     'completed_merchants'   => 0,
     'unreachable_merchants' => 0,
+    'frozen_merchants'      => 0,
     'hot_inactive'          => 0,
     'cold_inactive'         => 0,
     'total_active'         => 0,
@@ -507,6 +509,81 @@ try {
     }
 } catch (Throwable $e) {
     // بدون DB لا نفصل القائمة
+}
+
+// ── المتاجر المجمدة: قائمة منفصلة وإزالتها من باقي الخانات ─────
+/** @param array<int, mixed> $stores */
+function nawras_filter_out_store_id(array &$stores, $id) {
+    $id = (int) $id;
+    $stores = array_values(array_filter($stores, static function ($s) use ($id) {
+        return (int) ($s['id'] ?? 0) !== $id;
+    }));
+}
+
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    $stFrozen = $pdoDb->query("SELECT store_id, freeze_reason, updated_by FROM store_states WHERE category = 'frozen'");
+    $frozenRows = $stFrozen ? $stFrozen->fetchAll(PDO::FETCH_ASSOC) : [];
+    $frozenById = [];
+    foreach ($frozenRows as $fr) {
+        $fid = (int) ($fr['store_id'] ?? 0);
+        if ($fid <= 0) {
+            continue;
+        }
+        $frozenById[$fid] = $fr;
+    }
+    foreach (array_keys($frozenById) as $fid) {
+        nawras_filter_out_store_id($result['active_shipping'], $fid);
+        nawras_filter_out_store_id($result['completed_merchants'], $fid);
+        nawras_filter_out_store_id($result['unreachable_merchants'], $fid);
+        nawras_filter_out_store_id($result['hot_inactive'], $fid);
+        nawras_filter_out_store_id($result['cold_inactive'], $fid);
+        nawras_filter_out_store_id($result['incubating'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_1'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_2'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_3'], $fid);
+        nawras_filter_out_store_id($incubation_path['between'], $fid);
+    }
+    $result['frozen_merchants'] = [];
+    foreach ($frozenById as $fid => $fr) {
+        $s = $allStores[$fid] ?? $new[$fid] ?? $inactive[$fid] ?? null;
+        if (!is_array($s)) {
+            $s = [];
+        }
+        $s['id'] = $fid;
+        if (empty($s['name'])) {
+            $s['name'] = '';
+        }
+        if (empty($s['phone'])) {
+            $s['phone'] = '';
+        }
+        $s['freeze_reason'] = $fr['freeze_reason'] ?? '';
+        $s['frozen_updated_by'] = $fr['updated_by'] ?? '';
+        $s['_cat'] = 'frozen';
+        $result['frozen_merchants'][] = $s;
+    }
+    $counts['frozen_merchants'] = count($result['frozen_merchants']);
+    $counts['active_shipping'] = count($result['active_shipping']);
+    $counts['completed_merchants'] = count($result['completed_merchants']);
+    $counts['unreachable_merchants'] = count($result['unreachable_merchants']);
+    $counts['hot_inactive'] = count($result['hot_inactive']);
+    $counts['cold_inactive'] = count($result['cold_inactive']);
+    $counts['incubating'] = count($result['incubating']);
+    $incubation_counts['call_1'] = count($incubation_path['call_1']);
+    $incubation_counts['call_2'] = count($incubation_path['call_2']);
+    $incubation_counts['call_3'] = count($incubation_path['call_3']);
+    $incubation_counts['between'] = count($incubation_path['between']);
+    $incubation_counts['total'] = $incubation_counts['call_1'] + $incubation_counts['call_2'] + $incubation_counts['call_3'] + $incubation_counts['between'];
+    $counts['total_active'] = $counts['active_shipping'] + $counts['completed_merchants'] + $counts['unreachable_merchants']
+        + $counts['hot_inactive'] + $counts['cold_inactive'];
+} catch (Throwable $e) {
+    if (!isset($result['frozen_merchants'])) {
+        $result['frozen_merchants'] = [];
+    }
+    $counts['frozen_merchants'] = count($result['frozen_merchants']);
 }
 
 $counts['check'] = (

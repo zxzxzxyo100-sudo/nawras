@@ -320,7 +320,7 @@ function isDoneIncubationPath(storeStates, storeId) {
   if (!st) return false
   if (st.inc_call3_at) return true
   const c = st.category
-  return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable' || c === 'inactive'
+  return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable' || c === 'frozen' || c === 'inactive'
 }
 
 export default function IncubationPath() {

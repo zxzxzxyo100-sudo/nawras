@@ -273,6 +273,9 @@ export default function Dashboard() {
             if ((counts.unreachable_merchants || 0) > 0) {
               parts.push(`لم يُصل: ${(counts.unreachable_merchants || 0).toLocaleString('ar-SA')}`)
             }
+            if ((counts.frozen_merchants || 0) > 0) {
+              parts.push(`مجمد: ${(counts.frozen_merchants || 0).toLocaleString('ar-SA')}`)
+            }
             return parts.length ? `قيد المكالمة — ${parts.join(' — ')}` : 'آخر 30 يوم — قيد المكالمة'
           })()}
           icon={TrendingUp}
