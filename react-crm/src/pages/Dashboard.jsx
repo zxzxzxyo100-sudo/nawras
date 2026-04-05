@@ -9,7 +9,7 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby,
+  Award, Activity, ArrowUpRight, Baby, ClipboardList,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -96,7 +96,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
 
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const navigate = useNavigate()
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
   const workflowData = useMemo(() => {
@@ -151,6 +151,7 @@ export default function Dashboard() {
   ).length
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
+  const showIncubationHero = can('new') || can('incubation')
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -219,12 +220,14 @@ export default function Dashboard() {
           <SeagullMark size={70} opacity={0.035} />
         </div>
 
-        <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`relative grid grid-cols-2 gap-6 ${showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
           {[
             { label: 'إجمالي المتاجر',  value: (counts.total || 0).toLocaleString('ar-SA'), icon: Package,  sub: `${activeRate}% نسبة النشاط` },
             { label: 'إجمالي الطرود',    value: totalShipments.toLocaleString('ar-SA'),       icon: TrendingUp, sub: 'كل المتاجر' },
             { label: 'مكالمات اليوم',    value: calledToday,                                  icon: Phone,   sub: 'تواصل مباشر' },
-            { label: 'تحتاج تواصل',      value: pendingNewCalls,                              icon: Store,   sub: 'متاجر جديدة' },
+            ...(showIncubationHero
+              ? [{ label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' }]
+              : []),
           ].map((s, i) => (
             <motion.div
               key={i}
@@ -253,54 +256,73 @@ export default function Dashboard() {
         animate="visible"
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        <StoreTypeCard
-          title="جديدة & احتضان"
-          count={counts.incubating}
-          sub={`${pendingNewCalls} تحتاج مكالمة`}
-          icon={Baby}
-          gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
-          glow="#7c3aed55"
-          onClick={() => navigate('/new')}
-        />
-        <StoreTypeCard
-          title="نشط يشحن"
-          count={counts.active_shipping}
-          sub={(() => {
-            const parts = []
-            if ((counts.completed_merchants || 0) > 0) {
-              parts.push(`منجز: ${(counts.completed_merchants || 0).toLocaleString('ar-SA')}`)
-            }
-            if ((counts.unreachable_merchants || 0) > 0) {
-              parts.push(`لم يُصل: ${(counts.unreachable_merchants || 0).toLocaleString('ar-SA')}`)
-            }
-            if ((counts.frozen_merchants || 0) > 0) {
-              parts.push(`مجمد: ${(counts.frozen_merchants || 0).toLocaleString('ar-SA')}`)
-            }
-            return parts.length ? `قيد المكالمة — ${parts.join(' — ')}` : 'آخر 30 يوم — قيد المكالمة'
-          })()}
-          icon={TrendingUp}
-          gradient="linear-gradient(135deg, #065f46, #059669)"
-          glow="#05966955"
-          onClick={() => navigate('/active/pending')}
-        />
-        <StoreTypeCard
-          title="غير نشط ساخن"
-          count={counts.hot_inactive}
-          sub="15 – 60 يوم"
-          icon={Flame}
-          gradient="linear-gradient(135deg, #92400e, #d97706)"
-          glow="#d9770655"
-          onClick={() => navigate('/hot-inactive/all')}
-        />
-        <StoreTypeCard
-          title="غير نشط بارد"
-          count={counts.cold_inactive}
-          sub="أكثر من 60 يوم"
-          icon={Snowflake}
-          gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
-          glow="#8b5cf655"
-          onClick={() => navigate('/cold-inactive')}
-        />
+        {can('new') && (
+          <StoreTypeCard
+            title="جديدة & احتضان"
+            count={counts.incubating}
+            sub={`${pendingNewCalls} تحتاج مكالمة`}
+            icon={Baby}
+            gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
+            glow="#7c3aed55"
+            onClick={() => navigate('/new')}
+          />
+        )}
+        {can('active') && (
+          <StoreTypeCard
+            title="نشط يشحن"
+            count={counts.active_shipping}
+            sub={(() => {
+              const parts = []
+              if ((counts.completed_merchants || 0) > 0) {
+                parts.push(`منجز: ${(counts.completed_merchants || 0).toLocaleString('ar-SA')}`)
+              }
+              if ((counts.unreachable_merchants || 0) > 0) {
+                parts.push(`لم يُصل: ${(counts.unreachable_merchants || 0).toLocaleString('ar-SA')}`)
+              }
+              if ((counts.frozen_merchants || 0) > 0) {
+                parts.push(`مجمد: ${(counts.frozen_merchants || 0).toLocaleString('ar-SA')}`)
+              }
+              return parts.length ? `قيد المكالمة — ${parts.join(' — ')}` : 'آخر 30 يوم — قيد المكالمة'
+            })()}
+            icon={TrendingUp}
+            gradient="linear-gradient(135deg, #065f46, #059669)"
+            glow="#05966955"
+            onClick={() => navigate('/active/pending')}
+          />
+        )}
+        {can('hot_inactive') && (
+          <StoreTypeCard
+            title="غير نشط ساخن"
+            count={counts.hot_inactive}
+            sub="15 – 60 يوم"
+            icon={Flame}
+            gradient="linear-gradient(135deg, #92400e, #d97706)"
+            glow="#d9770655"
+            onClick={() => navigate('/hot-inactive/all')}
+          />
+        )}
+        {can('cold_inactive') && (
+          <StoreTypeCard
+            title="غير نشط بارد"
+            count={counts.cold_inactive}
+            sub="أكثر من 60 يوم"
+            icon={Snowflake}
+            gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
+            glow="#8b5cf655"
+            onClick={() => navigate('/cold-inactive')}
+          />
+        )}
+        {can('tasks') && can('active') && !can('incubation') && (
+          <StoreTypeCard
+            title="المهام اليومية"
+            count="مهام"
+            sub="متابعة المسند إليك من صفحة المهام"
+            icon={ClipboardList}
+            gradient="linear-gradient(135deg, #3730a3, #4f46e5)"
+            glow="#4f46e555"
+            onClick={() => navigate('/tasks')}
+          />
+        )}
       </motion.div>
 
       {/* ══ Charts Row ══════════════════════════════════════════════ */}
@@ -455,49 +477,51 @@ export default function Dashboard() {
         initial="hidden"
         animate="visible"
         transition={{ duration: 0.5, delay: 0.5 }}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-5"
+        className={can('new') ? 'grid grid-cols-1 lg:grid-cols-3 gap-5' : 'grid grid-cols-1 gap-5'}
       >
 
-        {/* أحدث المتاجر */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                <Store size={14} className="text-violet-600" />
-              </div>
-              أحدث المتاجر المسجلة
-            </h2>
-            <button onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors">
-              عرض الكل <ArrowUpRight size={11} />
-            </button>
-          </div>
-          <div>
-            {[...(stores.incubating || [])].sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0)).slice(0, 5).map((s, i) => {
-              const hours = s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 3600000) : null
-              return (
-                <div key={s.id} className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer ${i !== 4 ? 'border-b border-slate-50' : ''}`}>
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                    {s.name?.charAt(0) || '؟'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-slate-800 font-semibold text-sm truncate">{s.name}</p>
-                    <p className="text-slate-400 text-xs">{hours !== null ? (hours < 24 ? `منذ ${hours} ساعة` : `منذ ${Math.floor(hours / 24)} يوم`) : '—'}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs text-slate-300 font-mono">#{s.id}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${parseInt(s.total_shipments) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {parseInt(s.total_shipments) || 0} طرد
-                    </span>
-                  </div>
+        {/* أحدث المتاجر — يظهر لمن لديه صلاحية «المتاجر» فقط */}
+        {can('new') && (
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+              <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
+                  <Store size={14} className="text-violet-600" />
                 </div>
-              )
-            })}
+                أحدث المتاجر المسجلة
+              </h2>
+              <button type="button" onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors">
+                عرض الكل <ArrowUpRight size={11} />
+              </button>
+            </div>
+            <div>
+              {[...(stores.incubating || [])].sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0)).slice(0, 5).map((s, i) => {
+                const hours = s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 3600000) : null
+                return (
+                  <div key={s.id} className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer ${i !== 4 ? 'border-b border-slate-50' : ''}`}>
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                      {s.name?.charAt(0) || '؟'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-800 font-semibold text-sm truncate">{s.name}</p>
+                      <p className="text-slate-400 text-xs">{hours !== null ? (hours < 24 ? `منذ ${hours} ساعة` : `منذ ${Math.floor(hours / 24)} يوم`) : '—'}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs text-slate-300 font-mono">#{s.id}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${parseInt(s.total_shipments) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {parseInt(s.total_shipments) || 0} طرد
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* توزيع فوري */}
         <div
-          className="rounded-2xl p-5 lg:p-6 flex flex-col gap-4"
+          className={`rounded-2xl p-5 lg:p-6 flex flex-col gap-4 ${can('new') ? '' : 'lg:col-span-3'}`}
           style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
         >
           <div>
@@ -509,11 +533,11 @@ export default function Dashboard() {
           </div>
 
           {[
-            { label: 'نشط يشحن',   v: counts.active_shipping || 0, color: '#10b981', bg: '#10b98115' },
-            { label: 'غير نشط ساخن', v: counts.hot_inactive    || 0, color: '#f59e0b', bg: '#f59e0b15' },
-            { label: 'غير نشط بارد', v: counts.cold_inactive   || 0, color: '#8b5cf6', bg: '#8b5cf615' },
-            { label: 'جديدة & احتضان', v: counts.incubating  || 0, color: '#a78bfa', bg: '#a78bfa15' },
-          ].map(row => {
+            can('active') && { label: 'نشط يشحن',   v: counts.active_shipping || 0, color: '#10b981', bg: '#10b98115' },
+            can('hot_inactive') && { label: 'غير نشط ساخن', v: counts.hot_inactive    || 0, color: '#f59e0b', bg: '#f59e0b15' },
+            can('cold_inactive') && { label: 'غير نشط بارد', v: counts.cold_inactive   || 0, color: '#8b5cf6', bg: '#8b5cf615' },
+            can('new') && { label: 'جديدة & احتضان', v: counts.incubating  || 0, color: '#a78bfa', bg: '#a78bfa15' },
+          ].filter(Boolean).map(row => {
             const pct = counts.total ? Math.round((row.v / counts.total) * 100) : 0
             return (
               <div key={row.label}>
