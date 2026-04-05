@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useLayoutEffect, useId } from
 import { createPortal } from 'react-dom'
 import { Loader2 } from 'lucide-react'
 import { searchStores } from '../services/api'
+import StoreNameWithId from './StoreNameWithId'
 
 const DEBOUNCE_MS = 300
 
@@ -187,7 +188,9 @@ export default function StoreNameAutocomplete({
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => pickItem(row)}
               >
-                <span className="font-medium leading-snug">{row.name || '—'}</span>
+                <span className="font-medium leading-snug block min-w-0">
+                  <StoreNameWithId store={row} nameClassName="font-medium" idClassName="font-mono text-[11px] text-slate-500" />
+                </span>
                 {sub}
               </button>
             </li>

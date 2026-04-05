@@ -5,6 +5,7 @@ import { useStores }  from '../contexts/StoresContext'
 import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import CallModal      from './CallModal'
+import StoreNameWithId from './StoreNameWithId'
 import CustomerSatisfactionModal from './CustomerSatisfactionModal'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
@@ -211,8 +212,9 @@ export default function FloatingCallBar() {
                     >
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-xs font-medium truncate">{store.name}</p>
-                        <p className="text-white/30 text-[10px]">#{store.id}</p>
+                        <div className="text-white text-xs font-medium min-w-0">
+                          <StoreNameWithId store={store} nameClassName="text-white font-medium" idClassName="font-mono text-white/80 text-[10px]" />
+                        </div>
                       </div>
                       <span
                         className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -240,7 +242,18 @@ export default function FloatingCallBar() {
                   }}
                 >
                   <Phone size={14} />
-                  {selected ? `اتصل بـ ${selected.name.split(' ').slice(0,2).join(' ')}` : 'ابحث عن متجر أولاً'}
+                  {selected
+                    ? (
+                      <span className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                        <span>اتصل بـ</span>
+                        <StoreNameWithId
+                          store={selected}
+                          nameClassName="font-black"
+                          idClassName="font-mono text-white/90 text-[11px]"
+                        />
+                      </span>
+                    )
+                    : 'ابحث عن متجر أولاً'}
                 </motion.button>
               </div>
             </motion.div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
+import StoreNameWithId from '../components/StoreNameWithId'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -503,11 +504,12 @@ export default function Dashboard() {
                       {s.name?.charAt(0) || '؟'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-slate-800 font-semibold text-sm truncate">{s.name}</p>
+                      <div className="text-slate-800 font-semibold text-sm truncate">
+                        <StoreNameWithId store={s} nameClassName="font-semibold text-slate-800 text-sm" idClassName="font-mono text-xs text-slate-500 font-semibold" />
+                      </div>
                       <p className="text-slate-400 text-xs">{hours !== null ? (hours < 24 ? `منذ ${hours} ساعة` : `منذ ${Math.floor(hours / 24)} يوم`) : '—'}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-slate-300 font-mono">#{s.id}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${parseInt(s.total_shipments) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                         {parseInt(s.total_shipments) || 0} طرد
                       </span>
