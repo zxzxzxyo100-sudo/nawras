@@ -63,6 +63,10 @@ function ensure_store_assignments_workflow(PDO $pdo) {
         $pdo->exec('ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP');
     } catch (Throwable $e) {
     }
+    try {
+        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active'");
+    } catch (Throwable $e) {
+    }
     $done = true;
 }
 
@@ -784,14 +788,15 @@ elseif ($action === 'assign_store') {
         // إلغاء التعيين
         $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ?")->execute([$storeId]);
     } else {
-        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status)
-            VALUES (?, ?, ?, ?, ?, 'active')
+        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status, assignment_queue)
+            VALUES (?, ?, ?, ?, ?, 'active', 'active')
             ON DUPLICATE KEY UPDATE
                 assigned_to  = VALUES(assigned_to),
                 assigned_by  = VALUES(assigned_by),
                 notes        = VALUES(notes),
                 store_name   = VALUES(store_name),
                 workflow_status = 'active',
+                assignment_queue = 'active',
                 assigned_at  = CURRENT_TIMESTAMP")
             ->execute([$storeId, $storeName, $assignTo, $assignBy, $notes]);
     }

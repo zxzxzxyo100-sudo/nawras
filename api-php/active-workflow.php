@@ -5,6 +5,7 @@
 require_once __DIR__ . '/db.php';
 
 const ACTIVE_QUEUE_TARGET = 50;
+const INACTIVE_QUEUE_TARGET = 50;
 const SURVEY_COOLDOWN_DAYS = 30;
 
 $pdo = getDB();
@@ -26,6 +27,10 @@ function ensure_workflow_schema(PDO $pdo) {
     }
     try {
         $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active'");
     } catch (Throwable $e) {
     }
     $done = true;
@@ -55,7 +60,13 @@ function pick_next_pool_store(PDO $pdo) {
 }
 
 function count_active_queue(PDO $pdo, $username) {
-    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active'");
+    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'active'");
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
+function count_inactive_queue(PDO $pdo, $username) {
+    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'inactive'");
     $st->execute([$username]);
     return (int) $st->fetchColumn();
 }
@@ -63,15 +74,74 @@ function count_active_queue(PDO $pdo, $username) {
 function assign_store_to_user(PDO $pdo, $storeId, $storeName, $username, $assignedBy) {
     $sid = (string) $storeId;
     $pdo->prepare("
-        INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status)
-        VALUES (?, ?, ?, ?, '', 'active')
+        INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status, assignment_queue)
+        VALUES (?, ?, ?, ?, '', 'active', 'active')
         ON DUPLICATE KEY UPDATE
             assigned_to = VALUES(assigned_to),
             assigned_by = VALUES(assigned_by),
             store_name = VALUES(store_name),
             workflow_status = 'active',
+            assignment_queue = 'active',
             assigned_at = CURRENT_TIMESTAMP
     ")->execute([$sid, $storeName, $username, $assignedBy]);
+}
+
+function inactive_pipeline_where_sql() {
+    return "ss.category IN ('hot_inactive','cold_inactive')";
+}
+
+function pick_next_inactive_pool_store(PDO $pdo) {
+    $sql = "
+        SELECT ss.store_id, ss.store_name
+        FROM store_states ss
+        WHERE " . inactive_pipeline_where_sql() . "
+        AND CAST(ss.store_id AS CHAR) NOT IN (
+            SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
+        )
+        ORDER BY ss.store_id ASC
+        LIMIT 1
+    ";
+    $stmt = $pdo->query($sql);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username, $assignedBy) {
+    $sid = (string) $storeId;
+    $pdo->prepare("
+        INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status, assignment_queue)
+        VALUES (?, ?, ?, ?, '', 'active', 'inactive')
+        ON DUPLICATE KEY UPDATE
+            assigned_to = VALUES(assigned_to),
+            assigned_by = VALUES(assigned_by),
+            store_name = VALUES(store_name),
+            workflow_status = 'active',
+            assignment_queue = 'inactive',
+            assigned_at = CURRENT_TIMESTAMP
+    ")->execute([$sid, $storeName, $username, $assignedBy]);
+}
+
+/** تعبئة طابور موظف الاستعادة حتى 50 متجراً غير نشط */
+function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
+    ensure_workflow_schema($pdo);
+    $have = count_inactive_queue($pdo, $username);
+    $need = INACTIVE_QUEUE_TARGET - $have;
+    if ($need <= 0) {
+        return 0;
+    }
+    if ($maxToAdd !== null) {
+        $need = min($need, (int) $maxToAdd);
+    }
+    $added = 0;
+    while ($need > 0) {
+        $row = pick_next_inactive_pool_store($pdo);
+        if (!$row) {
+            break;
+        }
+        assign_inactive_store_to_user($pdo, $row['store_id'], $row['store_name'] ?? '', $username, $assignedBy);
+        $added++;
+        $need--;
+    }
+    return $added;
 }
 
 /** تعبئة طابور موظف حتى TARGET أو نفاد المجمع */
@@ -106,10 +176,41 @@ if ($action === 'get_my_workflow') {
     if ($username === '') {
         jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400);
     }
+    $queue = trim((string) ($_GET['queue'] ?? 'active'));
+    if ($queue === 'inactive') {
+        fill_inactive_slots_for_user($pdo, $username, $username, null);
+        $st = $pdo->prepare("
+            SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
+            FROM store_assignments
+            WHERE assigned_to = ? AND assignment_queue = 'inactive'
+            ORDER BY workflow_status ASC, assigned_at ASC
+        ");
+        $st->execute([$username]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $active = [];
+        $noAnswer = [];
+        foreach ($rows as $r) {
+            if (($r['workflow_status'] ?? 'active') === 'no_answer') {
+                $noAnswer[] = $r;
+            } else {
+                $active[] = $r;
+            }
+        }
+        jsonResponse([
+            'success' => true,
+            'queue' => 'inactive',
+            'target' => INACTIVE_QUEUE_TARGET,
+            'cooldown_days' => SURVEY_COOLDOWN_DAYS,
+            'active_tasks' => $active,
+            'no_answer_tasks' => $noAnswer,
+            'active_count' => count($active),
+            'no_answer_count' => count($noAnswer),
+        ]);
+    }
     $st = $pdo->prepare("
-        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status
+        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
         FROM store_assignments
-        WHERE assigned_to = ?
+        WHERE assigned_to = ? AND assignment_queue = 'active'
         ORDER BY workflow_status ASC, assigned_at ASC
     ");
     $st->execute([$username]);
@@ -125,6 +226,7 @@ if ($action === 'get_my_workflow') {
     }
     jsonResponse([
         'success' => true,
+        'queue' => 'active',
         'target' => ACTIVE_QUEUE_TARGET,
         'cooldown_days' => SURVEY_COOLDOWN_DAYS,
         'active_tasks' => $active,
@@ -138,6 +240,10 @@ if ($action === 'get_my_workflow') {
 elseif ($action === 'mark_no_answer') {
     $storeId = (int) ($input['store_id'] ?? 0);
     $username = trim((string) ($input['username'] ?? ''));
+    $queue = trim((string) ($input['queue'] ?? 'active'));
+    if (!in_array($queue, ['active', 'inactive'], true)) {
+        $queue = 'active';
+    }
     if ($storeId <= 0 || $username === '') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
@@ -145,19 +251,25 @@ elseif ($action === 'mark_no_answer') {
     $upd = $pdo->prepare("
         UPDATE store_assignments
         SET workflow_status = 'no_answer', workflow_updated_at = NOW()
-        WHERE store_id = ? AND assigned_to = ? AND workflow_status = 'active'
+        WHERE store_id = ? AND assigned_to = ? AND workflow_status = 'active' AND assignment_queue = ?
     ");
-    $upd->execute([$sid, $username]);
+    $upd->execute([$sid, $username, $queue]);
     if ($upd->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط لهذا المتجر أو تمت معالجته مسبقاً.'], 400);
     }
+    $roleLabel = $queue === 'inactive' ? 'inactive_manager' : 'active_manager';
+    $detail = $queue === 'inactive'
+        ? 'طابور الاستعادة — عدم رد — يُستبدل من المجمع'
+        : 'نُقل المتجر إلى قائمة المتابعة (عدم رد)';
     $pdo->prepare("
         INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
-        VALUES (?, ?, 'استبيان — عدم الرد', 'نُقل المتجر إلى قائمة المتابعة (عدم رد)', ?, 'active_manager')
-    ")->execute([$storeId, $input['store_name'] ?? '', $username]);
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([$storeId, $input['store_name'] ?? '', $queue === 'inactive' ? 'استعادة — عدم رد' : 'استبيان — عدم الرد', $detail, $username, $roleLabel]);
 
-    $added = fill_slots_for_user($pdo, $username, $username, null);
-    jsonResponse(['success' => true, 'replacement_added' => $added]);
+    $added = $queue === 'inactive'
+        ? fill_inactive_slots_for_user($pdo, $username, $username, null)
+        : fill_slots_for_user($pdo, $username, $username, null);
+    jsonResponse(['success' => true, 'replacement_added' => $added, 'queue' => $queue]);
 }
 
 // ========== POST: بعد إكمال الاستبيان — إزالة من الطابور + تعبئة ==========
@@ -168,7 +280,7 @@ elseif ($action === 'release_after_survey') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
     $sid = (string) $storeId;
-    $del = $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ? AND assigned_to = ?");
+    $del = $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'");
     $del->execute([$sid, $username]);
     if ($del->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
@@ -192,6 +304,22 @@ elseif ($action === 'fill_all_queues') {
         $report[$u] = $n;
     }
     jsonResponse(['success' => true, 'filled_per_user' => $report]);
+}
+
+elseif ($action === 'fill_all_inactive_queues') {
+    $role = trim((string) ($input['user_role'] ?? ''));
+    if ($role !== 'executive') {
+        jsonResponse(['success' => false, 'error' => 'غير مصرّح — المدير التنفيذي فقط.'], 403);
+    }
+    $by = trim((string) ($input['assigned_by'] ?? 'system'));
+    $stmt = $pdo->query("SELECT username FROM users WHERE role = 'inactive_manager'");
+    $users = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $report = [];
+    foreach ($users as $u) {
+        $n = fill_inactive_slots_for_user($pdo, $u, $by, null);
+        $report[$u] = $n;
+    }
+    jsonResponse(['success' => true, 'filled_inactive_per_user' => $report]);
 }
 
 // ========== GET: كل متاجر عدم الرد (للمدير) ==========

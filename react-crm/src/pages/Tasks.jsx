@@ -9,7 +9,7 @@ import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer } from '../services/api'
+import { getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const MIN_TASK_NOTE_LENGTH = 10
@@ -58,6 +58,10 @@ function taskIsNoAnswer(task, callLogs, assignments) {
     const a = assignments[String(task.store.id)] || assignments[task.store.id]
     if (a?.workflow_status === 'no_answer') return true
   }
+  if (task.type === 'recovery_call' && task.workflowQueue === 'inactive' && assignments) {
+    const a = assignments[String(task.store.id)] || assignments[task.store.id]
+    if (a?.assignment_queue === 'inactive' && a?.workflow_status === 'no_answer') return true
+  }
   return false
 }
 
@@ -65,10 +69,40 @@ function taskIsNoAnswer(task, callLogs, assignments) {
 // توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
 // «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
 // ══════════════════════════════════════════════════════════════════
-function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments) {
-  const tasks = []
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf) {
   const today = new Date().toISOString().split('T')[0]
 
+  /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
+  if (userRole === 'inactive_manager') {
+    const tasks = []
+    const rows = [
+      ...(inactiveWf?.active_tasks || []),
+      ...(inactiveWf?.no_answer_tasks || []),
+    ]
+    for (const row of rows) {
+      const store = allStores.find(s => String(s.id) === String(row.store_id))
+      if (!store) continue
+      const log = callLogs[store.id] || {}
+      const lastCallDate = latestCallEntry(log)?.date
+      const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
+      const daysSinceLast = lastCallDate
+        ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
+        : 999
+      if (callTodayHidesTask) continue
+      tasks.push({
+        id: `${store.id}-recovery-inactive`,
+        store,
+        priority: daysSinceLast >= 7 ? 'high' : 'normal',
+        type: 'recovery_call',
+        label: 'مكالمة استعادة',
+        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'لم يُتصل به مطلقاً',
+        workflowQueue: 'inactive',
+      })
+    }
+    return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
+  }
+
+  const tasks = []
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
@@ -115,7 +149,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (['hot_inactive', 'cold_inactive'].includes(dbCat) && ['inactive_manager', 'executive'].includes(userRole)) {
+    if (['hot_inactive', 'cold_inactive'].includes(dbCat) && userRole === 'executive') {
       if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-recovery`, store,
@@ -405,6 +439,18 @@ export default function Tasks() {
   const [doneSaving, setDoneSaving] = useState(false)
   const [doneModalErr, setDoneModalErr] = useState('')
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
+  /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
+  const [inactiveWf, setInactiveWf] = useState(null)
+
+  const loadInactiveWf = useCallback(async () => {
+    if (user?.role !== 'inactive_manager' || !user?.username) return
+    try {
+      const res = await getMyWorkflow(user.username, { queue: 'inactive' })
+      if (res?.success) setInactiveWf(res)
+    } catch {
+      setInactiveWf(null)
+    }
+  }, [user?.role, user?.username])
 
   const loadDismissals = useCallback(() => {
     const u = user?.username
@@ -422,9 +468,13 @@ export default function Tasks() {
     loadDismissals()
   }, [loadDismissals, lastLoaded])
 
+  useEffect(() => {
+    loadInactiveWf()
+  }, [loadInactiveWf, lastLoaded])
+
   const tasks = useMemo(
-    () => generateTasks(allStores, callLogs, storeStates, user?.role, user?.username, assignments),
-    [allStores, callLogs, storeStates, user, assignments]
+    () => generateTasks(allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf),
+    [allStores, callLogs, storeStates, user, assignments, inactiveWf]
   )
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
@@ -497,7 +547,16 @@ export default function Tasks() {
         if (!DISABLE_POINTS_AND_PERFORMANCE) {
           onCallSaved(res?.points_awarded ?? 0)
         }
+        if (task.workflowQueue === 'inactive' && user?.username) {
+          await markSurveyNoAnswer({
+            store_id: task.store.id,
+            store_name: task.store.name,
+            username: user.username,
+            queue: 'inactive',
+          })
+        }
         await reload()
+        await loadInactiveWf()
         loadDismissals()
         setFilter('no_answer')
         return
@@ -589,6 +648,14 @@ export default function Tasks() {
             </p>
             {dismissErr && (
               <p className="text-red-300 text-xs mt-1">{dismissErr}</p>
+            )}
+            {user?.role === 'inactive_manager' && inactiveWf?.success && (
+              <p className="text-violet-200/90 text-sm mt-2">
+                طابور الاستعادة:{' '}
+                {(inactiveWf.active_count ?? 0) + (inactiveWf.no_answer_count ?? 0)}
+                {' / '}
+                {inactiveWf.target ?? 50} متجراً غير نشط
+              </p>
             )}
             {pendingTasks.length > 0 && (
               <p className="text-white/40 text-sm mt-2">

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS store_assignments (
 
 ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active';
 ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
+ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active';
 
 -- ─── daily tasks (dismiss "done" per day) ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_task_dismissals (

@@ -127,8 +127,14 @@ export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
 // ─── سير عمل المتاجر النشطة (طابور 50، عدم الرد) ───────────────────────────
-export const getMyWorkflow = (username) =>
-  http.get('/active-workflow.php', { params: { action: 'get_my_workflow', username } }).then(r => r.data)
+/** queue: 'active' | 'inactive' — طابور المسؤول النشط أو موظف الاستعادة (50 متجر) */
+export const getMyWorkflow = (username, extra = {}) =>
+  http
+    .get('/active-workflow.php', { params: { action: 'get_my_workflow', username, ...extra } })
+    .then(r => r.data)
+
+export const fillAllInactiveQueues = (data) =>
+  http.post('/active-workflow.php?action=fill_all_inactive_queues', data).then(r => r.data)
 
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
