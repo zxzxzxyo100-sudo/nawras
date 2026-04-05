@@ -8,7 +8,7 @@ import StoreDrawer from '../components/StoreDrawer'
 import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { assignStore, listUsers } from '../services/api'
+import { assignStore, listUsers, markSurveyNoAnswer } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
@@ -38,8 +38,27 @@ export default function ActiveStores() {
   const [assignFilter, setAssignFilter]   = useState('all')
   /** متجر نافذة الاستبيان (منفصل عن «المحدد» حتى يبقى الاستبيان مفتوحاً عند إغلاق الدرج) */
   const [surveyModalStore, setSurveyModalStore] = useState(null)
+  const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
 
   const isExecutive = user?.role === 'executive'
+  const isActiveManager = user?.role === 'active_manager'
+
+  async function handleWorkflowNoAnswer(store) {
+    if (!user?.username) return
+    setWorkflowNoAnswerLoading(store.id)
+    try {
+      await markSurveyNoAnswer({
+        store_id: store.id,
+        store_name: store.name,
+        username: user.username,
+      })
+      await reload()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setWorkflowNoAnswerLoading(null)
+    }
+  }
 
   /** نشط قيد المكالمة — ليس «منجز» */
   const active = useMemo(() => {
@@ -595,6 +614,13 @@ export default function ActiveStores() {
                 surveyByStoreId,
               )}
             onEliteSurveyClick={store => setSurveyModalStore(store)}
+            eliteWorkflowNoAnswer={s => (
+              isActiveManager
+              && assignments[s.id]?.assigned_to === user?.username
+              && assignments[s.id]?.workflow_status !== 'no_answer'
+            )}
+            onEliteWorkflowNoAnswer={handleWorkflowNoAnswer}
+            eliteWorkflowNoAnswerLoadingId={workflowNoAnswerLoading}
           />
         </>
       )}

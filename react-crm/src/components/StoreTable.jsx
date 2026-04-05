@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ExternalLink,
   Phone,
+  PhoneOff,
   RotateCcw,
   ClipboardList,
 } from 'lucide-react'
@@ -40,6 +41,10 @@ export default function StoreTable({
   onEliteSurveyClick,
   /** فتح الاستعادة / التفاصيل (وضع elite) */
   onRestoreStore,
+  /** عدم رد — سير عمل الطابور (يُعرض بجانب الاتصال عندما تعيد الدالة true) */
+  eliteWorkflowNoAnswer,
+  onEliteWorkflowNoAnswer,
+  eliteWorkflowNoAnswerLoadingId,
   /**
    * تلوين صفوف (غير نشط ساخن/بارد): getStyle يعيد خلفية/لون نص؛ paintMode + onPaintClick للتلوين بالنقر
    */
@@ -485,6 +490,22 @@ export default function StoreTable({
                           >
                             <Phone size={16} strokeWidth={2} className="text-violet-600 drop-shadow-[0_0_4px_rgba(139,92,246,0.2)]" />
                           </button>
+                          {typeof eliteWorkflowNoAnswer === 'function'
+                            && eliteWorkflowNoAnswer(store)
+                            && typeof onEliteWorkflowNoAnswer === 'function' && (
+                            <button
+                              type="button"
+                              title="عدم الرد — يُنقل للمتابعة ويُستبدل في الطابور"
+                              disabled={eliteWorkflowNoAnswerLoadingId === store.id}
+                              onClick={e => {
+                                e.stopPropagation()
+                                onEliteWorkflowNoAnswer(store)
+                              }}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 transition-all hover:bg-amber-100 disabled:opacity-45"
+                            >
+                              <PhoneOff size={16} strokeWidth={2} />
+                            </button>
+                          )}
                           {typeof eliteNeedsSurvey === 'function' && eliteNeedsSurvey(store) && (
                             <button
                               type="button"

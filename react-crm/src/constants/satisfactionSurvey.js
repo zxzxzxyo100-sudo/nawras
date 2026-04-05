@@ -51,6 +51,13 @@ export const PENDING_CALL_PIPELINE_CATEGORIES = new Set([
   'active_pending_calls',
 ])
 
+/** متاجر غير نشطة (ساخن/بارد) — ملاحظة نصية بدل استبيان الـ 6 أسئلة في مكالمة عامة */
+export const INACTIVE_MERCHANT_CATEGORIES = new Set(['hot_inactive', 'cold_inactive'])
+
+export function isInactiveMerchantCategory(category) {
+  return INACTIVE_MERCHANT_CATEGORIES.has(category || '')
+}
+
 function hasSurveyRecord(storeId, surveyByStoreId) {
   if (storeId == null || !surveyByStoreId) return false
   return !!(

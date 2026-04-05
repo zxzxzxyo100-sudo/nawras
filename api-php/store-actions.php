@@ -36,6 +36,36 @@ function ensure_incubation_call_columns(PDO $pdo) {
     $done = true;
 }
 
+/** نوع السجل في الاستبيان: نشط (CSAT) مقابل ملاحظة نصية لمتجر غير نشط */
+function ensure_surveys_survey_kind(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE surveys ADD COLUMN survey_kind VARCHAR(32) NULL DEFAULT 'active_csat'");
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
+/** أعمدة سير العمل في التعيينات (طابور 50 / عدم رد) */
+function ensure_store_assignments_workflow(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec('ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP');
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
 /** تاريخ آخر مكالمة أنشأت حالة «منجز» (للعودة التلقائية بعد 30 يوماً) */
 function ensure_last_call_date_column(PDO $pdo) {
     static $done = false;
@@ -409,6 +439,44 @@ elseif ($action === 'get_all_calllogs') {
 
 // ========== SAVE SURVEY ==========
 elseif ($action === 'save_survey') {
+    ensure_surveys_survey_kind($pdo);
+    $surveyKind = trim((string) ($input['survey_kind'] ?? 'active_csat'));
+
+    // ── متجر غير نشط: ملاحظة نصية إلزامية (لا أسئلة متعددة) — لا تُحتسب ضمن CSAT ──
+    if ($surveyKind === 'inactive_feedback') {
+        $text = trim((string) ($input['inactive_feedback'] ?? $input['suggestions'] ?? ''));
+        if (function_exists('mb_strlen')) {
+            if (mb_strlen($text) < 10) {
+                jsonResponse(['success' => false, 'error' => 'يجب كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».'], 400);
+            }
+        } elseif (strlen($text) < 10) {
+            jsonResponse(['success' => false, 'error' => 'يجب كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».'], 400);
+        }
+        $storeId = (int) ($input['store_id'] ?? 0);
+        if ($storeId <= 0) {
+            jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+        }
+        try {
+            $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+        } catch (Throwable $e) {
+        }
+        $neutral = 3;
+        $submittedUser = trim((string) ($input['username'] ?? ''));
+        $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'inactive_feedback')")
+            ->execute([
+                $storeId, $neutral, $neutral, $neutral, $neutral, $neutral, $neutral,
+                $text,
+                $input['user'] ?? '',
+                $submittedUser !== '' ? $submittedUser : null,
+            ]);
+        $detail = 'ملاحظة متجر غير نشط — ماذا قال المتجر: ' . $text;
+        $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, 'ملاحظة متجر غير نشط', ?, ?, ?)")
+            ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
+        jsonResponse(['success' => true]);
+    }
+
     $answers = $input['answers'] ?? null;
     if (!is_array($answers) || count($answers) !== 6) {
         jsonResponse(['success' => false, 'error' => 'يجب إرسال ستة تقييمات (1–5) لكل سؤال.'], 400);
@@ -432,8 +500,8 @@ elseif ($action === 'save_survey') {
     } catch (Throwable $e) {
     }
     $submittedUser = trim((string) ($input['username'] ?? ''));
-    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active_csat')")
         ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
 
     $detail = sprintf(
@@ -681,6 +749,7 @@ elseif ($action === 'get_assignments') {
         assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
         notes        TEXT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    ensure_store_assignments_workflow($pdo);
 
     $stmt = $pdo->query("SELECT * FROM store_assignments ORDER BY assigned_at DESC");
     $data = [];
@@ -700,6 +769,7 @@ elseif ($action === 'assign_store') {
         assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
         notes        TEXT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    ensure_store_assignments_workflow($pdo);
 
     $storeId   = $input['store_id']   ?? '';
     $storeName = $input['store_name'] ?? '';
@@ -713,13 +783,14 @@ elseif ($action === 'assign_store') {
         // إلغاء التعيين
         $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ?")->execute([$storeId]);
     } else {
-        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes)
-            VALUES (?, ?, ?, ?, ?)
+        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status)
+            VALUES (?, ?, ?, ?, ?, 'active')
             ON DUPLICATE KEY UPDATE
                 assigned_to  = VALUES(assigned_to),
                 assigned_by  = VALUES(assigned_by),
                 notes        = VALUES(notes),
                 store_name   = VALUES(store_name),
+                workflow_status = 'active',
                 assigned_at  = CURRENT_TIMESTAMP")
             ->execute([$storeId, $storeName, $assignTo, $assignBy, $notes]);
     }

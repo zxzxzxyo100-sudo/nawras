@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ClipboardList, RefreshCw, Users, AlertTriangle, Loader2 } from 'lucide-react'
+import { ClipboardList, RefreshCw, Users, AlertTriangle, Loader2, Phone, PhoneOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import StoreDrawer from '../components/StoreDrawer'
@@ -9,6 +9,7 @@ import {
   getMyWorkflow,
   fillAllActiveQueues,
   listAllNoAnswerWorkflow,
+  markSurveyNoAnswer,
 } from '../services/api'
 
 function findStoreInContext(stores, storeStates, id) {
@@ -37,6 +38,7 @@ export default function ActiveWorkflow() {
   const [err, setErr] = useState('')
   const [filling, setFilling] = useState(false)
   const [execNoAnswer, setExecNoAnswer] = useState([])
+  const [noAnswerRowLoading, setNoAnswerRowLoading] = useState(null)
   const [selected, setSelected] = useState(null)
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [workflowStatusForDrawer, setWorkflowStatusForDrawer] = useState(null)
@@ -98,6 +100,25 @@ export default function ActiveWorkflow() {
     const st = findStoreInContext(stores, storeStates, row.store_id)
     setSelected(st)
     setWorkflowStatusForDrawer(workflowStatus)
+  }
+
+  async function handleNoAnswerActiveRow(row) {
+    if (!username) return
+    setNoAnswerRowLoading(row.store_id)
+    setErr('')
+    try {
+      await markSurveyNoAnswer({
+        store_id: row.store_id,
+        store_name: row.store_name || '',
+        username,
+      })
+      await reload()
+      await loadWf()
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message || 'تعذّر تسجيل عدم الرد')
+    } finally {
+      setNoAnswerRowLoading(null)
+    }
   }
 
   const target = wf?.target ?? 50
@@ -202,6 +223,30 @@ export default function ActiveWorkflow() {
                               className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
                             >
                               تفاصيل
+                            </button>
+                            {(() => {
+                              const st = findStoreInContext(stores, storeStates, row.store_id)
+                              const tel = st?.phone
+                              return (
+                                <a
+                                  href={tel ? `tel:${tel}` : undefined}
+                                  aria-disabled={!tel}
+                                  onClick={e => { if (!tel) e.preventDefault() }}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 ${!tel ? 'pointer-events-none opacity-40' : ''}`}
+                                >
+                                  <Phone size={14} />
+                                  اتصل
+                                </a>
+                              )
+                            })()}
+                            <button
+                              type="button"
+                              onClick={() => handleNoAnswerActiveRow(row)}
+                              disabled={noAnswerRowLoading === row.store_id}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border-2 border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              <PhoneOff size={14} />
+                              {noAnswerRowLoading === row.store_id ? 'جارٍ…' : 'عدم الرد'}
                             </button>
                             <button
                               type="button"

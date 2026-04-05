@@ -10,7 +10,10 @@ import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import {
   SATISFACTION_QUESTIONS,
   needsActiveSatisfactionSurvey,
+  isInactiveMerchantCategory,
 } from '../constants/satisfactionSurvey'
+
+const MIN_INACTIVE_FEEDBACK_LEN = 10
 
 function StarRow({ value, onChange }) {
   return (
@@ -63,12 +66,21 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
   const [error,   setError]   = useState('')
   const [ratings, setRatings] = useState(() => Array(6).fill(0))
   const [suggestions, setSuggestions] = useState('')
+  const [inactiveFeedback, setInactiveFeedback] = useState('')
 
   const dbCategory = storeStates[store.id]?.category || store.category || ''
-  const surveyNeeded = useMemo(
-    () => callType === 'general' && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
-    [callType, store.id, dbCategory, surveyByStoreId],
+  const inactiveFeedbackNeeded = useMemo(
+    () => callType === 'general' && isInactiveMerchantCategory(dbCategory),
+    [callType, dbCategory],
   )
+  const surveyNeeded = useMemo(
+    () =>
+      callType === 'general'
+      && !inactiveFeedbackNeeded
+      && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
+    [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded],
+  )
+  const inactiveFeedbackOk = inactiveFeedback.trim().length >= MIN_INACTIVE_FEEDBACK_LEN
   const allSurveyRated = ratings.every(r => r >= 1 && r <= 5)
 
   useEffect(() => {
@@ -77,6 +89,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
     setError('')
     setRatings(Array(6).fill(0))
     setSuggestions('')
+    setInactiveFeedback('')
   }, [store.id])
 
   function setRating(i, v) {
@@ -90,13 +103,28 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
   async function handleSave() {
     setSaving(true)
     setError('')
+    if (inactiveFeedbackNeeded && !inactiveFeedbackOk) {
+      setError(`يرجى كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».`)
+      setSaving(false)
+      return
+    }
     if (surveyNeeded && !allSurveyRated) {
       setError('يرجى تقييم كل الأسئلة الستة من 1 إلى 5 قبل حفظ المكالمة.')
       setSaving(false)
       return
     }
     try {
-      if (surveyNeeded) {
+      if (inactiveFeedbackNeeded) {
+        await saveSurvey({
+          store_id: store.id,
+          store_name: store.name,
+          survey_kind: 'inactive_feedback',
+          inactive_feedback: inactiveFeedback.trim(),
+          user: user?.fullname ?? '',
+          user_role: user?.role ?? '',
+          username: user?.username ?? '',
+        })
+      } else if (surveyNeeded) {
         await saveSurvey({
           store_id: store.id,
           store_name: store.name,
@@ -131,7 +159,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
     } catch (e) {
       const msg =
         e?.response?.data?.error
-        || (surveyNeeded ? 'تعذّر حفظ الاستبيان أو المكالمة.' : 'فشل حفظ المكالمة، حاول مرة أخرى')
+        || (inactiveFeedbackNeeded || surveyNeeded ? 'تعذّر حفظ الاستبيان أو المكالمة.' : 'فشل حفظ المكالمة، حاول مرة أخرى')
       setError(msg)
       setSaving(false)
     }
@@ -144,7 +172,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         animate={{ scale: 1,    opacity: 1, y: 0  }}
         exit={{   scale: 0.92, opacity: 0, y: 20 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
-        className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${surveyNeeded ? 'max-w-lg' : 'max-w-md'}`}
+        className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${surveyNeeded || inactiveFeedbackNeeded ? 'max-w-lg' : 'max-w-md'}`}
         style={{ fontFamily: "'Cairo', sans-serif" }}
       >
         {/* Header */}
@@ -232,6 +260,25 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
             </div>
           </div>
 
+          {inactiveFeedbackNeeded && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+              <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
+              <p className="text-[11px] text-amber-900/85 leading-relaxed">
+                ملاحظة إلزامية للمتاجر غير النشطة — اكتب ما دار في المحادثة ({MIN_INACTIVE_FEEDBACK_LEN} أحرف فأكثر).
+              </p>
+              <textarea
+                value={inactiveFeedback}
+                onChange={e => setInactiveFeedback(e.target.value)}
+                rows={5}
+                placeholder="اكتب ملخص رد المتجر..."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y min-h-[120px]"
+              />
+              <p className="text-[11px] text-slate-500 tabular-nums">
+                {inactiveFeedback.trim().length}/{MIN_INACTIVE_FEEDBACK_LEN} حرفاً على الأقل
+              </p>
+            </div>
+          )}
+
           {surveyNeeded && (
             <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
               <div>
@@ -280,7 +327,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         <div className="flex gap-3 px-5 pb-5">
           <motion.button
             onClick={handleSave}
-            disabled={saving || (surveyNeeded && !allSurveyRated)}
+            disabled={saving || (surveyNeeded && !allSurveyRated) || (inactiveFeedbackNeeded && !inactiveFeedbackOk)}
             whileHover={{ scale: saving ? 1 : 1.02 }}
             whileTap={{ scale: 0.97 }}
             className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60"
