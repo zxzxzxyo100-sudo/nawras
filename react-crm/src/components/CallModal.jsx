@@ -104,6 +104,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
           suggestions: suggestions.trim(),
           user: user?.fullname ?? '',
           user_role: user?.role ?? '',
+          username: user?.username ?? '',
         })
       }
       const payload = {

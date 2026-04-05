@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Star, ClipboardList } from 'lucide-react'
-import { saveSurvey } from '../services/api'
+import { saveSurvey, markSurveyNoAnswer, releaseAfterSurvey } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from './StoreNameWithId'
 import {
@@ -38,11 +38,20 @@ function StarRow({ value, onChange }) {
 /**
  * استبيان رضا العميل — متاجر نشطة (لوحة قيد المكالمة)
  */
-export default function ActiveStoreSurveyModal({ store, onClose, onSaved }) {
+export default function ActiveStoreSurveyModal({
+  store,
+  onClose,
+  onSaved,
+  /** ربط بسير عمل الطابور: إرسال + عدم رد + إزالة بعد الحفظ */
+  workflowMode = false,
+  username: workflowUsernameProp,
+}) {
   const { user } = useAuth()
+  const workflowUsername = workflowUsernameProp ?? user?.username ?? ''
   const [ratings, setRatings] = useState(() => Array(5).fill(0))
   const [suggestions, setSuggestions] = useState('')
   const [saving, setSaving] = useState(false)
+  const [noAnswerLoading, setNoAnswerLoading] = useState(false)
   const [error, setError] = useState('')
 
   const allStarsSet = ratings.every(r => r >= 1 && r <= 5)
@@ -81,15 +90,40 @@ export default function ActiveStoreSurveyModal({ store, onClose, onSaved }) {
       suggestions: suggestions.trim(),
       user: user?.fullname ?? '',
       user_role: user?.role ?? '',
+      username: workflowUsername || undefined,
     }
 
     setSaving(true)
     saveSurvey(payload)
-      .then(() => onSaved?.())
+      .then(async () => {
+        if (workflowMode && workflowUsername) {
+          await releaseAfterSurvey({ store_id: store.id, username: workflowUsername })
+        }
+        onSaved?.()
+      })
       .catch(err => {
         setError(err.response?.data?.error || 'تعذّر حفظ الاستبيان.')
       })
       .finally(() => setSaving(false))
+  }
+
+  async function handleNoAnswer() {
+    if (!workflowMode || !workflowUsername) return
+    setError('')
+    setNoAnswerLoading(true)
+    try {
+      await markSurveyNoAnswer({
+        store_id: store.id,
+        store_name: store.name,
+        username: workflowUsername,
+      })
+      onSaved?.()
+      onClose()
+    } catch (err) {
+      setError(err.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
+      setNoAnswerLoading(false)
+    }
   }
 
   return (
@@ -191,21 +225,33 @@ export default function ActiveStoreSurveyModal({ store, onClose, onSaved }) {
             )}
           </div>
 
-          <div className="shrink-0 flex flex-col-reverse sm:flex-row gap-2 px-4 py-3 sm:px-5 border-t border-slate-100 bg-slate-50/90">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-white transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !allStarsSet}
-              className="w-full sm:flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-black transition-colors"
-            >
-              {saving ? 'جارٍ الإرسال…' : 'إرسال الاستبيان'}
-            </button>
+          <div className="shrink-0 flex flex-col gap-2 px-4 py-3 sm:px-5 border-t border-slate-100 bg-slate-50/90">
+            {workflowMode && (
+              <button
+                type="button"
+                onClick={handleNoAnswer}
+                disabled={noAnswerLoading || saving}
+                className="w-full py-2.5 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm font-black hover:bg-amber-100 disabled:opacity-50"
+              >
+                {noAnswerLoading ? 'جارٍ التسجيل…' : 'عدم الرد'}
+              </button>
+            )}
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-white transition-colors"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !allStarsSet || noAnswerLoading}
+                className="w-full sm:flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-black transition-colors"
+              >
+                {saving ? 'جارٍ الإرسال…' : 'إرسال الاستبيان'}
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

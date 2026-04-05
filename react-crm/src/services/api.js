@@ -79,6 +79,27 @@ export const getSurveys = () =>
 export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
+// ─── سير عمل المتاجر النشطة (طابور 50، عدم الرد) ───────────────────────────
+export const getMyWorkflow = (username) =>
+  http.get('/active-workflow.php', { params: { action: 'get_my_workflow', username } }).then(r => r.data)
+
+export const markSurveyNoAnswer = (data) =>
+  http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
+
+export const releaseAfterSurvey = (data) =>
+  http.post('/active-workflow.php?action=release_after_survey', data).then(r => r.data)
+
+export const fillAllActiveQueues = (data) =>
+  http.post('/active-workflow.php?action=fill_all_queues', data).then(r => r.data)
+
+export const listAllNoAnswerWorkflow = (userRole) =>
+  http.get('/active-workflow.php', { params: { action: 'list_all_no_answer', user_role: userRole } }).then(r => r.data)
+
+export const getAssignmentStatus = (storeId, username) =>
+  http
+    .get('/active-workflow.php', { params: { action: 'get_assignment_status', store_id: storeId, username } })
+    .then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http

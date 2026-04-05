@@ -111,6 +111,23 @@ elseif ($action === 'set_status') {
         jsonResponse(['success' => false, 'error' => $err], 400);
     }
 
+    // موظف نشط: لا يجمّد متجراً في حالة «عدم رد» ضمن سير العمل
+    if ($category === 'frozen' && ($userRole ?? '') === 'active_manager') {
+        try {
+            $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+        } catch (Throwable $e) {
+        }
+        $un = trim((string) ($input['username'] ?? ''));
+        if ($un !== '') {
+            $stAsg = $pdo->prepare('SELECT workflow_status FROM store_assignments WHERE store_id = ? AND assigned_to = ?');
+            $stAsg->execute([(string) $storeId, $un]);
+            $asgRow = $stAsg->fetch(PDO::FETCH_ASSOC);
+            if ($asgRow && ($asgRow['workflow_status'] ?? '') === 'no_answer') {
+                jsonResponse(['success' => false, 'error' => 'لا يمكن تجميد متجر مُعلَّم «عدم رد» من حسابك. المتابعة من المدير التنفيذي.'], 403);
+            }
+        }
+    }
+
     // رفع التجميد: إفراغ سبب التجميد في السجل — العودة إلى «نشط قيد المكالمة»
     if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
         $freezeReason = '';
@@ -410,9 +427,14 @@ elseif ($action === 'save_survey') {
         jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
     }
 
-    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '']);
+    try {
+        $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+    } catch (Throwable $e) {
+    }
+    $submittedUser = trim((string) ($input['username'] ?? ''));
+    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
 
     $detail = sprintf(
         'تقييمات (1–5): سرعة التوصيل=%d، التجميع=%d، الدعم=%d، المنظومة=%d، التسويات=%d، المرجوعات=%d.',
