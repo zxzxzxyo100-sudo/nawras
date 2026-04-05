@@ -6,21 +6,54 @@ const http = axios.create({ baseURL: BASE })
 
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
-/** تسجيل الدخول — يمرّر رسالة الخادم العربية بدل رسالة axios عند 401 */
+/** يستخرج نص الخطأ من جسم الاستجابة (JSON كائن، أو نص JSON، أو حقول شائعة) */
+function parseApiErrorBody(data) {
+  if (data == null) return ''
+  if (typeof data === 'string') {
+    const t = data.trim()
+    if (t.startsWith('{')) {
+      try {
+        const o = JSON.parse(t)
+        return parseApiErrorBody(o)
+      } catch {
+        return t.length > 200 ? '' : t
+      }
+    }
+    return t.length > 200 ? '' : t
+  }
+  if (typeof data === 'object') {
+    const err = data.error ?? data.message ?? data.detail
+    if (err != null && String(err).trim() !== '') return String(err)
+  }
+  return ''
+}
+
+const FALLBACK_401_AR =
+  'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم وكلمة المرور؛ على التجريبي تأكد أن الحساب موجود في قاعدة بيانات التجريب وليس الإنتاج فقط.'
+
+/** تسجيل الدخول — يمرّر رسالة الخادم العربية بدل رسالة axios الافتراضية */
 export async function login(username, password) {
   try {
     const r = await http.post('/auth.php?action=login', { username, password })
     return r.data
   } catch (e) {
-    const data = e.response?.data
-    const msg =
-      (data && typeof data === 'object' && data.error)
-        ? String(data.error)
-        : e.response?.status === 401
-          ? 'بيانات الدخول غير صحيحة. على البيئة التجريبية: تأكد أن المستخدم موجود في قاعدة البيانات التجريبية (قد يختلف عن الإنتاج) وأن كلمة المرور مطابقة لما في الجدول.'
-          : (e.message || 'تعذّر الاتصال بالخادم')
+    const status = e.response?.status
+    const fromBody = parseApiErrorBody(e.response?.data)
+    let msg = fromBody
+    if (!msg && status === 401) msg = FALLBACK_401_AR
+    if (!msg && /status code 401/i.test(String(e.message))) msg = FALLBACK_401_AR
+    if (!msg) msg = e.message || 'تعذّر الاتصال بالخادم'
+    if (/^Request failed with status code \d+$/i.test(msg) && status === 401) msg = FALLBACK_401_AR
+    if (/^Request failed with status code \d+$/i.test(msg) && status) msg = `حدث خطأ (${status}). حاول مرة أخرى.`
     throw new Error(msg)
   }
+}
+
+/** للعرض في الواجهة إن وصل خطأ axios مباشرة دون تمرير عبر login() */
+export function formatAuthError(err) {
+  const m = err?.message || String(err)
+  if (/Request failed with status code 401|status code 401/i.test(m)) return FALLBACK_401_AR
+  return m
 }
 
 export const listUsers = () =>
@@ -94,8 +127,14 @@ export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
 // ─── سير عمل المتاجر النشطة (طابور 50، عدم الرد) ───────────────────────────
-export const getMyWorkflow = (username) =>
-  http.get('/active-workflow.php', { params: { action: 'get_my_workflow', username } }).then(r => r.data)
+/** queue: 'active' | 'inactive' — طابور المسؤول النشط أو موظف الاستعادة (50 متجر) */
+export const getMyWorkflow = (username, extra = {}) =>
+  http
+    .get('/active-workflow.php', { params: { action: 'get_my_workflow', username, ...extra } })
+    .then(r => r.data)
+
+export const fillAllInactiveQueues = (data) =>
+  http.post('/active-workflow.php?action=fill_all_inactive_queues', data).then(r => r.data)
 
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
