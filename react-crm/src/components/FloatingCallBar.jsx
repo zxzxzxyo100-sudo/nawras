@@ -5,6 +5,8 @@ import { useStores }  from '../contexts/StoresContext'
 import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import CallModal      from './CallModal'
+import CustomerSatisfactionModal from './CustomerSatisfactionModal'
+import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const CAT_COLORS = {
   active_shipping:      { bg: '#10b981', label: 'نشط' },
@@ -21,13 +23,14 @@ const CAT_COLORS = {
 }
 
 export default function FloatingCallBar() {
-  const { allStores } = useStores()
+  const { allStores, storeStates, surveyByStoreId, reload } = useStores()
   const { todayCalls, goalPct } = usePoints()
 
   const [open,       setOpen]       = useState(false)
   const [query,      setQuery]      = useState('')
   const [selected,   setSelected]   = useState(null)   // store to call
   const [showModal,  setShowModal]  = useState(false)
+  const [showSurveyModal, setShowSurveyModal] = useState(false)
   const inputRef = useRef(null)
 
   // فتح اللوحة → focus على البحث تلقائياً
@@ -52,7 +55,12 @@ export default function FloatingCallBar() {
   function callSelected() {
     if (!selected) return
     setOpen(false)
-    setShowModal(true)
+    const cat = storeStates[selected.id]?.category || selected.category || ''
+    if (needsActiveSatisfactionSurvey(selected.id, cat, surveyByStoreId)) {
+      setShowSurveyModal(true)
+    } else {
+      setShowModal(true)
+    }
   }
 
   const pulsing = !DISABLE_POINTS_AND_PERFORMANCE && goalPct < 100
@@ -240,12 +248,23 @@ export default function FloatingCallBar() {
         )}
       </AnimatePresence>
 
+      {showSurveyModal && selected && (
+        <CustomerSatisfactionModal
+          store={selected}
+          onClose={() => { setShowSurveyModal(false); setSelected(null) }}
+          onSaved={async () => {
+            await reload()
+            setShowSurveyModal(false)
+            setShowModal(true)
+          }}
+        />
+      )}
       {/* ─── CallModal ───────────────────────────────────────────── */}
       {showModal && selected && (
         <CallModal
           store={selected}
           onClose={() => { setShowModal(false); setSelected(null) }}
-          onSaved={() => {}}
+          onSaved={reload}
         />
       )}
     </>

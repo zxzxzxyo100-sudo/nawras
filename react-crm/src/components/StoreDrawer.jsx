@@ -4,6 +4,8 @@ import { setStoreStatus, getAuditLog } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
+import CustomerSatisfactionModal from './CustomerSatisfactionModal'
+import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { formatCallOutcome } from '../constants/callOutcomes'
 import {
   isRecoveryCompletedByShipment,
@@ -25,8 +27,9 @@ const CATEGORY_LABELS = {
 
 export default function StoreDrawer({ store, onClose }) {
   const { user } = useAuth()
-  const { callLogs, storeStates, reload } = useStores()
+  const { callLogs, storeStates, surveyByStoreId, reload } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
+  const [showSurveyModal, setShowSurveyModal] = useState(false)
   /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
   const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
   const [freezeReason, setFreezeReason]     = useState('')
@@ -143,6 +146,14 @@ export default function StoreDrawer({ store, onClose }) {
   const calls = Object.entries(storeLog).map(([type, data]) => ({ type, ...data }))
     .sort((a, b) => new Date(b.date) - new Date(a.date))
 
+  function requestCallModal() {
+    if (needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId)) {
+      setShowSurveyModal(true)
+    } else {
+      setShowCallModal(true)
+    }
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -173,7 +184,7 @@ export default function StoreDrawer({ store, onClose }) {
           <div className="flex flex-wrap gap-2 mt-4">
             <button
               type="button"
-              onClick={() => setShowCallModal(true)}
+              onClick={requestCallModal}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors"
             >
               <Phone size={14} />
@@ -367,6 +378,20 @@ export default function StoreDrawer({ store, onClose }) {
         </div>
       </div>
 
+      {showSurveyModal && (
+        <CustomerSatisfactionModal
+          store={store}
+          onClose={() => setShowSurveyModal(false)}
+          onSaved={async () => {
+            await reload()
+            setShowSurveyModal(false)
+            setShowCallModal(true)
+            getAuditLog(store.id)
+              .then(r => setAuditLog(r.data || []))
+              .catch(() => {})
+          }}
+        />
+      )}
       {showCallModal && (
         <CallModal
           store={store}

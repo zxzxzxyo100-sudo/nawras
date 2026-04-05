@@ -72,6 +72,13 @@ export const getAssignments = () =>
 export const assignStore = (data) =>
   http.post('/store-actions.php?action=assign_store', data).then(r => r.data)
 
+// ─── استبيان رضا العميل (متاجر نشط) ───────────────────────────────────────
+export const getSurveys = () =>
+  http.get('/store-actions.php?action=get_surveys').then(r => r.data)
+
+export const saveSurvey = (data) =>
+  http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
+
 // ─── Incubation ──────────────────────────────────────────────────────────────
 export const getIncubationData = () =>
   http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)
