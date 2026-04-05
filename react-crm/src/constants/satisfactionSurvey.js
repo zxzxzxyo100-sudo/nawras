@@ -61,7 +61,7 @@ function hasSurveyRecord(storeId, surveyByStoreId) {
 }
 
 /**
- * هل يجب إظهار استبيان رضا العميل قبل «تسجيل مكالمة»؟
+ * هل يجب إظهار استبيان رضا العميل ضمن «تسجيل مكالمة» (مكالمة عامة)؟
  * يُطبَّق على متاجر **قيد المكالمة** (النشطة في مسار الشحن) وليس على منجز / لم يُصل / احتضان…
  */
 export function needsActiveSatisfactionSurvey(storeId, category, surveyByStoreId) {

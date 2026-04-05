@@ -5,8 +5,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
 import StoreNameWithId from './StoreNameWithId'
-import CustomerSatisfactionModal from './CustomerSatisfactionModal'
-import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { formatCallOutcome } from '../constants/callOutcomes'
 import {
   isRecoveryCompletedByShipment,
@@ -28,9 +26,8 @@ const CATEGORY_LABELS = {
 
 export default function StoreDrawer({ store, onClose }) {
   const { user } = useAuth()
-  const { callLogs, storeStates, surveyByStoreId, reload } = useStores()
+  const { callLogs, storeStates, reload } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
-  const [showSurveyModal, setShowSurveyModal] = useState(false)
   /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
   const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
   const [freezeReason, setFreezeReason]     = useState('')
@@ -148,11 +145,7 @@ export default function StoreDrawer({ store, onClose }) {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
 
   function requestCallModal() {
-    if (needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId)) {
-      setShowSurveyModal(true)
-    } else {
-      setShowCallModal(true)
-    }
+    setShowCallModal(true)
   }
 
   return (
@@ -380,20 +373,6 @@ export default function StoreDrawer({ store, onClose }) {
         </div>
       </div>
 
-      {showSurveyModal && (
-        <CustomerSatisfactionModal
-          store={store}
-          onClose={() => setShowSurveyModal(false)}
-          onSaved={async () => {
-            await reload()
-            setShowSurveyModal(false)
-            setShowCallModal(true)
-            getAuditLog(store.id)
-              .then(r => setAuditLog(r.data || []))
-              .catch(() => {})
-          }}
-        />
-      )}
       {showCallModal && (
         <CallModal
           store={store}
