@@ -1,12 +1,34 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle,
+  Phone, RefreshCw, CheckCircle, X,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
+import { usePoints }  from '../contexts/PointsContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
-import { getDailyTaskDismissals, markDailyTaskDone } from '../services/api'
+import { getDailyTaskDismissals, markDailyTaskDone, logCall } from '../services/api'
+
+const MIN_TASK_NOTE_LENGTH = 10
+
+function storeHasShipped(store) {
+  if (!store) return false
+  const n = Number(store.total_shipments ?? 0)
+  if (n > 0) return true
+  const d = store.last_shipment_date
+  return Boolean(d && d !== 'لا يوجد')
+}
+
+/** نوع المكالمة لـ log_call حسب مفتاح المهمة */
+function taskIdToCallType(taskId) {
+  const m = String(taskId).match(/-inc-(call_[123])$/)
+  if (m) {
+    const n = m[1].replace('call_', '')
+    return `inc_call${n}`
+  }
+  return 'general'
+}
 
 // ══════════════════════════════════════════════════════════════════
 // توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
@@ -183,6 +205,7 @@ const TYPE_STYLES = {
 
 function TaskCard({ task, index, onCall, onDone }) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
+  const handleDone = () => onDone(task)
   return (
     <motion.div
       layout
@@ -233,7 +256,7 @@ function TaskCard({ task, index, onCall, onDone }) {
       <div className="flex items-center gap-2 flex-shrink-0">
         <CallButton onClick={() => onCall(task.store)} />
         <motion.button
-          onClick={() => onDone(task.id)}
+          onClick={handleDone}
           whileHover={{ scale: 1.06, y: -1 }}
           whileTap={{ scale: 0.9 }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
@@ -253,14 +276,71 @@ function TaskCard({ task, index, onCall, onDone }) {
 // ══════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ══════════════════════════════════════════════════════════════════
+function IncManagerDoneModal({ task, onClose, onConfirm, saving, error }) {
+  const [note, setNote] = useState('')
+  const ok = note.trim().length >= MIN_TASK_NOTE_LENGTH
+  return (
+    <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[600] p-4" dir="rtl">
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
+      >
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-emerald-50/80">
+          <p className="font-bold text-slate-800 text-sm">إتمام المهمة — محتوى المكالمة</p>
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-slate-600">
+            <span className="font-semibold">{task.store.name}</span>
+            <span className="text-slate-400 mr-2">— {task.label}</span>
+          </p>
+          <label className="block text-xs font-bold text-slate-700">محتوى المكالمة (إلزامي — {MIN_TASK_NOTE_LENGTH} أحرف فأكثر)</label>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={5}
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-y min-h-[120px]"
+            placeholder="اكتب ملخص ما دار في المكالمة..."
+          />
+          <p className="text-[11px] text-slate-400">
+            {note.trim().length}/{MIN_TASK_NOTE_LENGTH} حرفاً على الأقل
+          </p>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              disabled={!ok || saving}
+              onClick={() => onConfirm(note.trim())}
+              className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-bold"
+            >
+              {saving ? 'جارٍ الحفظ...' : 'تأكيد وإخفاء المهمة'}
+            </button>
+            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm">
+              إلغاء
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 export default function Tasks() {
   const { allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded } = useStores()
   const { user } = useAuth()
+  const { onCallSaved } = usePoints()
   const [selected, setSelected] = useState(null)
   /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
   const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
   const [filter, setFilter]     = useState('all')
   const [dismissErr, setDismissErr] = useState('')
+  /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
+  const [pendingDoneTask, setPendingDoneTask] = useState(null)
+  const [doneSaving, setDoneSaving] = useState(false)
+  const [doneModalErr, setDoneModalErr] = useState('')
 
   const loadDismissals = useCallback(() => {
     const u = user?.username
@@ -289,7 +369,7 @@ export default function Tasks() {
     ? pendingTasks.filter(t => t.priority === 'high')
     : pendingTasks
 
-  async function markDone(id) {
+  async function dismissTaskOnly(id) {
     setDismissErr('')
     const u = user?.username
     if (!u) return
@@ -298,6 +378,51 @@ export default function Tasks() {
       setDismissalKeys(prev => new Set([...prev, id]))
     } catch (e) {
       setDismissErr(e.response?.data?.error || 'تعذّر حفظ «تم»')
+    }
+  }
+
+  function requestDone(task) {
+    setDismissErr('')
+    if (user?.role === 'incubation_manager') {
+      setDoneModalErr('')
+      setPendingDoneTask(task)
+      return
+    }
+    dismissTaskOnly(task.id)
+  }
+
+  async function confirmIncManagerDone(note) {
+    const task = pendingDoneTask
+    if (!task || !user?.username) return
+    setDoneSaving(true)
+    setDoneModalErr('')
+    try {
+      const callType = taskIdToCallType(task.id)
+      const payload = {
+        store_id: task.store.id,
+        store_name: task.store.name,
+        call_type: callType,
+        outcome: 'answered',
+        note,
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: task.store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(task.store)
+      }
+      const res = await logCall(payload)
+      if (!DISABLE_POINTS_AND_PERFORMANCE) {
+        onCallSaved(res?.points_awarded ?? 10)
+      }
+      await markDailyTaskDone({ username: user.username, task_key: task.id })
+      setDismissalKeys(prev => new Set([...prev, task.id]))
+      setPendingDoneTask(null)
+      await reload()
+    } catch (e) {
+      setDoneModalErr(e.response?.data?.error || 'فشل حفظ المكالمة أو إتمام المهمة')
+    } finally {
+      setDoneSaving(false)
     }
   }
 
@@ -429,11 +554,21 @@ export default function Tasks() {
                 task={task}
                 index={i}
                 onCall={store => setSelected(store)}
-                onDone={markDone}
+                onDone={requestDone}
               />
             ))}
           </AnimatePresence>
         </motion.div>
+      )}
+
+      {pendingDoneTask && (
+        <IncManagerDoneModal
+          task={pendingDoneTask}
+          saving={doneSaving}
+          error={doneModalErr}
+          onClose={() => { if (!doneSaving) setPendingDoneTask(null) }}
+          onConfirm={confirmIncManagerDone}
+        />
       )}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
