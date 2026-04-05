@@ -49,6 +49,18 @@ function hideDailyTaskDueToCallToday(log, todayIso) {
   return String(top.outcome ?? '').trim() !== 'no_answer'
 }
 
+/** مهمة ضمن تبويب «متاجر لم ترد»: آخر مكالمة عدم رد، أو تعيين سير عمل no_answer */
+function taskIsNoAnswer(task, callLogs, assignments) {
+  const log = callLogs[task.store.id] || {}
+  const top = latestCallEntry(log)
+  if (top && String(top.outcome ?? '').trim() === 'no_answer') return true
+  if (task.type === 'assigned_store' && assignments) {
+    const a = assignments[String(task.store.id)] || assignments[task.store.id]
+    if (a?.workflow_status === 'no_answer') return true
+  }
+  return false
+}
+
 // ══════════════════════════════════════════════════════════════════
 // توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
 // «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
@@ -386,7 +398,7 @@ export default function Tasks() {
   const [selected, setSelected] = useState(null)
   /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
   const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
-  const [filter, setFilter]     = useState('all')
+  const [filter, setFilter]     = useState('all') // 'all' | 'high' | 'no_answer'
   const [dismissErr, setDismissErr] = useState('')
   /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
   const [pendingDoneTask, setPendingDoneTask] = useState(null)
@@ -416,10 +428,26 @@ export default function Tasks() {
   )
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
-  const highCount    = pendingTasks.filter(t => t.priority === 'high').length
-  const displayed    = filter === 'high'
-    ? pendingTasks.filter(t => t.priority === 'high')
-    : pendingTasks
+
+  const { mainTasks, noAnswerTasks, highCountMain } = useMemo(() => {
+    const main = []
+    const noAns = []
+    for (const t of pendingTasks) {
+      if (taskIsNoAnswer(t, callLogs, assignments)) noAns.push(t)
+      else main.push(t)
+    }
+    return {
+      mainTasks: main,
+      noAnswerTasks: noAns,
+      highCountMain: main.filter(t => t.priority === 'high').length,
+    }
+  }, [pendingTasks, callLogs, assignments])
+
+  const displayed = useMemo(() => {
+    if (filter === 'no_answer') return noAnswerTasks
+    if (filter === 'high') return mainTasks.filter(t => t.priority === 'high')
+    return mainTasks
+  }, [filter, mainTasks, noAnswerTasks])
 
   async function dismissTaskOnly(id) {
     setDismissErr('')
@@ -471,6 +499,7 @@ export default function Tasks() {
         }
         await reload()
         loadDismissals()
+        setFilter('no_answer')
         return
       }
       if (task.type === 'assigned_store') {
@@ -481,6 +510,7 @@ export default function Tasks() {
         })
         await reload()
         loadDismissals()
+        setFilter('no_answer')
       }
     } catch (e) {
       setDismissErr(e.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
@@ -562,10 +592,15 @@ export default function Tasks() {
             )}
             {pendingTasks.length > 0 && (
               <p className="text-white/40 text-sm mt-2">
-                {pendingTasks.length.toLocaleString('ar-SA')} مهمة معلقة
-                {highCount > 0 && (
+                {mainTasks.length.toLocaleString('ar-SA')} في القائمة الرئيسية
+                {noAnswerTasks.length > 0 && (
+                  <span className="text-amber-200/90 mr-2">
+                    {' '}— {noAnswerTasks.length.toLocaleString('ar-SA')} متجر لم يُرد
+                  </span>
+                )}
+                {highCountMain > 0 && (
                   <span className="text-amber-300/90 mr-2">
-                    {' '}— {highCount.toLocaleString('ar-SA')} عاجلة
+                    {' '}— {highCountMain.toLocaleString('ar-SA')} عاجلة
                   </span>
                 )}
               </p>
@@ -591,11 +626,12 @@ export default function Tasks() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.18 }}
-        className="flex gap-2"
+        className="flex flex-wrap gap-2"
       >
         {[
-          { val: 'all',  label: 'الكل',             count: pendingTasks.length },
-          { val: 'high', label: 'عالية الأولوية',   count: highCount           },
+          { val: 'all',  label: 'الكل',             count: mainTasks.length },
+          { val: 'high', label: 'عالية الأولوية',   count: highCountMain },
+          { val: 'no_answer', label: 'متاجر لم ترد', count: noAnswerTasks.length },
         ].map(tab => (
           <motion.button
             key={tab.val}
@@ -606,10 +642,17 @@ export default function Tasks() {
                 ? 'text-white shadow-lg'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
-            style={filter === tab.val ? {
-              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
-            } : {}}
+            style={filter === tab.val ? (
+              tab.val === 'no_answer'
+                ? {
+                    background: 'linear-gradient(135deg, #d97706, #b45309)',
+                    boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                  }
+                : {
+                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                  }
+            ) : {}}
           >
             {tab.label}
             <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
@@ -629,14 +672,42 @@ export default function Tasks() {
           transition={{ duration: 0.4 }}
           className="bg-white rounded-3xl p-12 text-center shadow-sm border border-slate-100"
         >
-          <motion.div
-            animate={{ rotate: [0, 12, -12, 0] }}
-            transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 4 }}
-          >
-            <CheckCircle size={56} className="text-emerald-400 mx-auto mb-4" />
-          </motion.div>
-          <p className="font-black text-slate-700 text-xl">أحسنت! لا توجد مهام معلقة</p>
-          <p className="text-slate-400 text-sm mt-2">تم الانتهاء من جميع المهام اليوم 🎉</p>
+          {pendingTasks.length === 0 ? (
+            <>
+              <motion.div
+                animate={{ rotate: [0, 12, -12, 0] }}
+                transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 4 }}
+              >
+                <CheckCircle size={56} className="text-emerald-400 mx-auto mb-4" />
+              </motion.div>
+              <p className="font-black text-slate-700 text-xl">أحسنت! لا توجد مهام معلقة</p>
+              <p className="text-slate-400 text-sm mt-2">تم الانتهاء من جميع المهام اليوم 🎉</p>
+            </>
+          ) : filter === 'no_answer' ? (
+            <>
+              <CheckCircle size={56} className="text-amber-400 mx-auto mb-4" />
+              <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم ترد»</p>
+              <p className="text-slate-500 text-sm mt-2">عند الضغط على «عدم الرد» يُنقل المتجر إلى هذا التبويب</p>
+            </>
+          ) : filter === 'high' ? (
+            <>
+              <CheckCircle size={56} className="text-slate-300 mx-auto mb-4" />
+              <p className="font-black text-slate-700 text-xl">لا توجد مهام عاجلة</p>
+              <p className="text-slate-500 text-sm mt-2">في القائمة الرئيسية حالياً</p>
+            </>
+          ) : filter === 'all' && mainTasks.length === 0 && noAnswerTasks.length > 0 ? (
+            <>
+              <CheckCircle size={56} className="text-amber-400 mx-auto mb-4" />
+              <p className="font-black text-slate-700 text-xl">القائمة الرئيسية فارغة</p>
+              <p className="text-slate-600 text-sm mt-2">
+                {noAnswerTasks.length.toLocaleString('ar-SA')} متجر في تبويب «متاجر لم ترد» — راجعها من هناك
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-bold text-slate-600">لا توجد مهام في هذا التبويب</p>
+            </>
+          )}
         </motion.div>
       ) : (
         <motion.div
