@@ -90,7 +90,40 @@ function inactive_pipeline_where_sql() {
     return "ss.category IN ('hot_inactive','cold_inactive')";
 }
 
+/**
+ * نفس مصدر الواجهة: ملف يُحدَّث عند كل تشغيل لـ all-stores.php
+ * (تصنيف ساخن/بارد يُحسب من API وليس مخزّناً في store_states لكل متجر).
+ */
 function pick_next_inactive_pool_store(PDO $pdo) {
+    $cacheFile = __DIR__ . '/cache/inactive_recovery_pool.json';
+    if (is_readable($cacheFile)) {
+        $raw = @file_get_contents($cacheFile);
+        $j = is_string($raw) ? json_decode($raw, true) : null;
+        $stores = is_array($j) && isset($j['stores']) && is_array($j['stores']) ? $j['stores'] : [];
+        if ($stores !== []) {
+            $stmt = $pdo->query("SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'");
+            $assigned = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $assigned[(string) ($row['store_id'] ?? '')] = true;
+            }
+            foreach ($stores as $row) {
+                $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
+                if ($sid === '' || isset($assigned[$sid])) {
+                    continue;
+                }
+                return [
+                    'store_id'   => $row['store_id'],
+                    'store_name' => $row['store_name'] ?? '',
+                ];
+            }
+            return null;
+        }
+    }
+    return pick_next_inactive_pool_store_from_store_states($pdo);
+}
+
+/** احتياطي: متاجر مسجّلة في store_states كساخن/بارد فقط */
+function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
     $sql = "
         SELECT ss.store_id, ss.store_name
         FROM store_states ss

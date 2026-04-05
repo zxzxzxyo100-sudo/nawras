@@ -640,6 +640,37 @@ if (!is_dir($cacheDir)) {
     json_encode($search_lite, JSON_UNESCAPED_UNICODE)
 );
 
+// طابور مهام الاستعادة (50) — نفس تصنيف ساخن/بارد كالواجهة (ليس من store_states فقط)
+$inactiveRecoveryPool = [];
+foreach ($result['hot_inactive'] ?? [] as $s) {
+    if (!isset($s['id'])) {
+        continue;
+    }
+    $inactiveRecoveryPool[] = [
+        'store_id'   => $s['id'],
+        'store_name' => isset($s['name']) ? (string) $s['name'] : '',
+        'bucket'     => 'hot_inactive',
+    ];
+}
+foreach ($result['cold_inactive'] ?? [] as $s) {
+    if (!isset($s['id'])) {
+        continue;
+    }
+    $inactiveRecoveryPool[] = [
+        'store_id'   => $s['id'],
+        'store_name' => isset($s['name']) ? (string) $s['name'] : '',
+        'bucket'     => 'cold_inactive',
+    ];
+}
+@file_put_contents(
+    $cacheDir . '/inactive_recovery_pool.json',
+    json_encode([
+        'generated_at' => date('c'),
+        'count'        => count($inactiveRecoveryPool),
+        'stores'         => $inactiveRecoveryPool,
+    ], JSON_UNESCAPED_UNICODE)
+);
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
