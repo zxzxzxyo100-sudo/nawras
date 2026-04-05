@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { login as apiLogin } from '../services/api'
+import { login as apiLogin, formatAuthError } from '../services/api'
 
 const AuthContext = createContext(null)
 
@@ -36,7 +36,8 @@ export function AuthProvider({ children }) {
       setUser(res.user)
       return res.user
     } catch (err) {
-      throw err instanceof Error ? err : new Error(String(err))
+      const e = err instanceof Error ? err : new Error(String(err))
+      throw new Error(formatAuthError(e))
     }
   }
 

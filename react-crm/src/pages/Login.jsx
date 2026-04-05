@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { formatAuthError } from '../services/api'
 import { Package } from 'lucide-react'
 
 export default function Login() {
@@ -19,7 +20,7 @@ export default function Login() {
       await login(username, password)
       navigate('/')
     } catch (err) {
-      setError(err.message)
+      setError(formatAuthError(err))
     } finally {
       setLoading(false)
     }
