@@ -6,8 +6,22 @@ const http = axios.create({ baseURL: BASE })
 
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
-export const login = (username, password) =>
-  http.post('/auth.php?action=login', { username, password }).then(r => r.data)
+/** تسجيل الدخول — يمرّر رسالة الخادم العربية بدل رسالة axios عند 401 */
+export async function login(username, password) {
+  try {
+    const r = await http.post('/auth.php?action=login', { username, password })
+    return r.data
+  } catch (e) {
+    const data = e.response?.data
+    const msg =
+      (data && typeof data === 'object' && data.error)
+        ? String(data.error)
+        : e.response?.status === 401
+          ? 'بيانات الدخول غير صحيحة. على البيئة التجريبية: تأكد أن المستخدم موجود في قاعدة البيانات التجريبية (قد يختلف عن الإنتاج) وأن كلمة المرور مطابقة لما في الجدول.'
+          : (e.message || 'تعذّر الاتصال بالخادم')
+    throw new Error(msg)
+  }
+}
 
 export const listUsers = () =>
   http.get('/auth.php?action=list_users').then(r => r.data)
