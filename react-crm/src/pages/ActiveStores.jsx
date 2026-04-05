@@ -2,18 +2,20 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff } from 'lucide-react'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff, Star } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
+import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
+import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
 
 export default function ActiveStores() {
   const { activeSegment } = useParams()
-  const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
+  const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta, surveyByStoreId } = useStores()
   const { user } = useAuth()
 
   function parseDbDate(v) {
@@ -34,6 +36,7 @@ export default function ActiveStores() {
   const [autoUsers, setAutoUsers]         = useState(new Set())
   // فلتر التعيين: 'all' | 'assigned' | 'unassigned' | username
   const [assignFilter, setAssignFilter]   = useState('all')
+  const [showActiveSurveyModal, setShowActiveSurveyModal] = useState(false)
 
   const isExecutive = user?.role === 'executive'
 
@@ -70,6 +73,10 @@ export default function ActiveStores() {
       .then(res => setUsers((res.data || []).filter(u => u.role === 'active_manager')))
       .catch(() => {})
   }, [isExecutive])
+
+  useEffect(() => {
+    if (!selected) setShowActiveSurveyModal(false)
+  }, [selected])
 
   // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
@@ -287,6 +294,13 @@ export default function ActiveStores() {
   const isPendingTab = activeSegment === 'pending'
   const isCompletedTab = activeSegment === 'completed'
   const isUnreachableTab = activeSegment === 'unreachable'
+
+  const selectedDbCategory = selected
+    ? (storeStates[selected.id]?.category || selected.category || '')
+    : ''
+  const selectedNeedsActiveSurvey =
+    Boolean(selected)
+    && needsActiveSatisfactionSurvey(selected.id, selectedDbCategory, surveyByStoreId)
 
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
@@ -535,6 +549,33 @@ export default function ActiveStores() {
             </p>
           </div>
 
+          {selectedNeedsActiveSurvey && (
+            <div className="rounded-2xl border border-violet-200 bg-gradient-to-l from-violet-50/95 to-white px-4 py-3 sm:py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-md">
+                  <Star size={20} className="text-amber-300 fill-amber-300" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-violet-950">استبيان رضا العميل مطلوب</p>
+                  <p className="text-xs text-violet-900/85 mt-0.5">
+                    المتجر المحدد «{selected?.name}» لم يُكمل استبيان الرضا بعد. يمكنك تعبئته من هنا قبل أو بعد تسجيل المكالمة.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowActiveSurveyModal(true)}
+                className="shrink-0 w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-black text-white shadow-lg transition-colors"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
+                  boxShadow: '0 6px 20px rgba(124,58,237,0.35)',
+                }}
+              >
+                فتح الاستبيان
+              </button>
+            </div>
+          )}
+
           <StoreTable
             variant="elite"
             stores={filteredActive}
@@ -611,6 +652,18 @@ export default function ActiveStores() {
       )}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+
+      {showActiveSurveyModal && selected && selectedNeedsActiveSurvey && (
+        <ActiveStoreSurveyModal
+          store={selected}
+          onClose={() => setShowActiveSurveyModal(false)}
+          onSaved={async () => {
+            await reload()
+            setShowActiveSurveyModal(false)
+            showSuccess('تم حفظ استبيان الرضا.')
+          }}
+        />
+      )}
     </div>
   )
 }
