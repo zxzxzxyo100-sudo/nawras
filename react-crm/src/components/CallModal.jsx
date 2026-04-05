@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { X, Phone, Zap, Star } from 'lucide-react'
-import { logCall, saveSurvey } from '../services/api'
+import { logCall, saveSurvey, markSurveyNoAnswer } from '../services/api'
 import StoreNameWithId         from './StoreNameWithId'
 import { useAuth }             from '../contexts/AuthContext'
 import { useStores }           from '../contexts/StoresContext'
@@ -40,13 +40,6 @@ function StarRow({ value, onChange }) {
   )
 }
 
-const OUTCOMES = [
-  { value: 'answered',  label: 'تم الرد',            emoji: '✅' },
-  { value: 'no_answer', label: 'لم يرد',              emoji: '📵' },
-  { value: 'busy',      label: 'مشغول',               emoji: '🔄' },
-  { value: 'callback',  label: 'طلب معاودة الاتصال',  emoji: '📞' },
-]
-
 function storeHasShipped(store) {
   if (!store) return false
   const n = Number(store.total_shipments ?? 0)
@@ -57,10 +50,9 @@ function storeHasShipped(store) {
 
 export default function CallModal({ store, callType = 'general', onClose, onSaved }) {
   const { user } = useAuth()
-  const { storeStates, surveyByStoreId } = useStores()
+  const { storeStates, surveyByStoreId, assignments } = useStores()
   const { onCallSaved, todayCalls, goalPct } = usePoints()
 
-  const [outcome, setOutcome] = useState('answered')
   const [note,    setNote]    = useState('')
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
@@ -84,7 +76,6 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
   const allSurveyRated = ratings.every(r => r >= 1 && r <= 5)
 
   useEffect(() => {
-    setOutcome('answered')
     setNote('')
     setError('')
     setRatings(Array(6).fill(0))
@@ -139,7 +130,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         store_id:       store.id,
         store_name:     store.name,
         call_type:      callType,
-        outcome,
+        outcome:        'answered',
         note,
         performed_by:   user?.fullname || user?.username || '',
         performed_role: user?.role,
@@ -150,7 +141,7 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
       }
       const res = await logCall(payload)
 
-      const pts = res?.points_awarded || 10
+      const pts = res?.points_awarded ?? 10
       onCallSaved(pts)
       onSaved?.()
 
@@ -161,6 +152,51 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         e?.response?.data?.error
         || (inactiveFeedbackNeeded || surveyNeeded ? 'تعذّر حفظ الاستبيان أو المكالمة.' : 'فشل حفظ المكالمة، حاول مرة أخرى')
       setError(msg)
+      setSaving(false)
+    }
+  }
+
+  async function handleNoAnswer() {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome: 'no_answer',
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
+      const pts = res?.points_awarded ?? 0
+      onCallSaved(pts)
+
+      if (user?.role === 'active_manager') {
+        const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
+        if (a?.assigned_to === user?.username) {
+          try {
+            await markSurveyNoAnswer({
+              store_id: store.id,
+              store_name: store.name,
+              username: user.username,
+            })
+          } catch {
+            /* ليس في طابور سير العمل النشط */
+          }
+        }
+      }
+
+      onSaved?.()
+      setTimeout(onClose, 400)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
       setSaving(false)
     }
   }
@@ -235,31 +271,6 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
           )}
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">نتيجة المكالمة</label>
-            <div className="grid grid-cols-2 gap-2">
-              {OUTCOMES.map(o => (
-                <motion.button
-                  key={o.value}
-                  onClick={() => setOutcome(o.value)}
-                  whileTap={{ scale: 0.96 }}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all flex items-center gap-2 justify-center ${
-                    outcome === o.value
-                      ? 'text-white border-transparent'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
-                  }`}
-                  style={outcome === o.value ? {
-                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                    boxShadow: '0 4px 12px rgba(124,58,237,0.35)',
-                  } : {}}
-                >
-                  <span>{o.emoji}</span>
-                  {o.label}
-                </motion.button>
-              ))}
-            </div>
-          </div>
-
           {inactiveFeedbackNeeded && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
               <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
@@ -324,29 +335,43 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-5 pb-5">
+        <div className="flex flex-col gap-2 px-5 pb-5">
           <motion.button
-            onClick={handleSave}
-            disabled={saving || (surveyNeeded && !allSurveyRated) || (inactiveFeedbackNeeded && !inactiveFeedbackOk)}
-            whileHover={{ scale: saving ? 1 : 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-            style={{
-              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-              boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
-            }}
+            type="button"
+            onClick={handleNoAnswer}
+            disabled={saving}
+            whileHover={{ scale: saving ? 1 : 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
           >
-            {saving
-              ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-              : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
-            }
+            {saving ? 'جارٍ التسجيل…' : 'عدم الرد — يبقى المتجر في المهام اليومية'}
           </motion.button>
-          <button
-            onClick={onClose}
-            className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm"
-          >
-            إلغاء
-          </button>
+          <div className="flex gap-3">
+            <motion.button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || (surveyNeeded && !allSurveyRated) || (inactiveFeedbackNeeded && !inactiveFeedbackOk)}
+              whileHover={{ scale: saving ? 1 : 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+              }}
+            >
+              {saving
+                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+              }
+            </motion.button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
+            >
+              إلغاء
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

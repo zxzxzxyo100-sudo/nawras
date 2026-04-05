@@ -32,6 +32,23 @@ function taskIdToCallType(taskId) {
   return 'general'
 }
 
+/** أحدث سجل مكالمة للمتجر (حسب التاريخ) */
+function latestCallEntry(log) {
+  const entries = Object.values(log || {}).filter(c => c?.date)
+  if (!entries.length) return null
+  entries.sort((a, b) => new Date(b.date) - new Date(a.date))
+  return entries[0]
+}
+
+/**
+ * إذا آخر مكالمة اليوم كانت «عدم رد» لا نُخفي المهمة — يبقى المتجر معلّقاً في المهام اليومية.
+ */
+function hideDailyTaskDueToCallToday(log, todayIso) {
+  const top = latestCallEntry(log)
+  if (!top?.date || !String(top.date).startsWith(todayIso)) return false
+  return String(top.outcome ?? '').trim() !== 'no_answer'
+}
+
 // ══════════════════════════════════════════════════════════════════
 // توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
 // «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
@@ -44,8 +61,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
     const incBucket    = store._inc
-    const lastCallDate = Object.values(log).map(c => c?.date).filter(Boolean).sort().reverse()[0]
-    const calledToday  = lastCallDate?.startsWith(today)
+    const topCall      = latestCallEntry(log)
+    const lastCallDate = topCall?.date
+    const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
     const daysSinceLast = lastCallDate
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
@@ -64,7 +82,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     }
 
     if (incBucket === 'never_started' && ['incubation_manager', 'executive'].includes(userRole)) {
-      if (!calledToday) {
+      if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-never`, store,
           priority: daysSinceLast >= 3 ? 'high' : 'normal',
@@ -75,7 +93,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     }
 
     if (incBucket === 'restoring' && ['incubation_manager', 'executive'].includes(userRole)) {
-      if (!calledToday) {
+      if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-restoring`, store,
           priority: daysSinceLast >= 2 ? 'high' : 'normal',
@@ -86,7 +104,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     }
 
     if (['hot_inactive', 'cold_inactive'].includes(dbCat) && ['inactive_manager', 'executive'].includes(userRole)) {
-      if (!calledToday) {
+      if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-recovery`, store,
           priority: daysSinceLast >= 7 ? 'high' : 'normal',
@@ -100,7 +118,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
         ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
         : 999
-      if (daysSinceShip >= 10 && !calledToday) {
+      if (daysSinceShip >= 10 && !callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-followup`, store,
           priority: daysSinceShip >= 14 ? 'high' : 'normal',
@@ -112,7 +130,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
 
     if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
-      if (asgn?.assigned_to === username && asgn?.workflow_status !== 'no_answer' && !calledToday) {
+      if (asgn?.assigned_to === username && !callTodayHidesTask) {
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
           : 999
@@ -217,7 +235,12 @@ function TaskCard({
 }) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
   const handleDone = () => onDone(task)
-  const showNoAnswer = task.type === 'assigned_store' && userRole === 'active_manager' && typeof onNoAnswerWorkflow === 'function'
+  const showNoAnswer =
+    typeof onNoAnswerWorkflow === 'function'
+    && (
+      (task.type === 'assigned_store' && userRole === 'active_manager')
+      || task.type === 'recovery_call'
+    )
   return (
     <motion.div
       layout
@@ -428,17 +451,37 @@ export default function Tasks() {
   }
 
   async function handleNoAnswerWorkflow(task) {
-    if (!user?.username || task.type !== 'assigned_store') return
+    if (!user?.username) return
     setDismissErr('')
     setNoAnswerLoadingId(task.id)
     try {
-      await markSurveyNoAnswer({
-        store_id: task.store.id,
-        store_name: task.store.name,
-        username: user.username,
-      })
-      await reload()
-      loadDismissals()
+      if (task.type === 'recovery_call') {
+        const res = await logCall({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          call_type: 'general',
+          outcome: 'no_answer',
+          note: '',
+          performed_by: user?.fullname || user?.username || '',
+          performed_role: user?.role,
+          registration_date: task.store.registered_at || null,
+        })
+        if (!DISABLE_POINTS_AND_PERFORMANCE) {
+          onCallSaved(res?.points_awarded ?? 0)
+        }
+        await reload()
+        loadDismissals()
+        return
+      }
+      if (task.type === 'assigned_store') {
+        await markSurveyNoAnswer({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          username: user.username,
+        })
+        await reload()
+        loadDismissals()
+      }
     } catch (e) {
       setDismissErr(e.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
     } finally {
