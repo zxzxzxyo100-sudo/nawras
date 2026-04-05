@@ -100,6 +100,10 @@ export const getAssignmentStatus = (storeId, username) =>
     .get('/active-workflow.php', { params: { action: 'get_assignment_status', store_id: storeId, username } })
     .then(r => r.data)
 
+/** لوحة تحليلات المدير — يتطلب user_role=executive */
+export const getManagerAnalytics = (params) =>
+  http.get('/manager-analytics.php', { params }).then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http
