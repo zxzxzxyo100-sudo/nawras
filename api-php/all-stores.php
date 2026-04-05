@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/onboarding-config.php';
 
 ini_set('memory_limit',      MEMORY_HEAVY);
 ini_set('max_execution_time', TIME_LONG);
@@ -141,7 +142,7 @@ $counts = [
     'total'                => 0,
 ];
 
-// ── مسار الاحتضان: دورة 14 يومًا — المكالمات في الأيام 1 و 3 و 10؛ «بين المكالمات» للباقي ──
+// ── مسار الاحتضان: م1 من اليوم 1؛ م2 بعد X يوماً من تسجيل م1؛ م3 بعد Y يوماً من تسجيل م2 (انظر onboarding-config.php) ──
 $incubation_path = [
     'call_1' => [],
     'call_2' => [],
@@ -326,8 +327,12 @@ foreach ($new as $id => $s) {
     $cycleDay = incubation_cycle_day($regTs, $now);
     $s['_cycle_day'] = $cycleDay;
 
-    // المكالمة الثالثة — من يوم 10 حتى تسجيل المكالمة (يشمل المتأخرين عن يوم 10)
-    if ($inc2 && !$inc3 && $cycleDay >= 10) {
+    $todayStr = date('Y-m-d', $now);
+    $dueCall2 = $inc1 ? nawras_date_plus_days($inc1, NAWRAS_ONBOARD_DAYS_AFTER_CALL1) : null;
+    $dueCall3 = $inc2 ? nawras_date_plus_days($inc2, NAWRAS_ONBOARD_DAYS_AFTER_CALL2) : null;
+
+    // المكالمة الثالثة — بعد Y يوماً من تسجيل المكالمة الثانية (تم)
+    if ($inc2 && !$inc3 && $dueCall3 && $todayStr >= $dueCall3) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_3';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
@@ -340,8 +345,8 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // المكالمة الثانية — من يوم 3 حتى تسجيل المكالمة (يشمل المتأخرين عن يوم 3)
-    if ($inc1 && !$inc2 && $cycleDay >= 3) {
+    // المكالمة الثانية — بعد X يوماً من تسجيل المكالمة الأولى (تم)
+    if ($inc1 && !$inc2 && $dueCall2 && $todayStr >= $dueCall2) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_2';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
@@ -409,8 +414,11 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // بين المكالمات — انتظار يوم 3 أو 10 فقط (بعد تسجيل المكالمة السابقة، بدون تأخير ولا غياب أولى)
-    if (($inc1 && !$inc2 && $cycleDay < 3) || ($inc2 && !$inc3 && $cycleDay < 10)) {
+    // بين المكالمات — قبل موعد المكالمة التالية (لم يحن بعد تاريخ الاستحقاق)
+    if (
+        ($inc1 && !$inc2 && $dueCall2 && $todayStr < $dueCall2)
+        || ($inc2 && !$inc3 && $dueCall3 && $todayStr < $dueCall3)
+    ) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'between_calls';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);

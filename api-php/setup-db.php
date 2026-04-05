@@ -118,6 +118,17 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS surveys (
     INDEX idx_store (store_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+// إخفاء مهام يومية بعد «تم» (نفس اليوم)
+$pdo->exec("CREATE TABLE IF NOT EXISTS daily_task_dismissals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    task_key VARCHAR(160) NOT NULL,
+    dismissed_on DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_task_day (username, task_key, dismissed_on),
+    INDEX idx_user_day (username, dismissed_on)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 // Insert default admin user
 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = 'admin'");
 $stmt->execute();

@@ -88,7 +88,7 @@ export default function CustomerSatisfactionModal({ store, onClose, onSaved }) {
               <span className="font-mono text-white/80 mr-2">#{store.id}</span>
             </p>
             <p className="text-amber-200/90 text-[11px] mt-2 leading-relaxed">
-              عبّي التقييم لكل بند قبل ما تقدر تسجّل مكالمة (متاجر قيد المكالمة) — المقترحات اختيارية.
+              عبّي التقييم لكل بند قبل تسجيل المكالمة في «نشط يشحن — قيد المكالمة» — المقترحات اختيارية.
             </p>
           </div>
           <button
