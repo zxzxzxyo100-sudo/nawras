@@ -9,6 +9,7 @@ import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 import StoreFilterDrawer from '../components/StoreFilterDrawer'
+import StoreNameWithId from '../components/StoreNameWithId'
 import { ONBOARD_DAYS_AFTER_CALL1, ONBOARD_DAYS_AFTER_CALL2 } from '../constants/onboardingSchedule'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
@@ -239,8 +240,9 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false
                   className={rowElite}
                 >
                   <td className="px-5 py-4 text-slate-700">
-                    <div className="font-semibold text-slate-900">{s.name || '—'}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">{s.id}</div>
+                    <div className="font-semibold text-slate-900 min-w-0">
+                      <StoreNameWithId store={s} nameClassName="font-semibold text-slate-900" idClassName="text-xs font-mono text-slate-600 font-semibold" />
+                    </div>
                   </td>
                   {betweenMode ? (
                     <>

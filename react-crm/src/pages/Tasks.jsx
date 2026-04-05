@@ -8,6 +8,7 @@ import { useAuth }    from '../contexts/AuthContext'
 import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
+import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyTaskDismissals, markDailyTaskDone, logCall } from '../services/api'
 
 const MIN_TASK_NOTE_LENGTH = 10
@@ -235,7 +236,9 @@ function TaskCard({ task, index, onCall, onDone }) {
       {/* معلومات المهمة */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-0.5">
-          <p className="font-bold text-slate-800 text-sm truncate">{task.store.name}</p>
+          <div className="font-bold text-slate-800 text-sm min-w-0">
+            <StoreNameWithId store={task.store} nameClassName="font-bold text-slate-800" idClassName="font-mono text-xs font-semibold text-slate-500" />
+          </div>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${s.badge}`}>
             {task.label}
           </span>
@@ -293,8 +296,8 @@ function IncManagerDoneModal({ task, onClose, onConfirm, saving, error }) {
           </button>
         </div>
         <div className="p-4 space-y-3">
-          <p className="text-xs text-slate-600">
-            <span className="font-semibold">{task.store.name}</span>
+          <p className="text-xs text-slate-600 min-w-0">
+            <StoreNameWithId store={task.store} nameClassName="font-semibold text-slate-800" idClassName="font-mono text-slate-500 text-[11px]" />
             <span className="text-slate-400 mr-2">— {task.label}</span>
           </p>
           <label className="block text-xs font-bold text-slate-700">محتوى المكالمة (إلزامي — {MIN_TASK_NOTE_LENGTH} أحرف فأكثر)</label>

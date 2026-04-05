@@ -12,6 +12,7 @@ import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
 import { STORE_BUCKET_KEYS } from '../utils/storeBuckets'
 import StoreFilterDrawer from './StoreFilterDrawer'
+import StoreNameWithId from './StoreNameWithId'
 
 /** خيارات عدد الصفوف في الصفحة (قائمة منسدلة مثل واجهات الإدارة) */
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 150, 200, 500, 1000, 'الكل']
@@ -405,8 +406,12 @@ export default function StoreTable({
                         {renderIdBadge?.(store)}
                       </div>
                     </td>
-                    <td className={`${tdPad} ${isElite ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}`}>
-                      {store.name}
+                    <td className={`${tdPad} ${isElite ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'} min-w-0`}>
+                      <StoreNameWithId
+                        store={store}
+                        nameClassName={isElite ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}
+                        idClassName={isElite ? 'text-xs font-mono text-slate-600 font-semibold' : 'text-xs font-mono text-slate-500'}
+                      />
                     </td>
                     <td className={tdPad}>
                       {store.phone

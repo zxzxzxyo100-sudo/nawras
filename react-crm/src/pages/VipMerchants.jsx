@@ -3,6 +3,7 @@ import { Crown, RefreshCw, Search, TrendingUp, TrendingDown, Minus, ExternalLink
 import { useStores } from '../contexts/StoresContext'
 import { getOrdersSummaryRange } from '../services/api'
 import StoreDrawer from '../components/StoreDrawer'
+import StoreNameWithId from '../components/StoreNameWithId'
 import { totalShipments } from '../utils/storeFields'
 import { VIP_MERCHANTS_COMING_SOON } from '../config/features'
 
@@ -219,7 +220,9 @@ function VipMerchantsFull() {
                       <td className="px-4 py-3.5">
                         <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{s.id}</span>
                       </td>
-                      <td className="px-4 py-3.5 font-medium text-slate-800">{s.name}</td>
+                      <td className="px-4 py-3.5 font-medium text-slate-800">
+                        <StoreNameWithId store={s} nameClassName="font-medium text-slate-800" idClassName="font-mono text-xs text-slate-500 font-semibold" />
+                      </td>
                       <td className="px-4 py-3.5 text-xs font-mono text-slate-600" dir="ltr">{s.phone || '—'}</td>
                       <td className="px-4 py-3.5 font-bold text-slate-800">{totalShipments(s)}</td>
                       <td className="px-4 py-3.5">

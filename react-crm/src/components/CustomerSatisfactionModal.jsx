@@ -3,6 +3,7 @@ import { X, Star } from 'lucide-react'
 import { saveSurvey } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { SATISFACTION_QUESTIONS } from '../constants/satisfactionSurvey'
+import StoreNameWithId from './StoreNameWithId'
 
 function StarRow({ value, onChange }) {
   return (
@@ -83,9 +84,8 @@ export default function CustomerSatisfactionModal({ store, onClose, onSaved }) {
         <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-l from-violet-900 to-slate-900 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-white font-bold text-base leading-snug">استبيان رضا العميل</h2>
-            <p className="text-violet-200/90 text-xs mt-1">
-              {store.name}
-              <span className="font-mono text-white/80 mr-2">#{store.id}</span>
+            <p className="text-violet-200/90 text-xs mt-1 min-w-0">
+              <StoreNameWithId store={store} nameClassName="text-violet-100" idClassName="font-mono text-white/85" />
             </p>
             <p className="text-amber-200/90 text-[11px] mt-2 leading-relaxed">
               عبّي التقييم لكل بند قبل تسجيل المكالمة في «نشط يشحن — قيد المكالمة» — المقترحات اختيارية.

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, Phone, Zap } from 'lucide-react'
 import { logCall }             from '../services/api'
+import StoreNameWithId         from './StoreNameWithId'
 import { useAuth }             from '../contexts/AuthContext'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -83,7 +84,9 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
               </div>
               <div>
                 <h3 className="font-black text-white text-base">تسجيل مكالمة</h3>
-                <p className="text-purple-300 text-xs truncate max-w-[180px]">{store.name}</p>
+                <div className="text-purple-300 text-xs max-w-[240px] min-w-0">
+                  <StoreNameWithId store={store} nameClassName="text-purple-200" idClassName="font-mono text-purple-300/95" />
+                </div>
               </div>
             </div>
             <button

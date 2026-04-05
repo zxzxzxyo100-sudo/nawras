@@ -3,6 +3,7 @@ import { Baby, Phone, RefreshCw, Filter, AlertCircle } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import StoreDrawer from '../components/StoreDrawer'
+import StoreNameWithId from '../components/StoreNameWithId'
 import CallModal from '../components/CallModal'
 import { INC_DELAY_STAGE_OPTIONS, ALL_STAGE_KEYS } from '../constants/incubationDelayStages'
 
@@ -240,8 +241,9 @@ export default function IncubationCallDelay() {
                   return (
                     <tr key={s.id ?? i} onClick={() => setSelected(s)} className={rowClass}>
                       <td className="px-4 py-3 text-slate-700">
-                        <div className="font-semibold text-slate-900">{s.name || '—'}</div>
-                        <div className="text-xs text-slate-500 font-mono tabular-nums">{s.id}</div>
+                        <div className="font-semibold text-slate-900 min-w-0">
+                          <StoreNameWithId store={s} nameClassName="font-semibold text-slate-900" idClassName="text-xs font-mono text-slate-600 font-semibold" />
+                        </div>
                       </td>
                       <td className="px-4 py-3 tabular-nums font-medium text-slate-800">
                         {s._cycle_day != null ? s._cycle_day : '—'}

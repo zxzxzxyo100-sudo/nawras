@@ -7,6 +7,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreDrawer from '../components/StoreDrawer'
+import StoreNameWithId from '../components/StoreNameWithId'
 import { isRestoredCategory } from '../constants/storeCategories'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 
@@ -97,8 +98,9 @@ function StoreCard({ store, col, storeStates, assignments, callLogs, onClick }) 
       {/* header */}
       <div className="flex items-start justify-between gap-2 mb-2.5">
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-slate-800 text-sm leading-tight truncate">{store.name}</p>
-          <p className="text-slate-400 text-xs mt-0.5 font-mono">#{store.id}</p>
+          <div className="font-bold text-slate-800 text-sm leading-tight min-w-0">
+            <StoreNameWithId store={store} nameClassName="font-bold text-slate-800 text-sm" idClassName="text-slate-500 text-xs font-mono font-semibold" />
+          </div>
         </div>
         <ExternalLink
           size={13}
