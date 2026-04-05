@@ -24,7 +24,7 @@ const CATEGORY_LABELS = {
   recovered:  { label: 'تم الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
 }
 
-export default function StoreDrawer({ store, onClose }) {
+export default function StoreDrawer({ store, onClose, workflowAssignmentStatus = null }) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
@@ -88,6 +88,7 @@ export default function StoreDrawer({ store, onClose }) {
         old_status: dbCategory,
         user: user?.fullname,
         user_role: user?.role,
+        username: user?.username,
       })
       reload()
       closeManualPanel()
@@ -110,6 +111,7 @@ export default function StoreDrawer({ store, onClose }) {
         old_status: dbCategory,
         user: user?.fullname,
         user_role: user?.role,
+        username: user?.username,
       })
       reload()
       closeManualPanel()
@@ -132,6 +134,7 @@ export default function StoreDrawer({ store, onClose }) {
         merchant_bucket: merchantBucket,
         user: user?.fullname,
         user_role: user?.role,
+        username: user?.username,
       })
       reload()
       closeManualPanel()
@@ -195,6 +198,7 @@ export default function StoreDrawer({ store, onClose }) {
                 رفع التجميد
               </button>
             ) : (
+              !(workflowAssignmentStatus === 'no_answer' && user?.role === 'active_manager') && (
               <button
                 type="button"
                 onClick={() => { setActionError(''); setManualPanel('freeze') }}
@@ -203,6 +207,7 @@ export default function StoreDrawer({ store, onClose }) {
                 <Lock size={14} />
                 تجميد
               </button>
+              )
             )}
             {canStartRestore && (
               <button

@@ -127,6 +127,18 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS store_assignments (
     assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     notes        TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+try {
+    $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+} catch (Throwable $e) {
+}
+try {
+    $pdo->exec('ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP');
+} catch (Throwable $e) {
+}
+try {
+    $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+} catch (Throwable $e) {
+}
 
 // مستخدم admin افتراضي للـ staging
 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = 'admin'");

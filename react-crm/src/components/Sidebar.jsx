@@ -27,6 +27,7 @@ const STORES_SUB = [
 
 /** نشط يشحن — قيد المكالمة / المنجزة (مثل مسار الاحتضان) */
 const ACTIVE_SUB = [
+  { to: '/active/workflow', label: 'طابور المهام (50)', kind: 'workflow' },
   { to: '/active/pending', label: 'قيد المكالمة', kind: 'pending' },
   { to: '/active/completed', label: 'المتاجر المنجزة', kind: 'completed' },
   { to: '/active/unreachable', label: 'لم يتم الوصول للمتجر', kind: 'unreachable' },
@@ -72,6 +73,8 @@ function storesSubLinkActive(kind, pathname, search) {
 
 function activeSubLinkActive(kind, pathname) {
   switch (kind) {
+    case 'workflow':
+      return pathname === '/active/workflow'
     case 'pending':
       return pathname === '/active/pending' || pathname === '/active'
     case 'completed':
