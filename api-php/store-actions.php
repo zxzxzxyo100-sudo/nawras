@@ -505,6 +505,30 @@ elseif ($action === 'save_survey') {
     } catch (Throwable $e) {
     }
     $submittedUser = trim((string) ($input['username'] ?? ''));
+
+    if ($surveyKind === 'new_merchant_onboarding') {
+        $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new_merchant_onboarding')")
+            ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
+
+        $detail = sprintf(
+            'استبيان تهيئة متجر جديد (1–5): إدخال الطلبات=%d، تتبع الشحنات=%d، أنواع المهام=%d.',
+            $q[0], $q[1], $q[2]
+        );
+        if ($suggestions !== '') {
+            $detail .= ' ملاحظات: ' . $suggestions;
+        }
+        $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, 'استبيان تهيئة متجر جديد', ?, ?, ?)")
+            ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
+
+        jsonResponse(['success' => true]);
+    }
+
+    if ($surveyKind !== 'active_csat') {
+        jsonResponse(['success' => false, 'error' => 'نوع الاستبيان غير مدعوم.'], 400);
+    }
+
     $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active_csat')")
         ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
@@ -526,9 +550,15 @@ elseif ($action === 'save_survey') {
 
 // ========== GET SURVEYS (optimized) ==========
 elseif ($action === 'get_surveys') {
+    ensure_surveys_survey_kind($pdo);
     // فقط آخر استبيان لكل متجر
     $stmt = $pdo->query("SELECT s.* FROM surveys s INNER JOIN (SELECT store_id, MAX(id) as max_id FROM surveys GROUP BY store_id) latest ON s.id = latest.max_id");
-    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $doneOnboarding = $pdo->query("SELECT DISTINCT store_id FROM surveys WHERE COALESCE(survey_kind, '') = 'new_merchant_onboarding'")->fetchAll(PDO::FETCH_COLUMN);
+    jsonResponse([
+        'success' => true,
+        'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+        'new_merchant_onboarding_done_ids' => array_map('intval', $doneOnboarding ?: []),
+    ]);
 }
 
 // ========== GET AUDIT LOGS ==========

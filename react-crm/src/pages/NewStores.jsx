@@ -5,6 +5,8 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
+import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
+import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 
 /** يُستخرج من الرابط: كل المتاجر | جديدة 48 ساعة | تحت الاحتضان */
 function useListPreset(searchParams) {
@@ -17,8 +19,10 @@ export default function NewStores() {
   const [searchParams] = useSearchParams()
   const listPreset = useListPreset(searchParams)
 
-  const { allStores, counts, callLogs, loading, reload, shipmentsRangeMeta } = useStores()
+  const { allStores, counts, callLogs, loading, reload, shipmentsRangeMeta, newMerchantOnboardingDoneIds } =
+    useStores()
   const [selected, setSelected] = useState(null)
+  const [onboardingStore, setOnboardingStore] = useState(null)
 
   const filteredForCount = useMemo(() => {
     if (listPreset === 'incubating') return allStores.filter(s => s.bucket === 'incubating')
@@ -118,7 +122,21 @@ export default function NewStores() {
             ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
             : undefined
         }
+        eliteNeedsNewMerchantOnboarding={s =>
+          needsNewMerchantOnboardingSurvey(s, newMerchantOnboardingDoneIds)}
+        onEliteNewMerchantOnboardingClick={setOnboardingStore}
       />
+
+      {onboardingStore && (
+        <NewMerchantOnboardingModal
+          store={onboardingStore}
+          onClose={() => setOnboardingStore(null)}
+          onSaved={() => {
+            setOnboardingStore(null)
+            reload()
+          }}
+        />
+      )}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
     </div>

@@ -36,6 +36,8 @@ export function StoresProvider({ children }) {
   const [callLogs, setCallLogs]           = useState({})
   /** آخر استبيان رضا لكل متجر (store_id → صف من get_surveys) */
   const [surveyByStoreId, setSurveyByStoreId] = useState({})
+  /** متاجر أُكمل لها استبيان التهيئة (مفتاح: store_id) — لا يعتمد على «آخر استبيان» فقط */
+  const [newMerchantOnboardingDoneIds, setNewMerchantOnboardingDoneIds] = useState(() => new Set())
   const [recoveryCalls, setRecoveryCalls] = useState({})
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
@@ -162,6 +164,19 @@ export function StoresProvider({ children }) {
         })
       }
       setSurveyByStoreId(surveyMap)
+      const onboardingDone = new Set()
+      if (surveysRes?.success) {
+        const rawOnboarding = surveysRes?.new_merchant_onboarding_done_ids
+        if (Array.isArray(rawOnboarding)) {
+          rawOnboarding.forEach(id => {
+            if (id == null) return
+            onboardingDone.add(id)
+            onboardingDone.add(String(id))
+            onboardingDone.add(Number(id))
+          })
+        }
+      }
+      setNewMerchantOnboardingDoneIds(onboardingDone)
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
         incubating:            mergeShipmentsInRange(apiResult.data.incubating),
@@ -222,7 +237,7 @@ export function StoresProvider({ children }) {
       stores, counts, allStores,
       vipMerchants,
       incubationPath, incubationCounts,
-      storeStates, assignments, callLogs, surveyByStoreId, recoveryCalls,
+      storeStates, assignments, callLogs, surveyByStoreId, newMerchantOnboardingDoneIds, recoveryCalls,
       shipmentsRangeMeta,
       loading, error, lastLoaded, reload: load,
     }}>
