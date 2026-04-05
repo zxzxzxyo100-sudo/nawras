@@ -35,6 +35,16 @@ if (!in_array($period, ['monthly', 'quarterly', 'yearly'], true)) {
 
 $pdo = getDB();
 
+try {
+    $pdo->exec("ALTER TABLE surveys ADD COLUMN survey_kind VARCHAR(32) NULL DEFAULT 'active_csat'");
+} catch (Throwable $e) {
+}
+
+/** استبيانات تُحتسب في CSAT فقط (استبعاد ملاحظات المتاجر غير النشطة) */
+function ma_csat_kind_sql() {
+    return " AND (COALESCE(survey_kind, 'active_csat') <> 'inactive_feedback') ";
+}
+
 /** جلب متاجر جدد من Nawris منذ تاريخ — نسخة محدودة الصفحات للتحليل */
 function ma_fetch_new_customers_since(string $since, int $maxPages = 25) {
     $all = [];
@@ -150,12 +160,12 @@ function ma_csat_expr_sql() {
 $today = date('Y-m-d');
 $yesterday = date('Y-m-d', strtotime('-1 day'));
 
-$stmtToday = $pdo->prepare('SELECT AVG(' . ma_csat_expr_sql() . ') AS a, COUNT(*) AS c FROM surveys WHERE DATE(created_at) = ?');
+$stmtToday = $pdo->prepare('SELECT AVG(' . ma_csat_expr_sql() . ') AS a, COUNT(*) AS c FROM surveys WHERE DATE(created_at) = ?' . ma_csat_kind_sql());
 $stmtToday->execute([$today]);
 $rowT = $stmtToday->fetch(PDO::FETCH_ASSOC);
 $csatToday = $rowT && $rowT['c'] > 0 ? round((float) $rowT['a'], 3) : null;
 
-$stmtY = $pdo->prepare('SELECT AVG(' . ma_csat_expr_sql() . ') AS a, COUNT(*) AS c FROM surveys WHERE DATE(created_at) = ?');
+$stmtY = $pdo->prepare('SELECT AVG(' . ma_csat_expr_sql() . ') AS a, COUNT(*) AS c FROM surveys WHERE DATE(created_at) = ?' . ma_csat_kind_sql());
 $stmtY->execute([$yesterday]);
 $rowY = $stmtY->fetch(PDO::FETCH_ASSOC);
 $csatYesterday = $rowY && $rowY['c'] > 0 ? round((float) $rowY['a'], 3) : null;
@@ -223,6 +233,7 @@ $stmtM = $pdo->prepare("
     SELECT MONTH(created_at) AS m, AVG(" . ma_csat_expr_sql() . ") AS avg_csat, COUNT(*) AS n
     FROM surveys
     WHERE YEAR(created_at) = ?
+    " . ma_csat_kind_sql() . "
     GROUP BY MONTH(created_at)
     ORDER BY m
 ");

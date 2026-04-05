@@ -9,7 +9,8 @@ import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyTaskDismissals, markDailyTaskDone, logCall } from '../services/api'
+import { getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer } from '../services/api'
+import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -111,7 +112,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
 
     if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
-      if (asgn?.assigned_to === username && !calledToday) {
+      if (asgn?.assigned_to === username && asgn?.workflow_status !== 'no_answer' && !calledToday) {
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
           : 999
@@ -204,9 +205,19 @@ const TYPE_STYLES = {
   assigned_store: { borderColor: '#93c5fd', accent: '#2563eb', badge: 'bg-blue-100 text-blue-700',     bg: 'rgba(37,99,235,0.04)'  },
 }
 
-function TaskCard({ task, index, onCall, onDone }) {
+function TaskCard({
+  task,
+  index,
+  onCall,
+  onDone,
+  onNoAnswerWorkflow,
+  noAnswerLoading,
+  userRole,
+  doneDisabled,
+}) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
   const handleDone = () => onDone(task)
+  const showNoAnswer = task.type === 'assigned_store' && userRole === 'active_manager' && typeof onNoAnswerWorkflow === 'function'
   return (
     <motion.div
       layout
@@ -256,13 +267,27 @@ function TaskCard({ task, index, onCall, onDone }) {
       </div>
 
       {/* أزرار الإجراء */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
         <CallButton onClick={() => onCall(task.store)} />
+        {showNoAnswer && (
+          <motion.button
+            type="button"
+            onClick={() => onNoAnswerWorkflow(task)}
+            disabled={noAnswerLoading}
+            whileHover={{ scale: noAnswerLoading ? 1 : 1.06, y: -1 }}
+            whileTap={{ scale: 0.9 }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+          >
+            عدم الرد
+          </motion.button>
+        )}
         <motion.button
           onClick={handleDone}
-          whileHover={{ scale: 1.06, y: -1 }}
-          whileTap={{ scale: 0.9 }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
+          disabled={doneDisabled}
+          title={doneDisabled ? 'يجب إكمال الاستبيان أولاً لإتمام المهمة.' : undefined}
+          whileHover={{ scale: doneDisabled ? 1 : 1.06, y: doneDisabled ? 0 : -1 }}
+          whileTap={{ scale: doneDisabled ? 1 : 0.9 }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-45 disabled:cursor-not-allowed disabled:grayscale"
           style={{
             background: 'linear-gradient(135deg, #059669, #047857)',
             boxShadow: '0 4px 12px rgba(5,150,105,0.35)',
@@ -332,7 +357,7 @@ function IncManagerDoneModal({ task, onClose, onConfirm, saving, error }) {
 }
 
 export default function Tasks() {
-  const { allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded } = useStores()
+  const { allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded, surveyByStoreId } = useStores()
   const { user } = useAuth()
   const { onCallSaved } = usePoints()
   const [selected, setSelected] = useState(null)
@@ -344,6 +369,7 @@ export default function Tasks() {
   const [pendingDoneTask, setPendingDoneTask] = useState(null)
   const [doneSaving, setDoneSaving] = useState(false)
   const [doneModalErr, setDoneModalErr] = useState('')
+  const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
 
   const loadDismissals = useCallback(() => {
     const u = user?.username
@@ -386,12 +412,38 @@ export default function Tasks() {
 
   function requestDone(task) {
     setDismissErr('')
+    if (task.type === 'assigned_store') {
+      const cat = storeStates[task.store.id]?.category || task.store.category || ''
+      if (needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)) {
+        setDismissErr('يجب إكمال الاستبيان أولاً لإتمام المهمة.')
+        return
+      }
+    }
     if (user?.role === 'incubation_manager') {
       setDoneModalErr('')
       setPendingDoneTask(task)
       return
     }
     dismissTaskOnly(task.id)
+  }
+
+  async function handleNoAnswerWorkflow(task) {
+    if (!user?.username || task.type !== 'assigned_store') return
+    setDismissErr('')
+    setNoAnswerLoadingId(task.id)
+    try {
+      await markSurveyNoAnswer({
+        store_id: task.store.id,
+        store_name: task.store.name,
+        username: user.username,
+      })
+      await reload()
+      loadDismissals()
+    } catch (e) {
+      setDismissErr(e.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
+      setNoAnswerLoadingId(null)
+    }
   }
 
   async function confirmIncManagerDone(note) {
@@ -551,15 +603,25 @@ export default function Tasks() {
           className="space-y-2.5"
         >
           <AnimatePresence mode="popLayout">
-            {displayed.map((task, i) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                index={i}
-                onCall={store => setSelected(store)}
-                onDone={requestDone}
-              />
-            ))}
+            {displayed.map((task, i) => {
+              const cat = storeStates[task.store.id]?.category || task.store.category || ''
+              const blockDone =
+                task.type === 'assigned_store'
+                && needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  index={i}
+                  onCall={store => setSelected(store)}
+                  onDone={requestDone}
+                  userRole={user?.role}
+                  onNoAnswerWorkflow={handleNoAnswerWorkflow}
+                  noAnswerLoading={noAnswerLoadingId === task.id}
+                  doneDisabled={blockDone}
+                />
+              )
+            })}
           </AnimatePresence>
         </motion.div>
       )}
