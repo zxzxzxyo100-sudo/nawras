@@ -1,224 +1,379 @@
-import React, { useState } from 'react';
-import api from '../services/api';
-import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect, useMemo } from 'react'
+import { motion } from 'framer-motion'
+import { X, Phone, Zap, Star } from 'lucide-react'
+import { logCall, saveSurvey, markSurveyNoAnswer } from '../services/api'
+import StoreNameWithId         from './StoreNameWithId'
+import { useAuth }             from '../contexts/AuthContext'
+import { useStores }           from '../contexts/StoresContext'
+import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
+import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
+import {
+  SATISFACTION_QUESTIONS,
+  needsActiveSatisfactionSurvey,
+  isInactiveMerchantCategory,
+} from '../constants/satisfactionSurvey'
 
-const CallModal = ({ task, onClose, onComplete }) => {
-  const [formData, setFormData] = useState({
-    callOutcome: '',
-    nawrasNote: '',
-    surveyData: task.task_type === 'monthly_survey' ? {
-      speed: 0,
-      finance: 0,
-      support: 0,
-      returns: 0,
-      trust: 0
-    } : null
-  });
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+const MIN_INACTIVE_FEEDBACK_LEN = 10
 
-  const isSurvey = task.task_type === 'monthly_survey';
+function StarRow({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-1 flex-row-reverse justify-end" dir="rtl">
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          className="p-0.5 rounded-lg transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-violet-400"
+          aria-label={`تقييم ${n} من 5`}
+        >
+          <Star
+            size={22}
+            className={n <= value ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}
+            strokeWidth={n <= value ? 0 : 1.5}
+          />
+        </button>
+      ))}
+      {value > 0 && (
+        <span className="text-xs font-bold text-slate-500 mr-1 tabular-nums">{value}/5</span>
+      )}
+    </div>
+  )
+}
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validate Nawras Note (MANDATORY)
-    if (!formData.nawrasNote.trim()) {
-      setError('ملاحظة النورس إلزامية! يجب كتابة ملاحظة تفصيلية عن المكالمة');
-      return;
+function storeHasShipped(store) {
+  if (!store) return false
+  const n = Number(store.total_shipments ?? 0)
+  if (n > 0) return true
+  const d = store.last_shipment_date
+  return Boolean(d && d !== 'لا يوجد')
+}
+
+export default function CallModal({ store, callType = 'general', onClose, onSaved }) {
+  const { user } = useAuth()
+  const { storeStates, surveyByStoreId, assignments } = useStores()
+  const { onCallSaved, todayCalls, goalPct } = usePoints()
+
+  const [note,    setNote]    = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState('')
+  const [ratings, setRatings] = useState(() => Array(6).fill(0))
+  const [suggestions, setSuggestions] = useState('')
+  const [inactiveFeedback, setInactiveFeedback] = useState('')
+
+  const dbCategory = storeStates[store.id]?.category || store.category || ''
+  const inactiveFeedbackNeeded = useMemo(
+    () => callType === 'general' && isInactiveMerchantCategory(dbCategory),
+    [callType, dbCategory],
+  )
+  const surveyNeeded = useMemo(
+    () =>
+      callType === 'general'
+      && !inactiveFeedbackNeeded
+      && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
+    [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded],
+  )
+  const inactiveFeedbackOk = inactiveFeedback.trim().length >= MIN_INACTIVE_FEEDBACK_LEN
+  const allSurveyRated = ratings.every(r => r >= 1 && r <= 5)
+
+  useEffect(() => {
+    setNote('')
+    setError('')
+    setRatings(Array(6).fill(0))
+    setSuggestions('')
+    setInactiveFeedback('')
+  }, [store.id])
+
+  function setRating(i, v) {
+    setRatings(prev => {
+      const next = [...prev]
+      next[i] = v
+      return next
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError('')
+    if (inactiveFeedbackNeeded && !inactiveFeedbackOk) {
+      setError(`يرجى كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».`)
+      setSaving(false)
+      return
     }
-
-    if (formData.nawrasNote.trim().length < 10) {
-      setError('ملاحظة النورس يجب أن تكون 10 أحرف على الأقل');
-      return;
+    if (surveyNeeded && !allSurveyRated) {
+      setError('يرجى تقييم كل الأسئلة الستة من 1 إلى 5 قبل حفظ المكالمة.')
+      setSaving(false)
+      return
     }
-
-    // Validate survey if needed
-    if (isSurvey) {
-      const allRated = Object.values(formData.surveyData).every(v => v > 0);
-      if (!allRated) {
-        setError('يجب تقييم جميع الأسئلة الخمسة!');
-        return;
-      }
-    }
-
     try {
-      setLoading(true);
-      setError('');
+      if (inactiveFeedbackNeeded) {
+        await saveSurvey({
+          store_id: store.id,
+          store_name: store.name,
+          survey_kind: 'inactive_feedback',
+          inactive_feedback: inactiveFeedback.trim(),
+          user: user?.fullname ?? '',
+          user_role: user?.role ?? '',
+          username: user?.username ?? '',
+        })
+      } else if (surveyNeeded) {
+        await saveSurvey({
+          store_id: store.id,
+          store_name: store.name,
+          answers: ratings,
+          suggestions: suggestions.trim(),
+          user: user?.fullname ?? '',
+          user_role: user?.role ?? '',
+          username: user?.username ?? '',
+        })
+      }
+      const payload = {
+        store_id:       store.id,
+        store_name:     store.name,
+        call_type:      callType,
+        outcome:        'answered',
+        note,
+        performed_by:   user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
 
-      // Submit call log
-      const callData = {
-        merchantId: task.merchant_id,
-        taskId: task.id,
-        callType: task.task_type.includes('retention') ? 'retention' 
-                  : task.task_type.includes('survey') ? 'survey' 
-                  : 'onboarding',
-        callOutcome: formData.callOutcome,
-        nawrasNote: formData.nawrasNote,
-        surveyData: isSurvey ? formData.surveyData : null
-      };
+      const pts = res?.points_awarded ?? 10
+      onCallSaved(pts)
+      onSaved?.()
 
-      await api.post('/calls', callData);
-
-      // Mark task as complete
-      await api.patch(`/tasks/${task.id}/complete`, {
-        callLogId: callData.id // Will be returned from API
-      });
-
-      onComplete(task.id);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message || 'حدث خطأ أثناء حفظ المكالمة');
-    } finally {
-      setLoading(false);
+      // أغلق الـ Modal بعد لحظة قصيرة
+      setTimeout(onClose, 400)
+    } catch (e) {
+      const msg =
+        e?.response?.data?.error
+        || (inactiveFeedbackNeeded || surveyNeeded ? 'تعذّر حفظ الاستبيان أو المكالمة.' : 'فشل حفظ المكالمة، حاول مرة أخرى')
+      setError(msg)
+      setSaving(false)
     }
-  };
+  }
 
-  const surveyQuestions = [
-    { key: 'speed', label: '1. سرعة التوصيل' },
-    { key: 'finance', label: '2. التعامل المالي' },
-    { key: 'support', label: '3. الدعم الفني' },
-    { key: 'returns', label: '4. حالة المرجوعات' },
-    { key: 'trust', label: '5. ثقة المناديب' }
-  ];
+  async function handleNoAnswer() {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome: 'no_answer',
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
+      const pts = res?.points_awarded ?? 0
+      onCallSaved(pts)
+
+      if (user?.role === 'active_manager') {
+        const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
+        if (a?.assigned_to === user?.username) {
+          try {
+            await markSurveyNoAnswer({
+              store_id: store.id,
+              store_name: store.name,
+              username: user.username,
+            })
+          } catch {
+            /* ليس في طابور سير العمل النشط */
+          }
+        }
+      }
+
+      onSaved?.()
+      setTimeout(onClose, 400)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0, y: 20 }}
+        animate={{ scale: 1,    opacity: 1, y: 0  }}
+        exit={{   scale: 0.92, opacity: 0, y: 20 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${surveyNeeded || inactiveFeedbackNeeded ? 'max-w-lg' : 'max-w-md'}`}
+        style={{ fontFamily: "'Cairo', sans-serif" }}
+      >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">تسجيل مكالمة</h2>
-            <p className="text-blue-100 text-sm mt-1">{task.merchant_name}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
-          >
-            <XMarkIcon className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Error Alert */}
-          {error && (
-            <div className="p-4 bg-red-100 dark:bg-red-900/30 border-r-4 border-red-500 rounded-lg flex items-start gap-3">
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-300 font-semibold">{error}</p>
-            </div>
-          )}
-
-          {/* Call Outcome */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-              نتيجة المكالمة *
-            </label>
-            <select
-              value={formData.callOutcome}
-              onChange={(e) => setFormData({ ...formData, callOutcome: e.target.value })}
-              required
-              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
-            >
-              <option value="">اختر النتيجة</option>
-              <option value="answered">تم الرد</option>
-              <option value="no_answer">لم يرد</option>
-              <option value="busy">مشغول</option>
-              <option value="callback_requested">طلب إعادة الاتصال</option>
-            </select>
-          </div>
-
-          {/* Survey Questions (if monthly survey) */}
-          {isSurvey && (
-            <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">
-                استبيان الرضا (5 أسئلة إلزامية)
-              </h3>
-              
-              {surveyQuestions.map((q) => (
-                <div key={q.key}>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    {q.label}
-                  </label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((rating) => (
-                      <button
-                        key={rating}
-                        type="button"
-                        onClick={() => setFormData({
-                          ...formData,
-                          surveyData: { ...formData.surveyData, [q.key]: rating }
-                        })}
-                        className={`
-                          flex-1 py-3 rounded-xl font-bold transition-all duration-200
-                          ${formData.surveyData[q.key] === rating
-                            ? 'bg-green-500 text-white shadow-lg scale-105'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                          }
-                        `}
-                      >
-                        {rating}
-                      </button>
-                    ))}
-                  </div>
+        <div style={{ background: 'linear-gradient(135deg, #1e0a3c, #2d1466)' }} className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', boxShadow: '0 4px 16px rgba(124,58,237,0.5)' }}
+              >
+                <Phone size={18} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-black text-white text-base">تسجيل مكالمة</h3>
+                <div className="text-purple-300 text-xs max-w-[240px] min-w-0">
+                  <StoreNameWithId store={store} nameClassName="text-purple-200" idClassName="font-mono text-purple-300/95" />
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Nawras Note (MANDATORY) */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-              ملاحظة النورس * (إلزامي)
-            </label>
-            <div className="relative">
-              <textarea
-                value={formData.nawrasNote}
-                onChange={(e) => setFormData({ ...formData, nawrasNote: e.target.value })}
-                required
-                rows={5}
-                placeholder="اكتب ملاحظة تفصيلية عن المكالمة... (هذا الحقل إلزامي ولا يمكن الحفظ بدونه)"
-                className="w-full px-4 py-3 border-2 border-blue-300 dark:border-blue-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all resize-none"
-              />
-              <div className="absolute bottom-3 left-3 text-sm text-gray-500 dark:text-gray-400">
-                {formData.nawrasNote.length} / 10 أحرف كحد أدنى
               </div>
             </div>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              💡 <strong>مهم:</strong> هذه الملاحظة ستبقى مع ملف التاجر للأبد وسيقرأها أي موظف يستلم الملف لاحقاً
-            </p>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            >
+              <X size={15} />
+            </button>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                  جاري الحفظ...
+          {!DISABLE_POINTS_AND_PERFORMANCE && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-white/50 text-xs flex items-center gap-1">
+                  <Zap size={10} className="text-amber-400" />
+                  هدف اليوم
                 </span>
-              ) : (
-                '💾 حفظ المكالمة'
-              )}
-            </button>
-            
+                <span className="text-amber-400 text-xs font-bold">
+                  {todayCalls} / {DAILY_GOAL} مكالمة
+                </span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: goalPct >= 100
+                      ? 'linear-gradient(90deg, #10b981, #059669)'
+                      : 'linear-gradient(90deg, #f59e0b, #d97706)',
+                    boxShadow: '0 0 8px rgba(245,158,11,0.5)',
+                  }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${goalPct}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4 flex-1 overflow-y-auto min-h-0" dir="rtl">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
+          )}
+
+          {inactiveFeedbackNeeded && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+              <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
+              <p className="text-[11px] text-amber-900/85 leading-relaxed">
+                ملاحظة إلزامية للمتاجر غير النشطة — اكتب ما دار في المحادثة ({MIN_INACTIVE_FEEDBACK_LEN} أحرف فأكثر).
+              </p>
+              <textarea
+                value={inactiveFeedback}
+                onChange={e => setInactiveFeedback(e.target.value)}
+                rows={5}
+                placeholder="اكتب ملخص رد المتجر..."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y min-h-[120px]"
+              />
+              <p className="text-[11px] text-slate-500 tabular-nums">
+                {inactiveFeedback.trim().length}/{MIN_INACTIVE_FEEDBACK_LEN} حرفاً على الأقل
+              </p>
+            </div>
+          )}
+
+          {surveyNeeded && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-black text-violet-900">استبيان رضا العميل</h4>
+                <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
+                  عبّي التقييم لكل بند قبل حفظ المكالمة — المقترحات اختيارية.
+                </p>
+              </div>
+              {SATISFACTION_QUESTIONS.map((q, i) => (
+                <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                  <p className="text-[10px] font-bold text-violet-700 mb-1">
+                    س{i + 1} — {q.short}
+                  </p>
+                  <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
+                  <StarRow value={ratings[i]} onChange={v => setRating(i, v)} />
+                </div>
+              ))}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  مقترحات أو ملاحظات إضافية من المتجر
+                </label>
+                <textarea
+                  value={suggestions}
+                  onChange={e => setSuggestions(e.target.value)}
+                  rows={3}
+                  placeholder="اختياري — أي ملاحظة يذكرها التاجر تُحفظ مع سجل النظام."
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-y min-h-[80px]"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">ملاحظات (اختياري)</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={3}
+              placeholder="اكتب ملاحظاتك هنا..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400 text-slate-800 text-sm resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex flex-col gap-2 px-5 pb-5">
+          <motion.button
+            type="button"
+            onClick={handleNoAnswer}
+            disabled={saving}
+            whileHover={{ scale: saving ? 1 : 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
+          >
+            {saving ? 'جارٍ التسجيل…' : 'عدم الرد — يبقى المتجر في المهام اليومية'}
+          </motion.button>
+          <div className="flex gap-3">
+            <motion.button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || (surveyNeeded && !allSurveyRated) || (inactiveFeedbackNeeded && !inactiveFeedbackOk)}
+              whileHover={{ scale: saving ? 1 : 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+              }}
+            >
+              {saving
+                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+              }
+            </motion.button>
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
-              className="px-6 py-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-all duration-200"
+              className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
             >
               إلغاء
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      </motion.div>
     </div>
-  );
-};
-
-export default CallModal;
+  )
+}

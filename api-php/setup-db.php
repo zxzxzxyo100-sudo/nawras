@@ -44,6 +44,18 @@ try {
 try {
     $pdo->exec("ALTER TABLE store_states ADD COLUMN next_call_date DATE AFTER incubation_stage");
 } catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call1_at DATETIME NULL DEFAULT NULL AFTER next_call_date");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call2_at DATETIME NULL DEFAULT NULL AFTER inc_call1_at");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL AFTER inc_call2_at");
+} catch(Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at");
+} catch(Exception $e) {}
 
 // Audit logs - complete history
 $pdo->exec("CREATE TABLE IF NOT EXISTS audit_logs (
@@ -69,6 +81,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS call_logs (
     store_name VARCHAR(300),
     call_type VARCHAR(50) NOT NULL,
     note TEXT NOT NULL,
+    outcome VARCHAR(32) NULL DEFAULT NULL,
     performed_by VARCHAR(200) NOT NULL,
     performed_role VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -103,6 +116,17 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS surveys (
     performed_by VARCHAR(200) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_store (store_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// إخفاء مهام يومية بعد «تم» (نفس اليوم)
+$pdo->exec("CREATE TABLE IF NOT EXISTS daily_task_dismissals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    task_key VARCHAR(160) NOT NULL,
+    dismissed_on DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_task_day (username, task_key, dismissed_on),
+    INDEX idx_user_day (username, dismissed_on)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 // Insert default admin user

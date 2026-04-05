@@ -1,19 +1,28 @@
-DirectoryIndex index.html
 Options -Indexes
 
+# PHP settings for heavy operations
+php_value memory_limit 256M
+php_value max_execution_time 120
+
+# React Router — redirect all non-file/api requests to index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+
+    # Allow api-php directory to work normally
+    RewriteRule ^api-php/ - [L]
+
+    # Allow actual files and directories
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Redirect everything else to index.html (React handles routing)
+    RewriteRule . /index.html [L]
 </IfModule>
 
-# PHP settings
-<IfModule mod_php.c>
-    php_value max_execution_time 30
-    php_value memory_limit 128M
-</IfModule>
-
-# LiteSpeed PHP settings
-<IfModule LiteSpeed>
-    php_value max_execution_time 30
-    php_value memory_limit 128M
-</IfModule>
+# CORS for api-php
+<FilesMatch "\.(php)$">
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</FilesMatch>

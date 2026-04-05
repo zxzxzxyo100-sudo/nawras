@@ -1,0 +1,170 @@
+import { Filter } from 'lucide-react'
+import StoreNameAutocomplete from './StoreNameAutocomplete'
+import { STORE_BUCKET_KEYS, STORE_BUCKET_LABELS } from '../utils/storeBuckets'
+
+/**
+ * شريط تصفية موحّد: اسم، رقم المتجر، نطاق تاريخ التسجيل، نطاق آخر شحنة
+ */
+export default function StoreFilterPanel({
+  isElite = true,
+  /** إخفاء صف العنوان + «مسح التصفية» (للاستخدام داخل لوحة جانبية) */
+  showHeaderRow = true,
+  nameQuery,
+  namePickedStoreId = null,
+  onNamePickedStoreIdChange,
+  idQuery,
+  regFrom,
+  regTo,
+  shipFrom,
+  shipTo,
+  onNameChange,
+  onIdChange,
+  onRegFromChange,
+  onRegToChange,
+  onShipFromChange,
+  onShipToChange,
+  onClear,
+  /** تصفية خانة المتجر (احتضان، نشط يشحن، …) */
+  showBucketFilter = false,
+  selectedBucketKeys = [],
+  onBucketKeysChange,
+}) {
+  const label = 'block text-[11px] text-slate-500 mb-1'
+  const inp = isElite
+    ? 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300'
+    : 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+
+  const dateInp = isElite
+    ? 'min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-300/80 focus:border-violet-300 [color-scheme:light]'
+    : 'min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 [color-scheme:light]'
+
+  const clearBtn = isElite
+    ? 'text-xs font-medium text-violet-700 hover:text-violet-900 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50/80 hover:bg-violet-100 transition-colors'
+    : 'text-xs font-medium text-slate-600 hover:text-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100'
+
+  return (
+    <div className="w-full space-y-3">
+      {showHeaderRow && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-slate-600">
+            <Filter size={15} className={isElite ? 'text-violet-600' : 'text-slate-500'} strokeWidth={2} />
+            <span className="text-xs font-semibold">تصفية</span>
+          </div>
+          <button type="button" onClick={onClear} className={clearBtn}>
+            مسح التصفية
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {showBucketFilter && onBucketKeysChange && (
+          <div className="space-y-2 sm:col-span-2 xl:col-span-4">
+            <span className={label}>حالة المتجر (الخانة)</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {STORE_BUCKET_KEYS.map(key => (
+                <label
+                  key={key}
+                  className="inline-flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBucketKeys.includes(key)}
+                    onChange={() => {
+                      const set = new Set(selectedBucketKeys)
+                      if (set.has(key)) set.delete(key)
+                      else set.add(key)
+                      onBucketKeysChange([...set])
+                    }}
+                    className={`rounded border-slate-300 ${isElite ? 'accent-violet-600' : 'accent-blue-600'} w-4 h-4 shrink-0`}
+                  />
+                  <span className="text-sm text-slate-700">{STORE_BUCKET_LABELS[key]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="space-y-2 sm:col-span-2 xl:col-span-1">
+          <label className={label}>اسم المتجر أو رقم الهاتف</label>
+          {onNamePickedStoreIdChange ? (
+            <>
+              <StoreNameAutocomplete
+                value={nameQuery}
+                onChange={onNameChange}
+                selectedStoreId={namePickedStoreId}
+                onSelectedStoreIdChange={onNamePickedStoreIdChange}
+                isElite={isElite}
+                placeholder="ابدأ الكتابة للبحث عن متجر (اقتراحات من الخادم)…"
+              />
+              {namePickedStoreId != null && (
+                <p className="text-[10px] text-emerald-700 font-mono tabular-nums" dir="ltr">
+                  تم اختيار المعرف: {String(namePickedStoreId)}
+                </p>
+              )}
+            </>
+          ) : (
+            <input
+              type="text"
+              value={nameQuery}
+              onChange={e => onNameChange(e.target.value)}
+              placeholder="اسم، أو أرقام الهاتف (أي جزء من الرقم، بلا شرط البداية)..."
+              className={inp}
+              dir="rtl"
+            />
+          )}
+        </div>
+        <div>
+          <label className={label}>رقم المتجر / المعرف</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={idQuery}
+            onChange={e => onIdChange(e.target.value)}
+            placeholder="مثال: 12345"
+            className={`${inp} font-mono tabular-nums`}
+            dir="ltr"
+          />
+        </div>
+        <div>
+          <span className={label}>تاريخ التسجيل</span>
+          <div className="flex gap-2 items-center flex-wrap">
+            <input
+              type="date"
+              value={regFrom}
+              onChange={e => onRegFromChange(e.target.value)}
+              className={dateInp}
+              title="من"
+            />
+            <span className="text-slate-400 text-xs shrink-0">—</span>
+            <input
+              type="date"
+              value={regTo}
+              onChange={e => onRegToChange(e.target.value)}
+              className={dateInp}
+              title="إلى"
+            />
+          </div>
+        </div>
+        <div>
+          <span className={label}>تاريخ آخر شحنة</span>
+          <div className="flex gap-2 items-center flex-wrap">
+            <input
+              type="date"
+              value={shipFrom}
+              onChange={e => onShipFromChange(e.target.value)}
+              className={dateInp}
+              title="من"
+            />
+            <span className="text-slate-400 text-xs shrink-0">—</span>
+            <input
+              type="date"
+              value={shipTo}
+              onChange={e => onShipToChange(e.target.value)}
+              className={dateInp}
+              title="إلى"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

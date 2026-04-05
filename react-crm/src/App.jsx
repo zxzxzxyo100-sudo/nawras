@@ -1,35 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import OfficerDashboard from './pages/OfficerDashboard';
-import ManagerDashboard from './pages/ManagerDashboard';
-import TaskDetail from './pages/TaskDetail';
-import MerchantDetail from './pages/MerchantDetail';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
-import './App.css';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { DISABLE_POINTS_AND_PERFORMANCE } from './config/features'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { StoresProvider } from './contexts/StoresContext'
+import { PointsProvider, usePoints } from './contexts/PointsContext'
+import Layout from './components/Layout'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import NewStores from './pages/NewStores'
+import ActiveStores from './pages/ActiveStores'
+import ActiveWorkflow from './pages/ActiveWorkflow'
+import ManagerAnalytics from './pages/ManagerAnalytics'
+import FrozenStores from './pages/FrozenStores'
+import HotInactive from './pages/HotInactive'
+import ColdInactive from './pages/ColdInactive'
+import IncubationPath from './pages/IncubationPath'
+import IncubationCallDelay from './pages/IncubationCallDelay'
+import Tasks from './pages/Tasks'
+import Users from './pages/Users'
+import Kanban from './pages/Kanban'
+import VipMerchants from './pages/VipMerchants'
+import MyPerformance from './pages/MyPerformance'
+import GoldCoinAnimation from './components/GoldCoinAnimation'
 
-function App() {
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <Router>
-          <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" />} />
-                <Route path="/dashboard" element={<OfficerDashboard />} />
-                <Route path="/manager" element={<ManagerDashboard />} />
-                <Route path="/tasks/:id" element={<TaskDetail />} />
-                <Route path="/merchants/:id" element={<MerchantDetail />} />
-              </Routes>
-            </main>
-          </div>
-        </Router>
-      </ThemeProvider>
-    </AuthProvider>
-  );
+function PrivateRoute({ children, view, viewAny }) {
+  const { user, loading, can } = useAuth()
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">جارٍ التحميل...</div>
+  if (!user) return <Navigate to="/login" replace />
+  if (viewAny?.length) {
+    if (!viewAny.some(v => can(v))) return <Navigate to="/" replace />
+    return children
+  }
+  if (view && !can(view)) return <Navigate to="/" replace />
+  return children
 }
 
-export default App;
+function AppRoutes() {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">جارٍ التحميل...</div>
+
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route path="/"             element={<Dashboard />} />
+        <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
+        <Route path="/active"       element={<Navigate to="/active/pending" replace />} />
+        <Route path="/active/frozen" element={<Navigate to="/frozen" replace />} />
+        <Route path="/frozen"       element={<PrivateRoute view="active"><FrozenStores /></PrivateRoute>} />
+        <Route
+          path="/active/workflow"
+          element={<PrivateRoute view="active"><ActiveWorkflow /></PrivateRoute>}
+        />
+        <Route
+          path="/active/:activeSegment"
+          element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>}
+        />
+        <Route path="/hot-inactive" element={<Navigate to="/hot-inactive/all" replace />} />
+        <Route
+          path="/hot-inactive/:recoverySegment"
+          element={(
+            <PrivateRoute viewAny={['hot_inactive', 'cold_inactive']}>
+              <HotInactive />
+            </PrivateRoute>
+          )}
+        />
+        <Route path="/cold-inactive"element={<PrivateRoute view="cold_inactive"><ColdInactive /></PrivateRoute>} />
+        <Route path="/vip"          element={<PrivateRoute view="vip_merchants"><VipMerchants /></PrivateRoute>} />
+        <Route path="/incubation" element={<Navigate to="/incubation/call-1" replace />} />
+        <Route
+          path="/incubation/call-delay"
+          element={<PrivateRoute view="incubation"><IncubationCallDelay /></PrivateRoute>}
+        />
+        <Route
+          path="/incubation/:tabKey"
+          element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>}
+        />
+        <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
+        <Route
+          path="/performance"
+          element={(
+            <PrivateRoute view="tasks">
+              {DISABLE_POINTS_AND_PERFORMANCE
+                ? <Navigate to="/tasks" replace />
+                : <MyPerformance />}
+            </PrivateRoute>
+          )}
+        />
+        <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
+        <Route
+          path="/analytics/manager"
+          element={<PrivateRoute view="manager_analytics"><ManagerAnalytics /></PrivateRoute>}
+        />
+        <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+function GlobalAnimations() {
+  const { coinTrigger, earnedPoints, showJackpot, setShowJackpot } = usePoints()
+  if (DISABLE_POINTS_AND_PERFORMANCE) return null
+  return (
+    <GoldCoinAnimation
+      trigger={coinTrigger}
+      points={earnedPoints}
+      showJackpot={showJackpot}
+      onJackpotDone={() => setShowJackpot(false)}
+    />
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <StoresProvider>
+          <PointsProvider>
+            <GlobalAnimations />
+            <AppRoutes />
+          </PointsProvider>
+        </StoresProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}

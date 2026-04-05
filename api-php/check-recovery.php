@@ -1,15 +1,14 @@
 <?php
-// Auto-recovery checker - optimized to prevent Out of Memory
-ini_set('memory_limit', '48M');
-ini_set('max_execution_time', '15');
+require_once __DIR__ . '/config.php';
+
+ini_set('memory_limit',      MEMORY_MEDIUM);
+ini_set('max_execution_time', TIME_MEDIUM);
 
 require_once __DIR__ . '/db.php';
 
 $pdo = getDB();
-$TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-$BASE = 'https://backoffice.nawris.algoriza.com/external-api';
 
-// Get all stores in "restoring" status
+// جلب كل المتاجر في وضع "restoring"
 $stmt = $pdo->query("SELECT store_id, store_name, restore_date FROM store_states WHERE category = 'restoring'");
 $restoringStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -22,46 +21,84 @@ foreach ($restoringStores as $s) {
     $storeMap[intval($s['store_id'])] = $s;
 }
 
-// جلب صفحة واحدة فقط (بدل كل الصفحات) لتوفير الذاكرة
-function fetchOnePage($url, $token) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'X-API-TOKEN: ' . $token]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-    $response = curl_exec($ch);
-    curl_close($ch);
-    $data = json_decode($response, true);
-    return (isset($data['data']) && is_array($data['data'])) ? $data['data'] : [];
-}
+// -------------------------------------------------------
+// جلب بيانات الشحن مع Pagination كامل (بدل صفحة واحدة)
+// نتوقف مبكراً إذا وجدنا كل المتاجر المطلوبة لتوفير الوقت
+// -------------------------------------------------------
+function fetchShipmentMap(string $url, int $maxPages, array $targetIds): array {
+    $shipMap = [];
+    $cursor  = null;
+    $page    = 0;
 
-// Fetch from BOTH APIs (صفحة واحدة فقط - أحدث البيانات)
-$since = date('Y-m-d', strtotime('-30 days'));
-$newCustomers = fetchOnePage($BASE . '/customers/new?since=' . $since, $TOKEN);
-$ordersSummary = fetchOnePage($BASE . '/customers/orders-summary?from=' . $since . '&to=' . date('Y-m-d'), $TOKEN);
+    do {
+        $fullUrl = $cursor ? $url . '&cursor=' . urlencode($cursor) : $url;
 
-// Merge: build shipment map by store ID
-$shipmentMap = [];
-foreach ($newCustomers as $s) {
-    $sid = intval($s['id']);
-    $ship = $s['last_shipment_date'] ?? null;
-    if ($ship && $ship !== 'لا يوجد') {
-        $shipmentMap[$sid] = $ship;
-    }
-}
-foreach ($ordersSummary as $s) {
-    $sid = intval($s['id']);
-    $ship = $s['last_shipment_date'] ?? null;
-    if ($ship && $ship !== 'لا يوجد') {
-        // Keep the most recent shipment date
-        if (!isset($shipmentMap[$sid]) || strtotime($ship) > strtotime($shipmentMap[$sid])) {
-            $shipmentMap[$sid] = $ship;
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $fullUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json',
+                'X-API-TOKEN: ' . NAWRIS_TOKEN,
+            ],
+        ]);
+        $response = curl_exec($ch);
+        $curlErr  = curl_errno($ch);
+        curl_close($ch);
+
+        if ($curlErr || !$response) break;
+
+        $data = json_decode($response, true);
+        if (!is_array($data)) break;
+
+        foreach ($data['data'] ?? [] as $s) {
+            $sid  = intval($s['id']);
+            $ship = $s['last_shipment_date'] ?? null;
+            if ($ship && $ship !== 'لا يوجد') {
+                if (!isset($shipMap[$sid]) || strtotime($ship) > strtotime($shipMap[$sid])) {
+                    $shipMap[$sid] = $ship;
+                }
+            }
         }
+
+        $cursor = $data['meta']['next_cursor'] ?? null;
+        $page++;
+
+        // توقف مبكر: وجدنا بيانات شحن لكل المتاجر المطلوبة
+        $foundAll = !array_diff($targetIds, array_keys($shipMap));
+        if ($foundAll) break;
+
+    } while ($cursor && $page < $maxPages);
+
+    return $shipMap;
+}
+
+/* نطاق واسع مثل all-stores.php — نافذة 30 يوماً كانت تفوت متاجر قديمة في /customers/new */
+$sinceWide = '2020-01-01';
+$targetIds  = array_keys($storeMap);
+
+$shipNew    = fetchShipmentMap(
+    NAWRIS_BASE . '/customers/new?since=' . $sinceWide,
+    MAX_PAGES_RECOVERY,
+    $targetIds
+);
+$shipOrders = fetchShipmentMap(
+    NAWRIS_BASE . '/customers/orders-summary?from=' . $sinceWide . '&to=' . date('Y-m-d'),
+    MAX_PAGES_RECOVERY,
+    $targetIds
+);
+
+// دمج: الاحتفاظ بأحدث تاريخ شحنة لكل متجر
+$shipmentMap = $shipNew;
+foreach ($shipOrders as $sid => $date) {
+    if (!isset($shipmentMap[$sid]) || strtotime($date) > strtotime($shipmentMap[$sid])) {
+        $shipmentMap[$sid] = $date;
     }
 }
 
-// Check each restoring store
+// فحص كل متجر في "restoring"
 $recoveredCount = 0;
 $recoveredNames = [];
 
@@ -72,9 +109,10 @@ foreach ($storeMap as $sid => $storeInfo) {
     $lastShipDate = $shipmentMap[$sid] ?? null;
     if (!$lastShipDate) continue;
 
-    // Shipped AFTER restore date?
-    if (strtotime($lastShipDate) > strtotime($restoreDate)) {
-        // AUTO-RECOVER
+    // مقارنة باليوم: طلبية نفس يوم «بدء الاستعادة» تُعتبر لاحقة منطقياً (كانت > توقيت تفوتها)
+    $shipDay    = date('Y-m-d', strtotime($lastShipDate));
+    $restoreDay = date('Y-m-d', strtotime($restoreDate));
+    if ($shipDay >= $restoreDay) {
         $pdo->prepare("UPDATE store_states SET category = 'recovered', updated_by = 'System / API' WHERE store_id = ?")
             ->execute([$sid]);
 
@@ -87,7 +125,7 @@ foreach ($storeMap as $sid => $storeInfo) {
                 'restoring',
                 'recovered',
                 'System / API',
-                'system'
+                'system',
             ]);
 
         $recoveredCount++;
@@ -96,12 +134,12 @@ foreach ($storeMap as $sid => $storeInfo) {
 }
 
 jsonResponse([
-    'success' => true,
-    'recovered' => $recoveredCount,
-    'stores' => $recoveredNames,
-    'message' => $recoveredCount > 0
+    'success'         => true,
+    'recovered'       => $recoveredCount,
+    'stores'          => $recoveredNames,
+    'message'         => $recoveredCount > 0
         ? "تم استعادة $recoveredCount متجر تلقائياً: " . implode(', ', $recoveredNames)
         : 'لا توجد متاجر جديدة للاستعادة',
-    'checked' => count($storeMap),
-    'shipments_found' => count($shipmentMap)
+    'checked'         => count($storeMap),
+    'shipments_found' => count($shipmentMap),
 ]);

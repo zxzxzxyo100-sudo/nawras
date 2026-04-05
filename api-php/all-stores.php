@@ -1,137 +1,659 @@
 <?php
-ini_set('memory_limit', '256M');
-ini_set('max_execution_time', '120');
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/onboarding-config.php';
+
+ini_set('memory_limit',      MEMORY_HEAVY);
+ini_set('max_execution_time', TIME_LONG);
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-$TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-$BASE = 'https://backoffice.nawris.algoriza.com/external-api';
+// ═══════════════════════════════════════════════════════════════
+// استراتيجية الجلب (بدون orders-summary — معطل بـ 500 error):
+//
+//  [A] /customers/new?since=90d
+//        → المتاجر الجديدة للاحتضان (آخر 90 يوم)
+//
+//  [B] /customers/new?since=2020-01-01
+//        → جميع المتاجر المسجلة (المصدر الرئيسي)
+//        → يرجع 8,885 متجر كلها status=active
+//
+//  [C] /customers/inactive?days=365
+//        → المتاجر الخاملة (لتحديث last_shipment_date بدقة أكثر)
+//        → نُدمجها مع [B] لضمان اكتمال البيانات
+// ═══════════════════════════════════════════════════════════════
 
-function fetchAll($url, $token, $max = 100) {
-    $all = [];
+function fetchAll($url, $max = MAX_PAGES_ALL) {
+    $all    = [];
     $cursor = null;
-    $p = 0;
+    $p      = 0;
     do {
-        $u = $cursor ? $url . (strpos($url,'?')!==false?'&':'?') . 'cursor=' . $cursor : $url;
+        $u = $cursor
+            ? $url . (strpos($url, '?') !== false ? '&' : '?') . 'cursor=' . urlencode($cursor)
+            : $url;
+
         $ch = curl_init();
-        curl_setopt_array($ch, [CURLOPT_URL=>$u, CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_CONNECTTIMEOUT=>5, CURLOPT_HTTPHEADER=>['Accept: application/json','X-API-TOKEN:'.$token]]);
-        $r = curl_exec($ch);
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $u,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json',
+                'X-API-TOKEN: ' . NAWRIS_TOKEN,
+            ],
+        ]);
+        $r  = curl_exec($ch);
+        $err = curl_errno($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        if ($err || !$r || $httpCode >= 400) break;
+
         $d = json_decode($r, true);
-        if (isset($d['data'])) foreach ($d['data'] as $i) $all[$i['id']] = $i;
+        if (!isset($d['data']) || !is_array($d['data'])) break;
+
+        foreach ($d['data'] as $i) {
+            $id = $i['id'];
+            if (!isset($all[$id])) {
+                $all[$id] = $i;
+            } else {
+                // الاحتفاظ بأحدث last_shipment_date
+                $n = $i['last_shipment_date']        ?? null;
+                $o = $all[$id]['last_shipment_date'] ?? null;
+                if ($n && $n !== 'لا يوجد' &&
+                    (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o))) {
+                    $all[$id]['last_shipment_date'] = $n;
+                }
+                // الاحتفاظ بأعلى total_shipments
+                if (($i['total_shipments'] ?? 0) > ($all[$id]['total_shipments'] ?? 0)) {
+                    $all[$id]['total_shipments'] = $i['total_shipments'];
+                }
+            }
+        }
+
         $cursor = $d['meta']['next_cursor'] ?? null;
         $p++;
     } while ($cursor && $p < $max);
+
     return $all;
 }
 
-$now = time();
+$now    = time();
+$days90 = date('Y-m-d', $now - 90 * 86400);
 
-// جلب البيانات
-$new = fetchAll($BASE.'/customers/new?since='.date('Y-m-d', $now-60*86400), $TOKEN, 30);
-$inactive = fetchAll($BASE.'/customers/inactive?days=10', $TOKEN, 30);
-$ord1 = fetchAll($BASE.'/customers/orders-summary?from='.date('Y-m-d',$now-30*86400).'&to='.date('Y-m-d'), $TOKEN, 60);
-$ord2 = fetchAll($BASE.'/customers/orders-summary?from='.date('Y-m-d',$now-61*86400).'&to='.date('Y-m-d',$now-31*86400), $TOKEN, 60);
+// ── [A] المتاجر الجديدة (آخر 90 يوم) — للاحتضان ─────────────────
+$new = fetchAll(
+    NAWRIS_BASE . '/customers/new?since=' . $days90,
+    MAX_PAGES_NEW
+);
 
-// دمج بدون تكرار
-$stores = [];
-foreach ([$ord1,$ord2,$new,$inactive] as $src) {
-    foreach ($src as $id => $s) {
-        if (!isset($stores[$id])) { $stores[$id] = $s; continue; }
-        $n = $s['last_shipment_date'] ?? null;
-        $o = $stores[$id]['last_shipment_date'] ?? null;
-        if ($n && $n !== 'لا يوجد' && (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o)))
-            $stores[$id]['last_shipment_date'] = $n;
-        if (($s['total_shipments']??0) > ($stores[$id]['total_shipments']??0))
-            $stores[$id]['total_shipments'] = $s['total_shipments'];
-        if (!empty($s['registered_at']))
-            $stores[$id]['registered_at'] = $s['registered_at'];
-        if (!empty($s['status']))
-            $stores[$id]['status'] = $s['status'];
+// ── [B] جميع المتاجر منذ 2020 ────────────────────────────────────
+$allStores = fetchAll(
+    NAWRIS_BASE . '/customers/new?since=2020-01-01',
+    MAX_PAGES_ALL
+);
+
+// ── [C] المتاجر الخاملة (365 يوم) — لتحديث بيانات الشحن ─────────
+$inactive = fetchAll(
+    NAWRIS_BASE . '/customers/inactive?days=365',
+    MAX_PAGES_RECOVERY
+);
+
+// ── دمج [C] في [B]: تحديث last_shipment_date وإضافة المتاجر المفقودة
+foreach ($inactive as $id => $s) {
+    if (!isset($allStores[$id])) {
+        // متجر موجود في inactive لكن غير موجود في new?since=2020 — أضفه
+        $allStores[$id] = $s;
+    } else {
+        // تحديث last_shipment_date إن كانت بيانات inactive أدق
+        $n = $s['last_shipment_date']          ?? null;
+        $o = $allStores[$id]['last_shipment_date'] ?? null;
+        if ($n && $n !== 'لا يوجد' &&
+            (!$o || $o === 'لا يوجد' || strtotime($n) > strtotime($o))) {
+            $allStores[$id]['last_shipment_date'] = $n;
+        }
     }
 }
 
-// ===== التصنيف =====
-// الاحتضان: مسجل أقل من 14 يوم
-// النشطة (1563): كل من status=active في API → مقسمة إلى 3:
-//   - نشط يشحن: شحن خلال 14 يوم
-//   - غير نشط ساخن: آخر شحنة 15-60 يوم
-//   - غير نشط بارد: آخر شحنة 60+ يوم أو لم يشحن أبداً
-// الباقي: غير نشط (ليس status=active)
-
+// ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
-    'incubating' => [],
-    'active' => [],
-    'inactive_hot' => [],
-    'inactive_cold' => [],
-    'other_inactive' => []
+    'incubating'            => [],
+    'active_shipping'       => [],
+    'completed_merchants'   => [],
+    'unreachable_merchants' => [],
+    'frozen_merchants'      => [],
+    'hot_inactive'          => [],
+    'cold_inactive'         => [],
 ];
 $counts = [
-    'total' => 0,
-    'incubating' => 0,
-    'api_active_total' => 0,  // إجمالي active في API (المستهدف 1563)
-    'active' => 0,            // منهم: شحن <= 14 يوم
-    'inactive_hot' => 0,      // منهم: شحن 15-60 يوم
-    'inactive_cold' => 0,     // منهم: شحن 60+ أو لم يشحن
-    'other_inactive' => 0     // ليس status=active أصلاً
+    'incubating'            => 0,
+    'active_shipping'       => 0,
+    'completed_merchants'   => 0,
+    'unreachable_merchants' => 0,
+    'frozen_merchants'      => 0,
+    'hot_inactive'          => 0,
+    'cold_inactive'         => 0,
+    'total_active'         => 0,
+    'total'                => 0,
 ];
 
-foreach ($stores as $s) {
-    $counts['total']++;
+// ── مسار الاحتضان: م1 من اليوم 1؛ م2 بعد X يوماً من تسجيل م1؛ م3 بعد Y يوماً من تسجيل م2 (انظر onboarding-config.php) ──
+$incubation_path = [
+    'call_1' => [],
+    'call_2' => [],
+    'call_3' => [],
+    'between' => [],
+];
+$incubation_counts = [
+    'call_1' => 0,
+    'call_2' => 0,
+    'call_3' => 0,
+    'between' => 0,
+    'total'  => 0,
+];
 
-    $reg = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
-    $daysReg = $reg ? ($now - $reg) / 86400 : 999;
+$newIds = array_fill_keys(array_keys($new), true);
 
-    $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد') ? strtotime($s['last_shipment_date']) : null;
-    $daysShip = $lastShip ? ($now - $lastShip) / 86400 : 999;
-
-    $apiStatus = $s['status'] ?? '';
-
-    // 1. احتضان: أقل من 14 يوم
-    if ($daysReg < 14) {
-        $s['_cat'] = 'incubating';
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        continue;
+/** يوم الدورة من 1 إلى 14 (اليوم الأول من التسجيل = 1) */
+function incubation_cycle_day($regTs, $now) {
+    if (!$regTs || $regTs <= 0) {
+        return 1;
     }
+    $d = (int) floor(($now - $regTs) / 86400);
 
-    // 2. المتاجر التي حالتها active في API
-    if ($apiStatus === 'active') {
-        $counts['api_active_total']++;
-
-        if ($daysShip <= 14) {
-            // نشط يشحن
-            $s['_cat'] = 'active';
-            $result['active'][] = $s;
-            $counts['active']++;
-        } elseif ($daysShip > 14 && $daysShip <= 60) {
-            // غير نشط ساخن
-            $s['_cat'] = 'inactive_hot';
-            $result['inactive_hot'][] = $s;
-            $counts['inactive_hot']++;
-        } else {
-            // غير نشط بارد (60+ أو لم يشحن أبداً)
-            $s['_cat'] = 'inactive_cold';
-            $result['inactive_cold'][] = $s;
-            $counts['inactive_cold']++;
-        }
-        continue;
-    }
-
-    // 3. الباقي (ليس active في API)
-    $s['_cat'] = 'other_inactive';
-    $result['other_inactive'][] = $s;
-    $counts['other_inactive']++;
+    return min(14, max(1, $d + 1));
 }
 
-// تحقق: api_active_total = active + inactive_hot + inactive_cold
-$counts['active_check'] = $counts['active'] + $counts['inactive_hot'] + $counts['inactive_cold'];
-$counts['match'] = ($counts['active_check'] === $counts['api_active_total']);
+/** مرحلة المسار + أيام التأخير (عرض وبين المكالمات وتأخير المكالمة وجميع خانات المكالمات) */
+function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped) {
+    $cd = min(14, max(1, (int) $cycleDay));
+    $s['_cycle_day'] = $cd;
+    $s['_inc_stage_key'] = '';
+    $s['_delay_days'] = 0;
+    if (!$inc1) {
+        $s['_inc_phase'] = $hasShipped
+            ? 'شحن مسجّل — لم تُسجَّل المكالمة الأولى بعد'
+            : ($cd > 1 ? 'تأخّر عن نافذة المكالمة الأولى (يوم 1 من 14)' : '');
+        $s['_days_until_window'] = max(0, 3 - $cd);
+        $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
+        $s['_inc_stage_key'] = $hasShipped ? 'shipped_no_c1' : 'late_c1';
+        $s['_delay_days'] = max(0, $cd - 1);
+
+        return;
+    }
+    if (!$inc2) {
+        if ($cd < 3) {
+            $s['_inc_phase'] = 'بين المكالمة الأولى والثانية — انتظار يوم 3 من 14';
+            $s['_days_until_window'] = max(0, 3 - $cd);
+            $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
+            $s['_inc_stage_key'] = 'wait_c2';
+            $s['_delay_days'] = 0;
+        } else {
+            $s['_inc_phase'] = $cd > 3
+                ? 'تأخّر عن نافذة المكالمة الثانية (يوم 3 من 14)'
+                : '';
+            $s['_days_until_window'] = max(0, 10 - $cd);
+            $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
+            $s['_inc_stage_key'] = $cd > 3 ? 'late_c2' : 'wait_c2';
+            $s['_delay_days'] = $cd > 3 ? max(0, $cd - 3) : 0;
+        }
+
+        return;
+    }
+    if (!$inc3) {
+        $s['_inc_phase'] = $cd < 10
+            ? 'بين المكالمة الثانية والثالثة — انتظار يوم 10 من 14'
+            : 'تأخّر عن نافذة المكالمة الثالثة (يوم 10 من 14)';
+        $s['_days_until_window'] = max(0, 10 - $cd);
+        $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
+        $s['_inc_stage_key'] = $cd < 10 ? 'wait_c3' : 'late_c3';
+        $s['_delay_days'] = $cd > 10 ? max(0, $cd - 10) : 0;
+    }
+}
+
+$dbMap = [];
+if (!empty($new)) {
+    try {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+        foreach (['inc_call1_at', 'inc_call2_at', 'inc_call3_at'] as $col) {
+            try {
+                $pdoDb->exec("ALTER TABLE store_states ADD COLUMN {$col} DATETIME NULL DEFAULT NULL");
+            } catch (Throwable $e) {
+                // موجود
+            }
+        }
+        $ids = array_keys($new);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category FROM store_states WHERE store_id IN ($ph)");
+        $stmt->execute(array_map('intval', $ids));
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $dbMap[(int) $row['store_id']] = $row;
+        }
+    } catch (Throwable $e) {
+        $dbMap = [];
+    }
+}
+
+// ── تصنيف المتاجر الجديدة (مسار الاحتضان) ───────────────────────
+foreach ($new as $id => $s) {
+    $db = $dbMap[$id] ?? null;
+    $regTs   = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
+    $regHrs  = $regTs ? ($now - $regTs) / 3600 : PHP_INT_MAX;
+    $regDays = $regHrs / 24;
+
+    $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
+               || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
+
+    $s['_hours'] = round($regHrs, 1);
+    $s['_days']  = round($regDays, 1);
+
+    $inc1 = $db['inc_call1_at'] ?? null;
+    $inc2 = $db['inc_call2_at'] ?? null;
+    $inc3 = $db['inc_call3_at'] ?? null;
+    $dbCat = $db['category'] ?? '';
+
+    // تخريج يدوي إلى نشط من الواجهة
+    if ($db && in_array($dbCat, ['active', 'active_shipping'], true) && empty($inc3)) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+            ? strtotime($s['last_shipment_date']) : null;
+        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+        if ($hasShipped) {
+            if ($daysShip <= 14) {
+                $s['_cat'] = 'active_shipping';
+                $result['active_shipping'][] = $s;
+                $counts['active_shipping']++;
+            } elseif ($daysShip <= 60) {
+                $s['_cat'] = 'hot_inactive';
+                $result['hot_inactive'][] = $s;
+                $counts['hot_inactive']++;
+            } else {
+                $s['_cat'] = 'cold_inactive';
+                $result['cold_inactive'][] = $s;
+                $counts['cold_inactive']++;
+            }
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $s['_inc'] = 'never_started';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // بعد المكالمة الثالثة — تصنيف حسب الشحن
+    if (!empty($inc3)) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        if ($hasShipped) {
+            $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+                ? strtotime($s['last_shipment_date']) : null;
+            $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+            if ($daysShip <= 14) {
+                $s['_cat'] = 'active_shipping';
+                $result['active_shipping'][] = $s;
+                $counts['active_shipping']++;
+            } elseif ($daysShip <= 60) {
+                $s['_cat'] = 'hot_inactive';
+                $result['hot_inactive'][] = $s;
+                $counts['hot_inactive']++;
+            } else {
+                $s['_cat'] = 'cold_inactive';
+                $result['cold_inactive'][] = $s;
+                $counts['cold_inactive']++;
+            }
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $s['_inc'] = 'never_started';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    $cycleDay = incubation_cycle_day($regTs, $now);
+    $s['_cycle_day'] = $cycleDay;
+
+    $todayStr = date('Y-m-d', $now);
+    $dueCall2 = $inc1 ? nawras_date_plus_days($inc1, NAWRAS_ONBOARD_DAYS_AFTER_CALL1) : null;
+    $dueCall3 = $inc2 ? nawras_date_plus_days($inc2, NAWRAS_ONBOARD_DAYS_AFTER_CALL2) : null;
+
+    // المكالمة الثالثة — بعد Y يوماً من تسجيل المكالمة الثانية (تم)
+    if ($inc2 && !$inc3 && $dueCall3 && $todayStr >= $dueCall3) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_3';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_3'][] = $s;
+        $incubation_counts['call_3']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // المكالمة الثانية — بعد X يوماً من تسجيل المكالمة الأولى (تم)
+    if ($inc1 && !$inc2 && $dueCall2 && $todayStr >= $dueCall2) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_2';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_2'][] = $s;
+        $incubation_counts['call_2']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // بعد 14 يومًا بدون مكالمة أولى وبدون شحن → بارد
+    if (!$inc1 && !$hasShipped && $cycleDay > 14) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'cold_inactive';
+        $s['_inc'] = 'never_started';
+        $s['_never_started'] = true;
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // ترحيل: شحن بعد 14 يوم من التسجيل
+    if ($hasShipped && $regDays > 14) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+            ? strtotime($s['last_shipment_date']) : null;
+        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+        if ($daysShip <= 14) {
+            $s['_cat'] = 'active_shipping';
+            $result['active_shipping'][] = $s;
+            $counts['active_shipping']++;
+        } elseif ($daysShip <= 60) {
+            $s['_cat'] = 'hot_inactive';
+            $result['hot_inactive'][] = $s;
+            $counts['hot_inactive']++;
+        } else {
+            $s['_cat'] = 'cold_inactive';
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+        }
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // المكالمة الأولى — أي متجر لم تُسجَّل مكالمته الأولى بعد (ضمن المسار قبل الترحيل)
+    if (!$inc1) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_1';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_1'][] = $s;
+        $incubation_counts['call_1']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // بين المكالمات — قبل موعد المكالمة التالية (لم يحن بعد تاريخ الاستحقاق)
+    if (
+        ($inc1 && !$inc2 && $dueCall2 && $todayStr < $dueCall2)
+        || ($inc2 && !$inc3 && $dueCall3 && $todayStr < $dueCall3)
+    ) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'between_calls';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['between'][] = $s;
+        $incubation_counts['between']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+}
+
+// ── تصنيف بقية المتاجر (من allStores) ───────────────────────────
+foreach ($allStores as $id => $s) {
+    if (isset($newIds[$id])) continue;                // تجنب تكرار المتاجر الجديدة
+    if (!empty($s['status']) && $s['status'] !== 'active') continue; // active فقط
+
+    $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
+        ? strtotime($s['last_shipment_date']) : null;
+    $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
+
+    if ($daysShip <= 14) {
+        $s['_cat'] = 'active_shipping';
+        $result['active_shipping'][] = $s;
+        $counts['active_shipping']++;
+    } elseif ($daysShip <= 60) {
+        $s['_cat'] = 'hot_inactive';
+        $result['hot_inactive'][] = $s;
+        $counts['hot_inactive']++;
+    } else {
+        $s['_cat'] = 'cold_inactive';
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
+    }
+
+    $counts['total_active']++;
+    $counts['total']++;
+}
+
+// فصل «المتاجر المنجزة» عن «نشط قيد المكالمة» (حسب store_states)
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    try {
+        $pdoDb->exec('ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at');
+    } catch (Throwable $e) {
+        // موجود
+    }
+    if (!empty($result['active_shipping'])) {
+        $ids = [];
+        foreach ($result['active_shipping'] as $s) {
+            if (isset($s['id'])) {
+                $ids[] = (int) $s['id'];
+            }
+        }
+        $ids = array_values(array_unique(array_filter($ids)));
+        if (!empty($ids)) {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdoDb->prepare("SELECT store_id, category, last_call_date FROM store_states WHERE store_id IN ($ph)");
+            $st->execute($ids);
+            $catById = [];
+            while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                $catById[(int) $r['store_id']] = $r;
+            }
+            $activePending = [];
+            $completed = [];
+            $unreachable = [];
+            foreach ($result['active_shipping'] as $s) {
+                $id = (int) ($s['id'] ?? 0);
+                $row = $catById[$id] ?? null;
+                $cat = $row['category'] ?? '';
+                if ($cat === 'completed') {
+                    if (!empty($row['last_call_date'])) {
+                        $s['last_call_date'] = $row['last_call_date'];
+                    }
+                    $completed[] = $s;
+                } elseif ($cat === 'unreachable') {
+                    if (!empty($row['last_call_date'])) {
+                        $s['last_call_date'] = $row['last_call_date'];
+                    }
+                    $unreachable[] = $s;
+                } else {
+                    $activePending[] = $s;
+                }
+            }
+            $result['active_shipping'] = $activePending;
+            $result['completed_merchants'] = $completed;
+            $result['unreachable_merchants'] = $unreachable;
+            $counts['active_shipping'] = count($activePending);
+            $counts['completed_merchants'] = count($completed);
+            $counts['unreachable_merchants'] = count($unreachable);
+        }
+    }
+} catch (Throwable $e) {
+    // بدون DB لا نفصل القائمة
+}
+
+// ── المتاجر المجمدة: قائمة منفصلة وإزالتها من باقي الخانات ─────
+/** @param array<int, mixed> $stores */
+function nawras_filter_out_store_id(array &$stores, $id) {
+    $id = (int) $id;
+    $stores = array_values(array_filter($stores, static function ($s) use ($id) {
+        return (int) ($s['id'] ?? 0) !== $id;
+    }));
+}
+
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    $stFrozen = $pdoDb->query("SELECT store_id, freeze_reason, updated_by FROM store_states WHERE category = 'frozen'");
+    $frozenRows = $stFrozen ? $stFrozen->fetchAll(PDO::FETCH_ASSOC) : [];
+    $frozenById = [];
+    foreach ($frozenRows as $fr) {
+        $fid = (int) ($fr['store_id'] ?? 0);
+        if ($fid <= 0) {
+            continue;
+        }
+        $frozenById[$fid] = $fr;
+    }
+    foreach (array_keys($frozenById) as $fid) {
+        nawras_filter_out_store_id($result['active_shipping'], $fid);
+        nawras_filter_out_store_id($result['completed_merchants'], $fid);
+        nawras_filter_out_store_id($result['unreachable_merchants'], $fid);
+        nawras_filter_out_store_id($result['hot_inactive'], $fid);
+        nawras_filter_out_store_id($result['cold_inactive'], $fid);
+        nawras_filter_out_store_id($result['incubating'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_1'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_2'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_3'], $fid);
+        nawras_filter_out_store_id($incubation_path['between'], $fid);
+    }
+    $result['frozen_merchants'] = [];
+    foreach ($frozenById as $fid => $fr) {
+        $s = $allStores[$fid] ?? $new[$fid] ?? $inactive[$fid] ?? null;
+        if (!is_array($s)) {
+            $s = [];
+        }
+        $s['id'] = $fid;
+        if (empty($s['name'])) {
+            $s['name'] = '';
+        }
+        if (empty($s['phone'])) {
+            $s['phone'] = '';
+        }
+        $s['freeze_reason'] = $fr['freeze_reason'] ?? '';
+        $s['frozen_updated_by'] = $fr['updated_by'] ?? '';
+        $s['_cat'] = 'frozen';
+        $result['frozen_merchants'][] = $s;
+    }
+    $counts['frozen_merchants'] = count($result['frozen_merchants']);
+    $counts['active_shipping'] = count($result['active_shipping']);
+    $counts['completed_merchants'] = count($result['completed_merchants']);
+    $counts['unreachable_merchants'] = count($result['unreachable_merchants']);
+    $counts['hot_inactive'] = count($result['hot_inactive']);
+    $counts['cold_inactive'] = count($result['cold_inactive']);
+    $counts['incubating'] = count($result['incubating']);
+    $incubation_counts['call_1'] = count($incubation_path['call_1']);
+    $incubation_counts['call_2'] = count($incubation_path['call_2']);
+    $incubation_counts['call_3'] = count($incubation_path['call_3']);
+    $incubation_counts['between'] = count($incubation_path['between']);
+    $incubation_counts['total'] = $incubation_counts['call_1'] + $incubation_counts['call_2'] + $incubation_counts['call_3'] + $incubation_counts['between'];
+    $counts['total_active'] = $counts['active_shipping'] + $counts['completed_merchants'] + $counts['unreachable_merchants']
+        + $counts['hot_inactive'] + $counts['cold_inactive'];
+} catch (Throwable $e) {
+    if (!isset($result['frozen_merchants'])) {
+        $result['frozen_merchants'] = [];
+    }
+    $counts['frozen_merchants'] = count($result['frozen_merchants']);
+}
+
+$counts['check'] = (
+    $counts['active_shipping'] + $counts['completed_merchants'] + $counts['unreachable_merchants'] + $counts['hot_inactive'] + $counts['cold_inactive']
+    === $counts['total_active']
+);
+
+// كبار التجار: يُجلب عبر vip-merchants.php (جلب كامل الصفحات) — يُترك هنا فارغاً للتوافق
+$vip_merchants = [];
+
+// ذاكرة بحث خفيفة لـ search-stores.php
+function nawras_lite_store_row($s, $fallbackId = null) {
+    $id = $s['id'] ?? $fallbackId;
+    return [
+        'id'    => $id,
+        'name'  => isset($s['name']) ? (string) $s['name'] : '',
+        'phone' => isset($s['phone']) ? (string) $s['phone'] : '',
+    ];
+}
+$search_lite_map = [];
+foreach ($new as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+foreach ($allStores as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+foreach ($inactive as $id => $s) {
+    $row = nawras_lite_store_row($s, $id);
+    if ($row['id'] !== null) {
+        $search_lite_map[(string) $row['id']] = $row;
+    }
+}
+$search_lite = array_values($search_lite_map);
+$cacheDir = __DIR__ . '/cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0755, true);
+}
+@file_put_contents(
+    $cacheDir . '/stores_search_lite.json',
+    json_encode($search_lite, JSON_UNESCAPED_UNICODE)
+);
 
 echo json_encode([
-    'success' => true,
-    'counts' => $counts,
-    'data' => $result
+    'success'           => true,
+    'counts'            => $counts,
+    'incubation_counts' => $incubation_counts,
+    'data'              => $result,
+    'vip_merchants'     => $vip_merchants,
+    'vip_merchants_count' => count($vip_merchants),
+    'incubation_path'   => $incubation_path,
+    'meta'              => [
+        'sources'           => ['new_90d', 'new_since_2020', 'inactive_365'],
+        'fetched_new_90d'   => count($new),
+        'fetched_all_2020'  => count($allStores),
+        'fetched_inactive'  => count($inactive),
+        'vip_endpoint'      => 'vip-merchants.php',
+        'generated_at'      => date('Y-m-d H:i:s'),
+    ],
 ], JSON_UNESCAPED_UNICODE);

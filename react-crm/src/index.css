@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Cairo', 'Segoe UI', sans-serif;
+    direction: rtl;
+    background-color: #f1f5f9;
+  }
+}

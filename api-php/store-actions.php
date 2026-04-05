@@ -2,75 +2,277 @@
 require_once __DIR__ . '/db.php';
 $pdo = getDB();
 
+/** عمود outcome لسجل المكالمات (إضافة تلقائية للقواعد القديمة) */
+function ensure_call_logs_outcome_column(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE call_logs ADD COLUMN outcome VARCHAR(32) NULL DEFAULT NULL AFTER note");
+    } catch (Throwable $e) {
+        // العمود موجود مسبقاً
+    }
+    $done = true;
+}
+
+/** أعمدة تواريخ مكالمات مسار الاحتضان (ثلاث مكالمات + 3 أيام) */
+function ensure_incubation_call_columns(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    foreach ([
+        'inc_call1_at' => "ALTER TABLE store_states ADD COLUMN inc_call1_at DATETIME NULL DEFAULT NULL",
+        'inc_call2_at' => "ALTER TABLE store_states ADD COLUMN inc_call2_at DATETIME NULL DEFAULT NULL",
+        'inc_call3_at' => "ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL",
+    ] as $_col => $sql) {
+        try {
+            $pdo->exec($sql);
+        } catch (Throwable $e) {
+            // العمود موجود
+        }
+    }
+    $done = true;
+}
+
+/** نوع السجل في الاستبيان: نشط (CSAT) مقابل ملاحظة نصية لمتجر غير نشط */
+function ensure_surveys_survey_kind(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE surveys ADD COLUMN survey_kind VARCHAR(32) NULL DEFAULT 'active_csat'");
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
+/** أعمدة سير العمل في التعيينات (طابور 50 / عدم رد) */
+function ensure_store_assignments_workflow(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec('ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP');
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
+/** تاريخ آخر مكالمة أنشأت حالة «منجز» (للعودة التلقائية بعد 30 يوماً) */
+function ensure_last_call_date_column(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec('ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at');
+    } catch (Throwable $e) {
+        // موجود
+    }
+    $done = true;
+}
+
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 // ========== GET STORE STATES ==========
 if ($action === 'get_states') {
-    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at FROM store_states");
+    ensure_incubation_call_columns($pdo);
+    ensure_last_call_date_column($pdo);
+    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
 // ========== SET STORE STATUS ==========
 elseif ($action === 'set_status') {
-    $storeId = $input['store_id'];
-    $category = $input['category'];
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $category = $input['category'] ?? '';
     $storeName = $input['store_name'] ?? '';
     $reason = $input['state_reason'] ?? '';
-    $freezeReason = $input['freeze_reason'] ?? '';
+    $freezeReason = trim((string) ($input['freeze_reason'] ?? ''));
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
     $oldStatus = $input['old_status'] ?? '';
+    /** من all-stores: hot_inactive | cold_inactive — مطلوب لبدء الاستعادة */
+    $merchantBucket = $input['merchant_bucket'] ?? '';
 
-    // Upsert store state
+    if ($storeId <= 0) {
+        jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+    }
+
+    $allowedTargets = ['frozen', 'active_pending_calls', 'restoring'];
+    if (!in_array($category, $allowedTargets, true)) {
+        jsonResponse(['success' => false, 'error' => 'التحويل اليدوي مقتصر على التجميد أو رفع التجميد أو بدء الاستعادة فقط.'], 400);
+    }
+
+    $stmtCur = $pdo->prepare('SELECT category FROM store_states WHERE store_id = ?');
+    $stmtCur->execute([$storeId]);
+    $rowCur = $stmtCur->fetch(PDO::FETCH_ASSOC);
+    $currentCat = $rowCur['category'] ?? '';
+
+    $err = '';
+    if ($category === 'frozen') {
+        if ($currentCat === 'frozen') {
+            $err = 'المتجر مجمّد مسبقاً.';
+        } elseif ($freezeReason === '') {
+            $err = 'سبب التجميد مطلوب.';
+        }
+    } elseif ($category === 'active_pending_calls') {
+        if ($currentCat !== 'frozen') {
+            $err = 'رفع التجميد مسموح فقط عندما تكون الحالة «مجمد». باقي الانتقالات تتم آلياً (مكالمات، شحن، قواعد النظام).';
+        }
+    } elseif ($category === 'restoring') {
+        if (in_array($currentCat, ['restoring', 'restored', 'recovered'], true)) {
+            $err = 'حالة الاستعادة محددة مسبقاً أو اكتملت.';
+        } elseif (!in_array($merchantBucket, ['hot_inactive', 'cold_inactive'], true)) {
+            $err = 'بدء الاستعادة يُسمح فقط لمتجر مُصنَّف غير نشط ساخن أو غير نشط بارد.';
+        }
+    }
+
+    if ($err !== '') {
+        jsonResponse(['success' => false, 'error' => $err], 400);
+    }
+
+    // موظف نشط: لا يجمّد متجراً في حالة «عدم رد» ضمن سير العمل
+    if ($category === 'frozen' && ($userRole ?? '') === 'active_manager') {
+        try {
+            $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+        } catch (Throwable $e) {
+        }
+        $un = trim((string) ($input['username'] ?? ''));
+        if ($un !== '') {
+            $stAsg = $pdo->prepare('SELECT workflow_status FROM store_assignments WHERE store_id = ? AND assigned_to = ?');
+            $stAsg->execute([(string) $storeId, $un]);
+            $asgRow = $stAsg->fetch(PDO::FETCH_ASSOC);
+            if ($asgRow && ($asgRow['workflow_status'] ?? '') === 'no_answer') {
+                jsonResponse(['success' => false, 'error' => 'لا يمكن تجميد متجر مُعلَّم «عدم رد» من حسابك. المتابعة من المدير التنفيذي.'], 403);
+            }
+        }
+    }
+
+    // رفع التجميد: إفراغ سبب التجميد في السجل — العودة إلى «نشط قيد المكالمة»
+    if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
+        $freezeReason = '';
+    }
+
     $stmt = $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, state_reason, freeze_reason, updated_by)
         VALUES (?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE category=VALUES(category), state_reason=VALUES(state_reason),
         freeze_reason=VALUES(freeze_reason), updated_by=VALUES(updated_by), store_name=VALUES(store_name)");
     $stmt->execute([$storeId, $storeName, $category, $reason, $freezeReason, $user]);
 
-    // Set restore date if restoring
     if ($category === 'restoring') {
-        $pdo->prepare("UPDATE store_states SET restore_date = NOW() WHERE store_id = ?")->execute([$storeId]);
-    }
-    // Set graduated date
-    if ($category === 'active' && $oldStatus === 'incubating') {
-        $pdo->prepare("UPDATE store_states SET graduated_at = NOW() WHERE store_id = ?")->execute([$storeId]);
+        $pdo->prepare('UPDATE store_states SET restore_date = NOW() WHERE store_id = ?')->execute([$storeId]);
     }
 
-    // Audit log
-    $actionName = [
-        'active' => 'تحويل إلى نشط',
-        'inactive' => 'تحويل إلى غير نشط',
-        'frozen' => 'تجميد المتجر',
-        'restoring' => 'بدء استعادة',
-        'recovered' => 'تمت الاستعادة',
-        'incubating' => 'إعادة للاحتضان',
-        'cold' => 'نقل للباردة'
-    ][$category] ?? 'تغيير حالة';
+    if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
+        $actionName = 'رفع التجميد';
+    } elseif ($category === 'frozen') {
+        $actionName = 'تجميد المتجر';
+    } elseif ($category === 'restoring') {
+        $actionName = 'بدء استعادة';
+    } else {
+        $actionName = 'تغيير حالة';
+    }
+
+    $detail = $freezeReason !== '' ? $freezeReason : $reason;
 
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, $actionName, $freezeReason ?: $reason, $oldStatus, $category, $user, $userRole]);
+        ->execute([$storeId, $storeName, $actionName, $detail, $oldStatus, $category, $user, $userRole]);
 
     jsonResponse(['success' => true]);
 }
 
 // ========== LOG CALL ==========
 elseif ($action === 'log_call') {
+    ensure_call_logs_outcome_column($pdo);
+    ensure_last_call_date_column($pdo);
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $callType = $input['call_type'];
-    $note = $input['note'];
-    $user = $input['user'] ?? '';
-    $userRole = $input['user_role'] ?? '';
+    $note = $input['note'] ?? '';
+    $outcome = isset($input['outcome']) ? substr((string) $input['outcome'], 0, 32) : '';
+    // دعم كلا المفتاحين: performed_by (من CallModal) و user (القديم)
+    $user = $input['performed_by'] ?? $input['user'] ?? '';
+    $userRole = $input['performed_role'] ?? $input['user_role'] ?? '';
     $hasShipped = !empty($input['has_shipped']);
     $registrationDate = $input['registration_date'] ?? null;
 
-    // Save call log
-    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, performed_by, performed_role)
-        VALUES (?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, $callType, $note, $user, $userRole]);
+    // Save call log (outcome: answered | no_answer | busy | callback من الواجهة)
+    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
+
+    // —— نشط يشحن: تم الرد → منجز | لم يرد / مشغول → لم يتم الوصول (باستثناء احتضان واستعادة) ——
+    if (!in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true) && strpos($callType, 'rcall') !== 0) {
+        $sid = (int) $storeId;
+        $oc = $outcome !== '' ? $outcome : '';
+        if ($oc === 'answered') {
+            $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                ->execute([$sid]);
+        } elseif ($oc === 'busy') {
+            $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                ->execute([$sid]);
+        }
+        // no_answer: لا تغيير لفئة المتجر — يبقى في المهام اليومية معلّقاً حتى اتصال ناجح
+    }
+
+    // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——
+    if (in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true)) {
+        ensure_incubation_call_columns($pdo);
+        $regDate = !empty($registrationDate) ? $registrationDate : null;
+
+        if ($callType === 'inc_call1') {
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call1_at, registration_date)
+                VALUES (?, ?, 'incubating', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call1_at = IF(inc_call1_at IS NULL, NOW(), inc_call1_at),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $regDate]);
+        } elseif ($callType === 'inc_call2') {
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call2_at, registration_date)
+                VALUES (?, ?, 'incubating', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call2_at = IF(inc_call2_at IS NULL, NOW(), inc_call2_at),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $regDate]);
+        } elseif ($callType === 'inc_call3') {
+            $hasShipped = !empty($input['has_shipped']);
+            $newCat = $hasShipped ? 'active_pending_calls' : 'inactive';
+            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call3_at, incubation_stage, graduated_at, registration_date)
+                VALUES (?, ?, ?, NOW(), 'graduated', NOW(), ?)
+                ON DUPLICATE KEY UPDATE
+                  inc_call3_at = IF(inc_call3_at IS NULL, NOW(), inc_call3_at),
+                  category = VALUES(category),
+                  incubation_stage = 'graduated',
+                  graduated_at = COALESCE(graduated_at, NOW()),
+                  store_name = VALUES(store_name),
+                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                ->execute([$storeId, $storeName, $newCat, $regDate]);
+        }
+
+        $labels = [
+            'inc_call1' => 'مسار الاحتضان — المكالمة الأولى',
+            'inc_call2' => 'مسار الاحتضان — المكالمة الثانية',
+            'inc_call3' => 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
+        ];
+        $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$storeId, $storeName, $labels[$callType] ?? $callType, $note, $user, $userRole]);
+
+        jsonResponse(['success' => true, 'points_awarded' => 0]);
+    }
 
     // Save recovery call if applicable
     if (strpos($callType, 'rcall') === 0) {
@@ -146,7 +348,40 @@ elseif ($action === 'log_call') {
         VALUES (?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $labels[$callType] ?? 'اتصال', $note, $user, $userRole]);
 
-    jsonResponse(['success' => true, 'next_stage' => $nextStage, 'next_call_date' => $nextCallDate]);
+    // ========== منح النقاط (NRS Points) ==========
+    $pointsAwarded = 0;
+    if ($user && $outcome !== 'no_answer') {
+        // إنشاء جدول النقاط إن لم يكن موجوداً
+        $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+            id         INT AUTO_INCREMENT PRIMARY KEY,
+            username   VARCHAR(100) NOT NULL,
+            fullname   VARCHAR(200) DEFAULT '',
+            points     INT          NOT NULL DEFAULT 10,
+            reason     VARCHAR(200) DEFAULT 'مكالمة',
+            store_id   INT,
+            store_name VARCHAR(300) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user (username),
+            INDEX idx_date (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // قيمة النقاط بناءً على نوع المكالمة
+        $pts = 10;
+        if (in_array($callType, ['day0','day3','day10'])) $pts = 15;
+        if (strpos($callType, 'rcall') === 0)             $pts = 20;
+
+        $pdo->prepare("INSERT INTO points_log (username, fullname, points, reason, store_id, store_name)
+            VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$user, $user, $pts, ($labels[$callType] ?? 'اتصال'), $storeId, $storeName]);
+        $pointsAwarded = $pts;
+    }
+
+    jsonResponse([
+        'success'        => true,
+        'next_stage'     => $nextStage,
+        'next_call_date' => $nextCallDate,
+        'points_awarded' => $pointsAwarded,
+    ]);
 }
 
 // ========== GET CALL LOGS FOR STORE ==========
@@ -177,26 +412,110 @@ elseif ($action === 'get_all_recovery_calls') {
 
 // ========== GET ALL CALL LOGS (for state machine) - optimized ==========
 elseif ($action === 'get_all_calllogs') {
-    // فقط آخر مكالمة من كل نوع لكل متجر (بدل تحميل الكل)
-    $stmt = $pdo->query("SELECT store_id, call_type, MAX(created_at) as created_at FROM call_logs GROUP BY store_id, call_type");
+    ensure_call_logs_outcome_column($pdo);
+    // آخر مكالمة من كل نوع لكل متجر مع الملاحظة والمنفذ
+    $stmt = $pdo->query("
+        SELECT cl.store_id, cl.call_type, cl.created_at, cl.note, cl.outcome, cl.performed_by
+        FROM call_logs cl
+        INNER JOIN (
+            SELECT store_id, call_type, MAX(created_at) AS max_date
+            FROM call_logs
+            GROUP BY store_id, call_type
+        ) latest
+        ON  cl.store_id   = latest.store_id
+        AND cl.call_type  = latest.call_type
+        AND cl.created_at = latest.max_date
+    ");
     $result = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $result[$row['store_id']][$row['call_type']] = $row['created_at'];
+        $result[$row['store_id']][$row['call_type']] = [
+            'date'         => $row['created_at'],
+            'note'         => $row['note']         ?? '',
+            'outcome'      => $row['outcome']      ?? '',
+            'performed_by' => $row['performed_by'] ?? '',
+        ];
     }
     jsonResponse(['success' => true, 'data' => $result]);
 }
 
 // ========== SAVE SURVEY ==========
 elseif ($action === 'save_survey') {
-    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$input['store_id'], $input['answers'][0], $input['answers'][1], $input['answers'][2],
-            $input['answers'][3], $input['answers'][4], $input['answers'][5], $input['suggestions'] ?? '', $input['user'] ?? '']);
+    ensure_surveys_survey_kind($pdo);
+    $surveyKind = trim((string) ($input['survey_kind'] ?? 'active_csat'));
 
-    // Audit log
+    // ── متجر غير نشط: ملاحظة نصية إلزامية (لا أسئلة متعددة) — لا تُحتسب ضمن CSAT ──
+    if ($surveyKind === 'inactive_feedback') {
+        $text = trim((string) ($input['inactive_feedback'] ?? $input['suggestions'] ?? ''));
+        if (function_exists('mb_strlen')) {
+            if (mb_strlen($text) < 10) {
+                jsonResponse(['success' => false, 'error' => 'يجب كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».'], 400);
+            }
+        } elseif (strlen($text) < 10) {
+            jsonResponse(['success' => false, 'error' => 'يجب كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».'], 400);
+        }
+        $storeId = (int) ($input['store_id'] ?? 0);
+        if ($storeId <= 0) {
+            jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+        }
+        try {
+            $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+        } catch (Throwable $e) {
+        }
+        $neutral = 3;
+        $submittedUser = trim((string) ($input['username'] ?? ''));
+        $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'inactive_feedback')")
+            ->execute([
+                $storeId, $neutral, $neutral, $neutral, $neutral, $neutral, $neutral,
+                $text,
+                $input['user'] ?? '',
+                $submittedUser !== '' ? $submittedUser : null,
+            ]);
+        $detail = 'ملاحظة متجر غير نشط — ماذا قال المتجر: ' . $text;
+        $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, 'ملاحظة متجر غير نشط', ?, ?, ?)")
+            ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
+        jsonResponse(['success' => true]);
+    }
+
+    $answers = $input['answers'] ?? null;
+    if (!is_array($answers) || count($answers) !== 6) {
+        jsonResponse(['success' => false, 'error' => 'يجب إرسال ستة تقييمات (1–5) لكل سؤال.'], 400);
+    }
+    $q = [];
+    foreach ($answers as $i => $v) {
+        $n = (int) $v;
+        if ($n < 1 || $n > 5) {
+            jsonResponse(['success' => false, 'error' => 'كل تقييم يجب أن يكون بين 1 و 5.'], 400);
+        }
+        $q[$i] = $n;
+    }
+    $suggestions = trim((string) ($input['suggestions'] ?? ''));
+    $storeId = (int) ($input['store_id'] ?? 0);
+    if ($storeId <= 0) {
+        jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+    }
+
+    try {
+        $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
+    } catch (Throwable $e) {
+    }
+    $submittedUser = trim((string) ($input['username'] ?? ''));
+    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active_csat')")
+        ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
+
+    $detail = sprintf(
+        'تقييمات (1–5): سرعة التوصيل=%d، التجميع=%d، الدعم=%d، المنظومة=%d، التسويات=%d، المرجوعات=%d.',
+        $q[0], $q[1], $q[2], $q[3], $q[4], $q[5]
+    );
+    if ($suggestions !== '') {
+        $detail .= ' مقترحات/ملاحظات: ' . $suggestions;
+    }
+
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
-        VALUES (?, ?, 'استبيان رضا العميل', ?, ?, ?)")
-        ->execute([$input['store_id'], $input['store_name'] ?? '', $input['suggestions'] ?? '', $input['user'] ?? '', $input['user_role'] ?? '']);
+        VALUES (?, ?, 'استبيان رضا العميل (نشط)', ?, ?, ?)")
+        ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
 
     jsonResponse(['success' => true]);
 }
@@ -254,29 +573,30 @@ elseif ($action === 'todays_tasks') {
 
 // ========== تخريج المتجر (GRADUATE STORE) ==========
 elseif ($action === 'graduate_store') {
+    ensure_call_logs_outcome_column($pdo);
     $storeId = $input['store_id'];
     $storeName = $input['store_name'] ?? '';
     $user = $input['user'] ?? '';
     $userRole = $input['user_role'] ?? '';
 
-    // تحديث الحالة إلى نشط + تسجيل التخريج
-    $pdo->prepare("UPDATE store_states SET category = 'active', incubation_stage = 'graduated', graduated_at = NOW() WHERE store_id = ?")
+    // تحديث الحالة إلى نشط قيد المكالمة + تسجيل التخريج
+    $pdo->prepare("UPDATE store_states SET category = 'active_pending_calls', incubation_stage = 'graduated', graduated_at = NOW() WHERE store_id = ?")
         ->execute([$storeId]);
 
     // إذا لم يوجد سجل
     $stmt = $pdo->prepare("SELECT store_id FROM store_states WHERE store_id = ?");
     $stmt->execute([$storeId]);
     if (!$stmt->fetch()) {
-        $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, incubation_stage, graduated_at) VALUES (?, ?, 'active', 'graduated', NOW())")
+        $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, incubation_stage, graduated_at) VALUES (?, ?, 'active_pending_calls', 'graduated', NOW())")
             ->execute([$storeId, $storeName]);
     }
 
     // سجل العمليات
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$storeId, $storeName, 'تخريج المتجر', 'تم تخريج المتجر من مسار الاحتضان إلى المتاجر النشطة', 'incubating', 'active', $user, $userRole]);
+        ->execute([$storeId, $storeName, 'تخريج المتجر', 'تم تخريج المتجر من مسار الاحتضان إلى المتاجر النشطة (قيد المكالمة)', 'incubating', 'active_pending_calls', $user, $userRole]);
 
     // تسجيل مكالمة التخريج
-    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, performed_by, performed_role) VALUES (?, ?, 'graduation', ?, ?, ?)")
+    $pdo->prepare("INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role) VALUES (?, ?, 'graduation', ?, NULL, ?, ?)")
         ->execute([$storeId, $storeName, 'تم التخريج إلى المتاجر النشطة', $user, $userRole]);
 
     jsonResponse(['success' => true]);
@@ -374,6 +694,241 @@ elseif ($action === 'get_incubation_data') {
         // الأعمدة الجديدة لم تُضاف بعد - يرجى فتح setup-db.php أولاً
         jsonResponse(['success' => true, 'data' => []]);
     }
+}
+
+// ========== GET AUDIT LOG (single store) ==========
+elseif ($action === 'get_audit_log') {
+    $storeId = $_GET['store_id'] ?? null;
+    if (!$storeId) { jsonResponse(['success' => true, 'data' => []]); }
+    $stmt = $pdo->prepare("SELECT action_type, action_detail, old_status, new_status, performed_by, performed_role, created_at FROM audit_logs WHERE store_id = ? ORDER BY created_at DESC LIMIT 50");
+    $stmt->execute([$storeId]);
+    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ========== RESET CATEGORY (bulk) ==========
+// يحذف حالة DB لمجموعة متاجر ويُعيدها لـ "غير نشطة" الافتراضية
+elseif ($action === 'reset_category') {
+    $storeIds = $input['store_ids'] ?? [];
+    $user     = $input['user']      ?? 'النظام';
+    $userRole = $input['user_role'] ?? '';
+    $reason   = $input['reason']    ?? 'إعادة تعيين يدوية';
+
+    if (empty($storeIds)) { jsonResponse(['success' => true, 'affected' => 0]); }
+
+    $placeholders = implode(',', array_fill(0, count($storeIds), '?'));
+    // جلب الأسماء والحالات الحالية قبل الحذف للتوثيق
+    $stmt = $pdo->prepare("SELECT store_id, store_name, category FROM store_states WHERE store_id IN ($placeholders)");
+    $stmt->execute($storeIds);
+    $existing = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // حذف الحالات من DB
+    $del = $pdo->prepare("DELETE FROM store_states WHERE store_id IN ($placeholders)");
+    $del->execute($storeIds);
+    $affected = $del->rowCount();
+
+    // تسجيل في audit_logs لكل متجر كان له حالة
+    $ins = $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, old_status, new_status, performed_by, performed_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    foreach ($existing as $row) {
+        $ins->execute([
+            $row['store_id'], $row['store_name'],
+            'إعادة تعيين الحالة', $reason,
+            $row['category'], 'inactive',
+            $user, $userRole
+        ]);
+    }
+
+    jsonResponse(['success' => true, 'affected' => $affected]);
+}
+
+// ========== GET ASSIGNMENTS ==========
+elseif ($action === 'get_assignments') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS store_assignments (
+        store_id     VARCHAR(50)  PRIMARY KEY,
+        store_name   VARCHAR(255) DEFAULT '',
+        assigned_to  VARCHAR(100) NOT NULL,
+        assigned_by  VARCHAR(100) DEFAULT '',
+        assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes        TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    ensure_store_assignments_workflow($pdo);
+
+    $stmt = $pdo->query("SELECT * FROM store_assignments ORDER BY assigned_at DESC");
+    $data = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $data[$row['store_id']] = $row;
+    }
+    jsonResponse(['success' => true, 'data' => $data]);
+}
+
+// ========== ASSIGN STORE ==========
+elseif ($action === 'assign_store') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS store_assignments (
+        store_id     VARCHAR(50)  PRIMARY KEY,
+        store_name   VARCHAR(255) DEFAULT '',
+        assigned_to  VARCHAR(100) NOT NULL,
+        assigned_by  VARCHAR(100) DEFAULT '',
+        assigned_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes        TEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    ensure_store_assignments_workflow($pdo);
+
+    $storeId   = $input['store_id']   ?? '';
+    $storeName = $input['store_name'] ?? '';
+    $assignTo  = $input['assigned_to'] ?? '';
+    $assignBy  = $input['assigned_by'] ?? '';
+    $notes     = $input['notes']       ?? '';
+
+    if (!$storeId) { jsonResponse(['success' => false, 'error' => 'store_id مطلوب'], 400); }
+
+    if ($assignTo === '') {
+        // إلغاء التعيين
+        $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ?")->execute([$storeId]);
+    } else {
+        $pdo->prepare("INSERT INTO store_assignments (store_id, store_name, assigned_to, assigned_by, notes, workflow_status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+            ON DUPLICATE KEY UPDATE
+                assigned_to  = VALUES(assigned_to),
+                assigned_by  = VALUES(assigned_by),
+                notes        = VALUES(notes),
+                store_name   = VALUES(store_name),
+                workflow_status = 'active',
+                assigned_at  = CURRENT_TIMESTAMP")
+            ->execute([$storeId, $storeName, $assignTo, $assignBy, $notes]);
+    }
+
+    jsonResponse(['success' => true]);
+}
+
+// ========== GET LEADERBOARD (أداء الموظفين + النقاط) ==========
+elseif ($action === 'get_leaderboard') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user (username), INDEX idx_date (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $today = date('Y-m-d');
+
+    // إجمالي النقاط لكل موظف + مكالمات اليوم + مكالمات الأسبوع
+    $stmt = $pdo->query("
+        SELECT
+            u.username,
+            u.fullname,
+            u.role,
+            COALESCE(SUM(p.points), 0)                              AS total_points,
+            COALESCE(SUM(CASE WHEN DATE(p.created_at) = CURDATE() THEN p.points ELSE 0 END), 0) AS today_points,
+            COALESCE(SUM(CASE WHEN p.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN p.points ELSE 0 END), 0) AS week_points,
+            COALESCE(COUNT(CASE WHEN DATE(p.created_at) = CURDATE() THEN 1 END), 0)             AS today_calls,
+            COALESCE(COUNT(p.id), 0)                                AS total_calls
+        FROM users u
+        LEFT JOIN points_log p ON p.username = u.fullname
+        WHERE u.role != 'executive'
+        GROUP BY u.username, u.fullname, u.role
+        ORDER BY total_points DESC
+    ");
+
+    jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ========== GET MY STATS (إحصائياتي الشخصية) ==========
+elseif ($action === 'get_my_stats') {
+    $username = $input['username'] ?? ($_GET['username'] ?? '');
+    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب']); }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+            id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+            fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+            reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user (username), INDEX idx_date (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // إجمالي النقاط
+        $totStmt = $pdo->prepare("SELECT COALESCE(SUM(points),0) AS total FROM points_log WHERE username = ?");
+        $totStmt->execute([$username]);
+        $totalPoints = (int)$totStmt->fetchColumn();
+        $totStmt->closeCursor();
+
+        // نقاط اليوم + مكالمات اليوم
+        $todayStmt = $pdo->prepare("
+            SELECT COALESCE(SUM(points),0) AS pts, COUNT(*) AS calls
+            FROM points_log WHERE username = ? AND DATE(created_at) = CURDATE()
+        ");
+        $todayStmt->execute([$username]);
+        $todayRow = $todayStmt->fetch(PDO::FETCH_ASSOC);
+        $todayStmt->closeCursor();
+
+        // مكالمات آخر 7 أيام (للرسم البياني)
+        $weekStmt = $pdo->prepare("
+            SELECT DATE(created_at) AS day, COUNT(*) AS calls, COALESCE(SUM(points),0) AS pts
+            FROM points_log
+            WHERE username = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+        ");
+        $weekStmt->execute([$username]);
+        $weekData = $weekStmt->fetchAll(PDO::FETCH_ASSOC);
+        $weekStmt->closeCursor();
+
+        // آخر 10 مكالمات
+        $recentStmt = $pdo->prepare("
+            SELECT reason, store_name, points, created_at
+            FROM points_log WHERE username = ?
+            ORDER BY created_at DESC LIMIT 10
+        ");
+        $recentStmt->execute([$username]);
+        $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        jsonResponse([
+            'success'      => true,
+            'total_points' => $totalPoints,
+            'today_points' => (int)($todayRow['pts']   ?? 0),
+            'today_calls'  => (int)($todayRow['calls'] ?? 0),
+            'week_data'    => $weekData,
+            'recent'       => $recent,
+        ]);
+    } catch (Throwable $e) {
+        error_log('get_my_stats: ' . $e->getMessage());
+        jsonResponse([
+            'success' => false,
+            'error'   => 'تعذّر قراءة إحصائيات النقاط — تحقق من جدول points_log أو إعدادات MySQL',
+        ]);
+    }
+}
+
+// ========== AWARD BONUS (إعلانات النورس الذكية) ==========
+elseif ($action === 'award_bonus') {
+    $username  = $input['username']  ?? '';
+    $adId      = $input['ad_id']     ?? 'ad_unknown';
+    $adTitle   = $input['ad_title']  ?? 'بونص إعلاني';
+    $pts       = min((int)($input['points'] ?? 5), 100);
+
+    if (!$username) { jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400); }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS points_log (
+        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(100) NOT NULL,
+        fullname VARCHAR(200) DEFAULT '', points INT NOT NULL DEFAULT 10,
+        reason VARCHAR(200) DEFAULT 'مكالمة', store_id INT, store_name VARCHAR(300) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user (username), INDEX idx_date (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // كل إعلان مرة واحدة فقط يومياً لنفس المستخدم
+    $check = $pdo->prepare("SELECT id FROM points_log WHERE username = ? AND reason = ? AND DATE(created_at) = CURDATE()");
+    $check->execute([$username, 'إعلان: ' . $adId]);
+    if ($check->rowCount() > 0) {
+        jsonResponse(['success' => false, 'error' => 'تم استخدام هذا البونص اليوم', 'already_claimed' => true]);
+        exit;
+    }
+
+    $pdo->prepare("INSERT INTO points_log (username, fullname, points, reason)
+        VALUES (?, ?, ?, ?)")
+        ->execute([$username, $username, $pts, 'إعلان: ' . $adId]);
+
+    jsonResponse(['success' => true, 'points_awarded' => $pts, 'ad_title' => $adTitle]);
 }
 
 else { jsonResponse(['error' => 'Unknown action'], 400); }

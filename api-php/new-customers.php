@@ -1,44 +1,63 @@
 <?php
-// حماية من Out of Memory
-ini_set('memory_limit', '96M');
-ini_set('max_execution_time', '15');
+require_once __DIR__ . '/config.php';
 
-header('Content-Type: application/json');
+ini_set('memory_limit',      MEMORY_MEDIUM);
+ini_set('max_execution_time', TIME_MEDIUM);
+
+header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-$TOKEN = 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703';
-$BASE = 'https://backoffice.nawris.algoriza.com/external-api';
 $since = isset($_GET['since']) ? $_GET['since'] : date('Y-m-d', strtotime('-90 days'));
 
-$allData = [];
-$cursor = null;
-$maxPages = 10; // حد أقصى 10 صفحات
-$page = 0;
+$allData  = [];
+$cursor   = null;
+$page     = 0;
+$truncated = false;
 
 do {
-    $url = $BASE . '/customers/new?since=' . $since;
-    if ($cursor) $url .= '&cursor=' . $cursor;
+    $url = NAWRIS_BASE . '/customers/new?since=' . urlencode($since);
+    if ($cursor) $url .= '&cursor=' . urlencode($cursor);
 
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Accept: application/json',
-        'X-API-TOKEN: ' . $TOKEN
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_HTTPHEADER     => [
+            'Accept: application/json',
+            'X-API-TOKEN: ' . NAWRIS_TOKEN,
+        ],
     ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     $response = curl_exec($ch);
+    $curlErr  = curl_errno($ch);
     curl_close($ch);
 
+    if ($curlErr || !$response) break;
+
     $data = json_decode($response, true);
+    if (!is_array($data)) break;
+
     if (isset($data['data']) && is_array($data['data'])) {
-        $allData = array_merge($allData, $data['data']);
+        foreach ($data['data'] as $item) {
+            $allData[$item['id']] = $item;   // key = id يمنع التكرار
+        }
     }
 
-    $cursor = isset($data['meta']['next_cursor']) ? $data['meta']['next_cursor'] : null;
+    $cursor = $data['meta']['next_cursor'] ?? null;
     $page++;
-} while ($cursor && $page < $maxPages);
 
-echo json_encode(['success' => true, 'data' => $allData, 'total' => count($allData)], JSON_UNESCAPED_UNICODE);
+    if ($page >= MAX_PAGES_NEW) {
+        $truncated = true;
+        break;
+    }
+} while ($cursor);
+
+echo json_encode([
+    'success'   => true,
+    'data'      => array_values($allData),
+    'total'     => count($allData),
+    'pages'     => $page,
+    'truncated' => $truncated,   // true = وُجدت صفحات إضافية لم تُجلب
+], JSON_UNESCAPED_UNICODE);
