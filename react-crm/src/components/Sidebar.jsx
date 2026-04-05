@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock,
+  ChevronDown, Circle, Layers, Lock, BarChart3,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -16,6 +16,7 @@ const NAV_ALL = [
   { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
+  { to: '/analytics/manager', label: 'تحليلات المدير', icon: BarChart3,        view: 'manager_analytics' },
 ]
 
 /** المتاجر — كل المتاجر ثم جديدة (48 ساعة) ثم تحت الاحتضان — مستقلة عن مسار الاحتضان */
@@ -398,8 +399,8 @@ const NAV_GROUPS = [
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/tasks', '/users']
-      : ['/tasks', '/performance', '/users'],
+      ? ['/tasks', '/users', '/analytics/manager']
+      : ['/tasks', '/performance', '/users', '/analytics/manager'],
   },
 ]
 

@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
 import ActiveWorkflow from './pages/ActiveWorkflow'
+import ManagerAnalytics from './pages/ManagerAnalytics'
 import FrozenStores from './pages/FrozenStores'
 import HotInactive from './pages/HotInactive'
 import ColdInactive from './pages/ColdInactive'
@@ -86,6 +87,10 @@ function AppRoutes() {
           )}
         />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
+        <Route
+          path="/analytics/manager"
+          element={<PrivateRoute view="manager_analytics"><ManagerAnalytics /></PrivateRoute>}
+        />
         <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
