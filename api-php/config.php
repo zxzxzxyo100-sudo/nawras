@@ -50,3 +50,10 @@ if ($_isStaging) {
     define('DB_PASS', 'Zidona11');
     define('IS_STAGING_ENV', false);
 }
+
+// --- Cron: تعبئة طوابير 50/50 يومياً (cron-daily-queue-fill.php) ---
+// عرّف NAWRAS_CRON_SECRET على السيرفر أو ضع قيمة هنا للإنتاج فقط
+if (!defined('CRON_QUEUE_FILL_SECRET')) {
+    $cronFromEnv = getenv('NAWRAS_CRON_SECRET');
+    define('CRON_QUEUE_FILL_SECRET', is_string($cronFromEnv) && $cronFromEnv !== '' ? $cronFromEnv : '');
+}
