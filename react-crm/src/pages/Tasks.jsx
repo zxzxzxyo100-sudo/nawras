@@ -11,6 +11,7 @@ import StoreDrawer    from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
+import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -69,7 +70,12 @@ function taskIsNoAnswer(task, callLogs, assignments) {
 // توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
 // «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
 // ══════════════════════════════════════════════════════════════════
-function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf) {
+function onboardingDoneForStore(doneSet, storeId) {
+  if (!doneSet || storeId == null) return false
+  return doneSet.has(storeId) || doneSet.has(String(storeId)) || doneSet.has(Number(storeId))
+}
+
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
   const today = new Date().toISOString().split('T')[0]
 
   /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
@@ -124,6 +130,21 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
               : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
         desc: 'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة',
+      })
+    }
+
+    if (
+      store.bucket === 'incubating'
+      && ['incubation_manager', 'executive'].includes(userRole)
+      && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
+    ) {
+      tasks.push({
+        id: `${store.id}-new-onboarding`,
+        store,
+        priority: 'normal',
+        type: 'new_merchant_onboarding',
+        label: 'استبيان تهيئة متجر جديد',
+        desc: 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة',
       })
     }
 
@@ -267,6 +288,7 @@ const TYPE_STYLES = {
   recovery_call:  { borderColor: '#fca5a5', accent: '#dc2626', badge: 'bg-red-100 text-red-700',       bg: 'rgba(220,38,38,0.04)'  },
   followup_call:  { borderColor: '#fcd34d', accent: '#d97706', badge: 'bg-amber-100 text-amber-700',   bg: 'rgba(217,119,6,0.04)'  },
   assigned_store: { borderColor: '#93c5fd', accent: '#2563eb', badge: 'bg-blue-100 text-blue-700',     bg: 'rgba(37,99,235,0.04)'  },
+  new_merchant_onboarding: { borderColor: '#ddd6fe', accent: '#6d28d9', badge: 'bg-violet-100 text-violet-800', bg: 'rgba(109,40,217,0.06)' },
 }
 
 function TaskCard({
@@ -426,7 +448,10 @@ function IncManagerDoneModal({ task, onClose, onConfirm, saving, error }) {
 }
 
 export default function Tasks() {
-  const { allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded, surveyByStoreId } = useStores()
+  const {
+    allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded, surveyByStoreId,
+    newMerchantOnboardingDoneIds,
+  } = useStores()
   const { user } = useAuth()
   const { onCallSaved } = usePoints()
   const [selected, setSelected] = useState(null)
@@ -439,6 +464,8 @@ export default function Tasks() {
   const [doneSaving, setDoneSaving] = useState(false)
   const [doneModalErr, setDoneModalErr] = useState('')
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
+  /** فتح استبيان تهيئة المتجر الجديد من «تم» */
+  const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
   /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
   const [inactiveWf, setInactiveWf] = useState(null)
 
@@ -473,8 +500,11 @@ export default function Tasks() {
   }, [loadInactiveWf, lastLoaded])
 
   const tasks = useMemo(
-    () => generateTasks(allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf),
-    [allStores, callLogs, storeStates, user, assignments, inactiveWf]
+    () => generateTasks(
+      allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
+      newMerchantOnboardingDoneIds,
+    ),
+    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds]
   )
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
@@ -513,6 +543,14 @@ export default function Tasks() {
 
   function requestDone(task) {
     setDismissErr('')
+    if (task.type === 'new_merchant_onboarding') {
+      if (onboardingDoneForStore(newMerchantOnboardingDoneIds, task.store.id)) {
+        dismissTaskOnly(task.id)
+        return
+      }
+      setPendingOnboardingTask(task)
+      return
+    }
     if (task.type === 'assigned_store') {
       const cat = storeStates[task.store.id]?.category || task.store.category || ''
       if (needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)) {
@@ -814,6 +852,19 @@ export default function Tasks() {
           error={doneModalErr}
           onClose={() => { if (!doneSaving) setPendingDoneTask(null) }}
           onConfirm={confirmIncManagerDone}
+        />
+      )}
+
+      {pendingOnboardingTask && (
+        <NewMerchantOnboardingModal
+          store={pendingOnboardingTask.store}
+          dailyTaskKey={pendingOnboardingTask.id}
+          onClose={() => setPendingOnboardingTask(null)}
+          onSaved={async () => {
+            setPendingOnboardingTask(null)
+            await reload()
+            loadDismissals()
+          }}
         />
       )}
 

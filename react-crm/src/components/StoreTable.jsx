@@ -39,6 +39,9 @@ export default function StoreTable({
   /** استبيان رضا العميل — يُعرض زر عندما يعيد الدالة true */
   eliteNeedsSurvey,
   onEliteSurveyClick,
+  /** استبيان تهيئة متجر جديد — يُمرَّر من لوحة «متاجر جديدة» فقط */
+  eliteNeedsNewMerchantOnboarding,
+  onEliteNewMerchantOnboardingClick,
   /** فتح الاستعادة / التفاصيل (وضع elite) */
   onRestoreStore,
   /** عدم رد — سير عمل الطابور (يُعرض بجانب الاتصال عندما تعيد الدالة true) */
@@ -513,6 +516,21 @@ export default function StoreTable({
                               onClick={e => {
                                 e.stopPropagation()
                                 onEliteSurveyClick?.(store)
+                              }}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 text-amber-900 transition-all hover:bg-amber-100 hover:shadow-[0_0_14px_-4px_rgba(245,158,11,0.35)]"
+                            >
+                              <ClipboardList size={16} strokeWidth={2} className="text-amber-700" />
+                            </button>
+                          )}
+                          {typeof eliteNeedsNewMerchantOnboarding === 'function'
+                            && eliteNeedsNewMerchantOnboarding(store)
+                            && typeof onEliteNewMerchantOnboardingClick === 'function' && (
+                            <button
+                              type="button"
+                              title="استبيان تهيئة متجر جديد"
+                              onClick={e => {
+                                e.stopPropagation()
+                                onEliteNewMerchantOnboardingClick(store)
                               }}
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 text-amber-900 transition-all hover:bg-amber-100 hover:shadow-[0_0_14px_-4px_rgba(245,158,11,0.35)]"
                             >
