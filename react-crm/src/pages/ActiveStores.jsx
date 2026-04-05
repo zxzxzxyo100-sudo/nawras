@@ -36,7 +36,8 @@ export default function ActiveStores() {
   const [autoUsers, setAutoUsers]         = useState(new Set())
   // فلتر التعيين: 'all' | 'assigned' | 'unassigned' | username
   const [assignFilter, setAssignFilter]   = useState('all')
-  const [showActiveSurveyModal, setShowActiveSurveyModal] = useState(false)
+  /** متجر نافذة الاستبيان (منفصل عن «المحدد» حتى يبقى الاستبيان مفتوحاً عند إغلاق الدرج) */
+  const [surveyModalStore, setSurveyModalStore] = useState(null)
 
   const isExecutive = user?.role === 'executive'
 
@@ -73,10 +74,6 @@ export default function ActiveStores() {
       .then(res => setUsers((res.data || []).filter(u => u.role === 'active_manager')))
       .catch(() => {})
   }, [isExecutive])
-
-  useEffect(() => {
-    if (!selected) setShowActiveSurveyModal(false)
-  }, [selected])
 
   // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
@@ -564,7 +561,7 @@ export default function ActiveStores() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowActiveSurveyModal(true)}
+                onClick={() => setSurveyModalStore(selected)}
                 className="shrink-0 w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-black text-white shadow-lg transition-colors"
                 style={{
                   background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
@@ -591,6 +588,13 @@ export default function ActiveStores() {
             selectable={isExecutive}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
+            eliteNeedsSurvey={s =>
+              needsActiveSatisfactionSurvey(
+                s.id,
+                storeStates[s.id]?.category || s.category || '',
+                surveyByStoreId,
+              )}
+            onEliteSurveyClick={store => setSurveyModalStore(store)}
           />
         </>
       )}
@@ -653,13 +657,18 @@ export default function ActiveStores() {
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
 
-      {showActiveSurveyModal && selected && selectedNeedsActiveSurvey && (
+      {surveyModalStore &&
+        needsActiveSatisfactionSurvey(
+          surveyModalStore.id,
+          storeStates[surveyModalStore.id]?.category || surveyModalStore.category || '',
+          surveyByStoreId,
+        ) && (
         <ActiveStoreSurveyModal
-          store={selected}
-          onClose={() => setShowActiveSurveyModal(false)}
+          store={surveyModalStore}
+          onClose={() => setSurveyModalStore(null)}
           onSaved={async () => {
             await reload()
-            setShowActiveSurveyModal(false)
+            setSurveyModalStore(null)
             showSuccess('تم حفظ استبيان الرضا.')
           }}
         />

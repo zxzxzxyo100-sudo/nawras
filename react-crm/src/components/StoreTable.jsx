@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Phone,
   RotateCcw,
+  ClipboardList,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
@@ -34,6 +35,9 @@ export default function StoreTable({
   renderIdBadge,
   /** اتصال من صف الجدول (وضع elite) */
   onCallStore,
+  /** استبيان رضا العميل — يُعرض زر عندما يعيد الدالة true */
+  eliteNeedsSurvey,
+  onEliteSurveyClick,
   /** فتح الاستعادة / التفاصيل (وضع elite) */
   onRestoreStore,
   /**
@@ -468,7 +472,7 @@ export default function StoreTable({
                       }}
                     >
                       {isElite ? (
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[11rem] mx-auto">
                           <button
                             type="button"
                             title="اتصال"
@@ -481,6 +485,19 @@ export default function StoreTable({
                           >
                             <Phone size={16} strokeWidth={2} className="text-violet-600 drop-shadow-[0_0_4px_rgba(139,92,246,0.2)]" />
                           </button>
+                          {typeof eliteNeedsSurvey === 'function' && eliteNeedsSurvey(store) && (
+                            <button
+                              type="button"
+                              title="استبيان رضا العميل"
+                              onClick={e => {
+                                e.stopPropagation()
+                                onEliteSurveyClick?.(store)
+                              }}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 text-amber-900 transition-all hover:bg-amber-100 hover:shadow-[0_0_14px_-4px_rgba(245,158,11,0.35)]"
+                            >
+                              <ClipboardList size={16} strokeWidth={2} className="text-amber-700" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             title="استعادة / تفاصيل"
