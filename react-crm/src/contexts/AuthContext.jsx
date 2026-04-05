@@ -29,11 +29,15 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function login(username, password) {
-    const res = await apiLogin(username, password)
-    if (!res.success) throw new Error(res.error || 'بيانات غير صحيحة')
-    localStorage.setItem('nawras_session', JSON.stringify(res.user))
-    setUser(res.user)
-    return res.user
+    try {
+      const res = await apiLogin(username, password)
+      if (!res?.success) throw new Error(res?.error || 'بيانات غير صحيحة')
+      localStorage.setItem('nawras_session', JSON.stringify(res.user))
+      setUser(res.user)
+      return res.user
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(String(err))
+    }
   }
 
   function logout() {

@@ -15,11 +15,35 @@ $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 if ($action === 'login') {
     try {
-        $stmt = $pdo->prepare("SELECT id, username, fullname, role FROM users WHERE username = ? AND password = ?");
-        $stmt->execute([$input['username'] ?? '', $input['password'] ?? '']);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($user) jsonResponse(['success' => true, 'user' => $user]);
-        else jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
+        $username = trim((string) ($input['username'] ?? ''));
+        $password = (string) ($input['password'] ?? '');
+
+        if ($username === '') {
+            jsonResponse(['success' => false, 'error' => 'اسم المستخدم مطلوب'], 400);
+        }
+
+        $stmt = $pdo->prepare('SELECT id, username, fullname, role, password FROM users WHERE username = ?');
+        $stmt->execute([$username]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
+        }
+
+        $stored = $row['password'] ?? '';
+        $ok = false;
+        if (is_string($stored) && strlen($stored) >= 60 && strncmp($stored, '$2', 2) === 0) {
+            $ok = password_verify($password, $stored);
+        } else {
+            $ok = hash_equals((string) $stored, $password);
+        }
+
+        if (!$ok) {
+            jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
+        }
+
+        unset($row['password']);
+        jsonResponse(['success' => true, 'user' => $row]);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'error' => 'خطأ في قاعدة البيانات: ' . $e->getMessage()], 500);
     }
