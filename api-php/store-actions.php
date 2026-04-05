@@ -392,15 +392,39 @@ elseif ($action === 'get_all_calllogs') {
 
 // ========== SAVE SURVEY ==========
 elseif ($action === 'save_survey') {
+    $answers = $input['answers'] ?? null;
+    if (!is_array($answers) || count($answers) !== 6) {
+        jsonResponse(['success' => false, 'error' => 'يجب إرسال ستة تقييمات (1–5) لكل سؤال.'], 400);
+    }
+    $q = [];
+    foreach ($answers as $i => $v) {
+        $n = (int) $v;
+        if ($n < 1 || $n > 5) {
+            jsonResponse(['success' => false, 'error' => 'كل تقييم يجب أن يكون بين 1 و 5.'], 400);
+        }
+        $q[$i] = $n;
+    }
+    $suggestions = trim((string) ($input['suggestions'] ?? ''));
+    $storeId = (int) ($input['store_id'] ?? 0);
+    if ($storeId <= 0) {
+        jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
+    }
+
     $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$input['store_id'], $input['answers'][0], $input['answers'][1], $input['answers'][2],
-            $input['answers'][3], $input['answers'][4], $input['answers'][5], $input['suggestions'] ?? '', $input['user'] ?? '']);
+        ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '']);
 
-    // Audit log
+    $detail = sprintf(
+        'تقييمات (1–5): سرعة التوصيل=%d، التجميع=%d، الدعم=%d، المنظومة=%d، التسويات=%d، المرجوعات=%d.',
+        $q[0], $q[1], $q[2], $q[3], $q[4], $q[5]
+    );
+    if ($suggestions !== '') {
+        $detail .= ' مقترحات/ملاحظات: ' . $suggestions;
+    }
+
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
-        VALUES (?, ?, 'استبيان رضا العميل', ?, ?, ?)")
-        ->execute([$input['store_id'], $input['store_name'] ?? '', $input['suggestions'] ?? '', $input['user'] ?? '', $input['user_role'] ?? '']);
+        VALUES (?, ?, 'استبيان رضا العميل (نشط)', ?, ?, ?)")
+        ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
 
     jsonResponse(['success' => true]);
 }

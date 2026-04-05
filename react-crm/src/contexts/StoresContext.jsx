@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import {
   getAllStores, getVipMerchants, getStoreStates, getAllCallLogs, getAllRecoveryCalls, getAssignments,
-  getOrdersSummaryRange,
+  getOrdersSummaryRange, getSurveys,
 } from '../services/api'
 import { useAuth } from './AuthContext'
 import { totalShipments, isActiveMerchantStatus } from '../utils/storeFields'
@@ -34,6 +34,8 @@ export function StoresProvider({ children }) {
   const [storeStates, setStoreStates]     = useState({})
   const [assignments, setAssignments]     = useState({})
   const [callLogs, setCallLogs]           = useState({})
+  /** آخر استبيان رضا لكل متجر (store_id → صف من get_surveys) */
+  const [surveyByStoreId, setSurveyByStoreId] = useState({})
   const [recoveryCalls, setRecoveryCalls] = useState({})
   const [loading, setLoading]             = useState(false)
   const [lastLoaded, setLastLoaded]       = useState(null)
@@ -54,13 +56,14 @@ export function StoresProvider({ children }) {
       const rangeTo = toDate.toISOString().slice(0, 10)
       const rangeFrom = fromDate.toISOString().slice(0, 10)
 
-      const [apiResult, vipRes, statesRes, callsRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
+      const [apiResult, vipRes, statesRes, callsRes, surveysRes, rcallsRes, assignRes, rangeRes] = await Promise.all([
         getAllStores(),
         VIP_MERCHANTS_COMING_SOON
           ? Promise.resolve({ success: false, data: [] })
           : getVipMerchants().catch(() => ({ success: false, data: [] })),
         getStoreStates(),
         getAllCallLogs(),
+        getSurveys().catch(() => ({ success: false, data: [] })),
         getAllRecoveryCalls(),
         getAssignments(),
         getOrdersSummaryRange(rangeFrom, rangeTo).catch(() => ({ success: false, data: [] })),
@@ -148,6 +151,17 @@ export function StoresProvider({ children }) {
       setStoreStates(stateMap)
       setAssignments(assignRes.data || {})
       setCallLogs(callsRes.data || {})
+      const surveyMap = {}
+      if (surveysRes?.success && Array.isArray(surveysRes.data)) {
+        surveysRes.data.forEach(row => {
+          const sid = row.store_id
+          if (sid == null) return
+          surveyMap[sid] = row
+          surveyMap[String(sid)] = row
+          surveyMap[Number(sid)] = row
+        })
+      }
+      setSurveyByStoreId(surveyMap)
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
         incubating:            mergeShipmentsInRange(apiResult.data.incubating),
@@ -208,7 +222,7 @@ export function StoresProvider({ children }) {
       stores, counts, allStores,
       vipMerchants,
       incubationPath, incubationCounts,
-      storeStates, assignments, callLogs, recoveryCalls,
+      storeStates, assignments, callLogs, surveyByStoreId, recoveryCalls,
       shipmentsRangeMeta,
       loading, error, lastLoaded, reload: load,
     }}>
