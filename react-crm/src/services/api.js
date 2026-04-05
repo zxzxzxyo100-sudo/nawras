@@ -79,6 +79,15 @@ export const getSurveys = () =>
 export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
+// ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
+export const getDailyTaskDismissals = (username, date) =>
+  http
+    .get('/daily-tasks.php', { params: { action: 'dismissals', username, date } })
+    .then(r => r.data)
+
+export const markDailyTaskDone = (data) =>
+  http.post('/daily-tasks.php?action=mark_done', data).then(r => r.data)
+
 // ─── Incubation ──────────────────────────────────────────────────────────────
 export const getIncubationData = () =>
   http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)

@@ -312,7 +312,7 @@ export default function Dashboard() {
             onClick={() => navigate('/cold-inactive')}
           />
         )}
-        {can('tasks') && can('active') && !can('incubation') && (
+        {can('tasks') && (can('active') || can('new')) && (
           <StoreTypeCard
             title="المهام اليومية"
             count="مهام"

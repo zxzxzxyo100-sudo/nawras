@@ -9,6 +9,7 @@ import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 import StoreFilterDrawer from '../components/StoreFilterDrawer'
+import { ONBOARD_DAYS_AFTER_CALL1, ONBOARD_DAYS_AFTER_CALL2 } from '../constants/onboardingSchedule'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
 function regDays(s) {
@@ -43,9 +44,9 @@ const TABS = [
     label: 'المكالمة الثانية',
     icon:  Clock,
     color: 'indigo',
-    desc:  'من يوم 3 من 14 حتى تسجيل المكالمة الثانية — بعد المكالمة الأولى وقبل الثانية.',
+    desc:  `تظهر المكالمة بعد ${ONBOARD_DAYS_AFTER_CALL1} يوماً من تسجيل المكالمة الأولى (تم) — حتى يُسجَّل الاتصال الثاني.`,
     badge: () => (
-      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">من يوم 3</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">+{ONBOARD_DAYS_AFTER_CALL1} يوم</span>
     ),
   },
   {
@@ -53,9 +54,9 @@ const TABS = [
     label: 'المكالمة الثالثة',
     icon:  PhoneCall,
     color: 'amber',
-    desc:  'من يوم 10 من 14 حتى تسجيل المكالمة الثالثة — بعد المكالمة الثانية.',
+    desc:  `تظهر المكالمة بعد ${ONBOARD_DAYS_AFTER_CALL2} يوماً من تسجيل المكالمة الثانية (تم) — حتى التخريج.`,
     badge: () => (
-      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">من يوم 10</span>
+      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">+{ONBOARD_DAYS_AFTER_CALL2} يوم</span>
     ),
   },
   {

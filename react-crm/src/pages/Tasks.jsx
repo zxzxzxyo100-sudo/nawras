@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Phone, RefreshCw, CheckCircle,
@@ -6,9 +6,11 @@ import {
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
 import StoreDrawer    from '../components/StoreDrawer'
+import { getDailyTaskDismissals, markDailyTaskDone } from '../services/api'
 
 // ══════════════════════════════════════════════════════════════════
-// توليد المهام (بدون تغيير في المنطق)
+// توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
+// «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
 // ══════════════════════════════════════════════════════════════════
 function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments) {
   const tasks = []
@@ -24,19 +26,16 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
 
-    if (['call_1', 'call_2', 'call_3', 'between_calls'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
+    if (['call_1', 'call_2', 'call_3'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
       tasks.push({
         id: `${store.id}-inc-${incBucket}`, store,
         priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
         label:
-          incBucket === 'between_calls' ? 'مسار الاحتضان — بين المكالمات'
-            : incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
-              : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
-                : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
-        desc: incBucket === 'between_calls'
-          ? 'راجع المرحلة والمتبقي للنافذة التالية من صفحة بين المكالمات'
-          : 'سجّل المكالمة من صفحة مسار الاحتضان',
+          incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
+            : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
+              : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
+        desc: 'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة',
       })
     }
 
@@ -255,24 +254,52 @@ function TaskCard({ task, index, onCall, onDone }) {
 // الصفحة الرئيسية
 // ══════════════════════════════════════════════════════════════════
 export default function Tasks() {
-  const { allStores, callLogs, storeStates, assignments, loading, reload } = useStores()
+  const { allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded } = useStores()
   const { user } = useAuth()
   const [selected, setSelected] = useState(null)
-  const [doneIds, setDoneIds]   = useState(new Set())
+  /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
+  const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
   const [filter, setFilter]     = useState('all')
+  const [dismissErr, setDismissErr] = useState('')
+
+  const loadDismissals = useCallback(() => {
+    const u = user?.username
+    if (!u) return
+    getDailyTaskDismissals(u)
+      .then(r => {
+        if (r?.success && Array.isArray(r.keys)) {
+          setDismissalKeys(new Set(r.keys))
+        }
+      })
+      .catch(() => {})
+  }, [user?.username])
+
+  useEffect(() => {
+    loadDismissals()
+  }, [loadDismissals, lastLoaded])
 
   const tasks = useMemo(
     () => generateTasks(allStores, callLogs, storeStates, user?.role, user?.username, assignments),
     [allStores, callLogs, storeStates, user, assignments]
   )
 
-  const pendingTasks = tasks.filter(t => !doneIds.has(t.id))
+  const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
   const highCount    = pendingTasks.filter(t => t.priority === 'high').length
   const displayed    = filter === 'high'
     ? pendingTasks.filter(t => t.priority === 'high')
     : pendingTasks
 
-  function markDone(id) { setDoneIds(prev => new Set([...prev, id])) }
+  async function markDone(id) {
+    setDismissErr('')
+    const u = user?.username
+    if (!u) return
+    try {
+      await markDailyTaskDone({ username: u, task_key: id })
+      setDismissalKeys(prev => new Set([...prev, id]))
+    } catch (e) {
+      setDismissErr(e.response?.data?.error || 'تعذّر حفظ «تم»')
+    }
+  }
 
   return (
     <div className="space-y-5 pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>
@@ -307,6 +334,9 @@ export default function Tasks() {
               مرحباً{' '}
               <span className="text-violet-300 font-semibold">{user?.fullname || user?.username}</span>
             </p>
+            {dismissErr && (
+              <p className="text-red-300 text-xs mt-1">{dismissErr}</p>
+            )}
             {pendingTasks.length > 0 && (
               <p className="text-white/40 text-sm mt-2">
                 {pendingTasks.length.toLocaleString('ar-SA')} مهمة معلقة

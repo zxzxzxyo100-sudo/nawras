@@ -42,17 +42,31 @@ export const SATISFACTION_QUESTIONS = [
 ]
 
 /**
- * الاستبيان يُشترط قبل «تسجيل مكالمة» فقط لمتاجر **نشط قيد المكالمة**
- * (خانة قيد المكالمة في صفحة المتاجر النشطة).
+ * فئات متاجر تبويب «نشط يشحن — قيد المكالمة» (/active/pending) في الواجهة.
+ * (في قاعدة البيانات غالباً `active_shipping` أو `active` وليس فقط `active_pending_calls`.)
  */
-export const SURVEY_REQUIRED_CATEGORY = 'active_pending_calls'
+export const PENDING_CALL_PIPELINE_CATEGORIES = new Set([
+  'active',
+  'active_shipping',
+  'active_pending_calls',
+])
+
+function hasSurveyRecord(storeId, surveyByStoreId) {
+  if (storeId == null || !surveyByStoreId) return false
+  return !!(
+    surveyByStoreId[storeId]
+    ?? surveyByStoreId[String(storeId)]
+    ?? surveyByStoreId[Number(storeId)]
+  )
+}
 
 /**
- * هل يجب إظهار استبيان رضا العميل قبل فتح مكالمة عامة؟
+ * هل يجب إظهار استبيان رضا العميل قبل «تسجيل مكالمة»؟
+ * يُطبَّق على متاجر **قيد المكالمة** (النشطة في مسار الشحن) وليس على منجز / لم يُصل / احتضان…
  */
 export function needsActiveSatisfactionSurvey(storeId, category, surveyByStoreId) {
   if (storeId == null) return false
   const cat = category || ''
-  if (cat !== SURVEY_REQUIRED_CATEGORY) return false
-  return !surveyByStoreId[storeId]
+  if (!PENDING_CALL_PIPELINE_CATEGORIES.has(cat)) return false
+  return !hasSurveyRecord(storeId, surveyByStoreId)
 }

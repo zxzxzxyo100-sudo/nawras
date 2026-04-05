@@ -4,11 +4,13 @@ import { login as apiLogin } from '../services/api'
 const AuthContext = createContext(null)
 
 export const ROLES = {
+  /** مسار الاحتضان (incubation) حصراً للمدير التنفيذي */
   executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'tasks', 'users', 'vip_merchants'] },
-  /** بدون مسار الاحتضان (incubation) ولا المتاجر الجديدة (new) — نشط يشحن + لوحة التحكم + المهام اليومية */
+  /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم + المهام اليومية */
   active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks'] },
   inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks'] },
-  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation', 'tasks'] },
+  /** موظف مبيعات / احتضان: متاجر جديدة + مهام — دون واجهة «مسار الاحتضان» */
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'tasks'] },
 }
 
 export function AuthProvider({ children }) {
