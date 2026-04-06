@@ -175,7 +175,11 @@ $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 if ($action === 'get_states') {
     ensure_incubation_call_columns($pdo);
     ensure_last_call_date_column($pdo);
-    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date FROM store_states");
+    try {
+        $pdo->exec('ALTER TABLE store_states ADD COLUMN officer_performance_error TINYINT(1) NOT NULL DEFAULT 0');
+    } catch (Throwable $e) {
+    }
+    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date, officer_performance_error FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
