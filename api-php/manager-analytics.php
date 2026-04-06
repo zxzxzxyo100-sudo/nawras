@@ -35,9 +35,36 @@ if (!in_array($period, ['monthly', 'quarterly', 'yearly'], true)) {
 
 $pdo = getDB();
 
+require_once __DIR__ . '/workflow-queue-lib.php';
+
 try {
     $pdo->exec("ALTER TABLE surveys ADD COLUMN survey_kind VARCHAR(32) NULL DEFAULT 'active_csat'");
 } catch (Throwable $e) {
+}
+
+/** مسؤولو الاستعادة — هدف الاتصالات اليومي للمزامنة مع لوحة المدير */
+$inactiveRecoveryDaily = [];
+try {
+    ensure_inactive_daily_stats_schema($pdo);
+    $st = $pdo->query("
+        SELECT u.username, u.fullname, COALESCE(s.successful_contacts, 0) AS successful_contacts
+        FROM users u
+        LEFT JOIN inactive_manager_daily_stats s
+            ON s.username = u.username AND s.work_date = CURDATE()
+        WHERE u.role = 'inactive_manager'
+        ORDER BY u.username ASC
+    ");
+    while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+        $c = (int) ($r['successful_contacts'] ?? 0);
+        $inactiveRecoveryDaily[] = [
+            'username' => $r['username'],
+            'fullname' => $r['fullname'] ?? '',
+            'successful_contacts' => $c,
+            'daily_goal_met' => $c >= INACTIVE_DAILY_SUCCESS_TARGET,
+        ];
+    }
+} catch (Throwable $e) {
+    $inactiveRecoveryDaily = [];
 }
 
 /** استبيانات تُحتسب في CSAT فقط (استبعاد ملاحظات المتاجر غير النشطة) */
@@ -370,6 +397,8 @@ echo json_encode([
     ],
     'months' => $monthsSeries,
     'quarters' => $period === 'quarterly' ? $quarters : null,
+    'inactive_recovery_daily' => $inactiveRecoveryDaily,
+    'inactive_daily_target' => defined('INACTIVE_DAILY_SUCCESS_TARGET') ? INACTIVE_DAILY_SUCCESS_TARGET : 50,
     'notes' => [
         'conversion' => 'نسبة التحويل اليومية: من متاجر Nawris المسجّلة في ذلك اليوم والتي لديها shipments > 0.',
         'recovery' => 'نسبة الاستعادة الشهرية: من متاجر مجمّدة في قاعدة النظام وظهرت لها طرود في orders-summary ضمن نطاق الشهر.',

@@ -13,7 +13,7 @@ import {
   LineChart,
   ReferenceLine,
 } from 'recharts'
-import { BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw, ShieldAlert, Loader2 } from 'lucide-react'
+import { BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw, ShieldAlert, Loader2, CheckCircle2, Circle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getManagerAnalytics } from '../services/api'
 
@@ -218,6 +218,38 @@ export default function ManagerAnalytics() {
               </p>
             </div>
           </div>
+
+          {Array.isArray(data?.inactive_recovery_daily) && data.inactive_recovery_daily.length > 0 && (
+            <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/80 to-white p-4 lg:p-6 shadow-sm">
+              <h2 className="text-sm font-black text-slate-800 mb-1 flex items-center gap-2">
+                مسؤولو الاستعادة — هدف الاتصالات اليومي
+                <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                  {data.inactive_daily_target ?? 50} / يوم
+                </span>
+              </h2>
+              <p className="text-xs text-slate-600 mb-4">
+                علامة صح عند بلوغ هدف اليوم (مزامنة من الخادم).
+              </p>
+              <ul className="flex flex-wrap gap-3">
+                {data.inactive_recovery_daily.map(row => (
+                  <li
+                    key={row.username}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+                  >
+                    {row.daily_goal_met ? (
+                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" aria-hidden />
+                    ) : (
+                      <Circle size={18} className="text-slate-300 shrink-0" aria-hidden />
+                    )}
+                    <span className="font-semibold text-slate-800">{row.fullname || row.username}</span>
+                    <span className="text-xs text-slate-500 tabular-nums">
+                      ({row.successful_contacts ?? 0}/{data.inactive_daily_target ?? 50})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 shadow-sm">
             <h2 className="text-sm font-black text-slate-800 mb-4">مقارنة الأداء الشهرية — التحويل % vs الاستعادة %</h2>

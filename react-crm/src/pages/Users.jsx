@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Users as UsersIcon, Plus, Trash2, Edit2, X, Check } from 'lucide-react'
-import { listUsers, addUser, updateUser, deleteUser } from '../services/api'
+import { Users as UsersIcon, Plus, Trash2, Edit2, X, Check, CheckCircle2, Circle } from 'lucide-react'
+import { listUsers, addUser, updateUser, deleteUser, getInactiveRecoveryDailyStatus } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 import { ROLES } from '../contexts/AuthContext'
 
 const ROLE_OPTIONS = Object.entries(ROLES).map(([value, { label }]) => ({ value, label }))
@@ -8,8 +9,11 @@ const ROLE_OPTIONS = Object.entries(ROLES).map(([value, { label }]) => ({ value,
 const EMPTY_FORM = { username: '', fullname: '', password: '', role: 'active_manager' }
 
 export default function Users() {
+  const { user } = useAuth()
   const [users, setUsers]       = useState([])
   const [loading, setLoading]   = useState(true)
+  /** username → هدف 50 اليوم (مسؤول استعادة) — للمدير التنفيذي */
+  const [inactiveGoalByUser, setInactiveGoalByUser] = useState(() => ({}))
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [form, setForm]         = useState(EMPTY_FORM)
@@ -21,11 +25,23 @@ export default function Users() {
     try {
       const res = await listUsers()
       setUsers(res.data || [])
+      if (user?.role === 'executive') {
+        const g = await getInactiveRecoveryDailyStatus()
+        if (g?.success && Array.isArray(g.data)) {
+          const m = {}
+          for (const row of g.data) {
+            if (row?.username) m[row.username] = !!row.daily_goal_met
+          }
+          setInactiveGoalByUser(m)
+        }
+      } else {
+        setInactiveGoalByUser({})
+      }
     } catch { /* ignore */ }
     setLoading(false)
   }
 
-  useEffect(() => { loadUsers() }, [])
+  useEffect(() => { loadUsers() }, [user?.role])
 
   function openAdd() { setEditing(null); setForm(EMPTY_FORM); setError(''); setShowForm(true) }
   function openEdit(u) {
@@ -90,6 +106,9 @@ export default function Users() {
                 <th className="text-right px-5 py-3">الاسم</th>
                 <th className="text-right px-5 py-3">اسم المستخدم</th>
                 <th className="text-right px-5 py-3">الصلاحية</th>
+                {user?.role === 'executive' && (
+                  <th className="text-right px-5 py-3 text-xs">هدف استعادة اليوم</th>
+                )}
                 <th className="text-right px-5 py-3">تاريخ الإنشاء</th>
                 <th className="px-5 py-3" />
               </tr>
@@ -104,6 +123,25 @@ export default function Users() {
                       {ROLES[u.role]?.label ?? u.role}
                     </span>
                   </td>
+                  {user?.role === 'executive' && (
+                    <td className="px-5 py-4">
+                      {u.role === 'inactive_manager' ? (
+                        inactiveGoalByUser[u.username] ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+                            <CheckCircle2 size={16} className="shrink-0" />
+                            تم
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                            <Circle size={16} className="shrink-0 text-slate-300" />
+                            —
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-5 py-4 text-slate-400 text-xs">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '—'}
                   </td>

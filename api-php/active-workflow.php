@@ -165,6 +165,7 @@ elseif ($action === 'complete_inactive_success') {
         'daily_successful_contacts' => $count,
         'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
         'daily_target_reached' => $reached,
+        'goal_just_met' => $count === INACTIVE_DAILY_SUCCESS_TARGET,
     ]);
 }
 
