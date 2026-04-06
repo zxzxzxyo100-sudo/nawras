@@ -139,6 +139,16 @@ export const fillAllInactiveQueues = (data) =>
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
 
+/** اتصال ناجح (تم) — طابور استعادة غير النشط: حذف من الطابور + عدّ يومي + تعبئة */
+export const completeInactiveQueueSuccess = (data) =>
+  http.post('/active-workflow.php?action=complete_inactive_success', data).then(r => r.data)
+
+/** تعبئة متجر واحد من المجمع (يُحترم هدف 50 نجاحاً يومياً) */
+export const fetchNextInactiveMerchant = (username) =>
+  http
+    .get('/active-workflow.php', { params: { action: 'fetch_next_inactive_merchant', username } })
+    .then(r => r.data)
+
 export const releaseAfterSurvey = (data) =>
   http.post('/active-workflow.php?action=release_after_survey', data).then(r => r.data)
 

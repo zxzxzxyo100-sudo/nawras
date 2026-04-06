@@ -37,10 +37,14 @@ if ($action === 'get_my_workflow') {
                 $active[] = $r;
             }
         }
+        $dailySuccess = get_inactive_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
             'queue' => 'inactive',
             'target' => INACTIVE_QUEUE_TARGET,
+            'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_successful_contacts' => $dailySuccess,
+            'daily_target_reached' => $dailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET,
             'cooldown_days' => SURVEY_COOLDOWN_DAYS,
             'active_tasks' => $active,
             'no_answer_tasks' => $noAnswer,
@@ -110,7 +114,58 @@ elseif ($action === 'mark_no_answer') {
     $added = $queue === 'inactive'
         ? fill_inactive_slots_for_user($pdo, $username, $username, null)
         : fill_slots_for_user($pdo, $username, $username, null);
-    jsonResponse(['success' => true, 'replacement_added' => $added, 'queue' => $queue]);
+    $payload = ['success' => true, 'replacement_added' => $added, 'queue' => $queue];
+    if ($queue === 'inactive') {
+        $payload['daily_successful_contacts'] = get_inactive_daily_success_count($pdo, $username);
+        $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= INACTIVE_DAILY_SUCCESS_TARGET;
+        if ($added > 0) {
+            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد إلى قائمتك.';
+        } elseif ($payload['daily_target_reached']) {
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد». لا يُضاف متجر جديد — تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.';
+        }
+    }
+    jsonResponse($payload);
+}
+
+// ========== POST: اتصال ناجح (تم) — إزالة من الطابور النشط + عدّ اليوم + تعبئة ==========
+elseif ($action === 'complete_inactive_success') {
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $username = trim((string) ($input['username'] ?? ''));
+    if ($storeId <= 0 || $username === '') {
+        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    ensure_inactive_daily_stats_schema($pdo);
+    $sid = (string) $storeId;
+    $del = $pdo->prepare("
+        DELETE FROM store_assignments
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status = 'active'
+    ");
+    $del->execute([$sid, $username]);
+    if ($del->rowCount() === 0) {
+        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط لهذا المتجر في طابور الاستعادة.'], 400);
+    }
+    increment_inactive_daily_success($pdo, $username);
+    $filled = fill_inactive_slots_for_user($pdo, $username, $username, null);
+    $count = get_inactive_daily_success_count($pdo, $username);
+    $reached = $count >= INACTIVE_DAILY_SUCCESS_TARGET;
+    $pdo->prepare("
+        INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([
+        $storeId,
+        $input['store_name'] ?? '',
+        'استعادة — اتصال ناجح (يومي)',
+        'عدّ اتصال ناجح نحو هدف اليوم (' . $count . '/' . INACTIVE_DAILY_SUCCESS_TARGET . '). تعبئة: +' . (int) $filled,
+        $username,
+        'inactive_manager',
+    ]);
+    jsonResponse([
+        'success' => true,
+        'replacement_added' => $filled,
+        'daily_successful_contacts' => $count,
+        'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_target_reached' => $reached,
+    ]);
 }
 
 // ========== POST: بعد إكمال الاستبيان — إزالة من الطابور + تعبئة ==========
@@ -190,6 +245,24 @@ elseif ($action === 'get_assignment_status') {
     $st->execute([$sid, $username]);
     $row = $st->fetch(PDO::FETCH_ASSOC);
     jsonResponse(['success' => true, 'assignment' => $row ?: null]);
+}
+
+// ========== GET: تعبئة متجر واحد من المجمع (fetchNextMerchant — يدوي/تكميلي) ==========
+elseif ($action === 'fetch_next_inactive_merchant') {
+    $username = trim((string) ($_GET['username'] ?? ''));
+    if ($username === '') {
+        jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400);
+    }
+    ensure_inactive_daily_stats_schema($pdo);
+    $added = fill_inactive_slots_for_user($pdo, $username, $username, 1);
+    $dc = get_inactive_daily_success_count($pdo, $username);
+    jsonResponse([
+        'success' => true,
+        'added' => $added,
+        'daily_successful_contacts' => $dc,
+        'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_target_reached' => $dc >= INACTIVE_DAILY_SUCCESS_TARGET,
+    ]);
 }
 
 else {

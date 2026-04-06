@@ -9,6 +9,10 @@ if (!defined('ACTIVE_QUEUE_TARGET')) {
 if (!defined('INACTIVE_QUEUE_TARGET')) {
     define('INACTIVE_QUEUE_TARGET', 50);
 }
+/** هدف اتصالات ناجحة (تم) يومياً لمسؤول الاستعادة — بعدها لا تُعبَّأ قوائم جديدة */
+if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
+    define('INACTIVE_DAILY_SUCCESS_TARGET', 50);
+}
 if (!defined('SURVEY_COOLDOWN_DAYS')) {
     define('SURVEY_COOLDOWN_DAYS', 30);
 }
@@ -34,7 +38,41 @@ function ensure_workflow_schema(PDO $pdo) {
         $pdo->exec("ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active'");
     } catch (Throwable $e) {
     }
+    ensure_inactive_daily_stats_schema($pdo);
     $done = true;
+}
+
+function ensure_inactive_daily_stats_schema(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS inactive_manager_daily_stats (
+            username VARCHAR(191) NOT NULL,
+            work_date DATE NOT NULL,
+            successful_contacts INT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, work_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $done = true;
+}
+
+function get_inactive_daily_success_count(PDO $pdo, $username) {
+    ensure_inactive_daily_stats_schema($pdo);
+    $st = $pdo->prepare('SELECT COALESCE(successful_contacts, 0) FROM inactive_manager_daily_stats WHERE username = ? AND work_date = CURDATE()');
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
+function increment_inactive_daily_success(PDO $pdo, $username) {
+    ensure_inactive_daily_stats_schema($pdo);
+    $pdo->prepare("
+        INSERT INTO inactive_manager_daily_stats (username, work_date, successful_contacts)
+        VALUES (?, CURDATE(), 1)
+        ON DUPLICATE KEY UPDATE successful_contacts = successful_contacts + 1
+    ")->execute([$username]);
 }
 
 function active_pipeline_where_sql() {
@@ -155,6 +193,10 @@ function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username
 
 function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
+    ensure_inactive_daily_stats_schema($pdo);
+    if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
+        return 0;
+    }
     $have = count_inactive_queue($pdo, $username);
     $need = INACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {

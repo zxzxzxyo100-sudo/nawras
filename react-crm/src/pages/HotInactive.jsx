@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { Flame, RefreshCw, Phone, PhoneOff, Users } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
@@ -6,6 +6,8 @@ import InactiveRowColorToolbar from '../components/InactiveRowColorToolbar'
 import { useInactiveRowColors } from '../hooks/useInactiveRowColors'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
+import { useAuth } from '../contexts/AuthContext'
+import { getMyWorkflow } from '../services/api'
 import { formatCallOutcome } from '../constants/callOutcomes'
 import {
   isRestoredCategory,
@@ -75,7 +77,22 @@ function aggregateUserStats(stores, storeStates, callLogs) {
 
 export default function HotInactive() {
   const { recoverySegment } = useParams()
-  const { stores, counts, callLogs, storeStates, loading, reload } = useStores()
+  const { user } = useAuth()
+  const { stores, counts, callLogs, storeStates, loading, reload, lastLoaded } = useStores()
+  const [inactiveWfSummary, setInactiveWfSummary] = useState(null)
+
+  useEffect(() => {
+    if (user?.role !== 'inactive_manager' || !user?.username) {
+      setInactiveWfSummary(null)
+      return
+    }
+    getMyWorkflow(user.username, { queue: 'inactive' })
+      .then(r => {
+        if (r?.success) setInactiveWfSummary(r)
+        else setInactiveWfSummary(null)
+      })
+      .catch(() => setInactiveWfSummary(null))
+  }, [user?.role, user?.username, lastLoaded])
   const [selected, setSelected] = useState(null)
   const inactiveRowColors = useInactiveRowColors('hot')
   const [rowPaintMode, setRowPaintMode] = useState(false)
@@ -270,6 +287,31 @@ export default function HotInactive() {
 
   return (
     <div className="space-y-5" dir="rtl">
+      {user?.role === 'inactive_manager' && inactiveWfSummary && (
+        <div
+          className={`rounded-2xl border px-4 py-3 shadow-sm ${
+            inactiveWfSummary.daily_target_reached
+              ? 'border-emerald-300 bg-emerald-50/95 text-emerald-950'
+              : 'border-amber-200/90 bg-amber-50/90 text-amber-950'
+          }`}
+        >
+          <p className="font-black text-sm">
+            اتصالات ناجحة اليوم:{' '}
+            {(inactiveWfSummary.daily_successful_contacts ?? 0).toLocaleString('ar-SA')} /{' '}
+            {inactiveWfSummary.inactive_daily_target ?? 50}
+          </p>
+          {inactiveWfSummary.daily_target_reached ? (
+            <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
+              تم بلوغ الهدف اليومي — لن يُضاف متاجر جديدة للطابور حتى اليوم التالي (قائمة «لم يرد» منفصلة).
+            </p>
+          ) : (
+            <p className="text-xs mt-1 text-amber-900/85">
+              الهدف: 50 اتصالاً مُسجَّلاً كـ «تم» من المهام — «لم يرد» يستبدل المتجر دون أن يُحسب نجاحاً.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">

@@ -9,7 +9,10 @@ import { usePoints }  from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import StoreDrawer    from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
+import {
+  getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow,
+  completeInactiveQueueSuccess,
+} from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 
@@ -302,7 +305,9 @@ function TaskCard({
   doneDisabled,
 }) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
-  const handleDone = () => onDone(task)
+  const handleDone = () => {
+    void onDone(task)
+  }
   const showNoAnswer =
     typeof onNoAnswerWorkflow === 'function'
     && (
@@ -464,6 +469,8 @@ export default function Tasks() {
   const [doneSaving, setDoneSaving] = useState(false)
   const [doneModalErr, setDoneModalErr] = useState('')
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
+  /** إشعار بعد «لم يرد» أو بلوغ الهدف */
+  const [toastMsg, setToastMsg] = useState('')
   /** فتح استبيان تهيئة المتجر الجديد من «تم» */
   const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
   /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
@@ -498,6 +505,12 @@ export default function Tasks() {
   useEffect(() => {
     loadInactiveWf()
   }, [loadInactiveWf, lastLoaded])
+
+  useEffect(() => {
+    if (!toastMsg) return undefined
+    const t = setTimeout(() => setToastMsg(''), 8000)
+    return () => clearTimeout(t)
+  }, [toastMsg])
 
   const tasks = useMemo(
     () => generateTasks(
@@ -541,8 +554,27 @@ export default function Tasks() {
     }
   }
 
-  function requestDone(task) {
+  async function requestDone(task) {
     setDismissErr('')
+    if (task.type === 'recovery_call' && task.workflowQueue === 'inactive' && user?.role === 'inactive_manager') {
+      try {
+        const res = await completeInactiveQueueSuccess({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          username: user.username,
+        })
+        await dismissTaskOnly(task.id)
+        await reload()
+        await loadInactiveWf()
+        loadDismissals()
+        if (res?.daily_target_reached) {
+          setToastMsg('تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.')
+        }
+      } catch (e) {
+        setDismissErr(e.response?.data?.error || 'تعذّر تسجيل الاتصال الناجح.')
+      }
+      return
+    }
     if (task.type === 'new_merchant_onboarding') {
       if (onboardingDoneForStore(newMerchantOnboardingDoneIds, task.store.id)) {
         dismissTaskOnly(task.id)
@@ -586,12 +618,13 @@ export default function Tasks() {
           onCallSaved(res?.points_awarded ?? 0)
         }
         if (task.workflowQueue === 'inactive' && user?.username) {
-          await markSurveyNoAnswer({
+          const mar = await markSurveyNoAnswer({
             store_id: task.store.id,
             store_name: task.store.name,
             username: user.username,
             queue: 'inactive',
           })
+          if (mar?.notify_ar) setToastMsg(mar.notify_ar)
         }
         await reload()
         await loadInactiveWf()
@@ -653,6 +686,27 @@ export default function Tasks() {
 
   return (
     <div className="space-y-5 pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="fixed bottom-24 left-1/2 z-[500] max-w-md w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl border border-violet-300/80 bg-violet-950/95 text-violet-50 px-4 py-3 text-sm font-medium shadow-xl shadow-violet-900/40 flex items-start justify-between gap-3"
+            dir="rtl"
+          >
+            <span>{toastMsg}</span>
+            <button
+              type="button"
+              onClick={() => setToastMsg('')}
+              className="shrink-0 p-1 rounded-lg hover:bg-white/10 text-white/80"
+              aria-label="إغلاق"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ══ بطاقة الهيدر + التحدي الذاتي ═══════════════════════════ */}
       <motion.div
@@ -688,12 +742,24 @@ export default function Tasks() {
               <p className="text-red-300 text-xs mt-1">{dismissErr}</p>
             )}
             {user?.role === 'inactive_manager' && inactiveWf?.success && (
-              <p className="text-violet-200/90 text-sm mt-2">
-                طابور الاستعادة:{' '}
-                {(inactiveWf.active_count ?? 0) + (inactiveWf.no_answer_count ?? 0)}
-                {' / '}
-                {inactiveWf.target ?? 50} متجراً غير نشط
-              </p>
+              <>
+                <p className="text-violet-200/90 text-sm mt-2">
+                  طابور الاستعادة:{' '}
+                  {(inactiveWf.active_count ?? 0) + (inactiveWf.no_answer_count ?? 0)}
+                  {' / '}
+                  {inactiveWf.target ?? 50} متجراً غير نشط
+                </p>
+                <p
+                  className={`text-sm mt-1.5 font-bold ${
+                    inactiveWf.daily_target_reached ? 'text-emerald-300' : 'text-amber-200/95'
+                  }`}
+                >
+                  اتصالات ناجحة اليوم:{' '}
+                  {(inactiveWf.daily_successful_contacts ?? 0).toLocaleString('ar-SA')} /{' '}
+                  {inactiveWf.inactive_daily_target ?? 50}
+                  {inactiveWf.daily_target_reached && ' — تم بلوغ الهدف'}
+                </p>
+              </>
             )}
             {pendingTasks.length > 0 && (
               <p className="text-white/40 text-sm mt-2">
