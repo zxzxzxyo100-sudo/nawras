@@ -44,68 +44,49 @@ function satisfactionPercent(row) {
   return Math.min(100, Math.round((avg / 5) * 100))
 }
 
-function GlassIcon({ children, className = '' }) {
+/** شريط تنقّل علوي بعرض الشاشة — بنفسجي خافت + عنوان + الرضا العالمي (أخضر كبير) */
+function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   return (
-    <span
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200/60 bg-white/70 shadow-[0_4px_16px_-4px_rgba(91,33,182,0.2)] backdrop-blur-md ${className}`}
+    <header
+      className="w-full border-b border-violet-300/25 bg-gradient-to-l from-[#ddd6f3] via-[#e8e0f5] to-[#e4dcf7] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
+      style={{ fontFamily: "'Cairo', sans-serif" }}
     >
-      {children}
-    </span>
-  )
-}
-
-/** شريط علوي: نمو + سرعة حل + الرضا العالمي (أخضر كبير) */
-function ExecutiveCrisisBar({ growth, resolution, globalSat, loading }) {
-  return (
-    <div className="border-b border-violet-200/30 bg-gradient-to-l from-white via-violet-50/25 to-white">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:gap-6 md:px-6 md:py-3">
-        <div className="shrink-0 text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-500">لوحة تنفيذية</p>
-          <p className="text-base font-black text-violet-950 md:text-lg">أداء المدير التنفيذي</p>
+      <div className="flex w-full min-w-0 flex-col gap-8 px-4 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-12 xl:px-16 2xl:px-20">
+        <div className="min-w-0 flex-1 text-right">
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-violet-600/70">تنفيذي</p>
+          <h1 className="mt-1 text-3xl font-black leading-tight tracking-tight text-violet-950 sm:text-4xl md:text-[2.35rem]">
+            التحقيق السريع
+          </h1>
+          <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-violet-800/75">
+            مركز الأزمات — استبيانات غير الراضين فقط لتركيز القيادة على الأولويات.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/45 px-3.5 py-2 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md">
+              <TrendingUp size={15} className="shrink-0 text-violet-600" strokeWidth={2.2} />
+              النمو {loading ? '—' : `${growth}%`}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/45 px-3.5 py-2 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md">
+              <Timer size={15} className="shrink-0 text-violet-600" strokeWidth={2.2} />
+              سرعة الحل {loading ? '—' : `${resolution}%`}
+            </span>
+          </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-stretch justify-end gap-3 md:gap-4">
-          <div className="flex min-w-[140px] flex-1 items-center gap-3 rounded-2xl border border-violet-100/90 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <GlassIcon>
-              <TrendingUp size={17} className="text-violet-700" strokeWidth={2.2} />
-            </GlassIcon>
-            <div className="min-w-0 text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">النمو</p>
-              <p className="text-xl font-black tabular-nums text-violet-950">{loading ? '—' : `${growth}%`}</p>
-            </div>
-          </div>
-
-          <div className="flex min-w-[140px] flex-1 items-center gap-3 rounded-2xl border border-violet-100/90 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <GlassIcon>
-              <Timer size={17} className="text-violet-700" strokeWidth={2.2} />
-            </GlassIcon>
-            <div className="min-w-0 text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500">سرعة الحل</p>
-              <p className="text-xl font-black tabular-nums text-violet-950">{loading ? '—' : `${resolution}%`}</p>
-            </div>
-          </div>
-
+        <div className="flex w-full shrink-0 justify-center lg:w-auto lg:justify-end">
           <div
-            className="flex min-w-[200px] flex-[1.2] items-center justify-between gap-4 rounded-2xl border px-5 py-4 shadow-lg md:min-w-[240px]"
-            style={{
-              background: 'linear-gradient(135deg, rgba(236,253,245,0.95), rgba(209,250,229,0.85))',
-              borderColor: 'rgba(16, 185, 129, 0.35)',
-              boxShadow: '0 12px 40px -12px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255,255,255,0.8)',
-            }}
+            className="flex min-w-[200px] flex-col items-center justify-center rounded-3xl border border-emerald-400/35 bg-gradient-to-b from-emerald-50/95 to-white px-10 py-7 text-center shadow-[0_16px_48px_-12px_rgba(16,185,129,0.28),0_4px_16px_-4px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:min-w-[240px] sm:px-12"
           >
-            <div className="min-w-0 text-right">
-              <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700/90">الرضا العالمي</p>
-              <p className="mt-1 text-4xl font-black tabular-nums leading-none text-emerald-700 md:text-5xl">
-                {loading ? '—' : `${globalSat}%`}
-              </p>
-            </div>
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/80 bg-white/90 shadow-inner">
-              <span className="text-2xl font-black text-emerald-600">✓</span>
-            </div>
+            <p className="text-[11px] font-black uppercase tracking-widest text-emerald-800/85">الرضا العالمي</p>
+            <p className="mt-1 text-5xl font-black tabular-nums leading-none text-emerald-600 sm:text-6xl md:text-7xl">
+              {loading ? '—' : `${globalSat}%`}
+            </p>
+            <span className="mt-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200/80 bg-white/90 text-lg font-bold text-emerald-600 shadow-inner">
+              ✓
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </header>
   )
 }
 
@@ -134,7 +115,7 @@ function CrisisCard({ row, onOpen, layoutId }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="group flex aspect-square max-h-[280px] w-full flex-col rounded-3xl border-2 border-rose-300/50 bg-white/90 p-5 text-right shadow-[0_8px_40px_-12px_rgba(244,63,94,0.35),0_0_0_1px_rgba(244,63,94,0.08)_inset] transition hover:border-rose-400/60 hover:shadow-[0_16px_48px_-12px_rgba(244,63,94,0.45)]"
+      className="group flex aspect-square max-h-[280px] w-full flex-col rounded-3xl border border-rose-200/80 bg-white/95 p-5 text-right shadow-[0_20px_50px_-18px_rgba(244,63,94,0.22),0_8px_28px_-8px_rgba(15,23,42,0.08),0_0_0_1px_rgba(251,113,133,0.12)_inset] ring-1 ring-rose-200/30 transition hover:border-rose-300 hover:shadow-[0_24px_56px_-16px_rgba(244,63,94,0.32),0_12px_32px_-8px_rgba(15,23,42,0.1)]"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <MerchantLogo name={row.store_name} storeId={row.store_id} />
@@ -455,14 +436,10 @@ export default function QuickVerification() {
 
   return (
     <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      <div className="sticky top-0 z-40 border-b border-violet-100/80 bg-white/95 backdrop-blur-md">
-        <ExecutiveCrisisBar
-          growth={kpis.growth}
-          resolution={kpis.resolution}
-          globalSat={kpis.global}
-          loading={loading}
-        />
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+      <div className="sticky top-0 z-40 shadow-[0_8px_30px_-12px_rgba(76,29,149,0.12)]">
+        <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
+        <div className="w-full border-b border-violet-100/90 bg-white/95 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:px-6">
           <div className="flex rounded-2xl border border-violet-100/90 bg-violet-50/20 p-1">
             <button
               type="button"
@@ -504,10 +481,11 @@ export default function QuickVerification() {
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             تحديث
           </button>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-12">
         <div className="relative mb-8">
           <Search className="pointer-events-none absolute right-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-violet-300" />
           <input
