@@ -13,6 +13,13 @@ import {
   Star,
   Store,
   Truck,
+  CheckCircle2,
+  XCircle,
+  Copy,
+  ClipboardList,
+  User,
+  Calendar,
+  ChevronLeft,
 } from 'lucide-react'
 import {
   Radar,
@@ -24,13 +31,23 @@ import {
 } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
-import { getQuickVerificationBourse } from '../services/api'
-import QuickVerificationAuditDrawer from '../components/QuickVerificationAuditDrawer'
+import { getQuickVerificationBourse, getQuickVerificationAuditTimeline } from '../services/api'
+
+const SUCCESS = '#28C76F'
+const DANGER = '#EA5455'
+const NAVY = '#1e3a5f'
 
 function textSnippet(s, max = 64) {
   const t = (s || '').trim()
   if (!t) return ''
   return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
+function fmtServerAt(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function MiniStars({ value }) {
@@ -59,6 +76,277 @@ function ArrowForState({ arrow }) {
   return <ArrowBigDown size={20} strokeWidth={2.5} className="text-rose-600" aria-hidden />
 }
 
+function AnimatedStars({ value }) {
+  const v = Math.max(0, Math.min(5, Number(value) || 0))
+  return (
+    <div className="flex items-center gap-1 flex-row-reverse justify-end" aria-hidden>
+      {[1, 2, 3, 4, 5].map(n => (
+        <motion.span
+          key={n}
+          initial={{ scale: 0.2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18, delay: (n - 1) * 0.05 }}
+        >
+          <Star
+            size={20}
+            className={n <= v ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}
+            strokeWidth={n <= v ? 0 : 1.5}
+          />
+        </motion.span>
+      ))}
+    </div>
+  )
+}
+
+/** درج التفصيل — داخل نفس الملف (تجريبي فقط) */
+function StagingAuditDrawer({ row, onClose }) {
+  const [latestCallNote, setLatestCallNote] = useState(null)
+  const [callStage, setCallStage] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const radarData = useMemo(() => {
+    if (!row?.questions?.length) return []
+    return row.questions.map(q => ({
+      subject: q.label.length > 12 ? `${q.label.slice(0, 11)}…` : q.label,
+      score: q.value,
+      fullMark: 5,
+    }))
+  }, [row])
+
+  useEffect(() => {
+    if (!row?.store_id) return
+    let cancelled = false
+    setLoading(true)
+    getQuickVerificationAuditTimeline(row.store_id)
+      .then(d => {
+        if (cancelled) return
+        setLatestCallNote(d?.latest_call_note || null)
+        const evs = Array.isArray(d?.events) ? d.events : []
+        let stage = null
+        for (let i = evs.length - 1; i >= 0; i--) {
+          const sub = String(evs[i]?.sub || '')
+          if (sub.includes('inc_call1')) {
+            stage = 1
+            break
+          }
+          if (sub.includes('inc_call2')) {
+            stage = 2
+            break
+          }
+          if (sub.includes('inc_call3')) {
+            stage = 3
+            break
+          }
+        }
+        setCallStage(stage)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLatestCallNote(null)
+          setCallStage(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [row?.store_id])
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const fullNoteText = [row?.suggestions?.trim(), latestCallNote?.text].filter(Boolean).join('\n\n---\n\n') || ''
+
+  async function copyNote() {
+    const t = fullNoteText || (row?.suggestions || '').trim() || latestCallNote?.text || ''
+    if (!t || !navigator.clipboard?.writeText) return
+    try {
+      await navigator.clipboard.writeText(t)
+    } catch { /* */ }
+  }
+
+  if (!row) return null
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[600] flex justify-end"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      dir="rtl"
+      style={{ fontFamily: "'Cairo', sans-serif" }}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/40"
+        aria-label="إغلاق"
+        onClick={onClose}
+      />
+      <motion.aside
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className="relative h-full w-full max-w-[480px] flex flex-col bg-white shadow-2xl border-r border-slate-200"
+      >
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-lg font-black truncate" style={{ color: NAVY }}>
+              {row.store_name}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 tabular-nums">#{row.store_id}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
+          <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+            <p className="text-xs font-black text-slate-500 uppercase tracking-wide">معلومات المكالمة</p>
+            <div className="flex items-start gap-2 text-sm">
+              <User size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-bold text-slate-700">الموظف: </span>
+                <span className="text-slate-900">{row.staff_fullname || row.staff_username || '—'}</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 text-sm">
+              <Calendar size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-bold text-slate-700">التاريخ والوقت: </span>
+                <span className="text-slate-900 tabular-nums">{fmtServerAt(row.created_at)}</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 text-sm">
+              <ClipboardList size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-bold text-slate-700">مرحلة المكالمة: </span>
+                <span className="text-slate-900">
+                  {loading ? '…' : callStage != null ? `مكالمة ${callStage}` : 'غير محدد في السجل'}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <p className="text-xs font-black text-slate-500 mb-3">إجابات الاستبيان</p>
+            {row.survey_kind === 'new_merchant_onboarding' && row.answers && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {row.answers.map((a, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-xl border p-3 flex flex-col gap-2 ${
+                      a.yes ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      {a.yes ? (
+                        <CheckCircle2 size={28} style={{ color: SUCCESS }} />
+                      ) : (
+                        <XCircle size={28} style={{ color: DANGER }} />
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 leading-snug">{a.label}</p>
+                    <p className="text-[10px] text-slate-400 tabular-nums">{fmtServerAt(row.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {row.survey_kind === 'active_csat' && row.questions && (
+              <>
+                {radarData.length > 0 && (
+                  <div className="h-[200px] w-full mb-4 rounded-xl border border-slate-200 p-2 bg-white" dir="ltr">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b' }} />
+                        <PolarRadiusAxis angle={90} domain={[0, 5]} tickCount={6} tick={{ fontSize: 9 }} />
+                        <Radar name="A" dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {row.questions.map((q, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-xl border p-3 ${
+                        q.risk === 'high'
+                          ? 'border-rose-200 bg-rose-50/40'
+                          : q.risk === 'mid'
+                            ? 'border-amber-200 bg-amber-50/40'
+                            : 'border-emerald-100 bg-emerald-50/30'
+                      }`}
+                    >
+                      <p className="text-xs font-bold text-slate-800 mb-2">{q.label}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <AnimatedStars value={q.value} />
+                        <span className="text-sm font-black tabular-nums text-slate-700">{q.value}/5</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-black" style={{ color: NAVY }}>
+                الملاحظات والتعليقات
+              </p>
+              <button
+                type="button"
+                onClick={() => void copyNote()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+              >
+                <Copy size={14} />
+                نسخ الملاحظة
+              </button>
+            </div>
+            {(row.suggestions || '').trim() !== '' && (
+              <div className="mb-3">
+                <p className="text-[11px] font-bold text-slate-500 mb-1">صوت المتجر (مسجّل)</p>
+                <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 rounded-lg p-3 bg-slate-50/80">
+                  {(row.suggestions || '').trim()}
+                </p>
+              </div>
+            )}
+            {latestCallNote?.text ? (
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 mb-1">ملاحظة المكالمة (الموظف)</p>
+                <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 rounded-lg p-3 bg-slate-50/80">
+                  {latestCallNote.text}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-1 tabular-nums">
+                  {latestCallNote.by ? `${latestCallNote.by} — ` : ''}
+                  {fmtServerAt(latestCallNote.at)}
+                </p>
+              </div>
+            ) : (
+              !((row.suggestions || '').trim()) && (
+                <p className="text-sm text-slate-400">لا توجد ملاحظات نصية في هذا السجل.</p>
+              )
+            )}
+          </section>
+        </div>
+      </motion.aside>
+    </motion.div>
+  )
+}
+
 /**
  * التحقق السريع — استبيان تهيئة (3) منفصل عن CSAT التجار النشطين (6 نجوم).
  * يُفعَّل في التطوير وبناء التجريبي فقط.
@@ -74,6 +362,8 @@ export default function QuickVerification() {
   const [err, setErr] = useState('')
   const [redOnly, setRedOnly] = useState(false)
   const [modalRow, setModalRow] = useState(null)
+  /** تبويبات الرضا — تجريبي فقط */
+  const [satTab, setSatTab] = useState('all')
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -110,13 +400,28 @@ export default function QuickVerification() {
   const currentDetails = mainTab === 'onboarding' ? detailRows : activeDetailRows
   const currentStaff = mainTab === 'onboarding' ? staffMissions : activeStaffMissions
 
+  const satStats = useMemo(() => {
+    let sat = 0
+    let uns = 0
+    currentDetails.forEach(r => {
+      if (r.arrow === 'up') sat += 1
+      else if (r.arrow === 'down') uns += 1
+    })
+    return { total: currentDetails.length, sat, uns }
+  }, [currentDetails])
+
   const filteredDetails = useMemo(() => {
+    if (IS_VITE_APP_STAGING) {
+      if (satTab === 'up') return currentDetails.filter(r => r.arrow === 'up')
+      if (satTab === 'down') return currentDetails.filter(r => r.arrow === 'down')
+      return currentDetails
+    }
     if (!redOnly) return currentDetails
     if (mainTab === 'onboarding') {
       return currentDetails.filter(r => r.arrow === 'down')
     }
     return currentDetails.filter(r => r.arrow === 'down' || r.tier === 'red')
-  }, [currentDetails, redOnly, mainTab])
+  }, [currentDetails, redOnly, mainTab, satTab])
 
   const radarData = useMemo(() => {
     if (!modalRow?.questions?.length) return []
@@ -136,44 +441,99 @@ export default function QuickVerification() {
 
   return (
     <div className="space-y-5 pb-16" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
-            <ShieldCheck size={22} className="text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900">التحقق السريع</h1>
-            <p className="text-slate-600 text-sm mt-0.5">
-              {mainTab === 'onboarding'
-                ? 'استبيان تهيئة المتجر الجديد (ثلاثة أسئلة نعم/لا): الكل نعم 🔼، أي لا 🔽.'
-                : 'استبيان رضا التجار النشطين — ستة محاور بنجوم 1–5: المتوسط ≥4 🔼، 3–3.9 ↔️، أقل من 3 🔽.'}
-            </p>
+      {/* رأس الصفحة */}
+      {IS_VITE_APP_STAGING ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
+                style={{ background: `linear-gradient(135deg, ${NAVY}, #334155)` }}
+              >
+                <ShieldCheck size={24} className="text-emerald-400" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black tracking-tight" style={{ color: NAVY }}>
+                  التحقق السريع
+                </h1>
+                <p className="text-slate-500 text-sm mt-1">
+                  لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-800">
+                الإجمالي
+                <span className="tabular-nums rounded-lg bg-white px-2 py-0.5 border border-slate-200">
+                  {satStats.total}
+                </span>
+              </span>
+              <span
+                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold"
+                style={{ borderColor: SUCCESS, color: SUCCESS, background: 'rgba(40,199,111,0.08)' }}
+              >
+                راضٍ 🔼
+                <span className="tabular-nums rounded-lg bg-white/80 px-2 py-0.5">{satStats.sat}</span>
+              </span>
+              <span
+                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold"
+                style={{ borderColor: DANGER, color: DANGER, background: 'rgba(234,84,85,0.08)' }}
+              >
+                غير راضٍ 🔽
+                <span className="tabular-nums rounded-lg bg-white/80 px-2 py-0.5">{satStats.uns}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => void loadAll()}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                تحديث
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setRedOnly(v => !v)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
-              redOnly
-                ? 'bg-rose-600 border-rose-600 text-white'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Filter size={16} />
-            {redOnly ? 'عرض الكل' : 'فقط الأحمر / الهبوط'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void loadAll()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            تحديث
-          </button>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
+              <ShieldCheck size={22} className="text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900">التحقق السريع</h1>
+              <p className="text-slate-600 text-sm mt-0.5">
+                {mainTab === 'onboarding'
+                  ? 'استبيان تهيئة المتجر الجديد (ثلاثة أسئلة نعم/لا): الكل نعم 🔼، أي لا 🔽.'
+                  : 'استبيان رضا التجار النشطين — ستة محاور بنجوم 1–5: المتوسط ≥4 🔼، 3–3.9 ↔️، أقل من 3 🔽.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setRedOnly(v => !v)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+                redOnly
+                  ? 'bg-rose-600 border-rose-600 text-white'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Filter size={16} />
+              {redOnly ? 'عرض الكل' : 'فقط الأحمر / الهبوط'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadAll()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              تحديث
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2">
         <button
@@ -201,6 +561,29 @@ export default function QuickVerification() {
           تجار نشطون (CSAT)
         </button>
       </div>
+
+      {IS_VITE_APP_STAGING && (
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {[
+            { id: 'all', label: 'الكل' },
+            { id: 'down', label: 'غير راضٍ 🔽' },
+            { id: 'up', label: 'راضي 🔼' },
+          ].map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setSatTab(t.id)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                satTab === t.id
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {err && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">{err}</p>
@@ -263,16 +646,21 @@ export default function QuickVerification() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-black text-slate-900">
-            {mainTab === 'onboarding' ? 'استبيانات تهيئة المتاجر (اليوم)' : 'تجار نشطون — متوسط الرضا (اليوم)'}
-          </h2>
-          <span className="text-xs text-slate-500 tabular-nums">{filteredDetails.length} سجل</span>
-        </div>
+        {!IS_VITE_APP_STAGING && (
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-black text-slate-900">
+              {mainTab === 'onboarding' ? 'استبيانات تهيئة المتاجر (اليوم)' : 'تجار نشطون — متوسط الرضا (اليوم)'}
+            </h2>
+            <span className="text-xs text-slate-500 tabular-nums">{filteredDetails.length} سجل</span>
+          </div>
+        )}
         {IS_VITE_APP_STAGING && (
-          <p className="px-4 py-2 text-[11px] text-slate-500 border-b border-slate-100 bg-slate-50/50">
-            وضع التجريبي: انقر صفاً لفتح درج التدقيق التفصيلي (استبيان + جدول زمني).
-          </p>
+          <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
+            <h2 className="text-base font-black" style={{ color: NAVY }}>
+              سجلات المتاجر (اليوم)
+            </h2>
+            <span className="text-xs font-bold text-slate-500 tabular-nums">{filteredDetails.length} عرض</span>
+          </div>
         )}
         {loading && currentDetails.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-16 text-slate-400 text-sm">
@@ -281,23 +669,65 @@ export default function QuickVerification() {
           </div>
         ) : filteredDetails.length === 0 ? (
           <p className="text-slate-500 text-sm py-12 text-center">لا توجد سجلات مطابقة.</p>
+        ) : IS_VITE_APP_STAGING ? (
+          <div className="divide-y divide-slate-100 bg-white">
+            {filteredDetails.map(row => {
+              const isUp = row.arrow === 'up'
+              const isDown = row.arrow === 'down'
+              const glow = isDown
+                ? '0 0 24px rgba(234,84,85,0.55)'
+                : isUp
+                  ? '0 0 24px rgba(40,199,111,0.5)'
+                  : '0 0 16px rgba(245,158,11,0.35)'
+              return (
+                <div
+                  key={row.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 hover:bg-slate-50/80 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span className="shrink-0 rounded-full bg-slate-100 text-slate-600 text-xs font-black px-3 py-1.5 tabular-nums border border-slate-200">
+                      #{row.store_id}
+                    </span>
+                    <p className="font-black text-base truncate" style={{ color: NAVY }}>
+                      {row.store_name}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center shrink-0">
+                    <div
+                      className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-slate-100"
+                      style={{ boxShadow: glow }}
+                    >
+                      <ArrowForState arrow={row.arrow} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 justify-between sm:justify-end min-w-0 sm:max-w-[220px]">
+                    <p className="text-xs text-slate-500 truncate flex-1 text-right">
+                      {textSnippet(row.suggestions, 20) || '—'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setModalRow(row)}
+                      className="shrink-0 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 shadow-sm"
+                    >
+                      عرض التفاصيل
+                      <ChevronLeft size={14} className="opacity-60" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-right">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-slate-600 text-xs">
-                  {IS_VITE_APP_STAGING && (
-                    <th className="px-4 py-2 font-bold w-20 tabular-nums">الكود</th>
-                  )}
                   <th className="px-4 py-2 font-bold">المتجر</th>
                   {mainTab === 'active_csat' && (
                     <th className="px-4 py-2 font-bold w-28">المتوسط</th>
                   )}
                   <th className="px-4 py-2 font-bold">الموظف</th>
                   <th className="px-4 py-2 font-bold w-28">المؤشر</th>
-                  {IS_VITE_APP_STAGING && (
-                    <th className="px-4 py-2 font-bold min-w-[140px] max-w-[220px]">ملاحظات (معاينة)</th>
-                  )}
                 </tr>
               </thead>
               <tbody>
@@ -312,9 +742,6 @@ export default function QuickVerification() {
                       if (e.key === 'Enter') setModalRow(row)
                     }}
                   >
-                    {IS_VITE_APP_STAGING && (
-                      <td className="px-4 py-3 tabular-nums text-slate-600 font-bold text-xs">#{row.store_id}</td>
-                    )}
                     <td className="px-4 py-3 font-medium text-slate-900">{row.store_name}</td>
                     {mainTab === 'active_csat' && (
                       <td className="px-4 py-3 tabular-nums font-bold text-slate-800">{row.avg}</td>
@@ -325,11 +752,6 @@ export default function QuickVerification() {
                         <ArrowForState arrow={row.arrow} />
                       </span>
                     </td>
-                    {IS_VITE_APP_STAGING && (
-                      <td className="px-4 py-3 text-xs text-slate-600 max-w-[220px] leading-snug">
-                        {textSnippet(row.suggestions) || '—'}
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -340,11 +762,7 @@ export default function QuickVerification() {
 
       <AnimatePresence>
         {modalRow && IS_VITE_APP_STAGING && (
-          <QuickVerificationAuditDrawer
-            key={modalRow.id}
-            row={modalRow}
-            onClose={() => setModalRow(null)}
-          />
+          <StagingAuditDrawer key={modalRow.id} row={modalRow} onClose={() => setModalRow(null)} />
         )}
       </AnimatePresence>
 
