@@ -152,7 +152,7 @@ export default function CallModal({
   onClose,
   onSaved,
   taskCompletion = null,
-  /** فُتح من صفحة المهام اليومية — يفرض واجهة الاستبيان الثلاثي مع IS_SIMPLE_LOG_CALL_MODAL */
+  /** فُتح من صفحة المهام اليومية — يُستخدم مع مسؤول المتاجر لإظهار الاستبيان حتى خارج التجريبي */
   fromDailyTasks = false,
 }) {
   const { user } = useAuth()
@@ -174,15 +174,18 @@ export default function CallModal({
     [callType, dbCategory],
   )
 
-  /** مسار مبسّط: استبيان 3 أسئلة فقط + حفظ / لم يرد (DEV أو VITE_APP_STAGING=1) */
-  const simpleOnboardingFlow = useMemo(
-    () =>
-      IS_SIMPLE_LOG_CALL_MODAL
-      && callType === 'general'
-      && !inactiveFeedbackNeeded
-      && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds),
-    [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded],
-  )
+  /**
+   * مسار مبسّط: استبيان 3 أسئلة + حفظ / لم يرد
+   * — التجريبي/التطوير: IS_SIMPLE_LOG_CALL_MODAL
+   * — مسؤول المتاجر من «المهام اليومية»: نفس الواجهة لكل المتاجر التي ما زالت تحتاج استبيان التهيئة (قديمة أو جديدة)
+   */
+  const simpleOnboardingFlow = useMemo(() => {
+    if (callType !== 'general' || inactiveFeedbackNeeded) return false
+    if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
+    if (IS_SIMPLE_LOG_CALL_MODAL) return true
+    if (fromDailyTasks && user?.role === 'active_manager') return true
+    return false
+  }, [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded, fromDailyTasks, user?.role])
 
   const onboardingNeeded = useMemo(
     () =>
