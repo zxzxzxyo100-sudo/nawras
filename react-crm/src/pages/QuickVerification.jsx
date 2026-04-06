@@ -93,6 +93,222 @@ const CRIMSON = SOFT_CORAL_ICON
 /** عتبة شحنات عالية + 🔽 = أولوية قصوى */
 const HIGH_SHIPMENT_THRESHOLD = 50
 
+/** لوحة 2025+ — عتمة + نيون (تجريبي `VITE_APP_STAGING=1` فقط) */
+const FV = {
+  obsidian: '#0A0A0B',
+  charcoal: '#111113',
+  cyan: '#00F2FE',
+  violet: '#4FACFE',
+  magenta: '#DA22FF',
+  silver: '#C8D4E0',
+  silverDim: '#7C8EA3',
+  emeraldCore: '#34F5C5',
+  rubyCore: '#FF2D6B',
+  glass: 'rgba(255,255,255,0.06)',
+  glassHi: 'rgba(255,255,255,0.1)',
+  edge: 'rgba(0, 242, 254, 0.28)',
+  edgeSoft: 'rgba(0, 242, 254, 0.12)',
+}
+
+function FuturisticAmbientBg() {
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden" aria-hidden>
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `linear-gradient(168deg, ${FV.obsidian} 0%, ${FV.charcoal} 42%, #0C0C0E 100%)`,
+        }}
+      />
+      <motion.div
+        className="absolute -top-[18%] left-1/2 h-[90vh] w-[min(100vw,90vh)] -translate-x-1/2 rounded-full"
+        style={{
+          background: `radial-gradient(ellipse at 50% 38%, ${FV.cyan}28 0%, transparent 58%)`,
+          filter: 'blur(64px)',
+        }}
+        animate={{ opacity: [0.38, 0.62, 0.38], scale: [1, 1.06, 1] }}
+        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute bottom-[-10%] right-[-5%] h-[75vh] w-[75vh] rounded-full"
+        style={{
+          background: `radial-gradient(circle at 40% 40%, ${FV.magenta}22 0%, transparent 58%)`,
+          filter: 'blur(72px)',
+        }}
+        animate={{ opacity: [0.28, 0.52, 0.28] }}
+        transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+      />
+      <motion.div
+        className="absolute left-[-15%] top-[22%] h-[55vh] w-[55vh] rounded-full"
+        style={{
+          background: `radial-gradient(circle, ${FV.violet}24 0%, transparent 58%)`,
+          filter: 'blur(56px)',
+        }}
+        animate={{ opacity: [0.22, 0.48, 0.22] }}
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
+      />
+    </div>
+  )
+}
+
+/** شبكة سلكية + خطوط خفيفة تشبه خريطة معتمة */
+function WireframeMapBackdrop() {
+  return (
+    <svg
+      className="pointer-events-none fixed inset-0 -z-[19] h-full w-full"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden
+    >
+      <defs>
+        <pattern id="qv-hex" width="28" height="48" patternUnits="userSpaceOnUse" patternTransform="scale(1)">
+          <path
+            d="M14 0 L26 8 L26 24 L14 32 L2 24 L2 8 Z"
+            fill="none"
+            stroke="#00F2FE"
+            strokeOpacity="0.07"
+            strokeWidth="0.5"
+          />
+        </pattern>
+        <linearGradient id="qv-map-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00F2FE" stopOpacity="0.12" />
+          <stop offset="50%" stopColor="#4FACFE" stopOpacity="0.08" />
+          <stop offset="100%" stopColor="#DA22FF" stopOpacity="0.1" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#qv-hex)" />
+      <path
+        d="M12 78 Q 180 40 340 90 T 620 70 T 880 100 T 1080 85"
+        fill="none"
+        stroke="url(#qv-map-glow)"
+        strokeWidth="0.6"
+        strokeOpacity="0.35"
+      />
+      <path
+        d="M40 220 Q 260 180 480 210 T 900 195"
+        fill="none"
+        stroke="#00F2FE"
+        strokeOpacity="0.1"
+        strokeWidth="0.5"
+      />
+    </svg>
+  )
+}
+
+function PrismShieldLogo({ size = 56 }) {
+  return (
+    <motion.div
+      className="relative flex items-center justify-center rounded-2xl"
+      style={{
+        width: size,
+        height: size,
+        background: 'linear-gradient(145deg, rgba(0,242,254,0.15) 0%, rgba(79,172,254,0.12) 40%, rgba(218,34,255,0.1) 100%)',
+        boxShadow: `0 0 28px ${FV.cyan}44, inset 0 1px 0 rgba(255,255,255,0.15)`,
+        border: `1px solid ${FV.edge}`,
+      }}
+      animate={{ boxShadow: [`0 0 20px ${FV.cyan}33`, `0 0 36px ${FV.magenta}44`, `0 0 20px ${FV.cyan}33`] }}
+      transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" aria-hidden>
+        <defs>
+          <linearGradient id="prism-sh" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={FV.cyan} />
+            <stop offset="45%" stopColor={FV.violet} />
+            <stop offset="100%" stopColor={FV.magenta} />
+          </linearGradient>
+        </defs>
+        <path
+          d="M12 2 L20 8 L20 16 L12 22 L4 16 L4 8 Z"
+          fill="none"
+          stroke="url(#prism-sh)"
+          strokeWidth="1.4"
+          strokeLinejoin="miter"
+        />
+        <path d="M12 2 L12 22 M4 8 L20 16 M20 8 L4 16" stroke="url(#prism-sh)" strokeWidth="0.45" strokeOpacity="0.85" />
+      </svg>
+    </motion.div>
+  )
+}
+
+function CrystalEmeraldGlyph({ className = '' }) {
+  return (
+    <motion.svg
+      width={36}
+      height={36}
+      viewBox="0 0 36 36"
+      className={className}
+      animate={{ filter: ['drop-shadow(0 0 6px rgba(52,245,197,0.5))', 'drop-shadow(0 0 14px rgba(52,245,197,0.85))', 'drop-shadow(0 0 6px rgba(52,245,197,0.5))'] }}
+      transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="cg-em" cx="40%" cy="35%" r="60%">
+          <stop offset="0%" stopColor="#ECFDF5" stopOpacity="0.95" />
+          <stop offset="45%" stopColor={FV.emeraldCore} />
+          <stop offset="100%" stopColor="#047857" />
+        </radialGradient>
+      </defs>
+      <polygon points="18,4 32,12 32,24 18,32 4,24 4,12" fill="none" stroke={FV.emeraldCore} strokeWidth="1.2" strokeOpacity="0.9" />
+      <polygon points="18,9 27,14 27,22 18,27 9,22 9,14" fill="url(#cg-em)" opacity="0.95" />
+    </motion.svg>
+  )
+}
+
+function CrystalRubyGlyph({ className = '' }) {
+  return (
+    <motion.svg
+      width={36}
+      height={36}
+      viewBox="0 0 36 36"
+      className={className}
+      animate={{ filter: ['drop-shadow(0 0 6px rgba(255,45,107,0.45))', 'drop-shadow(0 0 14px rgba(255,45,107,0.8))', 'drop-shadow(0 0 6px rgba(255,45,107,0.45))'] }}
+      transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="cg-rb" cx="38%" cy="32%" r="62%">
+          <stop offset="0%" stopColor="#FFE4E9" stopOpacity="0.95" />
+          <stop offset="50%" stopColor={FV.rubyCore} />
+          <stop offset="100%" stopColor="#9F1239" />
+        </radialGradient>
+      </defs>
+      <polygon points="18,4 32,12 32,24 18,32 4,24 4,12" fill="none" stroke={FV.rubyCore} strokeWidth="1.2" strokeOpacity="0.95" />
+      <polygon points="18,9 27,14 27,22 18,27 9,22 9,14" fill="url(#cg-rb)" opacity="0.95" />
+    </motion.svg>
+  )
+}
+
+function SegmentedEnergyBar({ pct }) {
+  const n = 14
+  const filled = Math.round((pct / 100) * n)
+  return (
+    <div className="flex w-full items-center gap-1" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      {Array.from({ length: n }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="h-2.5 flex-1 rounded-sm"
+          initial={false}
+          animate={{
+            opacity: i < filled ? 1 : 0.2,
+            boxShadow:
+              i < filled
+                ? `0 0 10px ${i % 2 === 0 ? FV.cyan : FV.violet}88`
+                : 'none',
+          }}
+          style={{
+            background:
+              i < filled
+                ? `linear-gradient(180deg, ${i % 3 === 0 ? FV.cyan : i % 3 === 1 ? FV.violet : FV.magenta} 0%, ${FV.charcoal} 100%)`
+                : 'rgba(255,255,255,0.06)',
+            border: `1px solid ${i < filled ? FV.edgeSoft : 'rgba(255,255,255,0.06)'}`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const glassPanel =
+  'backdrop-blur-[20px] bg-white/[0.06] border border-cyan-400/20 shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]'
+
 function resolveShipmentCount(allStores, storeId) {
   if (storeId == null || !Array.isArray(allStores)) return null
   const s = allStores.find(
@@ -105,8 +321,53 @@ function resolveShipmentCount(allStores, storeId) {
   return Number.isFinite(n) ? Math.trunc(n) : 0
 }
 
-/** سهم رضا — أخضر باستيل / مرجان ناعم (بدون توهج عدواني) */
+/** سهم رضا — الوضع الفاتح (DS) أو النيون الزجاجي (تجريبي) */
 function StagingSatisfactionArrow({ arrow, resolvedDown }) {
+  if (IS_VITE_APP_STAGING) {
+    const base = `${glassPanel} rounded-2xl`
+    if (resolvedDown) {
+      return (
+        <span className={`inline-flex items-center gap-2 px-3 py-2.5 ${base}`}>
+          <motion.span
+            animate={{ opacity: [0.75, 1, 0.75] }}
+            transition={{ duration: 2.8, repeat: Infinity }}
+          >
+            <CheckCircle2 size={22} strokeWidth={2} style={{ color: FV.emeraldCore }} aria-hidden />
+          </motion.span>
+          <span className="text-xs font-black" style={{ color: FV.silver }}>
+            تم الحل
+          </span>
+        </span>
+      )
+    }
+    if (arrow === 'up') {
+      return (
+        <motion.span
+          className={`inline-flex items-center justify-center p-3 ${base}`}
+          animate={{ boxShadow: [`0 0 16px ${FV.cyan}33`, `0 0 28px ${FV.emeraldCore}44`, `0 0 16px ${FV.cyan}33`] }}
+          transition={{ duration: 3.5, repeat: Infinity }}
+        >
+          <ArrowBigUp size={26} strokeWidth={2.2} style={{ color: FV.emeraldCore }} aria-hidden />
+        </motion.span>
+      )
+    }
+    if (arrow === 'mid') {
+      return (
+        <span className={`inline-flex items-center justify-center p-3 ${base}`}>
+          <ArrowLeftRight size={24} strokeWidth={2.4} style={{ color: FV.violet }} aria-hidden />
+        </span>
+      )
+    }
+    return (
+      <motion.span
+        className={`inline-flex items-center justify-center p-3 ${base}`}
+        animate={{ boxShadow: [`0 0 14px ${FV.rubyCore}44`, `0 0 26px ${FV.magenta}55`, `0 0 14px ${FV.rubyCore}44`] }}
+        transition={{ duration: 2.8, repeat: Infinity }}
+      >
+        <ArrowBigDown size={26} strokeWidth={2.2} style={{ color: FV.rubyCore }} aria-hidden />
+      </motion.span>
+    )
+  }
   if (resolvedDown) {
     return (
       <span
@@ -260,8 +521,12 @@ function AnimatedStars({ value }) {
         >
           <Star
             size={20}
-            className={n <= v ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}
             strokeWidth={n <= v ? 0 : 1.5}
+            style={
+              n <= v
+                ? { color: FV.cyan, fill: FV.cyan, filter: `drop-shadow(0 0 6px ${FV.cyan}88)` }
+                : { color: FV.silverDim, fill: 'transparent', opacity: 0.45 }
+            }
           />
         </motion.span>
       ))}
@@ -356,7 +621,8 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
     >
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/40"
+        className="absolute inset-0 backdrop-blur-[2px]"
+        style={{ background: 'rgba(10,10,11,0.78)' }}
         aria-label="إغلاق"
         onClick={onClose}
       />
@@ -365,52 +631,66 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="relative h-full w-full max-w-[480px] flex flex-col bg-white shadow-2xl border-r"
-        style={{ borderColor: CARD_BORDER }}
+        className={`relative flex h-full w-full max-w-[480px] flex-col border-r shadow-[0_0_60px_rgba(0,242,254,0.08)] ${glassPanel}`}
+        style={{
+          borderColor: FV.edgeSoft,
+          background: 'linear-gradient(165deg, rgba(17,17,19,0.92) 0%, rgba(10,10,11,0.96) 100%)',
+        }}
       >
         <div
-          className="shrink-0 flex items-center justify-between gap-3 border-b bg-white px-5 py-4"
-          style={{ borderColor: CARD_BORDER }}
+          className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4"
+          style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.03)' }}
         >
           <div className="min-w-0">
-            <p className="text-lg font-black truncate" style={{ color: NAVY }}>
+            <p className="truncate text-lg font-black" style={{ color: FV.silver, textShadow: `0 0 20px ${FV.cyan}22` }}>
               {row.store_name}
             </p>
-            <p className="text-xs mt-0.5 tabular-nums" style={{ color: SLATE_SECONDARY }}>
+            <p className="mt-0.5 text-xs tabular-nums" style={{ color: FV.silverDim }}>
               #{row.store_id}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+            className="shrink-0 rounded-xl p-2 transition-colors hover:bg-white/10"
+            style={{ color: FV.silverDim }}
           >
             <X size={22} />
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-6">
-          <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-            <p className="text-xs font-black text-slate-500 uppercase tracking-wide">معلومات المكالمة</p>
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
+          <section className={`space-y-3 rounded-xl border p-4 ${glassPanel}`} style={{ borderColor: FV.edgeSoft }}>
+            <p className="text-xs font-black uppercase tracking-wide" style={{ color: FV.cyan }}>
+              معلومات المكالمة
+            </p>
             <div className="flex items-start gap-2 text-sm">
-              <User size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <User size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
               <div>
-                <span className="font-bold text-slate-700">الموظف: </span>
-                <span className="text-slate-900">{row.staff_fullname || row.staff_username || '—'}</span>
+                <span className="font-bold" style={{ color: FV.silverDim }}>
+                  الموظف:{' '}
+                </span>
+                <span style={{ color: FV.silver }}>{row.staff_fullname || row.staff_username || '—'}</span>
               </div>
             </div>
             <div className="flex items-start gap-2 text-sm">
-              <Calendar size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <Calendar size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
               <div>
-                <span className="font-bold text-slate-700">التاريخ والوقت: </span>
-                <span className="text-slate-900 tabular-nums">{fmtServerAt(row.created_at)}</span>
+                <span className="font-bold" style={{ color: FV.silverDim }}>
+                  التاريخ والوقت:{' '}
+                </span>
+                <span className="tabular-nums" style={{ color: FV.silver }}>
+                  {fmtServerAt(row.created_at)}
+                </span>
               </div>
             </div>
             <div className="flex items-start gap-2 text-sm">
-              <ClipboardList size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <ClipboardList size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
               <div>
-                <span className="font-bold text-slate-700">مرحلة المكالمة: </span>
-                <span className="text-slate-900">
+                <span className="font-bold" style={{ color: FV.silverDim }}>
+                  مرحلة المكالمة:{' '}
+                </span>
+                <span style={{ color: FV.silver }}>
                   {loading ? '…' : callStage != null ? `مكالمة ${callStage}` : 'غير محدد في السجل'}
                 </span>
               </div>
@@ -418,25 +698,35 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
           </section>
 
           <section>
-            <p className="text-xs font-black text-slate-500 mb-3">إجابات الاستبيان</p>
+            <p className="mb-3 text-xs font-black" style={{ color: FV.silverDim }}>
+              إجابات الاستبيان
+            </p>
             {row.survey_kind === 'new_merchant_onboarding' && row.answers && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {row.answers.map((a, i) => (
                   <div
                     key={i}
-                    className={`rounded-xl border p-3 flex flex-col gap-2 ${
-                      a.yes ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'
-                    }`}
+                    className={`flex flex-col gap-2 rounded-xl border p-3 ${glassPanel}`}
+                    style={{
+                      borderColor: a.yes ? `${FV.emeraldCore}55` : `${FV.rubyCore}55`,
+                      boxShadow: a.yes
+                        ? `0 0 18px ${FV.emeraldCore}18`
+                        : `0 0 18px ${FV.rubyCore}22`,
+                    }}
                   >
                     <div className="flex items-center justify-between gap-2">
                       {a.yes ? (
-                        <CheckCircle2 size={28} style={{ color: SUCCESS }} />
+                        <CheckCircle2 size={28} style={{ color: FV.emeraldCore }} />
                       ) : (
-                        <XCircle size={28} style={{ color: DANGER }} />
+                        <XCircle size={28} style={{ color: FV.rubyCore }} />
                       )}
                     </div>
-                    <p className="text-xs font-bold text-slate-800 leading-snug">{a.label}</p>
-                    <p className="text-[10px] text-slate-400 tabular-nums">{fmtServerAt(row.created_at)}</p>
+                    <p className="text-xs font-bold leading-snug" style={{ color: FV.silver }}>
+                      {a.label}
+                    </p>
+                    <p className="text-[10px] tabular-nums" style={{ color: FV.silverDim }}>
+                      {fmtServerAt(row.created_at)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -444,39 +734,60 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             {row.survey_kind === 'active_csat' && row.questions && (
               <>
                 {radarData.length > 0 && (
-                  <div className="h-[200px] w-full mb-4 rounded-xl border border-slate-200 p-2 bg-white" dir="ltr">
+                  <div
+                    className="mb-4 h-[200px] w-full rounded-xl border p-2 backdrop-blur-md"
+                    style={{ borderColor: FV.edgeSoft, background: 'rgba(0,242,254,0.04)' }}
+                    dir="ltr"
+                  >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                        <PolarGrid stroke="#e2e8f0" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b' }} />
-                        <PolarRadiusAxis angle={90} domain={[0, 5]} tickCount={6} tick={{ fontSize: 9 }} />
+                        <PolarGrid stroke="rgba(0,242,254,0.18)" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: FV.silverDim }} />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 5]}
+                          tickCount={6}
+                          tick={{ fontSize: 9, fill: FV.silverDim }}
+                        />
                         <Radar
                           name="A"
                           dataKey="score"
-                          stroke={DS.radarStroke}
-                          fill={DS.radarStroke}
-                          fillOpacity={0.22}
+                          stroke={FV.cyan}
+                          fill={FV.violet}
+                          fillOpacity={0.28}
                         />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {row.questions.map((q, i) => (
                     <div
                       key={i}
-                      className={`rounded-xl border p-3 ${
-                        q.risk === 'high'
-                          ? 'border-rose-200 bg-rose-50/40'
-                          : q.risk === 'mid'
-                            ? 'border-amber-200 bg-amber-50/40'
-                            : 'border-emerald-100 bg-emerald-50/30'
-                      }`}
+                      className={`rounded-xl border p-3 ${glassPanel}`}
+                      style={{
+                        borderColor:
+                          q.risk === 'high'
+                            ? `${FV.rubyCore}55`
+                            : q.risk === 'mid'
+                              ? 'rgba(251,191,36,0.45)'
+                              : `${FV.emeraldCore}40`,
+                        background:
+                          q.risk === 'high'
+                            ? 'rgba(218,34,255,0.06)'
+                            : q.risk === 'mid'
+                              ? 'rgba(251,191,36,0.06)'
+                              : 'rgba(52,245,197,0.05)',
+                      }}
                     >
-                      <p className="text-xs font-bold text-slate-800 mb-2">{q.label}</p>
+                      <p className="mb-2 text-xs font-bold" style={{ color: FV.silver }}>
+                        {q.label}
+                      </p>
                       <div className="flex items-center justify-between gap-2">
                         <AnimatedStars value={q.value} />
-                        <span className="text-sm font-black tabular-nums text-slate-700">{q.value}/5</span>
+                        <span className="text-sm font-black tabular-nums" style={{ color: FV.silver }}>
+                          {q.value}/5
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -485,15 +796,16 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             )}
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <p className="text-sm font-black" style={{ color: NAVY }}>
+          <section className={`rounded-xl border p-4 ${glassPanel}`} style={{ borderColor: FV.edgeSoft }}>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-black" style={{ color: FV.silver }}>
                 الملاحظات والتعليقات
               </p>
               <button
                 type="button"
                 onClick={() => void copyNote()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors hover:bg-white/10"
+                style={{ borderColor: FV.edgeSoft, color: FV.cyan, background: 'rgba(0,242,254,0.06)' }}
               >
                 <Copy size={14} />
                 نسخ الملاحظة
@@ -501,26 +813,46 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             </div>
             {(row.suggestions || '').trim() !== '' && (
               <div className="mb-3">
-                <p className="text-[11px] font-bold text-slate-500 mb-1">صوت المتجر (مسجّل)</p>
-                <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 rounded-lg p-3 bg-slate-50/80">
+                <p className="mb-1 text-[11px] font-bold" style={{ color: FV.silverDim }}>
+                  صوت المتجر (مسجّل)
+                </p>
+                <p
+                  className="rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap"
+                  style={{
+                    borderColor: FV.edgeSoft,
+                    background: 'rgba(255,255,255,0.04)',
+                    color: FV.silver,
+                  }}
+                >
                   {(row.suggestions || '').trim()}
                 </p>
               </div>
             )}
             {latestCallNote?.text ? (
               <div>
-                <p className="text-[11px] font-bold text-slate-500 mb-1">ملاحظة المكالمة (الموظف)</p>
-                <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-100 rounded-lg p-3 bg-slate-50/80">
+                <p className="mb-1 text-[11px] font-bold" style={{ color: FV.silverDim }}>
+                  ملاحظة المكالمة (الموظف)
+                </p>
+                <p
+                  className="rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap"
+                  style={{
+                    borderColor: FV.edgeSoft,
+                    background: 'rgba(255,255,255,0.04)',
+                    color: FV.silver,
+                  }}
+                >
                   {latestCallNote.text}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-1 tabular-nums">
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: FV.silverDim }}>
                   {latestCallNote.by ? `${latestCallNote.by} — ` : ''}
                   {fmtServerAt(latestCallNote.at)}
                 </p>
               </div>
             ) : (
               !((row.suggestions || '').trim()) && (
-                <p className="text-sm text-slate-400">لا توجد ملاحظات نصية في هذا السجل.</p>
+                <p className="text-sm" style={{ color: FV.silverDim }}>
+                  لا توجد ملاحظات نصية في هذا السجل.
+                </p>
               )
             )}
           </section>
@@ -528,18 +860,19 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
 
         {row.arrow === 'down' && !row.resolved && (
           <div
-            className="shrink-0 border-t px-5 py-4 bg-white"
-            style={{ borderColor: CARD_BORDER }}
+            className="shrink-0 border-t px-5 py-4"
+            style={{ borderColor: FV.edgeSoft, background: 'rgba(10,10,11,0.9)' }}
           >
             <button
               type="button"
               onClick={() => onResolve?.(row.id)}
               disabled={resolveBusy}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition-opacity disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black shadow-lg transition-opacity disabled:opacity-60"
               style={{
-                background: `linear-gradient(180deg, ${DS.success.light} 0%, ${DS.success.soft} 100%)`,
-                color: DS.brand,
-                border: `1px solid ${DS.border}`,
+                background: `linear-gradient(135deg, ${FV.emeraldCore}33 0%, ${FV.cyan}44 50%, ${FV.violet}33 100%)`,
+                color: FV.silver,
+                border: `1px solid ${FV.edge}`,
+                boxShadow: `0 0 24px ${FV.emeraldCore}33`,
               }}
             >
               {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
@@ -549,8 +882,13 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         )}
         {row.arrow === 'down' && row.resolved && (
           <div
-            className="shrink-0 border-t px-5 py-3 text-center text-sm font-bold bg-emerald-50/90"
-            style={{ borderColor: DS.border, color: DS.success.solid }}
+            className="shrink-0 border-t px-5 py-3 text-center text-sm font-bold"
+            style={{
+              borderColor: FV.edgeSoft,
+              color: FV.emeraldCore,
+              background: 'rgba(52,245,197,0.1)',
+              boxShadow: `inset 0 0 24px ${FV.emeraldCore}14`,
+            }}
           >
             تم تسجيل حل هذه المشكلة ✅
           </div>
@@ -720,98 +1058,112 @@ export default function QuickVerification() {
 
   return (
     <div
-      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-8 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
+      className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] space-y-6 pb-10 px-3 md:px-5 pt-2' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
         fontFamily: "'Cairo', sans-serif",
-        ...(IS_VITE_APP_STAGING ? { background: PAGE_BG_STAGING } : {}),
+        ...(IS_VITE_APP_STAGING ? { background: 'transparent' } : {}),
       }}
     >
+      {IS_VITE_APP_STAGING ? (
+        <>
+          <FuturisticAmbientBg />
+          <WireframeMapBackdrop />
+        </>
+      ) : null}
+
       {/* رأس الصفحة */}
       {IS_VITE_APP_STAGING ? (
-        <div
-          className="rounded-2xl border bg-white px-5 py-6"
-          style={{
-            borderColor: DS.border,
-            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.04)',
-          }}
-        >
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+        <div className={`relative overflow-hidden rounded-2xl px-5 py-6 md:px-7 md:py-7 ${glassPanel}`}>
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              background:
+                'linear-gradient(125deg, rgba(255,255,255,0.12) 0%, transparent 42%, rgba(0,242,254,0.06) 100%)',
+            }}
+            aria-hidden
+          />
+          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start gap-4 min-w-0">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-                style={{
-                  background: `linear-gradient(155deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)`,
-                  border: `1px solid ${DS.border}`,
-                  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.14)',
-                }}
-              >
-                <ShieldCheck size={28} className="text-white" strokeWidth={2.2} />
-              </div>
-              <div>
+              <PrismShieldLogo size={56} />
+              <div className="min-w-0">
                 <h1
-                  className="text-2xl font-black tracking-tight leading-tight"
-                  style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                  className="text-2xl font-black tracking-tight md:text-3xl"
+                  style={{
+                    color: FV.silver,
+                    fontFeatureSettings: '"kern" 1',
+                    textShadow: `0 0 40px ${FV.cyan}33`,
+                  }}
                 >
                   التحقق السريع
                 </h1>
-                <p className="text-sm mt-1.5 font-medium" style={{ color: DS.textSecondary }}>
+                <p className="mt-1.5 text-sm font-medium" style={{ color: FV.silverDim }}>
                   لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black border bg-white"
-                style={{ borderColor: DS.border, color: DS.text }}
+                className={`inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black ${glassPanel}`}
+                style={{ color: FV.silver }}
               >
-                <LayoutGrid size={18} style={{ color: DS.textMuted }} aria-hidden />
+                <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.6, repeat: Infinity }}>
+                  <LayoutGrid size={18} style={{ color: FV.cyan }} strokeWidth={1.8} aria-hidden />
+                </motion.span>
                 الإجمالي
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: 'rgba(148, 163, 184, 0.14)', color: DS.brand }}
+                  style={{
+                    background: 'rgba(0,242,254,0.12)',
+                    color: FV.silver,
+                    border: `1px solid ${FV.edgeSoft}`,
+                  }}
                 >
                   {satStats.total}
                 </span>
               </span>
-              <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white"
-                style={{ borderColor: DS.border, color: DS.text }}
-              >
-                <Smile size={18} style={{ color: DS.success.solid }} strokeWidth={2.4} aria-hidden />
-                راضٍ
-                <ArrowBigUp size={16} style={{ color: DS.success.solid }} className="opacity-90" aria-hidden />
+              <span className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-black ${glassPanel}`}>
+                <CrystalEmeraldGlyph />
+                <span style={{ color: FV.silver }}>راضٍ</span>
+                <ArrowBigUp size={16} style={{ color: FV.emeraldCore }} aria-hidden />
                 <span
-                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: DS.success.light, color: DS.brand }}
+                  className="tabular-nums rounded-lg px-2 py-0.5 font-black"
+                  style={{
+                    background: 'rgba(52,245,197,0.1)',
+                    color: FV.emeraldCore,
+                    border: `1px solid rgba(52,245,197,0.25)`,
+                  }}
                 >
                   {satStats.sat}
                 </span>
               </span>
-              <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white"
-                style={{ borderColor: DS.border, color: DS.text }}
-              >
-                <Frown size={18} style={{ color: DS.danger.solid }} strokeWidth={2.4} aria-hidden />
-                غير راضٍ
-                <ArrowBigDown size={16} style={{ color: DS.danger.solid }} className="opacity-90" aria-hidden />
+              <span className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-black ${glassPanel}`}>
+                <CrystalRubyGlyph />
+                <span style={{ color: FV.silver }}>غير راضٍ</span>
+                <ArrowBigDown size={16} style={{ color: FV.rubyCore }} aria-hidden />
                 <span
-                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: DS.danger.light, color: DS.brand }}
+                  className="tabular-nums rounded-lg px-2 py-0.5 font-black"
+                  style={{
+                    background: 'rgba(255,45,107,0.1)',
+                    color: FV.rubyCore,
+                    border: `1px solid rgba(255,45,107,0.28)`,
+                  }}
                 >
                   {satStats.uns}
                 </span>
               </span>
-              <button
+              <motion.button
                 type="button"
                 onClick={() => void loadAll()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                style={{ color: DS.brand, borderColor: DS.border }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${glassPanel}`}
+                style={{ color: FV.silver, borderColor: FV.edge }}
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
                 تحديث
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
@@ -857,42 +1209,73 @@ export default function QuickVerification() {
       )}
 
       <div
-        className="flex flex-wrap gap-2 rounded-2xl border p-2"
-        style={{ borderColor: DS.border, background: 'rgba(255,255,255,0.7)' }}
+        className={`flex flex-wrap gap-2 rounded-2xl p-2 ${IS_VITE_APP_STAGING ? glassPanel : 'border'}`}
+        style={
+          IS_VITE_APP_STAGING
+            ? undefined
+            : { borderColor: DS.border, background: 'rgba(255,255,255,0.7)' }
+        }
       >
         <button
           type="button"
           onClick={() => setMainTab('onboarding')}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            mainTab === 'onboarding'
-              ? 'bg-white shadow-sm border text-slate-900'
-              : 'text-slate-600 hover:bg-white/90 border border-transparent'
+            IS_VITE_APP_STAGING
+              ? mainTab === 'onboarding'
+                ? 'border text-white shadow-[0_0_20px_rgba(0,242,254,0.25)]'
+                : 'border border-transparent text-slate-400 hover:bg-white/5'
+              : mainTab === 'onboarding'
+                ? 'bg-white shadow-sm border text-slate-900'
+                : 'text-slate-600 hover:bg-white/90 border border-transparent'
           }`}
-          style={mainTab === 'onboarding' ? { borderColor: DS.border } : undefined}
+          style={
+            IS_VITE_APP_STAGING
+              ? mainTab === 'onboarding'
+                ? {
+                    borderColor: FV.edge,
+                    background: `linear-gradient(135deg, rgba(0,242,254,0.15) 0%, rgba(218,34,255,0.1) 100%)`,
+                  }
+                : undefined
+              : mainTab === 'onboarding'
+                ? { borderColor: DS.border }
+                : undefined
+          }
         >
-          <Store size={18} />
+          <Store size={18} style={IS_VITE_APP_STAGING ? { color: FV.cyan } : undefined} strokeWidth={1.8} />
           متاجر جدد (تهيئة)
         </button>
         <button
           type="button"
           onClick={() => setMainTab('active_csat')}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            mainTab === 'active_csat'
-              ? 'bg-white shadow-sm border text-slate-900'
-              : 'text-slate-600 hover:bg-white/90 border border-transparent'
+            IS_VITE_APP_STAGING
+              ? mainTab === 'active_csat'
+                ? 'border text-white shadow-[0_0_20px_rgba(79,172,254,0.28)]'
+                : 'border border-transparent text-slate-400 hover:bg-white/5'
+              : mainTab === 'active_csat'
+                ? 'bg-white shadow-sm border text-slate-900'
+                : 'text-slate-600 hover:bg-white/90 border border-transparent'
           }`}
-          style={mainTab === 'active_csat' ? { borderColor: DS.border } : undefined}
+          style={
+            IS_VITE_APP_STAGING
+              ? mainTab === 'active_csat'
+                ? {
+                    borderColor: FV.edge,
+                    background: `linear-gradient(135deg, rgba(79,172,254,0.18) 0%, rgba(218,34,255,0.12) 100%)`,
+                  }
+                : undefined
+              : mainTab === 'active_csat'
+                ? { borderColor: DS.border }
+                : undefined
+          }
         >
-          <Truck size={18} />
+          <Truck size={18} style={IS_VITE_APP_STAGING ? { color: FV.violet } : undefined} strokeWidth={1.8} />
           تجار نشطون (CSAT)
         </button>
       </div>
 
       {IS_VITE_APP_STAGING && (
-        <div
-          className="flex flex-wrap gap-2 rounded-2xl border bg-white p-2"
-          style={{ borderColor: DS.border, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}
-        >
+        <div className={`flex flex-wrap gap-2 rounded-2xl p-2 ${glassPanel}`}>
           {[
             { id: 'all', label: 'الكل' },
             { id: 'down', label: 'غير راضٍ 🔽' },
@@ -903,13 +1286,14 @@ export default function QuickVerification() {
               type="button"
               onClick={() => setSatTab(t.id)}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                satTab === t.id
-                  ? 'text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50'
+                satTab === t.id ? 'text-white shadow-[0_0_18px_rgba(0,242,254,0.35)]' : 'text-slate-400 hover:bg-white/5'
               }`}
               style={
                 satTab === t.id
-                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  ? {
+                      background: `linear-gradient(100deg, ${FV.cyan}22 0%, ${FV.magenta}18 100%)`,
+                      border: `1px solid ${FV.edge}`,
+                    }
                   : undefined
               }
             >
@@ -920,20 +1304,21 @@ export default function QuickVerification() {
       )}
 
       {IS_VITE_APP_STAGING && (
-        <div
-          className="flex flex-col gap-3 rounded-2xl border bg-white p-3 md:flex-row md:items-stretch md:justify-between"
-          style={{ borderColor: DS.border, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}
-        >
+        <div className={`flex flex-col gap-3 rounded-2xl p-3 md:flex-row md:items-stretch md:justify-between ${glassPanel}`}>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setAuditViewTab('active')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
-                auditViewTab === 'active' ? 'text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                auditViewTab === 'active' ? 'text-white' : 'text-slate-400 hover:bg-white/5'
               }`}
               style={
                 auditViewTab === 'active'
-                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  ? {
+                      background: `linear-gradient(100deg, rgba(0,242,254,0.2) 0%, rgba(79,172,254,0.15) 100%)`,
+                      border: `1px solid ${FV.edge}`,
+                      boxShadow: `0 0 22px ${FV.cyan}22`,
+                    }
                   : undefined
               }
             >
@@ -943,11 +1328,15 @@ export default function QuickVerification() {
               type="button"
               onClick={() => setAuditViewTab('resolved')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
-                auditViewTab === 'resolved' ? 'text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                auditViewTab === 'resolved' ? 'text-white' : 'text-slate-400 hover:bg-white/5'
               }`}
               style={
                 auditViewTab === 'resolved'
-                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  ? {
+                      background: `linear-gradient(100deg, rgba(218,34,255,0.18) 0%, rgba(79,172,254,0.14) 100%)`,
+                      border: `1px solid ${FV.edge}`,
+                      boxShadow: `0 0 22px ${FV.magenta}28`,
+                    }
                   : undefined
               }
             >
@@ -958,7 +1347,7 @@ export default function QuickVerification() {
             <Search
               className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2"
               size={18}
-              style={{ color: DS.textMuted }}
+              style={{ color: FV.cyan }}
               aria-hidden
             />
             <input
@@ -966,8 +1355,11 @@ export default function QuickVerification() {
               value={quickSearch}
               onChange={e => setQuickSearch(e.target.value)}
               placeholder="بحث فوري: اسم المتجر أو كود المتجر…"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pr-10 pl-3 text-sm font-medium outline-none transition-colors focus:border-teal-700/30 focus:bg-white focus:ring-2 focus:ring-teal-900/10"
-              style={{ color: DS.text }}
+              className={`w-full rounded-xl py-2.5 pr-10 pl-3 text-sm font-medium outline-none transition-all ${glassPanel}`}
+              style={{
+                color: FV.silver,
+                borderColor: FV.edgeSoft,
+              }}
               autoComplete="off"
             />
           </div>
@@ -975,40 +1367,77 @@ export default function QuickVerification() {
       )}
 
       {err && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">{err}</p>
+        <p
+          className={`text-sm rounded-xl px-4 py-2 ${IS_VITE_APP_STAGING ? `${glassPanel} text-amber-200 border-amber-400/30` : 'text-amber-800 bg-amber-50 border border-amber-200'}`}
+        >
+          {err}
+        </p>
       )}
 
-      <section className="rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 lg:p-5 text-white shadow-lg ring-1 ring-white/5">
-        <h2 className="text-sm font-black text-slate-100 mb-3 tracking-tight">
+      <section
+        className={
+          IS_VITE_APP_STAGING
+            ? `relative overflow-hidden rounded-2xl p-4 lg:p-6 ${glassPanel}`
+            : 'rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 lg:p-5 text-white shadow-lg ring-1 ring-white/5'
+        }
+      >
+        {IS_VITE_APP_STAGING ? (
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.07]"
+            style={{
+              background:
+                'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,242,254,0.4) 2px, rgba(0,242,254,0.4) 3px)',
+            }}
+            aria-hidden
+          />
+        ) : null}
+        <h2
+          className={`text-sm font-black mb-3 tracking-tight ${IS_VITE_APP_STAGING ? 'relative text-cyan-100/95' : 'text-slate-100'}`}
+        >
           ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
         </h2>
         {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-slate-400 text-sm">
+          <div
+            className={`relative z-10 flex items-center justify-center gap-2 py-8 text-sm ${IS_VITE_APP_STAGING ? 'text-slate-400' : 'text-slate-400'}`}
+          >
             <Loader2 size={20} className="animate-spin" />
             جارٍ التحميل…
           </div>
         ) : !currentStaff?.length ? (
-          <p className="text-slate-500 text-sm py-6 text-center">لا توجد بيانات موظفين اليوم في هذا القسم.</p>
+          <p
+            className={`relative z-10 text-sm py-6 text-center ${IS_VITE_APP_STAGING ? 'text-slate-500' : 'text-slate-500'}`}
+          >
+            لا توجد بيانات موظفين اليوم في هذا القسم.
+          </p>
         ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+          <ul className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
             {currentStaff.map(row => {
               const arrow = row.satisfaction_arrow
               const up = arrow === 'up'
               const mid = arrow === 'mid'
+              const fx = IS_VITE_APP_STAGING
               return (
                 <li
                   key={row.username || row.fullname}
-                  className="rounded-xl border border-slate-600/40 bg-slate-800/35 px-3 py-2.5 flex items-center justify-between gap-2 backdrop-blur-sm"
+                  className={
+                    fx
+                      ? `rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 ${glassPanel}`
+                      : 'rounded-xl border border-slate-600/40 bg-slate-800/35 px-3 py-2.5 flex items-center justify-between gap-2 backdrop-blur-sm'
+                  }
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-slate-50 text-sm truncate">{row.fullname || row.username}</p>
-                    <p className="text-[10px] text-slate-400 truncate">
+                    <p
+                      className={`font-bold text-sm truncate ${fx ? 'text-slate-100' : 'text-slate-50'}`}
+                    >
+                      {row.fullname || row.username}
+                    </p>
+                    <p className={`text-[10px] truncate ${fx ? 'text-slate-500' : 'text-slate-400'}`}>
                       {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 shrink-0 cursor-pointer rounded-lg hover:bg-white/10 p-1 -m-1 transition-colors"
+                    className={`flex items-center gap-1.5 shrink-0 cursor-pointer rounded-lg p-1 -m-1 transition-colors ${fx ? 'hover:bg-white/5' : 'hover:bg-white/10'}`}
                     onClick={() => {
                       const u = row.username
                       const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
@@ -1020,11 +1449,36 @@ export default function QuickVerification() {
                     title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
                   >
                     {up ? (
-                      <ArrowBigUp size={22} strokeWidth={2.5} style={{ color: '#34D399' }} aria-hidden />
+                      <motion.span
+                        animate={fx ? { filter: ['drop-shadow(0 0 4px rgba(52,245,197,0.4))', 'drop-shadow(0 0 12px rgba(52,245,197,0.85))'] } : undefined}
+                        transition={fx ? { duration: 2.4, repeat: Infinity, repeatType: 'reverse' } : undefined}
+                      >
+                        <ArrowBigUp
+                          size={22}
+                          strokeWidth={2.5}
+                          style={{ color: fx ? FV.emeraldCore : '#34D399' }}
+                          aria-hidden
+                        />
+                      </motion.span>
                     ) : mid ? (
-                      <ArrowLeftRight size={22} strokeWidth={2.5} style={{ color: DS.amber.muted }} aria-hidden />
+                      <ArrowLeftRight
+                        size={22}
+                        strokeWidth={2.5}
+                        style={{ color: fx ? FV.violet : DS.amber.muted }}
+                        aria-hidden
+                      />
                     ) : (
-                      <ArrowBigDown size={22} strokeWidth={2.5} style={{ color: '#FB7185' }} aria-hidden />
+                      <motion.span
+                        animate={fx ? { filter: ['drop-shadow(0 0 6px rgba(255,0,85,0.55))', 'drop-shadow(0 0 16px rgba(255,45,107,0.95))'] } : undefined}
+                        transition={fx ? { duration: 1.8, repeat: Infinity, repeatType: 'reverse' } : undefined}
+                      >
+                        <ArrowBigDown
+                          size={22}
+                          strokeWidth={2.5}
+                          style={{ color: fx ? FV.rubyCore : '#FB7185' }}
+                          aria-hidden
+                        />
+                      </motion.span>
                     )}
                   </button>
                 </li>
@@ -1036,38 +1490,31 @@ export default function QuickVerification() {
 
       {IS_VITE_APP_STAGING && (
         <section className="mx-auto w-full max-w-6xl" aria-label="لوحة إنجازات المدير">
-          <div
-            className="rounded-2xl border bg-gradient-to-b from-white to-slate-50/90 p-4 md:p-6"
-            style={{
-              borderColor: DS.border,
-              boxShadow: '0 1px 2px rgba(15,23,42,0.05), 0 16px 40px rgba(15,23,42,0.06)',
-            }}
-          >
+          <div className={`rounded-2xl p-4 md:p-6 ${glassPanel}`}>
             <p
-              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.14em] md:text-xs"
-              style={{ color: DS.textMuted }}
+              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.18em] md:text-xs"
+              style={{ color: FV.silverDim }}
             >
               لوحة إنجازات المدير
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
-              <div
-                className="flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
-                style={{ borderColor: DS.border }}
-              >
+              <div className={`flex flex-col rounded-xl p-4 md:p-5 ${glassPanel}`}>
                 <div className="flex items-start gap-3">
-                  <div
+                  <motion.div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: DS.statWellRed }}
+                    style={{ background: 'rgba(255,45,107,0.12)', border: `1px solid ${FV.rubyCore}44` }}
+                    animate={{ boxShadow: [`0 0 12px ${FV.rubyCore}33`, `0 0 22px ${FV.magenta}44`] }}
+                    transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse' }}
                   >
-                    <AlertCircle size={24} strokeWidth={2.2} style={{ color: ACHIEVE_RED }} aria-hidden />
-                  </div>
+                    <AlertCircle size={24} strokeWidth={2} style={{ color: FV.rubyCore }} aria-hidden />
+                  </motion.div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: DS.text }}>
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: FV.silverDim }}>
                       إجمالي المشاكل المكتشفة
                     </p>
                     <p
                       className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: DS.text }}
+                      style={{ color: FV.silver, textShadow: `0 0 24px ${FV.cyan}22` }}
                     >
                       {execMetrics.totalProblems}
                     </p>
@@ -1075,24 +1522,23 @@ export default function QuickVerification() {
                 </div>
               </div>
 
-              <div
-                className="flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
-                style={{ borderColor: DS.border }}
-              >
+              <div className={`flex flex-col rounded-xl p-4 md:p-5 ${glassPanel}`}>
                 <div className="flex items-start gap-3">
-                  <div
+                  <motion.div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: DS.statWellGreen }}
+                    style={{ background: 'rgba(52,245,197,0.1)', border: `1px solid ${FV.emeraldCore}44` }}
+                    animate={{ boxShadow: [`0 0 12px ${FV.emeraldCore}33`, `0 0 22px ${FV.cyan}44`] }}
+                    transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse', delay: 0.5 }}
                   >
-                    <CheckCircle2 size={24} strokeWidth={2.2} style={{ color: ACHIEVE_GREEN }} aria-hidden />
-                  </div>
+                    <CheckCircle2 size={24} strokeWidth={2} style={{ color: FV.emeraldCore }} aria-hidden />
+                  </motion.div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: DS.text }}>
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: FV.silverDim }}>
                       مشاكل تم حلها
                     </p>
                     <p
                       className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: DS.text }}
+                      style={{ color: FV.silver, textShadow: `0 0 24px ${FV.emeraldCore}22` }}
                     >
                       {execMetrics.resolvedProblems}
                     </p>
@@ -1100,32 +1546,19 @@ export default function QuickVerification() {
                 </div>
               </div>
 
-              <div
-                className="flex flex-col justify-between rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
-                style={{ borderColor: DS.border }}
-              >
-                <p className="text-sm font-bold md:text-[15px]" style={{ color: DS.text }}>
+              <div className={`flex flex-col justify-between rounded-xl p-4 md:p-5 ${glassPanel}`}>
+                <p className="text-sm font-bold md:text-[15px]" style={{ color: FV.silverDim }}>
                   نسبة الإنجاز %
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <span className="text-3xl font-black tabular-nums md:text-4xl" style={{ color: DS.text }}>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <span
+                    className="text-3xl font-black tabular-nums md:text-4xl shrink-0"
+                    style={{ color: FV.silver }}
+                  >
                     {execMetrics.pct}%
                   </span>
-                  <div
-                    className="h-3 min-w-[140px] flex-1 overflow-hidden rounded-full ring-1 ring-slate-200/80"
-                    style={{ background: DS.bgPage }}
-                    role="progressbar"
-                    aria-valuenow={execMetrics.pct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all duration-500 ease-out"
-                      style={{
-                        width: `${execMetrics.pct}%`,
-                        background: `linear-gradient(90deg, ${DS.progressFrom}, ${DS.progressTo})`,
-                      }}
-                    />
+                  <div className="min-w-0 flex-1 pt-1">
+                    <SegmentedEnergyBar pct={execMetrics.pct} />
                   </div>
                 </div>
               </div>
@@ -1137,10 +1570,9 @@ export default function QuickVerification() {
       <section
         className={
           IS_VITE_APP_STAGING
-            ? 'rounded-2xl border shadow-sm overflow-hidden'
+            ? `rounded-2xl overflow-hidden ${glassPanel}`
             : 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
         }
-        style={IS_VITE_APP_STAGING ? { borderColor: DS.border, background: DS.bgPage } : undefined}
       >
         {!IS_VITE_APP_STAGING && (
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
@@ -1152,13 +1584,13 @@ export default function QuickVerification() {
         )}
         {IS_VITE_APP_STAGING && (
           <div
-            className="px-5 py-4 border-b bg-white flex flex-wrap items-center justify-between gap-2"
-            style={{ borderColor: DS.border }}
+            className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4"
+            style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.03)' }}
           >
-            <h2 className="text-base font-black" style={{ color: DS.brand }}>
+            <h2 className="text-base font-black" style={{ color: FV.silver }}>
               {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
             </h2>
-            <span className="text-xs font-bold tabular-nums" style={{ color: DS.textSecondary }}>
+            <span className="text-xs font-bold tabular-nums" style={{ color: FV.silverDim }}>
               {stagingDisplayRows.length} عرض
             </span>
           </div>
@@ -1170,7 +1602,7 @@ export default function QuickVerification() {
           </div>
         ) : IS_VITE_APP_STAGING ? (
           stagingDisplayRows.length === 0 ? (
-            <p className="text-slate-500 text-sm py-12 text-center px-4">
+            <p className="py-12 text-center px-4 text-sm" style={{ color: FV.silverDim }}>
               {auditViewTab === 'active'
                 ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
                 : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
@@ -1198,7 +1630,10 @@ export default function QuickVerification() {
                         y: 0,
                         ...(isHighRisk
                           ? {
-                              boxShadow: [`0 0 0 0px ${DS.riskPulse}`, `0 0 0 6px ${DS.riskPulse}`],
+                              boxShadow: [
+                                '0 0 0 0px rgba(255,45,107,0.25)',
+                                '0 0 0 8px rgba(218,34,255,0.35)',
+                              ],
                             }
                           : {}),
                       }}
@@ -1221,14 +1656,14 @@ export default function QuickVerification() {
                         scale: 0.98,
                         transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] },
                       }}
-                      className="group mb-4 rounded-2xl border bg-white px-4 py-4 md:px-5 md:py-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                      className={`group mb-4 rounded-2xl px-4 py-4 md:px-5 md:py-4 transition-all duration-300 hover:-translate-y-0.5 ${glassPanel}`}
                       style={{
                         borderWidth: isHighRisk ? 2 : 1,
-                        borderColor: isHighRisk ? DS.riskBorder : CARD_BORDER,
+                        borderColor: isHighRisk ? 'rgba(255,45,107,0.55)' : FV.edgeSoft,
                         ...(resolvedDown && !isHighRisk
                           ? {
-                              borderColor: DS.success.border,
-                              boxShadow: `0 0 0 1px ${DS.success.border}`,
+                              borderColor: `${FV.emeraldCore}66`,
+                              boxShadow: `0 0 20px ${FV.emeraldCore}22`,
                             }
                           : {}),
                       }}
@@ -1240,14 +1675,14 @@ export default function QuickVerification() {
                               <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                 <span
                                   className="max-w-full text-xl font-black leading-tight tracking-tight md:text-2xl"
-                                  style={{ color: DS.brand, fontFeatureSettings: '"kern" 1' }}
+                                  style={{ color: FV.silver, fontFeatureSettings: '"kern" 1' }}
                                   title={row.store_name}
                                 >
                                   {row.store_name}
                                 </span>
                                 <span
                                   className="text-sm font-semibold tabular-nums md:text-base"
-                                  style={{ color: DS.textMuted }}
+                                  style={{ color: FV.silverDim }}
                                 >
                                   #{row.store_id}
                                 </span>
@@ -1256,9 +1691,10 @@ export default function QuickVerification() {
                                 <span
                                   className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black uppercase tracking-wide"
                                   style={{
-                                    borderColor: DS.danger.border,
-                                    background: DS.danger.light,
-                                    color: DS.danger.solid,
+                                    borderColor: 'rgba(255,45,107,0.5)',
+                                    background: 'rgba(218,34,255,0.12)',
+                                    color: FV.rubyCore,
+                                    boxShadow: `0 0 14px ${FV.rubyCore}44`,
                                   }}
                                 >
                                   <Flame size={12} className="shrink-0" aria-hidden />
@@ -1267,21 +1703,21 @@ export default function QuickVerification() {
                               ) : null}
                             </div>
                             {auditViewTab === 'resolved' ? (
-                              <p className="mt-2 text-xs font-bold" style={{ color: DS.success.solid }}>
+                              <p className="mt-2 text-xs font-bold" style={{ color: FV.emeraldCore }}>
                                 مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
                               </p>
                             ) : null}
                           </div>
                           <div
                             className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
-                            style={{ borderColor: DS.border, background: DS.surface }}
+                            style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.04)' }}
                             title="عدد الشحنات (من بيانات المتجر)"
                           >
-                            <Package size={17} style={{ color: DS.textSecondary }} className="shrink-0" aria-hidden />
-                            <span className="text-[11px] font-bold" style={{ color: DS.textSecondary }}>
+                            <Package size={17} style={{ color: FV.cyan }} className="shrink-0" aria-hidden />
+                            <span className="text-[11px] font-bold" style={{ color: FV.silverDim }}>
                               الشحنات
                             </span>
-                            <span className="text-base font-black tabular-nums" style={{ color: DS.text }}>
+                            <span className="text-base font-black tabular-nums" style={{ color: FV.silver }}>
                               {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
                             </span>
                           </div>
@@ -1289,7 +1725,7 @@ export default function QuickVerification() {
 
                         <div
                           className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
-                          style={{ borderColor: DS.border }}
+                          style={{ borderColor: 'rgba(0,242,254,0.12)' }}
                         >
                           <div className="flex items-center justify-center shrink-0">
                             <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
@@ -1297,15 +1733,15 @@ export default function QuickVerification() {
                           <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
                             <p
                               className="truncate flex-1 text-right text-xs font-medium lg:text-right"
-                              style={{ color: DS.textSecondary }}
+                              style={{ color: FV.silverDim }}
                             >
                               {textSnippet(row.suggestions, 24) || '—'}
                             </p>
                             <button
                               type="button"
                               onClick={() => setModalRow(row)}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors hover:bg-slate-50"
-                              style={{ borderColor: DS.border, color: DS.brand }}
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors hover:bg-white/5"
+                              style={{ borderColor: FV.edge, color: FV.cyan }}
                             >
                               عرض التفاصيل
                               <ChevronLeft size={14} className="opacity-70" />
