@@ -35,10 +35,17 @@ try {
         survey_id INT NOT NULL PRIMARY KEY,
         resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         resolved_by VARCHAR(100) NULL DEFAULT NULL,
+        executive_notes TEXT NULL DEFAULT NULL,
         INDEX idx_resolved_at (resolved_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (Throwable $e) {
     // ignore; SELECT may fail below if DB unavailable
+}
+
+try {
+    $pdo->exec('ALTER TABLE quick_verification_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+} catch (Throwable $e) {
+    // العمود موجود
 }
 
 $labelsOnb = ['إدخال الشحنات', 'أداء التطبيق', 'المهام اللوجستية'];
@@ -61,7 +68,8 @@ try {
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
           s.performed_by, s.submitted_username, s.created_at,
-          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by
+          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by,
+          qvr.executive_notes AS qv_executive_notes
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
@@ -122,6 +130,7 @@ try {
             'resolved' => $resolved,
             'resolved_at' => $resolved ? $r['qv_resolved_at'] : null,
             'resolved_by' => $resolved ? trim((string) ($r['qv_resolved_by'] ?? '')) : null,
+            'executive_notes' => $resolved ? trim((string) ($r['qv_executive_notes'] ?? '')) : null,
         ];
     }
 
@@ -132,7 +141,8 @@ try {
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
           s.performed_by, s.submitted_username, s.created_at,
-          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by
+          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by,
+          qvr.executive_notes AS qv_executive_notes
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
@@ -212,6 +222,7 @@ try {
             'resolved' => $resolved,
             'resolved_at' => $resolved ? $r['qv_resolved_at'] : null,
             'resolved_by' => $resolved ? trim((string) ($r['qv_resolved_by'] ?? '')) : null,
+            'executive_notes' => $resolved ? trim((string) ($r['qv_executive_notes'] ?? '')) : null,
         ];
     }
 } catch (Throwable $e) {
