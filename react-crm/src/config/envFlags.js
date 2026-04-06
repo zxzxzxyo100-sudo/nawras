@@ -1,8 +1,7 @@
 /**
- * سلوك «مسار المهام v2» (إخفاء «تم»، إتمام عبر حفظ المكالمة فقط، لوحة الرضا):
- * يُفعَّل في التطوير المحلي أو بناء التجريبي (__STAGING__).
- * ملاحظة: في Vite، `import.meta.env.DEV` يعادل NODE_ENV=development؛
- * البناء التجريبي يكون عادةً production لذا نعتمد __STAGING__.
+ * سلوك «مسار المهام v2» (إخفاء «تم»، استبيان التهيئة عند الاتصال، التحقق السريع، …):
+ * المواصفات: `process.env.NODE_ENV === 'development'` — في Vite = `import.meta.env.DEV`.
+ * البناء التجريبي على الخادم يكون `production`؛ لذلك نفعّل أيضاً `__STAGING__` لاختبار التجريبي فقط.
  */
 export const IS_STAGING_OR_DEV =
   Boolean(import.meta.env.DEV) ||
@@ -10,3 +9,6 @@ export const IS_STAGING_OR_DEV =
 
 /** مطابقة process.env.NODE_ENV === 'development' في Vite — التطوير المحلي فقط (لا يشمل التجريبي المبنى). */
 export const IS_DEV_ONLY = Boolean(import.meta.env.DEV)
+
+/** نفس مجال الميزات أعلاه — للتوثيق في الواردات الجديدة */
+export const IS_DEV_OR_STAGING_FEATURES = IS_STAGING_OR_DEV

@@ -7,6 +7,7 @@ import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 /** يُستخرج من الرابط: كل المتاجر | جديدة 48 ساعة | تحت الاحتضان */
 function useListPreset(searchParams) {
@@ -37,6 +38,15 @@ export default function NewStores() {
   }, [allStores, listPreset])
 
   const totalCount = counts?.total ?? allStores.length
+
+  function handleEliteCall(store) {
+    if (IS_STAGING_OR_DEV && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) {
+      setOnboardingStore(store)
+      return
+    }
+    const p = store.phone
+    if (p) window.open(`tel:${String(p).replace(/\s/g, '')}`, '_self')
+  }
 
   const { title, subtitle } = useMemo(() => {
     if (listPreset === 'incubating') {
@@ -125,6 +135,7 @@ export default function NewStores() {
         eliteNeedsNewMerchantOnboarding={s =>
           needsNewMerchantOnboardingSurvey(s, newMerchantOnboardingDoneIds)}
         onEliteNewMerchantOnboardingClick={setOnboardingStore}
+        onCallStore={handleEliteCall}
       />
 
       {onboardingStore && (
@@ -132,8 +143,12 @@ export default function NewStores() {
           store={onboardingStore}
           onClose={() => setOnboardingStore(null)}
           onSaved={() => {
+            const s = onboardingStore
             setOnboardingStore(null)
             reload()
+            if (IS_STAGING_OR_DEV && s?.phone) {
+              window.open(`tel:${String(s.phone).replace(/\s/g, '')}`, '_self')
+            }
           }}
         />
       )}

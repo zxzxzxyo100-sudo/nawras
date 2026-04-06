@@ -16,6 +16,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction } from '../services/api'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -107,7 +108,7 @@ export default function Dashboard() {
   const [missionsErr, setMissionsErr] = useState('')
 
   const loadStaffSatisfaction = useCallback(async () => {
-    if (user?.role !== 'executive') return
+    if (user?.role !== 'executive' || IS_STAGING_OR_DEV) return
     setMissionsLoading(true)
     setMissionsErr('')
     try {
@@ -132,7 +133,7 @@ export default function Dashboard() {
 
   function handleDashboardRefresh() {
     reload()
-    if (user?.role === 'executive') {
+    if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
   }
@@ -363,8 +364,8 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* ══ بورصة رضا الموظفين (المدير التنفيذي) ═══════════════════════ */}
-      {user?.role === 'executive' && (
+      {/* ══ بورصة رضا الموظفين — على التجريبي تُعرض من صفحة «التحقق السريع» ══ */}
+      {user?.role === 'executive' && !IS_STAGING_OR_DEV && (
         <motion.div
           variants={fadeUp}
           initial="hidden"
