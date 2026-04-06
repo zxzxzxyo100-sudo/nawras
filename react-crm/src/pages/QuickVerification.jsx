@@ -14,13 +14,11 @@ import {
   Store,
   Truck,
   CheckCircle2,
-  XCircle,
   Copy,
   ClipboardList,
   User,
   Calendar,
   ChevronLeft,
-  Flame,
   Search,
 } from 'lucide-react'
 import {
@@ -87,6 +85,19 @@ const CRIMSON = SOFT_CORAL_ICON
 
 /** عتبة شحنات عالية + 🔽 = أولوية قصوى */
 const HIGH_SHIPMENT_THRESHOLD = 50
+
+/** لوحة أعمال بسيطة — تجريبي (Apple/Stripe): أبيض، رمادي هادئ، أزرق ملكي واحد */
+const PRO = {
+  bg: '#FFFFFF',
+  surface: '#F3F4F6',
+  border: '#E5E7EB',
+  text: '#1F2937',
+  textMuted: '#6B7280',
+  accent: '#1D4ED8',
+  green: '#16A34A',
+  red: '#DC2626',
+  amber: '#D97706',
+}
 
 /** لوحة 2025+ — عتمة + نيون (تجريبي `VITE_APP_STAGING=1` فقط) */
 const FV = {
@@ -358,6 +369,90 @@ function ExecStatusStrip({ execMetrics }) {
   )
 }
 
+/** شريط إحصائيات تنفيذية — صف واحد + خط تقدم أخضر بسيط */
+function MinimalExecStrip({ execMetrics }) {
+  const { totalProblems, resolvedProblems, pct } = execMetrics
+  return (
+    <div className="w-full">
+      <div className="flex flex-col items-stretch gap-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="flex flex-1 flex-wrap items-stretch justify-center gap-0 sm:justify-start">
+          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
+            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
+              إجمالي المكتشفة
+            </span>
+            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
+              {totalProblems}
+            </span>
+          </div>
+          <div className="hidden w-px self-stretch sm:block" style={{ background: PRO.border }} aria-hidden />
+          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
+            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
+              تم حلّها
+            </span>
+            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
+              {resolvedProblems}
+            </span>
+          </div>
+          <div className="hidden w-px self-stretch sm:block" style={{ background: PRO.border }} aria-hidden />
+          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
+            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
+              نسبة الإنجاز
+            </span>
+            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
+              {pct}%
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 h-1 w-full overflow-hidden rounded-full" style={{ background: PRO.border }}>
+        <div
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: PRO.green }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** مؤشر رضا بسيط — نقطة خضراء / حمراء */
+function MinimalSatisfactionDot({ arrow, resolvedDown }) {
+  if (resolvedDown) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <span className="select-none text-base leading-none" style={{ color: PRO.green }} aria-hidden>
+          ●
+        </span>
+        <span className="text-xs font-medium" style={{ color: PRO.textMuted }}>
+          تم الحل
+        </span>
+      </span>
+    )
+  }
+  if (arrow === 'up') {
+    return (
+      <span className="select-none text-xl leading-none" style={{ color: PRO.green }} title="راضٍ" aria-hidden>
+        ●
+      </span>
+    )
+  }
+  if (arrow === 'mid') {
+    return (
+      <span className="select-none text-xl leading-none text-slate-400" title="محايد" aria-hidden>
+        ●
+      </span>
+    )
+  }
+  return (
+    <span className="select-none text-xl leading-none" style={{ color: PRO.red }} title="غير راضٍ" aria-hidden>
+      ●
+    </span>
+  )
+}
+
 const glassPanel =
   'backdrop-blur-[20px] bg-white/[0.06] border border-cyan-400/20 shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]'
 
@@ -620,12 +715,12 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       dir="rtl"
-      style={{ fontFamily: "'Cairo', sans-serif" }}
+      style={{ fontFamily: "'Tajawal', sans-serif" }}
     >
       <button
         type="button"
-        className="absolute inset-0 backdrop-blur-[2px]"
-        style={{ background: 'rgba(10,10,11,0.78)' }}
+        className="absolute inset-0"
+        style={{ background: 'rgba(15, 23, 42, 0.35)' }}
         aria-label="إغلاق"
         onClick={onClose}
       />
@@ -634,100 +729,85 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className={`relative flex h-full w-full max-w-[480px] flex-col border-r shadow-[0_0_60px_rgba(0,242,254,0.08)] ${glassPanel}`}
-        style={{
-          borderColor: FV.edgeSoft,
-          background: 'linear-gradient(165deg, rgba(17,17,19,0.92) 0%, rgba(10,10,11,0.96) 100%)',
-        }}
+        className="relative flex h-full w-full max-w-[480px] flex-col border-l bg-white shadow-xl"
+        style={{ borderColor: PRO.border }}
       >
-        <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4"
-          style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.03)' }}
-        >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: PRO.border }}>
           <div className="min-w-0">
-            <p className="truncate text-lg font-black" style={{ color: FV.silver, textShadow: `0 0 20px ${FV.cyan}22` }}>
+            <p className="truncate text-lg font-bold" style={{ color: PRO.text }}>
               {row.store_name}
             </p>
-            <p className="mt-0.5 text-xs tabular-nums" style={{ color: FV.silverDim }}>
+            <p className="mt-0.5 text-xs tabular-nums" style={{ color: PRO.textMuted }}>
               #{row.store_id}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-xl p-2 transition-colors hover:bg-white/10"
-            style={{ color: FV.silverDim }}
+            className="shrink-0 rounded-lg p-2 transition-colors hover:bg-gray-100"
+            style={{ color: PRO.textMuted }}
           >
             <X size={22} />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4">
-          <section className={`space-y-3 rounded-xl border p-4 ${glassPanel}`} style={{ borderColor: FV.edgeSoft }}>
-            <p className="text-xs font-black uppercase tracking-wide" style={{ color: FV.cyan }}>
+        <div className="min-h-0 flex-1 space-y-10 overflow-y-auto px-5 py-6">
+          <div>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-wide" style={{ color: PRO.textMuted }}>
               معلومات المكالمة
             </p>
-            <div className="flex items-start gap-2 text-sm">
-              <User size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
-              <div>
-                <span className="font-bold" style={{ color: FV.silverDim }}>
-                  الموظف:{' '}
-                </span>
-                <span style={{ color: FV.silver }}>{row.staff_fullname || row.staff_username || '—'}</span>
+            <div className="space-y-3 text-sm" style={{ color: PRO.text }}>
+              <div className="flex items-start gap-2">
+                <User size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <div>
+                  <span className="font-medium" style={{ color: PRO.textMuted }}>
+                    الموظف:{' '}
+                  </span>
+                  {row.staff_fullname || row.staff_username || '—'}
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-2 text-sm">
-              <Calendar size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
-              <div>
-                <span className="font-bold" style={{ color: FV.silverDim }}>
-                  التاريخ والوقت:{' '}
-                </span>
-                <span className="tabular-nums" style={{ color: FV.silver }}>
-                  {fmtServerAt(row.created_at)}
-                </span>
+              <div className="flex items-start gap-2">
+                <Calendar size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <div>
+                  <span className="font-medium" style={{ color: PRO.textMuted }}>
+                    التاريخ والوقت:{' '}
+                  </span>
+                  <span className="tabular-nums">{fmtServerAt(row.created_at)}</span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-2 text-sm">
-              <ClipboardList size={16} className="mt-0.5 shrink-0" style={{ color: FV.violet }} />
-              <div>
-                <span className="font-bold" style={{ color: FV.silverDim }}>
-                  مرحلة المكالمة:{' '}
-                </span>
-                <span style={{ color: FV.silver }}>
+              <div className="flex items-start gap-2">
+                <ClipboardList size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <div>
+                  <span className="font-medium" style={{ color: PRO.textMuted }}>
+                    مرحلة المكالمة:{' '}
+                  </span>
                   {loading ? '…' : callStage != null ? `مكالمة ${callStage}` : 'غير محدد في السجل'}
-                </span>
+                </div>
               </div>
             </div>
-          </section>
+          </div>
 
-          <section>
-            <p className="mb-3 text-xs font-black" style={{ color: FV.silverDim }}>
+          <div>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-wide" style={{ color: PRO.textMuted }}>
               إجابات الاستبيان
             </p>
             {row.survey_kind === 'new_merchant_onboarding' && row.answers && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {row.answers.map((a, i) => (
                   <div
                     key={i}
-                    className={`flex flex-col gap-2 rounded-xl border p-3 ${glassPanel}`}
-                    style={{
-                      borderColor: a.yes ? `${FV.emeraldCore}55` : `${FV.rubyCore}55`,
-                      boxShadow: a.yes
-                        ? `0 0 18px ${FV.emeraldCore}18`
-                        : `0 0 18px ${FV.rubyCore}22`,
-                    }}
+                    className="border-b pb-4 sm:border sm:p-3 sm:pb-3"
+                    style={{ borderColor: PRO.border }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      {a.yes ? (
-                        <CheckCircle2 size={28} style={{ color: FV.emeraldCore }} />
-                      ) : (
-                        <XCircle size={28} style={{ color: FV.rubyCore }} />
-                      )}
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="text-lg" style={{ color: a.yes ? PRO.green : PRO.red }} aria-hidden>
+                        ●
+                      </span>
+                      <span className="text-xs font-semibold" style={{ color: PRO.text }}>
+                        {a.label}
+                      </span>
                     </div>
-                    <p className="text-xs font-bold leading-snug" style={{ color: FV.silver }}>
-                      {a.label}
-                    </p>
-                    <p className="text-[10px] tabular-nums" style={{ color: FV.silverDim }}>
+                    <p className="text-[10px] tabular-nums" style={{ color: PRO.textMuted }}>
                       {fmtServerAt(row.created_at)}
                     </p>
                   </div>
@@ -738,57 +818,40 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
               <>
                 {radarData.length > 0 && (
                   <div
-                    className="mb-4 h-[200px] w-full rounded-xl border p-2 backdrop-blur-md"
-                    style={{ borderColor: FV.edgeSoft, background: 'rgba(0,242,254,0.04)' }}
+                    className="mb-6 h-[200px] w-full rounded-lg border p-2 bg-white"
+                    style={{ borderColor: PRO.border }}
                     dir="ltr"
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                        <PolarGrid stroke="rgba(0,242,254,0.18)" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: FV.silverDim }} />
+                        <PolarGrid stroke={PRO.border} />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: PRO.textMuted }} />
                         <PolarRadiusAxis
                           angle={90}
                           domain={[0, 5]}
                           tickCount={6}
-                          tick={{ fontSize: 9, fill: FV.silverDim }}
+                          tick={{ fontSize: 9, fill: PRO.textMuted }}
                         />
                         <Radar
                           name="A"
                           dataKey="score"
-                          stroke={FV.cyan}
-                          fill={FV.violet}
-                          fillOpacity={0.28}
+                          stroke={PRO.accent}
+                          fill={PRO.accent}
+                          fillOpacity={0.18}
                         />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
                 )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {row.questions.map((q, i) => (
-                    <div
-                      key={i}
-                      className={`rounded-xl border p-3 ${glassPanel}`}
-                      style={{
-                        borderColor:
-                          q.risk === 'high'
-                            ? `${FV.rubyCore}55`
-                            : q.risk === 'mid'
-                              ? 'rgba(251,191,36,0.45)'
-                              : `${FV.emeraldCore}40`,
-                        background:
-                          q.risk === 'high'
-                            ? 'rgba(218,34,255,0.06)'
-                            : q.risk === 'mid'
-                              ? 'rgba(251,191,36,0.06)'
-                              : 'rgba(52,245,197,0.05)',
-                      }}
-                    >
-                      <p className="mb-2 text-xs font-bold" style={{ color: FV.silver }}>
+                    <div key={i} className="border-b pb-4 sm:border sm:p-3" style={{ borderColor: PRO.border }}>
+                      <p className="mb-2 text-xs font-semibold" style={{ color: PRO.text }}>
                         {q.label}
                       </p>
                       <div className="flex items-center justify-between gap-2">
                         <AnimatedStars value={q.value} />
-                        <span className="text-sm font-black tabular-nums" style={{ color: FV.silver }}>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: PRO.text }}>
                           {q.value}/5
                         </span>
                       </div>
@@ -797,35 +860,31 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
                 </div>
               </>
             )}
-          </section>
+          </div>
 
-          <section className={`rounded-xl border p-4 ${glassPanel}`} style={{ borderColor: FV.edgeSoft }}>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-sm font-black" style={{ color: FV.silver }}>
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold" style={{ color: PRO.text }}>
                 الملاحظات والتعليقات
               </p>
               <button
                 type="button"
                 onClick={() => void copyNote()}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors hover:bg-white/10"
-                style={{ borderColor: FV.edgeSoft, color: FV.cyan, background: 'rgba(0,242,254,0.06)' }}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ background: PRO.accent }}
               >
                 <Copy size={14} />
-                نسخ الملاحظة
+                نسخ
               </button>
             </div>
             {(row.suggestions || '').trim() !== '' && (
-              <div className="mb-3">
-                <p className="mb-1 text-[11px] font-bold" style={{ color: FV.silverDim }}>
+              <div className="mb-4">
+                <p className="mb-1 text-[11px] font-medium" style={{ color: PRO.textMuted }}>
                   صوت المتجر (مسجّل)
                 </p>
                 <p
-                  className="rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap"
-                  style={{
-                    borderColor: FV.edgeSoft,
-                    background: 'rgba(255,255,255,0.04)',
-                    color: FV.silver,
-                  }}
+                  className="whitespace-pre-wrap border-b pb-3 text-sm leading-relaxed"
+                  style={{ borderColor: PRO.border, color: PRO.text }}
                 >
                   {(row.suggestions || '').trim()}
                 </p>
@@ -833,67 +892,47 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             )}
             {latestCallNote?.text ? (
               <div>
-                <p className="mb-1 text-[11px] font-bold" style={{ color: FV.silverDim }}>
+                <p className="mb-1 text-[11px] font-medium" style={{ color: PRO.textMuted }}>
                   ملاحظة المكالمة (الموظف)
                 </p>
-                <p
-                  className="rounded-lg border p-3 text-sm leading-relaxed whitespace-pre-wrap"
-                  style={{
-                    borderColor: FV.edgeSoft,
-                    background: 'rgba(255,255,255,0.04)',
-                    color: FV.silver,
-                  }}
-                >
+                <p className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: PRO.text }}>
                   {latestCallNote.text}
                 </p>
-                <p className="mt-1 text-[10px] tabular-nums" style={{ color: FV.silverDim }}>
+                <p className="mt-1 text-[10px] tabular-nums" style={{ color: PRO.textMuted }}>
                   {latestCallNote.by ? `${latestCallNote.by} — ` : ''}
                   {fmtServerAt(latestCallNote.at)}
                 </p>
               </div>
             ) : (
               !((row.suggestions || '').trim()) && (
-                <p className="text-sm" style={{ color: FV.silverDim }}>
+                <p className="text-sm" style={{ color: PRO.textMuted }}>
                   لا توجد ملاحظات نصية في هذا السجل.
                 </p>
               )
             )}
-          </section>
+          </div>
         </div>
 
         {row.arrow === 'down' && !row.resolved && (
-          <div
-            className="shrink-0 border-t px-5 py-4"
-            style={{ borderColor: FV.edgeSoft, background: 'rgba(10,10,11,0.9)' }}
-          >
+          <div className="shrink-0 border-t px-5 py-4" style={{ borderColor: PRO.border, background: PRO.surface }}>
             <button
               type="button"
               onClick={() => onResolve?.(row.id)}
               disabled={resolveBusy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black shadow-lg transition-opacity disabled:opacity-60"
-              style={{
-                background: `linear-gradient(135deg, ${FV.emeraldCore}33 0%, ${FV.cyan}44 50%, ${FV.violet}33 100%)`,
-                color: FV.silver,
-                border: `1px solid ${FV.edge}`,
-                boxShadow: `0 0 24px ${FV.emeraldCore}33`,
-              }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+              style={{ background: PRO.accent }}
             >
               {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
-              تم حل المشكلة ✅
+              تم حل المشكلة
             </button>
           </div>
         )}
         {row.arrow === 'down' && row.resolved && (
           <div
-            className="shrink-0 border-t px-5 py-3 text-center text-sm font-bold"
-            style={{
-              borderColor: FV.edgeSoft,
-              color: FV.emeraldCore,
-              background: 'rgba(52,245,197,0.1)',
-              boxShadow: `inset 0 0 24px ${FV.emeraldCore}14`,
-            }}
+            className="shrink-0 border-t px-5 py-3 text-center text-sm font-semibold"
+            style={{ borderColor: PRO.border, color: '#15803D', background: '#F0FDF4' }}
           >
-            تم تسجيل حل هذه المشكلة ✅
+            تم تسجيل حل هذه المشكلة
           </div>
         )}
       </motion.aside>
@@ -1064,279 +1103,346 @@ export default function QuickVerification() {
       className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] pb-10 px-3 md:px-5 pt-4' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
-        fontFamily: "'Cairo', sans-serif",
-        background: DS.bgPage,
+        fontFamily: IS_VITE_APP_STAGING ? "'Tajawal', sans-serif" : "'Cairo', sans-serif",
+        background: IS_VITE_APP_STAGING ? PRO.bg : DS.bgPage,
       }}
     >
-      {/* تجريبي: وثيقة واحدة — خلفية رمادية فاتحة + لوحة بيضاء موحّدة */}
       {IS_VITE_APP_STAGING ? (
-        <div className="mx-auto max-w-6xl">
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm" style={{ borderColor: DS.border }}>
-            {/* شريط عنوان موحّد: العنوان + فلاتر الرضا + تحديث */}
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900">
-                  <ShieldCheck size={20} className="text-emerald-400" aria-hidden />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg font-black leading-tight text-slate-900 md:text-xl">التحقق السريع</h1>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
-                    <span className="mx-2 text-slate-300">·</span>
-                    <span className="tabular-nums">{satStats.total} إجمالي</span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span className="tabular-nums text-emerald-700">{satStats.sat} راضٍ</span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span className="tabular-nums text-rose-700">{satStats.uns} غير راضٍ</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <div
-                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-                  role="tablist"
-                  aria-label="تصفية حسب الرضا"
-                >
-                  {[
-                    { id: 'all', label: 'الكل' },
-                    { id: 'down', label: 'غير راضٍ' },
-                    { id: 'up', label: 'راضٍ' },
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={satTab === t.id}
-                      onClick={() => setSatTab(t.id)}
-                      className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
-                        satTab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/80 hover:text-slate-800'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void loadAll()}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
-                  تحديث
-                </button>
-              </div>
+        <div className="mx-auto max-w-6xl px-4 pb-12 pt-8">
+          <div className="overflow-hidden rounded-2xl" style={{ background: PRO.surface }}>
+            {/* إحصائيات — أعلى الصفحة */}
+            <div className="border-b bg-white px-6 py-6 sm:px-8" style={{ borderColor: PRO.border }}>
+              <MinimalExecStrip execMetrics={execMetrics} />
             </div>
 
-            {/* شريط أدوات: تبويب القسم + التدقيق + بحث */}
-            <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-2.5 md:flex-row md:items-center md:justify-between md:gap-4">
-              <div
-                className="inline-flex w-fit max-w-full flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-                role="tablist"
-                aria-label="نوع الاستبيان"
-              >
-                <button
-                  type="button"
-                  onClick={() => setMainTab('onboarding')}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
-                    mainTab === 'onboarding' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'
-                  }`}
-                >
-                  <Store size={16} strokeWidth={1.8} />
-                  متاجر جدد
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMainTab('active_csat')}
-                  className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
-                    mainTab === 'active_csat' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'
-                  }`}
-                >
-                  <Truck size={16} strokeWidth={1.8} />
-                  تجار نشطون
-                </button>
+            {/* رأس موحّد: عنوان + بحث مدمج + تحديث */}
+            <div className="space-y-6 border-b bg-white px-6 py-6 sm:px-8" style={{ borderColor: PRO.border }}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-2xl font-bold tracking-tight md:text-[1.65rem]" style={{ color: PRO.text }}>
+                    التحقق السريع
+                  </h1>
+                  <p className="mt-1.5 text-sm font-normal" style={{ color: PRO.textMuted }}>
+                    {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'} ·{' '}
+                    <span className="tabular-nums">{satStats.total}</span> إجمالي · راضٍ{' '}
+                    <span className="tabular-nums">{satStats.sat}</span> · غير راضٍ{' '}
+                    <span className="tabular-nums">{satStats.uns}</span>
+                  </p>
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center lg:max-w-xl">
+                  <label className="relative min-w-0 flex-1">
+                    <span className="sr-only">بحث</span>
+                    <Search
+                      className="pointer-events-none absolute right-0 top-1/2 z-[1] -translate-y-1/2 opacity-40"
+                      size={18}
+                      style={{ color: PRO.textMuted }}
+                      aria-hidden
+                    />
+                    <input
+                      type="search"
+                      value={quickSearch}
+                      onChange={e => setQuickSearch(e.target.value)}
+                      placeholder="بحث باسم المتجر أو الكود…"
+                      className="w-full border-0 border-b-2 border-transparent bg-transparent py-2.5 pr-8 pl-1 text-sm outline-none transition-colors placeholder:opacity-60 focus:border-[#1D4ED8]"
+                      style={{
+                        color: PRO.text,
+                        borderBottomColor: PRO.border,
+                        fontFamily: "'Tajawal', sans-serif",
+                      }}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void loadAll()}
+                    disabled={loading}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    style={{ background: PRO.accent }}
+                  >
+                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
+                    تحديث
+                  </button>
+                </div>
               </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-2">
-                <div className="inline-flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+
+              <div className="flex flex-wrap items-center gap-6" role="tablist" aria-label="تصفية الرضا">
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'down', label: 'غير راضٍ' },
+                  { id: 'up', label: 'راضٍ' },
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={satTab === t.id}
+                    onClick={() => setSatTab(t.id)}
+                    className="border-b-2 border-transparent pb-1 text-sm font-semibold transition-colors"
+                    style={{
+                      color: satTab === t.id ? PRO.accent : PRO.textMuted,
+                      borderBottomColor: satTab === t.id ? PRO.accent : 'transparent',
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-4 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
+                <div className="flex flex-wrap gap-6" role="tablist" aria-label="نوع الاستبيان">
+                  <button
+                    type="button"
+                    onClick={() => setMainTab('onboarding')}
+                    className="text-sm font-semibold transition-colors"
+                    style={{ color: mainTab === 'onboarding' ? PRO.accent : PRO.textMuted }}
+                  >
+                    متاجر جدد
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMainTab('active_csat')}
+                    className="text-sm font-semibold transition-colors"
+                    style={{ color: mainTab === 'active_csat' ? PRO.accent : PRO.textMuted }}
+                  >
+                    تجار نشطون
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-6" role="tablist" aria-label="التدقيق">
                   <button
                     type="button"
                     onClick={() => setAuditViewTab('active')}
-                    className={`rounded-md px-3 py-1.5 text-sm font-black transition-colors ${
-                      auditViewTab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white'
-                    }`}
+                    className="text-sm font-semibold transition-colors"
+                    style={{ color: auditViewTab === 'active' ? PRO.accent : PRO.textMuted }}
                   >
                     قيد التدقيق
                   </button>
                   <button
                     type="button"
                     onClick={() => setAuditViewTab('resolved')}
-                    className={`rounded-md px-3 py-1.5 text-sm font-black transition-colors ${
-                      auditViewTab === 'resolved' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white'
-                    }`}
+                    className="text-sm font-semibold transition-colors"
+                    style={{ color: auditViewTab === 'resolved' ? PRO.accent : PRO.textMuted }}
                   >
                     سجل الحلول
                   </button>
                 </div>
-                <div className="relative min-h-[40px] min-w-0 flex-1 md:max-w-md">
-                  <Search
-                    className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
-                    size={18}
-                    aria-hidden
-                  />
-                  <input
-                    type="search"
-                    value={quickSearch}
-                    onChange={e => setQuickSearch(e.target.value)}
-                    placeholder="بحث: اسم المتجر أو الكود…"
-                    className="w-full rounded-lg border border-slate-200 bg-white py-2 pr-9 pl-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-200"
-                    autoComplete="off"
-                  />
-                </div>
               </div>
             </div>
 
-            <ExecStatusStrip execMetrics={execMetrics} />
-
             {err ? (
-              <p className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">{err}</p>
+              <p className="border-b px-6 py-3 text-sm sm:px-8" style={{ borderColor: PRO.border, background: '#FFFBEB', color: '#92400E' }}>
+                {err}
+              </p>
             ) : null}
 
-            {IS_VITE_APP_STAGING ? (
-              <div className="border-t border-slate-100">
-                <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-2">
-                  <h2 className="text-xs font-black uppercase tracking-wide text-slate-500">
-                    ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
-                  </h2>
+            {/* ملخص الموظفين — جدول بسيط */}
+            <div className="border-b bg-white px-6 py-8 sm:px-8" style={{ borderColor: PRO.border }}>
+              <h2 className="mb-6 text-base font-bold" style={{ color: PRO.text }}>
+                ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+              </h2>
+              {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
+                <div className="flex items-center justify-center gap-2 py-12 text-sm" style={{ color: PRO.textMuted }}>
+                  <Loader2 size={20} className="animate-spin" />
+                  جارٍ التحميل…
                 </div>
-                {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
-                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
-                    <Loader2 size={20} className="animate-spin" />
-                    جارٍ التحميل…
-                  </div>
-                ) : !currentStaff?.length ? (
-                  <p className="py-6 text-center text-sm text-slate-500">لا توجد بيانات موظفين اليوم في هذا القسم.</p>
-                ) : (
-                  <ul className="divide-y divide-slate-100">
-                    {currentStaff.map(row => {
-                      const arrow = row.satisfaction_arrow
-                      const up = arrow === 'up'
-                      const mid = arrow === 'mid'
-                      return (
-                        <li
-                          key={row.username || row.fullname}
-                          className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+              ) : !currentStaff?.length ? (
+                <p className="py-8 text-center text-sm" style={{ color: PRO.textMuted }}>
+                  لا توجد بيانات موظفين اليوم في هذا القسم.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-right text-sm" style={{ borderColor: PRO.border }}>
+                    <thead>
+                      <tr>
+                        <th
+                          className="border px-4 py-3 font-semibold"
+                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
                         >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-900">{row.fullname || row.username}</p>
-                            <p className="truncate text-[11px] text-slate-500">
-                              {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg p-1 -m-1 text-slate-600 transition-colors hover:bg-slate-100"
-                            onClick={() => {
-                              const u = row.username
-                              const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
-                              const first = u
-                                ? pool.find(dr => dr.staff_username === u)
-                                : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
-                              if (first) setModalRow(first)
-                            }}
-                            title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
+                          الموظف
+                        </th>
+                        <th
+                          className="border px-4 py-3 font-semibold"
+                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
+                        >
+                          الدور / اليوم
+                        </th>
+                        <th
+                          className="border px-4 py-3 font-semibold"
+                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
+                        >
+                          الرضا
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentStaff.map(row => {
+                        const arrow = row.satisfaction_arrow
+                        const up = arrow === 'up'
+                        const mid = arrow === 'mid'
+                        return (
+                          <tr
+                            key={row.username || row.fullname}
+                            className="transition-colors hover:bg-white"
+                            style={{ borderColor: PRO.border }}
                           >
-                            {up ? (
-                              <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-600" aria-hidden />
-                            ) : mid ? (
-                              <ArrowLeftRight size={22} strokeWidth={2.5} className="text-amber-500" aria-hidden />
-                            ) : (
-                              <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-600" aria-hidden />
-                            )}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-            ) : null}
+                            <td className="border px-4 py-3 font-medium" style={{ borderColor: PRO.border, color: PRO.text }}>
+                              {row.fullname || row.username}
+                            </td>
+                            <td className="border px-4 py-3 text-xs" style={{ borderColor: PRO.border, color: PRO.textMuted }}>
+                              {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
+                            </td>
+                            <td className="border px-4 py-3" style={{ borderColor: PRO.border }}>
+                              <button
+                                type="button"
+                                className="inline-flex items-center"
+                                onClick={() => {
+                                  const u = row.username
+                                  const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
+                                  const first = u
+                                    ? pool.find(dr => dr.staff_username === u)
+                                    : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
+                                  if (first) setModalRow(first)
+                                }}
+                              >
+                                {up ? (
+                                  <span className="text-xl leading-none" style={{ color: PRO.green }} aria-hidden>
+                                    ●
+                                  </span>
+                                ) : mid ? (
+                                  <span className="text-xl leading-none text-slate-400" aria-hidden>
+                                    ●
+                                  </span>
+                                ) : (
+                                  <span className="text-xl leading-none" style={{ color: PRO.red }} aria-hidden>
+                                    ●
+                                  </span>
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
-            <div className="border-t border-slate-100 bg-white">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-                <h2 className="text-sm font-black text-slate-900">
-                  {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
+            {/* جدول المتاجر */}
+            <div className="bg-white px-6 py-8 sm:px-8">
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
+                <h2 className="text-base font-bold" style={{ color: PRO.text }}>
+                  {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل'}
                 </h2>
-                <span className="text-xs font-medium tabular-nums text-slate-500">{stagingDisplayRows.length} عرض</span>
+                <span className="text-xs font-medium tabular-nums" style={{ color: PRO.textMuted }}>
+                  {stagingDisplayRows.length} سجل
+                </span>
               </div>
               {loading && currentDetails.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+                <div className="flex items-center justify-center gap-2 py-16 text-sm" style={{ color: PRO.textMuted }}>
                   <Loader2 size={22} className="animate-spin" />
                   جارٍ تحميل التفاصيل…
                 </div>
               ) : stagingDisplayRows.length === 0 ? (
-                <p className="px-4 py-12 text-center text-sm text-slate-500">
+                <p className="py-12 text-center text-sm" style={{ color: PRO.textMuted }}>
                   {auditViewTab === 'active'
                     ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
                     : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
                 </p>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {stagingDisplayRows.map(row => {
-                    const shipN = resolveShipmentCount(allStores, row.store_id)
-                    const resolvedDown = row.arrow === 'down' && !!row.resolved
-                    const isHighRisk =
-                      auditViewTab === 'active' &&
-                      row.arrow === 'down' &&
-                      !row.resolved &&
-                      shipN != null &&
-                      shipN > HIGH_SHIPMENT_THRESHOLD
-                    return (
-                      <div
-                        key={row.id}
-                        className={`flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${
-                          isHighRisk ? 'border-s-4 border-rose-500 bg-rose-50/40' : ''
-                        } ${resolvedDown && !isHighRisk ? 'bg-emerald-50/25' : ''}`}
-                      >
-                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-2">
-                          <span className="max-w-full text-lg font-bold leading-snug text-slate-900" title={row.store_name}>
-                            {row.store_name}
-                          </span>
-                          <span className="text-xs tabular-nums text-slate-400">#{row.store_id}</span>
-                          <span
-                            className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700"
-                            title="عدد الشحنات (من بيانات المتجر)"
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-right text-sm" style={{ borderColor: PRO.border }}>
+                    <thead>
+                      <tr>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          المتجر
+                        </th>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          الكود
+                        </th>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          الشحنات
+                        </th>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          الرضا
+                        </th>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          ملاحظة
+                        </th>
+                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
+                          &nbsp;
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stagingDisplayRows.map(row => {
+                        const shipN = resolveShipmentCount(allStores, row.store_id)
+                        const resolvedDown = row.arrow === 'down' && !!row.resolved
+                        const isHighRisk =
+                          auditViewTab === 'active' &&
+                          row.arrow === 'down' &&
+                          !row.resolved &&
+                          shipN != null &&
+                          shipN > HIGH_SHIPMENT_THRESHOLD
+                        return (
+                          <tr
+                            key={row.id}
+                            className="transition-colors hover:bg-white"
+                            style={{
+                              background: isHighRisk ? 'rgba(254, 242, 242, 0.5)' : resolvedDown ? 'rgba(240, 253, 244, 0.35)' : undefined,
+                            }}
                           >
-                            {shipN != null ? shipN.toLocaleString('ar-EG') : '—'} شحنة
-                          </span>
-                          {isHighRisk ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-rose-700">
-                              <Flame size={12} aria-hidden />
-                              High Risk
-                            </span>
-                          ) : null}
-                          {auditViewTab === 'resolved' ? (
-                            <span className="w-full basis-full text-xs font-semibold text-emerald-800 sm:basis-auto">
-                              مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:max-w-[min(100%,28rem)]">
-                          <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
-                          <p className="max-w-[220px] flex-1 truncate text-right text-xs text-slate-500">
-                            {textSnippet(row.suggestions, 40) || '—'}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => setModalRow(row)}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm transition-colors hover:bg-slate-50"
-                          >
-                            عرض التفاصيل
-                            <ChevronLeft size={14} className="opacity-60" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                            <td className="border px-3 py-3 align-middle sm:px-4" style={{ borderColor: PRO.border }}>
+                              <span className="font-semibold" style={{ color: PRO.text }}>
+                                {row.store_name}
+                              </span>
+                              {isHighRisk ? (
+                                <span className="mr-2 text-xs font-medium" style={{ color: PRO.red }}>
+                                  {' '}
+                                  (أولوية)
+                                </span>
+                              ) : null}
+                              {auditViewTab === 'resolved' ? (
+                                <div className="mt-1 text-xs" style={{ color: PRO.textMuted }}>
+                                  مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td
+                              className="border px-3 py-3 align-middle tabular-nums text-xs sm:px-4"
+                              style={{ borderColor: PRO.border, color: PRO.textMuted }}
+                            >
+                              #{row.store_id}
+                            </td>
+                            <td
+                              className="border px-3 py-3 align-middle tabular-nums sm:px-4"
+                              style={{ borderColor: PRO.border, color: PRO.text }}
+                            >
+                              {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
+                            </td>
+                            <td className="border px-3 py-3 align-middle sm:px-4" style={{ borderColor: PRO.border }}>
+                              <MinimalSatisfactionDot arrow={row.arrow} resolvedDown={resolvedDown} />
+                            </td>
+                            <td
+                              className="max-w-[14rem] border px-3 py-3 align-middle text-xs sm:px-4"
+                              style={{ borderColor: PRO.border, color: PRO.textMuted }}
+                            >
+                              <span className="line-clamp-2">{textSnippet(row.suggestions, 48) || '—'}</span>
+                            </td>
+                            <td className="border px-3 py-3 align-middle whitespace-nowrap sm:px-4" style={{ borderColor: PRO.border }}>
+                              <button
+                                type="button"
+                                onClick={() => setModalRow(row)}
+                                className="text-sm font-semibold transition-opacity hover:opacity-80"
+                                style={{ color: PRO.accent }}
+                              >
+                                تفاصيل
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
