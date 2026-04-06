@@ -6,6 +6,9 @@
 const VITE_STAGING =
   String(import.meta.env.VITE_APP_STAGING ?? '') === '1'
 
+/** بناء التجريبي مع `VITE_APP_STAGING=1` فقط (لا يشمل `npm run dev` بدون المتغير). */
+export const IS_VITE_APP_STAGING = VITE_STAGING
+
 /**
  * نافذة «تسجيل مكالمة» مبسّطة: استبيان 3 أسئلة مباشرة + حفظ / لم يرد فقط.
  * التطوير المحلي (`npm run dev`) أو بناء التجريبي مع `VITE_APP_STAGING=1` في `.env.staging`.
