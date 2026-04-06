@@ -36,19 +36,34 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import { IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
-import { getQuickVerificationBourse, getQuickVerificationAuditTimeline } from '../services/api'
+import {
+  getQuickVerificationBourse,
+  getQuickVerificationAuditTimeline,
+  postQuickVerificationResolveAudit,
+} from '../services/api'
 import { totalShipments, parcelsInRangeDisplay } from '../utils/storeFields'
 
 const SUCCESS = '#28C76F'
 const DANGER = '#EA5455'
+/** عناوين — كحلي عميق (بدل الأسود الصافي) */
 const NAVY = '#1e3a5f'
-/** أخضر نيون للرضا */
-const NEON_GREEN = '#00E676'
-/** قرمزي عميق لعدم الرضا */
-const CRIMSON = '#B71C1C'
-/** برتقالي مؤسسي للإحصائيات */
-const CORPORATE_ORANGE = '#FF9F43'
-const PAGE_BG_STAGING = '#F8F9FA'
+/** نص ثانوي — Slate */
+const SLATE_SECONDARY = '#334155'
+/** خلفية الصفحة — رمادي محايد مريح */
+const PAGE_BG_STAGING = '#F3F4F6'
+/** بطاقات بيضاء مع حدود ناعمة */
+const CARD_BORDER = '#E5E7EB'
+/** أخضر باستيل للرضا 🔼 */
+const PASTEL_GREEN_BG = '#D1FAE5'
+const PASTEL_GREEN_ICON = '#059669'
+/** مرجان/وردي ناعم لعدم الرضا 🔽 */
+const SOFT_CORAL_BG = '#FFE4E6'
+const SOFT_CORAL_ICON = '#E11D48'
+/** برتقالي خفيف للإحصائيات */
+const CORPORATE_ORANGE = '#FB923C'
+/** توافق مع الشريط العلوي القديم */
+const NEON_GREEN = PASTEL_GREEN_ICON
+const CRIMSON = SOFT_CORAL_ICON
 
 function resolveShipmentCount(allStores, storeId) {
   if (storeId == null || !Array.isArray(allStores)) return null
@@ -62,40 +77,62 @@ function resolveShipmentCount(allStores, storeId) {
   return Number.isFinite(n) ? Math.trunc(n) : 0
 }
 
-/** سهم رضا بتوهج نيون / قرمزي */
-function StagingSatisfactionArrow({ arrow }) {
+/** سهم رضا — أخضر باستيل / مرجان ناعم (بدون توهج عدواني) */
+function StagingSatisfactionArrow({ arrow, resolvedDown }) {
+  if (resolvedDown) {
+    return (
+      <span
+        className="inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 border"
+        style={{
+          borderColor: CARD_BORDER,
+          background: '#ECFDF5',
+          color: PASTEL_GREEN_ICON,
+          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
+        }}
+      >
+        <CheckCircle2 size={24} strokeWidth={2.2} aria-hidden />
+        <span className="text-xs font-black" style={{ color: SLATE_SECONDARY }}>
+          تم الحل
+        </span>
+      </span>
+    )
+  }
   if (arrow === 'up') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-white"
+        className="inline-flex items-center justify-center rounded-2xl p-3 border"
         style={{
-          boxShadow: `0 0 22px ${NEON_GREEN}88, 0 0 40px ${NEON_GREEN}44`,
-          color: NEON_GREEN,
+          borderColor: CARD_BORDER,
+          background: PASTEL_GREEN_BG,
+          color: PASTEL_GREEN_ICON,
+          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
         }}
       >
-        <ArrowBigUp size={26} strokeWidth={2.6} aria-hidden />
+        <ArrowBigUp size={26} strokeWidth={2.4} aria-hidden />
       </span>
     )
   }
   if (arrow === 'mid') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-amber-100"
-        style={{ boxShadow: '0 0 18px rgba(245,158,11,0.35)' }}
+        className="inline-flex items-center justify-center rounded-2xl p-3 border border-amber-100 bg-amber-50/90"
+        style={{ boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)' }}
       >
-        <ArrowLeftRight size={24} strokeWidth={2.5} className="text-amber-500" aria-hidden />
+        <ArrowLeftRight size={24} strokeWidth={2.5} className="text-amber-600" aria-hidden />
       </span>
     )
   }
   return (
     <span
-      className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-white"
+      className="inline-flex items-center justify-center rounded-2xl p-3 border"
       style={{
-        boxShadow: `0 0 22px ${CRIMSON}99, 0 0 38px ${CRIMSON}55`,
-        color: CRIMSON,
+        borderColor: CARD_BORDER,
+        background: SOFT_CORAL_BG,
+        color: SOFT_CORAL_ICON,
+        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
       }}
     >
-      <ArrowBigDown size={26} strokeWidth={2.6} aria-hidden />
+      <ArrowBigDown size={26} strokeWidth={2.4} aria-hidden />
     </span>
   )
 }
@@ -162,7 +199,7 @@ function AnimatedStars({ value }) {
 }
 
 /** درج التفصيل — داخل نفس الملف (تجريبي فقط) */
-function StagingAuditDrawer({ row, onClose }) {
+function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
   const [latestCallNote, setLatestCallNote] = useState(null)
   const [callStage, setCallStage] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -257,14 +294,20 @@ function StagingAuditDrawer({ row, onClose }) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="relative h-full w-full max-w-[480px] flex flex-col bg-white shadow-2xl border-r border-slate-200"
+        className="relative h-full w-full max-w-[480px] flex flex-col bg-white shadow-2xl border-r"
+        style={{ borderColor: CARD_BORDER }}
       >
-        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+        <div
+          className="shrink-0 flex items-center justify-between gap-3 border-b bg-white px-5 py-4"
+          style={{ borderColor: CARD_BORDER }}
+        >
           <div className="min-w-0">
             <p className="text-lg font-black truncate" style={{ color: NAVY }}>
               {row.store_name}
             </p>
-            <p className="text-xs text-slate-500 mt-0.5 tabular-nums">#{row.store_id}</p>
+            <p className="text-xs mt-0.5 tabular-nums" style={{ color: SLATE_SECONDARY }}>
+              #{row.store_id}
+            </p>
           </div>
           <button
             type="button"
@@ -405,6 +448,36 @@ function StagingAuditDrawer({ row, onClose }) {
             )}
           </section>
         </div>
+
+        {row.arrow === 'down' && !row.resolved && (
+          <div
+            className="shrink-0 border-t px-5 py-4 bg-white"
+            style={{ borderColor: CARD_BORDER }}
+          >
+            <button
+              type="button"
+              onClick={() => onResolve?.(row.id)}
+              disabled={resolveBusy}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition-opacity disabled:opacity-60"
+              style={{
+                background: `linear-gradient(180deg, ${PASTEL_GREEN_BG} 0%, #A7F3D0 100%)`,
+                color: NAVY,
+                border: `1px solid ${CARD_BORDER}`,
+              }}
+            >
+              {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
+              تم حل المشكلة ✅
+            </button>
+          </div>
+        )}
+        {row.arrow === 'down' && row.resolved && (
+          <div
+            className="shrink-0 border-t px-5 py-3 text-center text-sm font-bold bg-emerald-50/90"
+            style={{ borderColor: CARD_BORDER, color: PASTEL_GREEN_ICON }}
+          >
+            تم تسجيل حل هذه المشكلة ✅
+          </div>
+        )}
       </motion.aside>
     </motion.div>
   )
@@ -428,6 +501,7 @@ export default function QuickVerification() {
   const [modalRow, setModalRow] = useState(null)
   /** تبويبات الرضا — تجريبي فقط */
   const [satTab, setSatTab] = useState('all')
+  const [resolvingId, setResolvingId] = useState(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -439,23 +513,57 @@ export default function QuickVerification() {
         setStaffMissions(Array.isArray(d.staff_summary) ? d.staff_summary : [])
         setActiveDetailRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setActiveStaffMissions(Array.isArray(d.active_csat_staff_summary) ? d.active_csat_staff_summary : [])
-      } else {
-        setDetailRows([])
-        setStaffMissions([])
-        setActiveDetailRows([])
-        setActiveStaffMissions([])
-        setErr(d?.error || 'تعذّر تحميل بيانات التحقق السريع.')
+        return d
       }
+      setDetailRows([])
+      setStaffMissions([])
+      setActiveDetailRows([])
+      setActiveStaffMissions([])
+      setErr(d?.error || 'تعذّر تحميل بيانات التحقق السريع.')
+      return null
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
       setStaffMissions([])
       setActiveStaffMissions([])
       setDetailRows([])
       setActiveDetailRows([])
+      return null
     } finally {
       setLoading(false)
     }
   }, [])
+
+  const resolveAudit = useCallback(
+    async surveyId => {
+      setResolvingId(surveyId)
+      setErr('')
+      try {
+        const res = await postQuickVerificationResolveAudit({
+          survey_id: surveyId,
+          user_role: 'executive',
+          resolved_by: user?.username || '',
+        })
+        if (!res?.success) {
+          setErr(res?.error || 'تعذّر حفظ الحل.')
+          return
+        }
+        const d = await loadAll()
+        if (d?.success) {
+          const pool = mainTab === 'onboarding' ? d.rows : d.active_csat_rows
+          const arr = Array.isArray(pool) ? pool : []
+          const updated = arr.find(r => r.id === surveyId)
+          if (updated) {
+            setModalRow(prev => (prev && prev.id === surveyId ? updated : prev))
+          }
+        }
+      } catch (e) {
+        setErr(e?.response?.data?.error || e?.message || 'تعذّر حفظ الحل.')
+      } finally {
+        setResolvingId(null)
+      }
+    },
+    [loadAll, mainTab, user?.username],
+  )
 
   useEffect(() => {
     void loadAll()
@@ -472,6 +580,16 @@ export default function QuickVerification() {
       else if (r.arrow === 'down') uns += 1
     })
     return { total: currentDetails.length, sat, uns }
+  }, [currentDetails])
+
+  /** مؤشر الأداء التنفيذي — مشاكل 🔽 ومُحلّة */
+  const execMetrics = useMemo(() => {
+    const downAudits = currentDetails.filter(r => r.arrow === 'down')
+    const totalProblems = downAudits.length
+    const resolvedProblems = downAudits.filter(r => r.resolved).length
+    const pct =
+      totalProblems === 0 ? 100 : Math.min(100, Math.round((resolvedProblems / totalProblems) * 100))
+    return { totalProblems, resolvedProblems, pct }
   }, [currentDetails])
 
   const filteredDetails = useMemo(() => {
@@ -505,7 +623,7 @@ export default function QuickVerification() {
 
   return (
     <div
-      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-16 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
+      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-28 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
       dir="rtl"
       style={{
         fontFamily: "'Cairo', sans-serif",
@@ -514,14 +632,17 @@ export default function QuickVerification() {
     >
       {/* رأس الصفحة */}
       {IS_VITE_APP_STAGING ? (
-        <div className="rounded-2xl border-2 border-slate-200/90 bg-white px-5 py-6 shadow-[0_4px_24px_rgba(30,58,95,0.06)]">
+        <div
+          className="rounded-2xl border bg-white px-5 py-6 shadow-sm"
+          style={{ borderColor: CARD_BORDER }}
+        >
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
             <div className="flex items-start gap-4 min-w-0">
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
                 style={{
                   background: `linear-gradient(145deg, ${NAVY} 0%, #2c5282 100%)`,
-                  border: `1px solid ${CORPORATE_ORANGE}55`,
+                  border: `1px solid ${CARD_BORDER}`,
                 }}
               >
                 <ShieldCheck size={28} className="text-white" strokeWidth={2.2} />
@@ -533,49 +654,49 @@ export default function QuickVerification() {
                 >
                   التحقق السريع
                 </h1>
-                <p className="text-slate-500 text-sm mt-1.5 font-medium">
+                <p className="text-sm mt-1.5 font-medium" style={{ color: SLATE_SECONDARY }}>
                   لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm border-2 bg-white"
-                style={{ borderColor: NAVY, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm border bg-white"
+                style={{ borderColor: CARD_BORDER, color: NAVY }}
               >
                 <LayoutGrid size={18} style={{ color: CORPORATE_ORANGE }} aria-hidden />
                 الإجمالي
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: `${CORPORATE_ORANGE}18`, color: NAVY }}
+                  style={{ background: PAGE_BG_STAGING, color: NAVY }}
                 >
                   {satStats.total}
                 </span>
               </span>
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 text-sm font-black bg-white shadow-sm"
-                style={{ borderColor: NEON_GREEN, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white shadow-sm"
+                style={{ borderColor: CARD_BORDER, color: NAVY }}
               >
-                <Smile size={18} style={{ color: NEON_GREEN }} strokeWidth={2.4} aria-hidden />
+                <Smile size={18} style={{ color: PASTEL_GREEN_ICON }} strokeWidth={2.4} aria-hidden />
                 راضٍ
-                <ArrowBigUp size={16} style={{ color: NEON_GREEN }} className="opacity-90" aria-hidden />
+                <ArrowBigUp size={16} style={{ color: PASTEL_GREEN_ICON }} className="opacity-90" aria-hidden />
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: `${NEON_GREEN}14`, color: NAVY }}
+                  style={{ background: PASTEL_GREEN_BG, color: NAVY }}
                 >
                   {satStats.sat}
                 </span>
               </span>
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 text-sm font-black bg-white shadow-sm"
-                style={{ borderColor: CRIMSON, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white shadow-sm"
+                style={{ borderColor: CARD_BORDER, color: NAVY }}
               >
-                <Frown size={18} style={{ color: CRIMSON }} strokeWidth={2.4} aria-hidden />
+                <Frown size={18} style={{ color: SOFT_CORAL_ICON }} strokeWidth={2.4} aria-hidden />
                 غير راضٍ
-                <ArrowBigDown size={16} style={{ color: CRIMSON }} className="opacity-90" aria-hidden />
+                <ArrowBigDown size={16} style={{ color: SOFT_CORAL_ICON }} className="opacity-90" aria-hidden />
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: `${CRIMSON}12`, color: NAVY }}
+                  style={{ background: SOFT_CORAL_BG, color: NAVY }}
                 >
                   {satStats.uns}
                 </span>
@@ -584,8 +705,8 @@ export default function QuickVerification() {
                 type="button"
                 onClick={() => void loadAll()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border-2 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 shadow-sm"
-                style={{ color: NAVY }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 shadow-sm"
+                style={{ color: NAVY, borderColor: CARD_BORDER }}
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 تحديث
@@ -747,9 +868,10 @@ export default function QuickVerification() {
       <section
         className={
           IS_VITE_APP_STAGING
-            ? 'rounded-2xl border border-slate-200/90 bg-[#F8F9FA] shadow-[0_2px_20px_rgba(15,23,42,0.04)] overflow-hidden'
+            ? 'rounded-2xl border shadow-sm overflow-hidden'
             : 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
         }
+        style={IS_VITE_APP_STAGING ? { borderColor: CARD_BORDER, background: PAGE_BG_STAGING } : undefined}
       >
         {!IS_VITE_APP_STAGING && (
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
@@ -760,11 +882,16 @@ export default function QuickVerification() {
           </div>
         )}
         {IS_VITE_APP_STAGING && (
-          <div className="px-5 py-4 border-b border-slate-200/80 bg-white/90 flex items-center justify-between gap-2">
+          <div
+            className="px-5 py-4 border-b bg-white flex items-center justify-between gap-2"
+            style={{ borderColor: CARD_BORDER }}
+          >
             <h2 className="text-base font-black" style={{ color: NAVY }}>
               سجلات المتاجر (اليوم)
             </h2>
-            <span className="text-xs font-bold text-slate-500 tabular-nums">{filteredDetails.length} عرض</span>
+            <span className="text-xs font-bold tabular-nums" style={{ color: SLATE_SECONDARY }}>
+              {filteredDetails.length} عرض
+            </span>
           </div>
         )}
         {loading && currentDetails.length === 0 ? (
@@ -778,55 +905,71 @@ export default function QuickVerification() {
           <div className="px-3 md:px-4 pb-6 pt-2 space-y-4">
             {filteredDetails.map(row => {
               const shipN = resolveShipmentCount(allStores, row.store_id)
+              const resolvedDown = row.arrow === 'down' && !!row.resolved
               return (
                 <motion.div
                   key={row.id}
                   layout
-                  className="group rounded-2xl border border-slate-200/90 bg-white px-5 py-5 md:px-6 md:py-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_12px_40px_rgba(15,23,42,0.08)]"
+                  className="group rounded-2xl border bg-white px-4 py-4 md:px-5 md:py-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                  style={{
+                    borderColor: CARD_BORDER,
+                    ...(resolvedDown ? { borderColor: `${PASTEL_GREEN_ICON}55`, boxShadow: '0 0 0 1px rgba(16,185,129,0.12)' } : {}),
+                  }}
                 >
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-                    {/* الهوية + القوة التشغيلية — خط أفقي واحد */}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-w-0 flex-1">
-                      <div className="min-w-0 flex-1">
-                        <h3
-                          className="text-lg md:text-xl font-black leading-snug tracking-tight truncate"
-                          style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="grid min-w-0 flex-1 grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-x-4">
+                      <h3
+                        className="min-w-0 text-lg font-black leading-snug tracking-tight truncate sm:text-xl"
+                        style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                        title={row.store_name}
+                      >
+                        {row.store_name}
+                      </h3>
+                      <div className="flex items-center justify-start sm:justify-center">
+                        <span
+                          className="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-black tabular-nums"
+                          style={{
+                            borderColor: CARD_BORDER,
+                            background: PAGE_BG_STAGING,
+                            color: SLATE_SECONDARY,
+                          }}
                         >
-                          {row.store_name}
-                        </h3>
-                        <p className="mt-1 text-xs font-bold text-slate-500 tabular-nums tracking-wide">
-                          كود المتجر{' '}
-                          <span className="inline-block rounded-lg bg-slate-100 text-slate-700 px-2 py-0.5 border border-slate-200/90">
-                            #{row.store_id}
-                          </span>
-                        </p>
+                          كود {row.store_id}
+                        </span>
                       </div>
                       <div
-                        className="shrink-0 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 border border-slate-200/80"
-                        style={{ background: 'linear-gradient(180deg, #f1f5f9 0%, #e8ecf0 100%)' }}
+                        className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
+                        style={{ borderColor: CARD_BORDER, background: '#FFFFFF' }}
                         title="عدد الشحنات (من بيانات المتجر)"
                       >
-                        <Package size={18} className="text-slate-500 shrink-0" aria-hidden />
-                        <span className="text-[11px] font-bold text-slate-500 uppercase">الشحنات</span>
-                        <span className="text-base font-black tabular-nums text-slate-900">
+                        <Package size={17} style={{ color: SLATE_SECONDARY }} className="shrink-0" aria-hidden />
+                        <span className="text-[11px] font-bold" style={{ color: SLATE_SECONDARY }}>
+                          الشحنات
+                        </span>
+                        <span className="text-base font-black tabular-nums" style={{ color: NAVY }}>
                           {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
                         </span>
-                        <span className="text-xs font-bold text-slate-600">شحنة</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-row flex-wrap items-center justify-between lg:justify-end gap-4 lg:gap-6">
+                    <div className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
+                      style={{ borderColor: CARD_BORDER }}
+                    >
                       <div className="flex items-center justify-center shrink-0">
-                        <StagingSatisfactionArrow arrow={row.arrow} />
+                        <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
                       </div>
-                      <div className="flex items-center gap-3 min-w-0 flex-1 lg:max-w-[240px] lg:flex-initial lg:justify-end">
-                        <p className="text-xs text-slate-500 truncate flex-1 text-right lg:text-right font-medium">
-                          {textSnippet(row.suggestions, 20) || '—'}
+                      <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
+                        <p
+                          className="truncate flex-1 text-right text-xs font-medium lg:text-right"
+                          style={{ color: SLATE_SECONDARY }}
+                        >
+                          {textSnippet(row.suggestions, 24) || '—'}
                         </p>
                         <button
                           type="button"
                           onClick={() => setModalRow(row)}
-                          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-300 bg-transparent px-4 py-2 text-xs font-black transition-colors text-[#1e3a5f] hover:bg-[#1e3a5f] hover:border-[#1e3a5f] hover:text-white"
+                          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors"
+                          style={{ borderColor: CARD_BORDER, color: NAVY }}
                         >
                           عرض التفاصيل
                           <ChevronLeft size={14} className="opacity-70" />
@@ -883,7 +1026,13 @@ export default function QuickVerification() {
 
       <AnimatePresence>
         {modalRow && IS_VITE_APP_STAGING && (
-          <StagingAuditDrawer key={modalRow.id} row={modalRow} onClose={() => setModalRow(null)} />
+          <StagingAuditDrawer
+            key={modalRow.id}
+            row={modalRow}
+            onClose={() => setModalRow(null)}
+            onResolve={resolveAudit}
+            resolveBusy={resolvingId === modalRow.id}
+          />
         )}
       </AnimatePresence>
 
@@ -1062,6 +1211,59 @@ export default function QuickVerification() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {IS_VITE_APP_STAGING && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[500] border-t px-3 py-3 md:px-5"
+          style={{
+            background: '#FFFFFF',
+            borderColor: CARD_BORDER,
+            boxShadow: '0 -8px 32px rgba(15, 23, 42, 0.06)',
+          }}
+          dir="rtl"
+        >
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm sm:justify-start">
+              <span style={{ color: SLATE_SECONDARY }}>
+                <span className="font-black" style={{ color: NAVY }}>
+                  إجمالي المشاكل المكتشفة:
+                </span>{' '}
+                <span className="font-black tabular-nums">{execMetrics.totalProblems}</span>
+                <span className="mx-1 opacity-60" aria-hidden>
+                  🔽
+                </span>
+              </span>
+              <span style={{ color: SLATE_SECONDARY }}>
+                <span className="font-black" style={{ color: NAVY }}>
+                  مشاكل تم حلها:
+                </span>{' '}
+                <span className="font-black tabular-nums text-emerald-700">{execMetrics.resolvedProblems}</span>
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-md sm:flex-row sm:items-center sm:gap-3">
+              <span className="shrink-0 text-xs font-black" style={{ color: SLATE_SECONDARY }}>
+                نسبة الإنجاز {execMetrics.pct}%
+              </span>
+              <div
+                className="h-2.5 w-full overflow-hidden rounded-full sm:flex-1"
+                style={{ background: PAGE_BG_STAGING }}
+                role="progressbar"
+                aria-valuenow={execMetrics.pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width: `${execMetrics.pct}%`,
+                    background: `linear-gradient(90deg, ${PASTEL_GREEN_ICON}, ${CORPORATE_ORANGE})`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
