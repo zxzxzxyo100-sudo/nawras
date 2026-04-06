@@ -22,6 +22,18 @@ if ($userRole !== 'executive') {
 }
 
 $pdo = getDB();
+
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_resolutions (
+        survey_id INT NOT NULL PRIMARY KEY,
+        resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        resolved_by VARCHAR(100) NULL DEFAULT NULL,
+        INDEX idx_resolved_at (resolved_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+} catch (Throwable $e) {
+    // ignore; SELECT may fail below if DB unavailable
+}
+
 $labelsOnb = ['إدخال الشحنات', 'أداء التطبيق', 'المهام اللوجستية'];
 $labelsCsat = [
     'سرعة التوصيل',
@@ -41,9 +53,11 @@ try {
           s.q1_delivery, s.q2_collection, s.q3_support,
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
-          s.performed_by, s.submitted_username, s.created_at
+          s.performed_by, s.submitted_username, s.created_at,
+          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
+        LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
         WHERE DATE(s.created_at) = CURDATE()
         AND COALESCE(s.survey_kind, '') = 'new_merchant_onboarding'
         ORDER BY s.created_at DESC
@@ -83,6 +97,8 @@ try {
             }
         }
         $score = (string) ($r['satisfaction_score'] ?? '');
+        $qvAt = $r['qv_resolved_at'] ?? null;
+        $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
         $rows[] = [
             'id' => (int) $r['id'],
             'survey_kind' => 'new_merchant_onboarding',
@@ -96,6 +112,9 @@ try {
             'gap_tags' => array_values(array_unique($tags)),
             'suggestions' => trim((string) ($r['suggestions'] ?? '')),
             'created_at' => $r['created_at'],
+            'resolved' => $resolved,
+            'resolved_at' => $resolved ? $r['qv_resolved_at'] : null,
+            'resolved_by' => $resolved ? trim((string) ($r['qv_resolved_by'] ?? '')) : null,
         ];
     }
 
@@ -105,9 +124,11 @@ try {
           s.q1_delivery, s.q2_collection, s.q3_support, s.q4_app, s.q5_payments, s.q6_returns,
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
-          s.performed_by, s.submitted_username, s.created_at
+          s.performed_by, s.submitted_username, s.created_at,
+          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
+        LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
         WHERE DATE(s.created_at) = CURDATE()
         AND COALESCE(s.survey_kind, '') = 'active_csat'
         ORDER BY s.created_at DESC
@@ -164,6 +185,8 @@ try {
         }
         $score = (string) ($r['satisfaction_score'] ?? '');
         $arrow = $score === 'up' ? 'up' : ($score === 'mid' ? 'mid' : 'down');
+        $qvAt = $r['qv_resolved_at'] ?? null;
+        $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
         $activeCsatRows[] = [
             'id' => (int) $r['id'],
             'survey_kind' => 'active_csat',
@@ -179,6 +202,9 @@ try {
             'gap_tags' => array_values(array_unique($tags)),
             'suggestions' => trim((string) ($r['suggestions'] ?? '')),
             'created_at' => $r['created_at'],
+            'resolved' => $resolved,
+            'resolved_at' => $resolved ? $r['qv_resolved_at'] : null,
+            'resolved_by' => $resolved ? trim((string) ($r['qv_resolved_by'] ?? '')) : null,
         ];
     }
 } catch (Throwable $e) {

@@ -183,6 +183,10 @@ export const getQuickVerificationAuditTimeline = (storeId) =>
     })
     .then(r => r.data)
 
+/** تسجيل حل مشكلة تدقيق (استبيان اليوم) — للمدير التنفيذي */
+export const postQuickVerificationResolveAudit = (data) =>
+  http.post('/quick-verification-resolve-audit.php', data).then(r => r.data)
+
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http
