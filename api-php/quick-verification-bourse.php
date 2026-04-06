@@ -39,6 +39,7 @@ try {
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           s.q1_delivery, s.q2_collection, s.q3_support,
           s.satisfaction_score, s.satisfaction_gap_tags,
+          s.suggestions,
           s.performed_by, s.submitted_username, s.created_at
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
@@ -91,6 +92,7 @@ try {
             'answers' => $answers,
             'arrow' => $score === 'up' ? 'up' : 'down',
             'gap_tags' => array_values(array_unique($tags)),
+            'suggestions' => trim((string) ($r['suggestions'] ?? '')),
             'created_at' => $r['created_at'],
         ];
     }
@@ -99,6 +101,7 @@ try {
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           s.q1_delivery, s.q2_collection, s.q3_support, s.q4_app, s.q5_payments, s.q6_returns,
           s.satisfaction_score, s.satisfaction_gap_tags,
+          s.suggestions,
           s.performed_by, s.submitted_username, s.created_at
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
@@ -170,6 +173,7 @@ try {
             'arrow' => $arrow,
             'questions' => $questions,
             'gap_tags' => array_values(array_unique($tags)),
+            'suggestions' => trim((string) ($r['suggestions'] ?? '')),
             'created_at' => $r['created_at'],
         ];
     }

@@ -345,6 +345,17 @@ export default function QuickVerification() {
                   <p className="text-slate-800">{modalRow.staff_fullname || modalRow.staff_username || '—'}</p>
                 </div>
 
+                {(modalRow.suggestions || '').trim() !== '' && (
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-500 mb-1">
+                      ملاحظات أو مقترحات المتجر
+                    </p>
+                    <p className="text-sm text-slate-800 whitespace-pre-wrap rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2.5 leading-relaxed">
+                      {(modalRow.suggestions || '').trim()}
+                    </p>
+                  </div>
+                )}
+
                 {modalRow.survey_kind === 'active_csat' && modalRow.questions && (
                   <>
                     <div className="flex flex-wrap items-center gap-2 text-sm">
