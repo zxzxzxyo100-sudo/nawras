@@ -17,7 +17,7 @@ import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
-import { IS_STAGING_OR_DEV } from '../config/envFlags'
+import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV } from '../config/envFlags'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -547,14 +547,29 @@ export default function Tasks() {
     }
   }, [selectedTask, user?.username, user?.role])
 
-  /** مسؤول المتاجر: من المهام اليومية — إن كان المتجر يحتاج استبيان التهيئة، افتح نافذة المكالمة فوراً (لا خطوة إضافية) */
+  /**
+   * مع VITE_APP_STAGING=1: افتح نافذة «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة دون النافذة المنفصلة القديمة.
+   * — مسؤول المتاجر + متجر مُسنَد يحتاج تهيئة، أو
+   * — مدير الاحتضان/تنفيذي + مهمة «استبيان تهيئة متجر جديد».
+   */
   const drawerAutoOpenCallModal = useMemo(() => {
-    if (user?.role !== 'active_manager' || !selectedTask) return false
-    if (selectedTask.type !== 'assigned_store') return false
-    return needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
+    if (!selectedTask || !IS_SIMPLE_LOG_CALL_MODAL) return false
+    const needs = needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
+    if (!needs) return false
+    if (user?.role === 'active_manager' && selectedTask.type === 'assigned_store') return true
+    if (
+      selectedTask.type === 'new_merchant_onboarding'
+      && ['incubation_manager', 'executive'].includes(user?.role)
+    ) return true
+    return false
   }, [user?.role, selectedTask, newMerchantOnboardingDoneIds])
 
   function handleTaskCall(taskRow) {
+    // التجريبي/التطوير: استبيان التهيئة داخل CallModal الموحّد (لا NewMerchantOnboardingModal منفصلة)
+    if (taskRow.type === 'new_merchant_onboarding' && IS_SIMPLE_LOG_CALL_MODAL) {
+      setSelectedTask(taskRow)
+      return
+    }
     if (IS_STAGING_OR_DEV && taskRow.type === 'new_merchant_onboarding') {
       setPendingOnboardingTask(taskRow)
       return
@@ -1021,6 +1036,7 @@ export default function Tasks() {
           onClose={() => setSelectedTask(null)}
           taskCompletion={drawerTaskCompletion}
           autoOpenCallModal={drawerAutoOpenCallModal}
+          fromDailyTasks
           extraOnSaved={() => {
             loadDismissals()
             void loadInactiveWf()

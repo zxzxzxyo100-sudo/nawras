@@ -36,6 +36,8 @@ export default function StoreDrawer({
   callType = 'general',
   /** عند فتح الدرج من «المهام اليومية» + اتصال — يُفتح استبيان/تسجيل المكالمة مباشرة */
   autoOpenCallModal = false,
+  /** نافذة التسجيل فُتحت من صفحة المهام اليومية — تمرير إلى CallModal لواجهة الاستبيان المفرَضة */
+  fromDailyTasks = false,
 }) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
@@ -405,6 +407,7 @@ export default function StoreDrawer({
             extraOnSaved?.()
           }}
           taskCompletion={taskCompletion}
+          fromDailyTasks={fromDailyTasks}
         />
       )}
     </>

@@ -9,6 +9,7 @@ const VITE_STAGING =
 /**
  * نافذة «تسجيل مكالمة» مبسّطة: استبيان 3 أسئلة مباشرة + حفظ / لم يرد فقط.
  * التطوير المحلي (`npm run dev`) أو بناء التجريبي مع `VITE_APP_STAGING=1` في `.env.staging`.
+ * يُستخدم أيضاً لمسار «المهام اليومية» (موظفو المتاجر الجدد / مسؤول المتاجر).
  */
 export const IS_SIMPLE_LOG_CALL_MODAL =
   Boolean(import.meta.env.DEV) ||
