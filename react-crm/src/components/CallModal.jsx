@@ -412,7 +412,7 @@ export default function CallModal({
             whileTap={{ scale: 0.98 }}
             className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
           >
-            {saving ? 'جارٍ التسجيل…' : 'عدم الرد — يبقى المتجر في المهام اليومية'}
+            {saving ? 'جارٍ التسجيل…' : 'لم يتم الرد — يبقى المتجر في المهام اليومية'}
           </motion.button>
           <div className="flex gap-3">
             <motion.button

@@ -171,6 +171,10 @@ export const getManagerAnalytics = (params) =>
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)
 
+/** التحقق السريع — استبيانات تهيئة المتاجر الجديدة اليوم (تفاصيل الصفوف) */
+export const getQuickVerificationBourse = () =>
+  http.get('/quick-verification-bourse.php', { params: { user_role: 'executive' } }).then(r => r.data)
+
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http

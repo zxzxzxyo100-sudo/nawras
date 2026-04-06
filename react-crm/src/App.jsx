@@ -6,6 +6,7 @@ import { PointsProvider, usePoints } from './contexts/PointsContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import QuickVerification from './pages/QuickVerification'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
 import ActiveWorkflow from './pages/ActiveWorkflow'
@@ -43,6 +44,10 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<Dashboard />} />
+        <Route
+          path="/quick-verification"
+          element={<PrivateRoute view="quick_verification"><QuickVerification /></PrivateRoute>}
+        />
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
         <Route path="/active"       element={<Navigate to="/active/pending" replace />} />
         <Route path="/active/frozen" element={<Navigate to="/frozen" replace />} />

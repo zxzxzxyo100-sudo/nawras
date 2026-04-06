@@ -338,18 +338,21 @@ elseif ($action === 'log_call') {
                   registration_date = COALESCE(registration_date, VALUES(registration_date))")
                 ->execute([$storeId, $storeName, $regDate]);
         } elseif ($callType === 'inc_call3') {
-            $hasShipped = !empty($input['has_shipped']);
-            $newCat = $hasShipped ? 'active_pending_calls' : 'inactive';
-            $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call3_at, incubation_stage, graduated_at, registration_date)
-                VALUES (?, ?, ?, NOW(), 'graduated', NOW(), ?)
-                ON DUPLICATE KEY UPDATE
-                  inc_call3_at = IF(inc_call3_at IS NULL, NOW(), inc_call3_at),
-                  category = VALUES(category),
-                  incubation_stage = 'graduated',
-                  graduated_at = COALESCE(graduated_at, NOW()),
-                  store_name = VALUES(store_name),
-                  registration_date = COALESCE(registration_date, VALUES(registration_date))")
-                ->execute([$storeId, $storeName, $newCat, $regDate]);
+            // التخريج إلى نشط/غير نشط فقط عند «تم الرد» على المكالمة الثالثة
+            if ($outcome === 'answered') {
+                $hasShipped = !empty($input['has_shipped']);
+                $newCat = $hasShipped ? 'active_pending_calls' : 'inactive';
+                $pdo->prepare("INSERT INTO store_states (store_id, store_name, category, inc_call3_at, incubation_stage, graduated_at, registration_date)
+                    VALUES (?, ?, ?, NOW(), 'graduated', NOW(), ?)
+                    ON DUPLICATE KEY UPDATE
+                      inc_call3_at = IF(inc_call3_at IS NULL, NOW(), inc_call3_at),
+                      category = VALUES(category),
+                      incubation_stage = 'graduated',
+                      graduated_at = COALESCE(graduated_at, NOW()),
+                      store_name = VALUES(store_name),
+                      registration_date = COALESCE(registration_date, VALUES(registration_date))")
+                    ->execute([$storeId, $storeName, $newCat, $regDate]);
+            }
         }
 
         $labels = [
