@@ -13,9 +13,13 @@ import {
   LineChart,
   ReferenceLine,
 } from 'recharts'
-import { BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw, ShieldAlert, Loader2, CheckCircle2, Circle } from 'lucide-react'
+import {
+  BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw, ShieldAlert, Loader2, CheckCircle2, Circle,
+  ArrowBigUp, ArrowBigDown,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getManagerAnalytics } from '../services/api'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 function csatColorClass(v) {
   if (v == null || Number.isNaN(v)) return 'text-slate-500'
@@ -218,6 +222,70 @@ export default function ManagerAnalytics() {
               </p>
             </div>
           </div>
+
+          {IS_STAGING_OR_DEV && (
+            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 lg:p-6 shadow-xl text-white">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-sm font-black tracking-tight flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
+                      <BarChart3 size={18} aria-hidden />
+                    </span>
+                    مهام اليوم — بورصة الرضا
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed max-w-xl">
+                    السهم من استبيانات «تم الرد» فقط: أخضر إذا كل التقييمات إيجابية (≥4)، أحمر إن وُجد تقييم سلبي (≤3).
+                    «لم يرد» لا يُظهر سهماً — يُحسب في نشاط الاتصال فقط.
+                  </p>
+                </div>
+              </div>
+              {!Array.isArray(data?.daily_staff_missions) || data.daily_staff_missions.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-600 rounded-xl">
+                  لا توجد استبيانات مكتملة اليوم لعرض الأسهم.
+                </p>
+              ) : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {data.daily_staff_missions.map(row => {
+                    const up = row.satisfaction_arrow === 'up'
+                    return (
+                      <li
+                        key={row.username}
+                        className="rounded-xl border border-slate-600/80 bg-slate-800/60 px-3 py-3 flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-slate-100 text-sm truncate">{row.fullname || row.username}</span>
+                          {up ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-400 font-black tabular-nums" title="رضا إيجابي">
+                              <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-rose-400 font-black tabular-nums" title="تقييم سلبي في أحد الأسئلة">
+                              <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان اليوم
+                        </p>
+                        {!up && Array.isArray(row.gap_tags) && row.gap_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {row.gap_tags.map(t => (
+                              <span
+                                key={t}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-950/80 text-rose-200 border border-rose-700/50"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
 
           {Array.isArray(data?.inactive_recovery_daily) && data.inactive_recovery_daily.length > 0 && (
             <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/80 to-white p-4 lg:p-6 shadow-sm">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { X, Star, ClipboardList, Info } from 'lucide-react'
 import { saveSurvey, markDailyTaskDone } from '../services/api'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from './StoreNameWithId'
 import {
@@ -68,7 +69,9 @@ export default function NewMerchantOnboardingModal({
     e.preventDefault()
     setError('')
     if (!allStarsSet) {
-      setError('يرجى تقييم الأسئلة الثلاثة بالنجوم قبل «تم».')
+      setError(IS_STAGING_OR_DEV
+        ? 'يرجى تقييم الأسئلة الثلاثة بالنجوم قبل حفظ الاستبيان.'
+        : 'يرجى تقييم الأسئلة الثلاثة بالنجوم قبل «تم».')
       return
     }
     const answers = buildOnboardingAnswersForApi(ratings)
@@ -206,7 +209,7 @@ export default function NewMerchantOnboardingModal({
                 disabled={saving || !allStarsSet}
                 className="w-full sm:flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-black transition-colors"
               >
-                {saving ? 'جارٍ الحفظ…' : 'تم'}
+                {saving ? 'جارٍ الحفظ…' : (IS_STAGING_OR_DEV ? 'حفظ الاستبيان' : 'تم')}
               </button>
             </div>
           </div>

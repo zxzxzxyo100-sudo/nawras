@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle, X,
+  Phone, RefreshCw, CheckCircle, X, ClipboardList,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
@@ -16,6 +16,7 @@ import {
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -148,7 +149,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
         priority: 'normal',
         type: 'new_merchant_onboarding',
         label: 'استبيان تهيئة متجر جديد',
-        desc: 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة',
+        desc: IS_STAGING_OR_DEV
+          ? 'قيّم تجربة التاجر من الاستبيان ثلاثي الأسئلة — أو من لوحة المتاجر الجديدة'
+          : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة',
       })
     }
 
@@ -304,6 +307,8 @@ function TaskCard({
   noAnswerLoading,
   userRole,
   doneDisabled,
+  hideDoneButton,
+  onOpenOnboarding,
 }) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
   const handleDone = () => {
@@ -378,21 +383,39 @@ function TaskCard({
             عدم الرد
           </motion.button>
         )}
-        <motion.button
-          onClick={handleDone}
-          disabled={doneDisabled}
-          title={doneDisabled ? 'يجب إكمال الاستبيان أولاً لإتمام المهمة.' : undefined}
-          whileHover={{ scale: doneDisabled ? 1 : 1.06, y: doneDisabled ? 0 : -1 }}
-          whileTap={{ scale: doneDisabled ? 1 : 0.9 }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-45 disabled:cursor-not-allowed disabled:grayscale"
-          style={{
-            background: 'linear-gradient(135deg, #059669, #047857)',
-            boxShadow: '0 4px 12px rgba(5,150,105,0.35)',
-          }}
-        >
-          <CheckCircle size={12} />
-          تم
-        </motion.button>
+        {hideDoneButton && task.type === 'new_merchant_onboarding' && (
+          <motion.button
+            type="button"
+            onClick={() => onOpenOnboarding?.(task)}
+            whileHover={{ scale: 1.06, y: -1 }}
+            whileTap={{ scale: 0.9 }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
+            style={{
+              background: 'linear-gradient(135deg, #6d28d9, #5b21b6)',
+              boxShadow: '0 4px 12px rgba(109,40,217,0.35)',
+            }}
+          >
+            <ClipboardList size={12} />
+            استبيان التهيئة
+          </motion.button>
+        )}
+        {!hideDoneButton && (
+          <motion.button
+            onClick={handleDone}
+            disabled={doneDisabled}
+            title={doneDisabled ? 'يجب إكمال الاستبيان أولاً لإتمام المهمة.' : undefined}
+            whileHover={{ scale: doneDisabled ? 1 : 1.06, y: doneDisabled ? 0 : -1 }}
+            whileTap={{ scale: doneDisabled ? 1 : 0.9 }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-45 disabled:cursor-not-allowed disabled:grayscale"
+            style={{
+              background: 'linear-gradient(135deg, #059669, #047857)',
+              boxShadow: '0 4px 12px rgba(5,150,105,0.35)',
+            }}
+          >
+            <CheckCircle size={12} />
+            تم
+          </motion.button>
+        )}
       </div>
     </motion.div>
   )
@@ -460,7 +483,7 @@ export default function Tasks() {
   } = useStores()
   const { user } = useAuth()
   const { onCallSaved } = usePoints()
-  const [selected, setSelected] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(null)
   /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
   const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
   const [filter, setFilter]     = useState('all') // 'all' | 'high' | 'no_answer'
@@ -508,6 +531,18 @@ export default function Tasks() {
   useEffect(() => {
     loadInactiveWf()
   }, [loadInactiveWf, lastLoaded])
+
+  const drawerTaskCompletion = useMemo(() => {
+    if (!IS_STAGING_OR_DEV || !selectedTask || !user?.username) return undefined
+    return {
+      dailyTaskKey: selectedTask.id,
+      inactiveRecovery:
+        selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive',
+      releaseActiveWorkflow:
+        selectedTask.type === 'assigned_store' && user.role === 'active_manager',
+      onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
+    }
+  }, [selectedTask, user?.username, user?.role])
 
   useEffect(() => {
     if (!toastMsg) return undefined
@@ -920,12 +955,14 @@ export default function Tasks() {
                   key={task.id}
                   task={task}
                   index={i}
-                  onCall={store => setSelected(store)}
+                  onCall={taskRow => setSelectedTask(taskRow)}
                   onDone={requestDone}
                   userRole={user?.role}
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
                   doneDisabled={blockDone}
+                  hideDoneButton={IS_STAGING_OR_DEV}
+                  onOpenOnboarding={setPendingOnboardingTask}
                 />
               )
             })}
@@ -956,7 +993,18 @@ export default function Tasks() {
         />
       )}
 
-      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+      {selectedTask && (
+        <StoreDrawer
+          store={selectedTask.store}
+          callType={taskIdToCallType(selectedTask.id)}
+          onClose={() => setSelectedTask(null)}
+          taskCompletion={drawerTaskCompletion}
+          extraOnSaved={() => {
+            loadDismissals()
+            void loadInactiveWf()
+          }}
+        />
+      )}
     </div>
   )
 }

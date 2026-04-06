@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
@@ -10,10 +10,12 @@ import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
   Award, Activity, ArrowUpRight, Baby, ClipboardList,
+  BarChart3, ArrowBigUp, ArrowBigDown, Loader2,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
+import { getManagerAnalytics } from '../services/api'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -99,6 +101,45 @@ export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
   const navigate = useNavigate()
+
+  const [staffMissions, setStaffMissions] = useState(null)
+  const [missionsLoading, setMissionsLoading] = useState(false)
+  const [missionsErr, setMissionsErr] = useState('')
+
+  const loadStaffSatisfaction = useCallback(async () => {
+    if (user?.role !== 'executive') return
+    setMissionsLoading(true)
+    setMissionsErr('')
+    try {
+      const res = await getManagerAnalytics({
+        year: new Date().getFullYear(),
+        period: 'yearly',
+        user_role: 'executive',
+      })
+      if (res?.success) {
+        setStaffMissions(Array.isArray(res.daily_staff_missions) ? res.daily_staff_missions : [])
+      } else {
+        setMissionsErr(res?.error || 'تعذّر تحميل بورصة الرضا')
+        setStaffMissions([])
+      }
+    } catch (e) {
+      setMissionsErr(e.response?.data?.error || e.message || 'خطأ')
+      setStaffMissions([])
+    } finally {
+      setMissionsLoading(false)
+    }
+  }, [user?.role])
+
+  useEffect(() => {
+    loadStaffSatisfaction()
+  }, [loadStaffSatisfaction])
+
+  function handleDashboardRefresh() {
+    reload()
+    if (user?.role === 'executive') {
+      void loadStaffSatisfaction()
+    }
+  }
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
   const workflowData = useMemo(() => {
     const days = []
@@ -190,13 +231,13 @@ export default function Dashboard() {
           </p>
         </div>
         <motion.button
-          onClick={reload}
-          disabled={loading}
+          onClick={handleDashboardRefresh}
+          disabled={loading || (user?.role === 'executive' && missionsLoading)}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.96 }}
           className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={loading || missionsLoading ? 'animate-spin' : ''} />
           تحديث
         </motion.button>
       </motion.div>
@@ -325,6 +366,93 @@ export default function Dashboard() {
           />
         )}
       </motion.div>
+
+      {/* ══ بورصة رضا الموظفين (المدير التنفيذي) ═══════════════════════ */}
+      {user?.role === 'executive' && (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.45, delay: 0.28 }}
+          className="rounded-2xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 lg:p-5 shadow-xl text-white"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                <BarChart3 size={20} className="text-emerald-300" aria-hidden />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-white tracking-tight">بورصة الرضا اليوم</h2>
+                <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
+                  أسهم من استبيانات «تم الرد» اليوم؛ أخضر صعوداً إذا كل التقييمات ≥4، أحمر هبوطاً إن وُجد ≤3.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/analytics/manager')}
+              className="shrink-0 text-xs font-bold text-violet-300 hover:text-white border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 px-3 py-2 rounded-xl transition-colors"
+            >
+              تحليلات المدير ←
+            </button>
+          </div>
+
+          {missionsErr && (
+            <p className="text-amber-300 text-xs mb-3">{missionsErr}</p>
+          )}
+
+          {missionsLoading && staffMissions === null ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-slate-400 text-sm">
+              <Loader2 size={20} className="animate-spin" />
+              جارٍ تحميل مؤشرات الرضا…
+            </div>
+          ) : !staffMissions?.length ? (
+            <div className="rounded-xl border border-dashed border-slate-600 py-8 text-center text-slate-500 text-sm">
+              لا توجد استبيانات مكتملة اليوم لعرض الأسهم.
+            </div>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+              {staffMissions.slice(0, 9).map(row => {
+                const up = row.satisfaction_arrow === 'up'
+                return (
+                  <li
+                    key={row.username}
+                    className="rounded-xl border border-slate-600/70 bg-slate-800/50 px-3 py-2.5 flex items-center justify-between gap-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-100 text-sm truncate">{row.fullname || row.username}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {up ? (
+                        <span className="inline-flex" title="رضا إيجابي">
+                          <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                        </span>
+                      ) : (
+                        <span className="inline-flex" title="فجوة في التقييم">
+                          <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
+                        </span>
+                      )}
+                      {!up && Array.isArray(row.gap_tags) && row.gap_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[140px]">
+                          {row.gap_tags.slice(0, 3).map(t => (
+                            <span
+                              key={t}
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950/90 text-rose-200 border border-rose-700/40"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </motion.div>
+      )}
 
       {/* ══ Charts Row ══════════════════════════════════════════════ */}
       <motion.div
