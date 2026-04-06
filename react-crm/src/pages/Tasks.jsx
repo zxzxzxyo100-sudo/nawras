@@ -141,7 +141,7 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
   }
 }
 
-function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds, surveyByStoreId) {
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
   const today = new Date().toISOString().split('T')[0]
 
   /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
@@ -182,7 +182,6 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       storeStates,
       newMerchantOnboardingDoneIds,
       IS_STAGING_OR_DEV,
-      surveyByStoreId || {},
     )
   }
 
@@ -863,9 +862,8 @@ export default function Tasks() {
     () => generateTasks(
       allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
       newMerchantOnboardingDoneIds,
-      surveyByStoreId,
     ),
-    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds, surveyByStoreId]
+    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds]
   )
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
@@ -1242,7 +1240,7 @@ export default function Tasks() {
             )}
             {isMoStaging && moTab !== 'cold_verify' && (
               <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
-                وضع مسؤول المتاجر الجديدة (تجريبي): في «متابعة دورية» تُعرَض مهام الاحتضان في أيام الدورة 1 و 3 و 10 فقط (وما بين المكالمات في يومَي 3 و 10 عند الحاجة)؛ بعد فوات النافذة دون تسجيل المكالمة لا يُعاد عرضها هنا إلا إن وُسِمت من التحقيق السريع. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+                وضع مسؤول المتاجر الجديدة (تجريبي): في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
               </p>
             )}
             {pendingTasks.length > 0 && (
