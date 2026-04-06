@@ -34,6 +34,8 @@ export default function StoreDrawer({
   extraOnSaved = null,
   /** نوع المكالمة لـ log_call (مثلاً inc_call1 لمسار الاحتضان) */
   callType = 'general',
+  /** عند فتح الدرج من «المهام اليومية» + اتصال — يُفتح استبيان/تسجيل المكالمة مباشرة */
+  autoOpenCallModal = false,
 }) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
@@ -80,6 +82,11 @@ export default function StoreDrawer({
       .catch(() => {})
       .finally(() => setLoadingAudit(false))
   }, [store.id])
+
+  useEffect(() => {
+    if (!autoOpenCallModal) return
+    setShowCallModal(true)
+  }, [store.id, autoOpenCallModal])
 
   async function submitFreeze() {
     setActionError('')

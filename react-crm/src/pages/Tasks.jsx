@@ -14,6 +14,7 @@ import {
   completeInactiveQueueSuccess,
 } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
+import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -215,11 +216,17 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
           : 999
+        const needsOnboarding =
+          store.bucket === 'incubating'
+          && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
+        const shipDesc = daysSinceShip < 999 ? `آخر شحنة قبل ${daysSinceShip} يوم` : 'لا توجد شحنات بعد'
         tasks.push({
           id: `${store.id}-assigned`, store,
           priority: daysSinceShip >= 10 ? 'high' : 'normal',
           type: 'assigned_store', label: 'متجر مُسنَد إليك',
-          desc: daysSinceShip < 999 ? `آخر شحنة قبل ${daysSinceShip} يوم` : 'لا توجد شحنات بعد',
+          desc: needsOnboarding && IS_STAGING_OR_DEV
+            ? `${shipDesc} — اضغط «اتصل» لفتح استبيان التهيئة (ثلاثة أسئلة) مباشرة`
+            : shipDesc,
         })
       }
     }
@@ -539,6 +546,13 @@ export default function Tasks() {
       onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
     }
   }, [selectedTask, user?.username, user?.role])
+
+  /** مسؤول المتاجر: من المهام اليومية — إن كان المتجر يحتاج استبيان التهيئة، افتح نافذة المكالمة فوراً (لا خطوة إضافية) */
+  const drawerAutoOpenCallModal = useMemo(() => {
+    if (user?.role !== 'active_manager' || !selectedTask) return false
+    if (selectedTask.type !== 'assigned_store') return false
+    return needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
+  }, [user?.role, selectedTask, newMerchantOnboardingDoneIds])
 
   function handleTaskCall(taskRow) {
     if (IS_STAGING_OR_DEV && taskRow.type === 'new_merchant_onboarding') {
@@ -1006,6 +1020,7 @@ export default function Tasks() {
           callType={taskIdToCallType(selectedTask.id)}
           onClose={() => setSelectedTask(null)}
           taskCompletion={drawerTaskCompletion}
+          autoOpenCallModal={drawerAutoOpenCallModal}
           extraOnSaved={() => {
             loadDismissals()
             void loadInactiveWf()
