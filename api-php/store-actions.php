@@ -86,37 +86,35 @@ function nawras_compute_satisfaction(array $q, $surveyKind) {
         return ['score' => 'down', 'tags' => $tags];
     }
 
-    $bucket = [
-        0 => '[إدخال]', 1 => '[إدخال]',
-        2 => '[تتبع]', 3 => '[تتبع]',
-        4 => '[مهام]', 5 => '[مهام]',
+    /** active_csat — متوسط 6 تقييمات (معايير عالمية مبسّطة):
+     *  أخضر 🔼: متوسط ≥ 4.0 | أصفر ↔️: 3.0–3.9 | أحمر 🔽: < 3.0
+     */
+    $labelsCsat = [
+        '[سرعة التوصيل]',       // q1_delivery
+        '[التجميع والمندوب]',   // q2_collection
+        '[الدعم الفني]',       // q3_support
+        '[سهولة التطبيق]',      // q4_app
+        '[التسويات المالية]',  // q5_payments
+        '[المرجوعات]',         // q6_returns
     ];
+    $vals = [];
     for ($i = 0; $i < 6; $i++) {
-        $v = (int) ($q[$i] ?? 0);
-        if ($v <= 3) {
-            $tags[] = $bucket[$i];
+        $vals[$i] = (int) ($q[$i] ?? 0);
+    }
+    $sum = array_sum($vals);
+    $avg = $sum / 6.0;
+    $tags = [];
+    for ($i = 0; $i < 6; $i++) {
+        if ($vals[$i] <= 3) {
+            $tags[] = $labelsCsat[$i];
         }
     }
     $tags = array_values(array_unique($tags));
-    $anyBad = false;
-    for ($i = 0; $i < 6; $i++) {
-        if ((int) ($q[$i] ?? 0) <= 3) {
-            $anyBad = true;
-            break;
-        }
-    }
-    $allGood = true;
-    for ($i = 0; $i < 6; $i++) {
-        if ((int) ($q[$i] ?? 0) < 4) {
-            $allGood = false;
-            break;
-        }
-    }
-    if ($anyBad) {
-        return ['score' => 'down', 'tags' => $tags];
-    }
-    if ($allGood) {
+    if ($avg >= 4.0) {
         return ['score' => 'up', 'tags' => []];
+    }
+    if ($avg >= 3.0) {
+        return ['score' => 'mid', 'tags' => $tags];
     }
 
     return ['score' => 'down', 'tags' => $tags];

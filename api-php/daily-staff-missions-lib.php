@@ -34,10 +34,17 @@ function nawras_build_daily_staff_missions(PDO $pdo) {
         }
         foreach ($byUser as $uname => $rows) {
             $anyDown = false;
+            $anyMid = false;
             $tags = [];
             foreach ($rows as $row) {
-                if (($row['satisfaction_score'] ?? '') === 'down') {
-                    $anyDown = true;
+                $sc = (string) ($row['satisfaction_score'] ?? '');
+                if ($sc === 'down' || $sc === 'mid') {
+                    if ($sc === 'down') {
+                        $anyDown = true;
+                    }
+                    if ($sc === 'mid') {
+                        $anyMid = true;
+                    }
                     $j = $row['satisfaction_gap_tags'] ?? '';
                     if ($j !== '' && $j !== null) {
                         $dec = json_decode((string) $j, true);
@@ -67,6 +74,15 @@ function nawras_build_daily_staff_missions(PDO $pdo) {
                     'fullname' => $fullname,
                     'role' => $role,
                     'satisfaction_arrow' => 'down',
+                    'gap_tags' => $tags,
+                    'answered_surveys_today' => count($rows),
+                ];
+            } elseif ($anyMid) {
+                $dailyStaffMissions[] = [
+                    'username' => $uname,
+                    'fullname' => $fullname,
+                    'role' => $role,
+                    'satisfaction_arrow' => 'mid',
                     'gap_tags' => $tags,
                     'answered_surveys_today' => count($rows),
                 ];
