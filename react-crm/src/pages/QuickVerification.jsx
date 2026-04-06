@@ -46,33 +46,52 @@ import {
 } from '../services/api'
 import { totalShipments, parcelsInRangeDisplay } from '../utils/storeFields'
 
-const SUCCESS = '#28C76F'
-const DANGER = '#EA5455'
-/** عناوين — كحلي عميق (بدل الأسود الصافي) */
-const NAVY = '#1e3a5f'
-/** نص ثانوي — Slate */
-const SLATE_SECONDARY = '#334155'
-/** خلفية الصفحة — رمادي محايد مريح */
-const PAGE_BG_STAGING = '#F3F4F6'
-/** بطاقات بيضاء مع حدود ناعمة */
-const CARD_BORDER = '#E5E7EB'
-/** أخضر باستيل للرضا 🔼 */
-const PASTEL_GREEN_BG = '#D1FAE5'
-const PASTEL_GREEN_ICON = '#059669'
-/** مرجان/وردي ناعم لعدم الرضا 🔽 */
-const SOFT_CORAL_BG = '#FFE4E6'
-const SOFT_CORAL_ICON = '#E11D48'
-/** برتقالي خفيف للإحصائيات */
-const CORPORATE_ORANGE = '#FB923C'
-/** عتبة شحنات عالية + 🔽 = أولوية قصوى */
-const HIGH_SHIPMENT_THRESHOLD = 50
-/** لوحة إنجازات المدير — تجريبي */
-const EXEC_STAT_NAVY = '#1E293B'
-const ACHIEVE_RED = '#EF4444'
-const ACHIEVE_GREEN = '#10B981'
-/** توافق مع الشريط العلوي القديم */
+const SUCCESS = '#059669'
+const DANGER = '#E11D48'
+
+/**
+ * نظام ألوان موحّد — لوحة تنفيذية هادئة (slate + teal/amber كلمسة علامة)
+ * تباين WCAG مقبول، بدون صراخ لوني.
+ */
+const DS = {
+  bgPage: '#F1F5F9',
+  surface: '#FFFFFF',
+  border: '#E2E8F0',
+  text: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  /** كحلي العلامة */
+  brand: '#1E3A5F',
+  brandIconEnd: '#0F172A',
+  success: { solid: '#059669', light: '#ECFDF5', soft: '#D1FAE5', border: '#A7F3D0' },
+  danger: { solid: '#BE123C', light: '#FFF1F2', soft: '#FFE4E6', border: '#FECDD3' },
+  amber: { solid: '#D97706', light: '#FFFBEB', border: '#FDE68A', muted: '#F59E0B' },
+  /** تدرج شريط إنجاز: teal → amber ذهبي هادئ */
+  progressFrom: '#0D9488',
+  progressTo: '#B45309',
+  riskPulse: 'rgba(190, 18, 60, 0.22)',
+  riskBorder: 'rgba(190, 18, 60, 0.42)',
+  statWellRed: 'rgba(220, 38, 38, 0.09)',
+  statWellGreen: 'rgba(5, 150, 105, 0.1)',
+  radarStroke: '#0D9488',
+}
+
+const NAVY = DS.brand
+const SLATE_SECONDARY = DS.textSecondary
+const PAGE_BG_STAGING = DS.bgPage
+const CARD_BORDER = DS.border
+const PASTEL_GREEN_BG = DS.success.soft
+const PASTEL_GREEN_ICON = DS.success.solid
+const SOFT_CORAL_BG = DS.danger.soft
+const SOFT_CORAL_ICON = DS.danger.solid
+const CORPORATE_ORANGE = DS.progressTo
+const ACHIEVE_RED = '#DC2626'
+const ACHIEVE_GREEN = DS.success.solid
 const NEON_GREEN = PASTEL_GREEN_ICON
 const CRIMSON = SOFT_CORAL_ICON
+
+/** عتبة شحنات عالية + 🔽 = أولوية قصوى */
+const HIGH_SHIPMENT_THRESHOLD = 50
 
 function resolveShipmentCount(allStores, storeId) {
   if (storeId == null || !Array.isArray(allStores)) return null
@@ -93,14 +112,14 @@ function StagingSatisfactionArrow({ arrow, resolvedDown }) {
       <span
         className="inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 border"
         style={{
-          borderColor: CARD_BORDER,
-          background: '#ECFDF5',
+          borderColor: DS.success.border,
+          background: DS.success.light,
           color: PASTEL_GREEN_ICON,
-          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
         }}
       >
         <CheckCircle2 size={24} strokeWidth={2.2} aria-hidden />
-        <span className="text-xs font-black" style={{ color: SLATE_SECONDARY }}>
+        <span className="text-xs font-black" style={{ color: DS.textSecondary }}>
           تم الحل
         </span>
       </span>
@@ -111,10 +130,10 @@ function StagingSatisfactionArrow({ arrow, resolvedDown }) {
       <span
         className="inline-flex items-center justify-center rounded-2xl p-3 border"
         style={{
-          borderColor: CARD_BORDER,
-          background: PASTEL_GREEN_BG,
+          borderColor: DS.success.border,
+          background: DS.success.soft,
           color: PASTEL_GREEN_ICON,
-          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
         }}
       >
         <ArrowBigUp size={26} strokeWidth={2.4} aria-hidden />
@@ -124,10 +143,14 @@ function StagingSatisfactionArrow({ arrow, resolvedDown }) {
   if (arrow === 'mid') {
     return (
       <span
-        className="inline-flex items-center justify-center rounded-2xl p-3 border border-amber-100 bg-amber-50/90"
-        style={{ boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)' }}
+        className="inline-flex items-center justify-center rounded-2xl p-3 border"
+        style={{
+          borderColor: DS.amber.border,
+          background: DS.amber.light,
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
+        }}
       >
-        <ArrowLeftRight size={24} strokeWidth={2.5} className="text-amber-600" aria-hidden />
+        <ArrowLeftRight size={24} strokeWidth={2.5} style={{ color: DS.amber.solid }} aria-hidden />
       </span>
     )
   }
@@ -135,10 +158,10 @@ function StagingSatisfactionArrow({ arrow, resolvedDown }) {
     <span
       className="inline-flex items-center justify-center rounded-2xl p-3 border"
       style={{
-        borderColor: CARD_BORDER,
-        background: SOFT_CORAL_BG,
+        borderColor: DS.danger.border,
+        background: DS.danger.light,
         color: SOFT_CORAL_ICON,
-        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
       }}
     >
       <ArrowBigDown size={26} strokeWidth={2.4} aria-hidden />
@@ -427,7 +450,13 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
                         <PolarGrid stroke="#e2e8f0" />
                         <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b' }} />
                         <PolarRadiusAxis angle={90} domain={[0, 5]} tickCount={6} tick={{ fontSize: 9 }} />
-                        <Radar name="A" dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} />
+                        <Radar
+                          name="A"
+                          dataKey="score"
+                          stroke={DS.radarStroke}
+                          fill={DS.radarStroke}
+                          fillOpacity={0.22}
+                        />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
@@ -508,9 +537,9 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
               disabled={resolveBusy}
               className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black shadow-md transition-opacity disabled:opacity-60"
               style={{
-                background: `linear-gradient(180deg, ${PASTEL_GREEN_BG} 0%, #A7F3D0 100%)`,
-                color: NAVY,
-                border: `1px solid ${CARD_BORDER}`,
+                background: `linear-gradient(180deg, ${DS.success.light} 0%, ${DS.success.soft} 100%)`,
+                color: DS.brand,
+                border: `1px solid ${DS.border}`,
               }}
             >
               {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
@@ -521,7 +550,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         {row.arrow === 'down' && row.resolved && (
           <div
             className="shrink-0 border-t px-5 py-3 text-center text-sm font-bold bg-emerald-50/90"
-            style={{ borderColor: CARD_BORDER, color: PASTEL_GREEN_ICON }}
+            style={{ borderColor: DS.border, color: DS.success.solid }}
           >
             تم تسجيل حل هذه المشكلة ✅
           </div>
@@ -701,16 +730,20 @@ export default function QuickVerification() {
       {/* رأس الصفحة */}
       {IS_VITE_APP_STAGING ? (
         <div
-          className="rounded-2xl border bg-white px-5 py-6 shadow-sm"
-          style={{ borderColor: CARD_BORDER }}
+          className="rounded-2xl border bg-white px-5 py-6"
+          style={{
+            borderColor: DS.border,
+            boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.04)',
+          }}
         >
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
             <div className="flex items-start gap-4 min-w-0">
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
                 style={{
-                  background: `linear-gradient(145deg, ${NAVY} 0%, #2c5282 100%)`,
-                  border: `1px solid ${CARD_BORDER}`,
+                  background: `linear-gradient(155deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)`,
+                  border: `1px solid ${DS.border}`,
+                  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.14)',
                 }}
               >
                 <ShieldCheck size={28} className="text-white" strokeWidth={2.2} />
@@ -722,49 +755,49 @@ export default function QuickVerification() {
                 >
                   التحقق السريع
                 </h1>
-                <p className="text-sm mt-1.5 font-medium" style={{ color: SLATE_SECONDARY }}>
+                <p className="text-sm mt-1.5 font-medium" style={{ color: DS.textSecondary }}>
                   لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm border bg-white"
-                style={{ borderColor: CARD_BORDER, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black border bg-white"
+                style={{ borderColor: DS.border, color: DS.text }}
               >
-                <LayoutGrid size={18} style={{ color: CORPORATE_ORANGE }} aria-hidden />
+                <LayoutGrid size={18} style={{ color: DS.textMuted }} aria-hidden />
                 الإجمالي
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: PAGE_BG_STAGING, color: NAVY }}
+                  style={{ background: 'rgba(148, 163, 184, 0.14)', color: DS.brand }}
                 >
                   {satStats.total}
                 </span>
               </span>
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white shadow-sm"
-                style={{ borderColor: CARD_BORDER, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white"
+                style={{ borderColor: DS.border, color: DS.text }}
               >
-                <Smile size={18} style={{ color: PASTEL_GREEN_ICON }} strokeWidth={2.4} aria-hidden />
+                <Smile size={18} style={{ color: DS.success.solid }} strokeWidth={2.4} aria-hidden />
                 راضٍ
-                <ArrowBigUp size={16} style={{ color: PASTEL_GREEN_ICON }} className="opacity-90" aria-hidden />
+                <ArrowBigUp size={16} style={{ color: DS.success.solid }} className="opacity-90" aria-hidden />
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: PASTEL_GREEN_BG, color: NAVY }}
+                  style={{ background: DS.success.light, color: DS.brand }}
                 >
                   {satStats.sat}
                 </span>
               </span>
               <span
-                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white shadow-sm"
-                style={{ borderColor: CARD_BORDER, color: NAVY }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-black bg-white"
+                style={{ borderColor: DS.border, color: DS.text }}
               >
-                <Frown size={18} style={{ color: SOFT_CORAL_ICON }} strokeWidth={2.4} aria-hidden />
+                <Frown size={18} style={{ color: DS.danger.solid }} strokeWidth={2.4} aria-hidden />
                 غير راضٍ
-                <ArrowBigDown size={16} style={{ color: SOFT_CORAL_ICON }} className="opacity-90" aria-hidden />
+                <ArrowBigDown size={16} style={{ color: DS.danger.solid }} className="opacity-90" aria-hidden />
                 <span
                   className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{ background: SOFT_CORAL_BG, color: NAVY }}
+                  style={{ background: DS.danger.light, color: DS.brand }}
                 >
                   {satStats.uns}
                 </span>
@@ -773,8 +806,8 @@ export default function QuickVerification() {
                 type="button"
                 onClick={() => void loadAll()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 shadow-sm"
-                style={{ color: NAVY, borderColor: CARD_BORDER }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                style={{ color: DS.brand, borderColor: DS.border }}
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 تحديث
@@ -823,15 +856,19 @@ export default function QuickVerification() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2">
+      <div
+        className="flex flex-wrap gap-2 rounded-2xl border p-2"
+        style={{ borderColor: DS.border, background: 'rgba(255,255,255,0.7)' }}
+      >
         <button
           type="button"
           onClick={() => setMainTab('onboarding')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
             mainTab === 'onboarding'
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-              : 'text-slate-600 hover:bg-white/80'
+              ? 'bg-white shadow-sm border text-slate-900'
+              : 'text-slate-600 hover:bg-white/90 border border-transparent'
           }`}
+          style={mainTab === 'onboarding' ? { borderColor: DS.border } : undefined}
         >
           <Store size={18} />
           متاجر جدد (تهيئة)
@@ -839,11 +876,12 @@ export default function QuickVerification() {
         <button
           type="button"
           onClick={() => setMainTab('active_csat')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
             mainTab === 'active_csat'
-              ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
-              : 'text-slate-600 hover:bg-white/80'
+              ? 'bg-white shadow-sm border text-slate-900'
+              : 'text-slate-600 hover:bg-white/90 border border-transparent'
           }`}
+          style={mainTab === 'active_csat' ? { borderColor: DS.border } : undefined}
         >
           <Truck size={18} />
           تجار نشطون (CSAT)
@@ -851,7 +889,10 @@ export default function QuickVerification() {
       </div>
 
       {IS_VITE_APP_STAGING && (
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div
+          className="flex flex-wrap gap-2 rounded-2xl border bg-white p-2"
+          style={{ borderColor: DS.border, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}
+        >
           {[
             { id: 'all', label: 'الكل' },
             { id: 'down', label: 'غير راضٍ 🔽' },
@@ -861,11 +902,16 @@ export default function QuickVerification() {
               key={t.id}
               type="button"
               onClick={() => setSatTab(t.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 satTab === t.id
-                  ? 'bg-slate-900 text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
+              style={
+                satTab === t.id
+                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  : undefined
+              }
             >
               {t.label}
             </button>
@@ -875,37 +921,44 @@ export default function QuickVerification() {
 
       {IS_VITE_APP_STAGING && (
         <div
-          className="flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-sm md:flex-row md:items-stretch md:justify-between"
-          style={{ borderColor: CARD_BORDER }}
+          className="flex flex-col gap-3 rounded-2xl border bg-white p-3 md:flex-row md:items-stretch md:justify-between"
+          style={{ borderColor: DS.border, boxShadow: '0 1px 3px rgba(15,23,42,0.05)' }}
         >
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setAuditViewTab('active')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${
-                auditViewTab === 'active'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50'
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
+                auditViewTab === 'active' ? 'text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
               }`}
+              style={
+                auditViewTab === 'active'
+                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  : undefined
+              }
             >
               قيد التدقيق
             </button>
             <button
               type="button"
               onClick={() => setAuditViewTab('resolved')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${
-                auditViewTab === 'resolved'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50'
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
+                auditViewTab === 'resolved' ? 'text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
               }`}
+              style={
+                auditViewTab === 'resolved'
+                  ? { background: `linear-gradient(180deg, ${DS.brand} 0%, ${DS.brandIconEnd} 100%)` }
+                  : undefined
+              }
             >
               سجل الحلول
             </button>
           </div>
           <div className="relative min-h-[44px] min-w-0 flex-1 md:max-w-lg">
             <Search
-              className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2"
               size={18}
+              style={{ color: DS.textMuted }}
               aria-hidden
             />
             <input
@@ -913,8 +966,8 @@ export default function QuickVerification() {
               value={quickSearch}
               onChange={e => setQuickSearch(e.target.value)}
               placeholder="بحث فوري: اسم المتجر أو كود المتجر…"
-              className="w-full rounded-xl border py-2.5 pr-10 pl-3 text-sm font-medium outline-none focus:ring-2 focus:ring-slate-300"
-              style={{ borderColor: CARD_BORDER, color: NAVY }}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pr-10 pl-3 text-sm font-medium outline-none transition-colors focus:border-teal-700/30 focus:bg-white focus:ring-2 focus:ring-teal-900/10"
+              style={{ color: DS.text }}
               autoComplete="off"
             />
           </div>
@@ -925,8 +978,8 @@ export default function QuickVerification() {
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">{err}</p>
       )}
 
-      <section className="rounded-2xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 lg:p-5 shadow-xl text-white">
-        <h2 className="text-sm font-black text-white mb-3">
+      <section className="rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 lg:p-5 text-white shadow-lg ring-1 ring-white/5">
+        <h2 className="text-sm font-black text-slate-100 mb-3 tracking-tight">
           ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
         </h2>
         {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
@@ -945,11 +998,11 @@ export default function QuickVerification() {
               return (
                 <li
                   key={row.username || row.fullname}
-                  className="rounded-xl border border-slate-600/70 bg-slate-800/50 px-3 py-2.5 flex items-center justify-between gap-2"
+                  className="rounded-xl border border-slate-600/40 bg-slate-800/35 px-3 py-2.5 flex items-center justify-between gap-2 backdrop-blur-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-slate-100 text-sm truncate">{row.fullname || row.username}</p>
-                    <p className="text-[10px] text-slate-500 truncate">
+                    <p className="font-bold text-slate-50 text-sm truncate">{row.fullname || row.username}</p>
+                    <p className="text-[10px] text-slate-400 truncate">
                       {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
                     </p>
                   </div>
@@ -967,11 +1020,11 @@ export default function QuickVerification() {
                     title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
                   >
                     {up ? (
-                      <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                      <ArrowBigUp size={22} strokeWidth={2.5} style={{ color: '#34D399' }} aria-hidden />
                     ) : mid ? (
-                      <ArrowLeftRight size={22} strokeWidth={2.5} className="text-amber-400" aria-hidden />
+                      <ArrowLeftRight size={22} strokeWidth={2.5} style={{ color: DS.amber.muted }} aria-hidden />
                     ) : (
-                      <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
+                      <ArrowBigDown size={22} strokeWidth={2.5} style={{ color: '#FB7185' }} aria-hidden />
                     )}
                   </button>
                 </li>
@@ -984,34 +1037,37 @@ export default function QuickVerification() {
       {IS_VITE_APP_STAGING && (
         <section className="mx-auto w-full max-w-6xl" aria-label="لوحة إنجازات المدير">
           <div
-            className="rounded-2xl border bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.07)] md:p-6"
-            style={{ borderColor: CARD_BORDER }}
+            className="rounded-2xl border bg-gradient-to-b from-white to-slate-50/90 p-4 md:p-6"
+            style={{
+              borderColor: DS.border,
+              boxShadow: '0 1px 2px rgba(15,23,42,0.05), 0 16px 40px rgba(15,23,42,0.06)',
+            }}
           >
             <p
-              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.12em] md:text-xs"
-              style={{ color: EXEC_STAT_NAVY }}
+              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.14em] md:text-xs"
+              style={{ color: DS.textMuted }}
             >
               لوحة إنجازات المدير
             </p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
               <div
-                className="flex flex-col rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
-                style={{ borderColor: '#E2E8F0' }}
+                className="flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
+                style={{ borderColor: DS.border }}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: 'rgba(239, 68, 68, 0.12)' }}
+                    style={{ background: DS.statWellRed }}
                   >
                     <AlertCircle size={24} strokeWidth={2.2} style={{ color: ACHIEVE_RED }} aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: DS.text }}>
                       إجمالي المشاكل المكتشفة
                     </p>
                     <p
                       className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: EXEC_STAT_NAVY }}
+                      style={{ color: DS.text }}
                     >
                       {execMetrics.totalProblems}
                     </p>
@@ -1020,23 +1076,23 @@ export default function QuickVerification() {
               </div>
 
               <div
-                className="flex flex-col rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
-                style={{ borderColor: '#E2E8F0' }}
+                className="flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
+                style={{ borderColor: DS.border }}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: 'rgba(16, 185, 129, 0.12)' }}
+                    style={{ background: DS.statWellGreen }}
                   >
                     <CheckCircle2 size={24} strokeWidth={2.2} style={{ color: ACHIEVE_GREEN }} aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: DS.text }}>
                       مشاكل تم حلها
                     </p>
                     <p
                       className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: EXEC_STAT_NAVY }}
+                      style={{ color: DS.text }}
                     >
                       {execMetrics.resolvedProblems}
                     </p>
@@ -1045,22 +1101,19 @@ export default function QuickVerification() {
               </div>
 
               <div
-                className="flex flex-col justify-between rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
-                style={{ borderColor: '#E2E8F0' }}
+                className="flex flex-col justify-between rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md md:p-5"
+                style={{ borderColor: DS.border }}
               >
-                <p className="text-sm font-bold md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                <p className="text-sm font-bold md:text-[15px]" style={{ color: DS.text }}>
                   نسبة الإنجاز %
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <span
-                    className="text-3xl font-black tabular-nums md:text-4xl"
-                    style={{ color: EXEC_STAT_NAVY }}
-                  >
+                  <span className="text-3xl font-black tabular-nums md:text-4xl" style={{ color: DS.text }}>
                     {execMetrics.pct}%
                   </span>
                   <div
-                    className="h-3 min-w-[140px] flex-1 overflow-hidden rounded-full"
-                    style={{ background: PAGE_BG_STAGING }}
+                    className="h-3 min-w-[140px] flex-1 overflow-hidden rounded-full ring-1 ring-slate-200/80"
+                    style={{ background: DS.bgPage }}
                     role="progressbar"
                     aria-valuenow={execMetrics.pct}
                     aria-valuemin={0}
@@ -1070,7 +1123,7 @@ export default function QuickVerification() {
                       className="h-full rounded-full transition-all duration-500 ease-out"
                       style={{
                         width: `${execMetrics.pct}%`,
-                        background: `linear-gradient(90deg, ${ACHIEVE_GREEN}, ${CORPORATE_ORANGE})`,
+                        background: `linear-gradient(90deg, ${DS.progressFrom}, ${DS.progressTo})`,
                       }}
                     />
                   </div>
@@ -1087,7 +1140,7 @@ export default function QuickVerification() {
             ? 'rounded-2xl border shadow-sm overflow-hidden'
             : 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
         }
-        style={IS_VITE_APP_STAGING ? { borderColor: CARD_BORDER, background: PAGE_BG_STAGING } : undefined}
+        style={IS_VITE_APP_STAGING ? { borderColor: DS.border, background: DS.bgPage } : undefined}
       >
         {!IS_VITE_APP_STAGING && (
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
@@ -1100,12 +1153,12 @@ export default function QuickVerification() {
         {IS_VITE_APP_STAGING && (
           <div
             className="px-5 py-4 border-b bg-white flex flex-wrap items-center justify-between gap-2"
-            style={{ borderColor: CARD_BORDER }}
+            style={{ borderColor: DS.border }}
           >
-            <h2 className="text-base font-black" style={{ color: NAVY }}>
+            <h2 className="text-base font-black" style={{ color: DS.brand }}>
               {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
             </h2>
-            <span className="text-xs font-bold tabular-nums" style={{ color: SLATE_SECONDARY }}>
+            <span className="text-xs font-bold tabular-nums" style={{ color: DS.textSecondary }}>
               {stagingDisplayRows.length} عرض
             </span>
           </div>
@@ -1145,10 +1198,7 @@ export default function QuickVerification() {
                         y: 0,
                         ...(isHighRisk
                           ? {
-                              boxShadow: [
-                                '0 0 0 0px rgba(220,38,38,0.12)',
-                                '0 0 0 5px rgba(220,38,38,0.28)',
-                              ],
+                              boxShadow: [`0 0 0 0px ${DS.riskPulse}`, `0 0 0 6px ${DS.riskPulse}`],
                             }
                           : {}),
                       }}
@@ -1174,11 +1224,11 @@ export default function QuickVerification() {
                       className="group mb-4 rounded-2xl border bg-white px-4 py-4 md:px-5 md:py-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                       style={{
                         borderWidth: isHighRisk ? 2 : 1,
-                        borderColor: isHighRisk ? 'rgba(220, 38, 38, 0.55)' : CARD_BORDER,
+                        borderColor: isHighRisk ? DS.riskBorder : CARD_BORDER,
                         ...(resolvedDown && !isHighRisk
                           ? {
-                              borderColor: `${PASTEL_GREEN_ICON}55`,
-                              boxShadow: '0 0 0 1px rgba(16,185,129,0.12)',
+                              borderColor: DS.success.border,
+                              boxShadow: `0 0 0 1px ${DS.success.border}`,
                             }
                           : {}),
                       }}
@@ -1190,41 +1240,48 @@ export default function QuickVerification() {
                               <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                 <span
                                   className="max-w-full text-xl font-black leading-tight tracking-tight md:text-2xl"
-                                  style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                                  style={{ color: DS.brand, fontFeatureSettings: '"kern" 1' }}
                                   title={row.store_name}
                                 >
                                   {row.store_name}
                                 </span>
                                 <span
                                   className="text-sm font-semibold tabular-nums md:text-base"
-                                  style={{ color: '#94a3b8' }}
+                                  style={{ color: DS.textMuted }}
                                 >
                                   #{row.store_id}
                                 </span>
                               </div>
                               {isHighRisk ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-rose-700">
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black uppercase tracking-wide"
+                                  style={{
+                                    borderColor: DS.danger.border,
+                                    background: DS.danger.light,
+                                    color: DS.danger.solid,
+                                  }}
+                                >
                                   <Flame size={12} className="shrink-0" aria-hidden />
                                   High Risk
                                 </span>
                               ) : null}
                             </div>
                             {auditViewTab === 'resolved' ? (
-                              <p className="mt-2 text-xs font-bold" style={{ color: PASTEL_GREEN_ICON }}>
+                              <p className="mt-2 text-xs font-bold" style={{ color: DS.success.solid }}>
                                 مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
                               </p>
                             ) : null}
                           </div>
                           <div
                             className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
-                            style={{ borderColor: CARD_BORDER, background: '#FFFFFF' }}
+                            style={{ borderColor: DS.border, background: DS.surface }}
                             title="عدد الشحنات (من بيانات المتجر)"
                           >
-                            <Package size={17} style={{ color: SLATE_SECONDARY }} className="shrink-0" aria-hidden />
-                            <span className="text-[11px] font-bold" style={{ color: SLATE_SECONDARY }}>
+                            <Package size={17} style={{ color: DS.textSecondary }} className="shrink-0" aria-hidden />
+                            <span className="text-[11px] font-bold" style={{ color: DS.textSecondary }}>
                               الشحنات
                             </span>
-                            <span className="text-base font-black tabular-nums" style={{ color: NAVY }}>
+                            <span className="text-base font-black tabular-nums" style={{ color: DS.text }}>
                               {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
                             </span>
                           </div>
@@ -1232,7 +1289,7 @@ export default function QuickVerification() {
 
                         <div
                           className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
-                          style={{ borderColor: CARD_BORDER }}
+                          style={{ borderColor: DS.border }}
                         >
                           <div className="flex items-center justify-center shrink-0">
                             <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
@@ -1240,15 +1297,15 @@ export default function QuickVerification() {
                           <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
                             <p
                               className="truncate flex-1 text-right text-xs font-medium lg:text-right"
-                              style={{ color: SLATE_SECONDARY }}
+                              style={{ color: DS.textSecondary }}
                             >
                               {textSnippet(row.suggestions, 24) || '—'}
                             </p>
                             <button
                               type="button"
                               onClick={() => setModalRow(row)}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors"
-                              style={{ borderColor: CARD_BORDER, color: NAVY }}
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors hover:bg-slate-50"
+                              style={{ borderColor: DS.border, color: DS.brand }}
                             >
                               عرض التفاصيل
                               <ChevronLeft size={14} className="opacity-70" />
