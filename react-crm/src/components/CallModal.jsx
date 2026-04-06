@@ -11,7 +11,7 @@ import {
   completeInactiveQueueSuccess,
   releaseAfterSurvey,
 } from '../services/api'
-import { IS_STAGING_OR_DEV } from '../config/envFlags'
+import { IS_STAGING_OR_DEV, IS_SIMPLE_LOG_CALL_MODAL } from '../config/envFlags'
 import StoreNameWithId         from './StoreNameWithId'
 import { useAuth }             from '../contexts/AuthContext'
 import { useStores }           from '../contexts/StoresContext'
@@ -30,7 +30,14 @@ import {
 
 const MIN_INACTIVE_FEEDBACK_LEN = 10
 
-/** أزرار نتيجة المكالمة — مطابقة للواجهة */
+/** عناوين الاستبيان المبسّط (نفس الأسئلة + النص الكامل من DEV) */
+const SIMPLE_ONBOARDING_HEADINGS = [
+  'إدخال الشحنات والباركود',
+  'أداء التطبيق والتتبع',
+  'المهام (راجع / تسوية / تجميع)',
+]
+
+/** أزرار نتيجة المكالمة — الوضع الكامل فقط */
 const OUTCOME_OPTIONS = [
   { id: 'answered', label: 'تم الرد', Icon: CheckCircle2 },
   { id: 'no_answer', label: 'لم يرد', Icon: PhoneOff },
@@ -100,12 +107,44 @@ function storeHasShipped(store) {
   return Boolean(d && d !== 'لا يوجد')
 }
 
+async function runTaskCompletionAfterAnswered({
+  taskCompletion,
+  user,
+  store,
+  setError,
+  setSaving,
+}) {
+  if (!IS_STAGING_OR_DEV || !taskCompletion || !user?.username) return true
+  const u = user.username
+  const sid = store.id
+  const sname = store.name
+  try {
+    if (taskCompletion.inactiveRecovery && user?.role === 'inactive_manager') {
+      const cir = await completeInactiveQueueSuccess({
+        store_id: sid,
+        store_name: sname,
+        username: u,
+      })
+      if (cir?.goal_just_met) {
+        taskCompletion.onInactiveGoalBurst?.()
+      }
+    } else if (taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager') {
+      await releaseAfterSurvey({ store_id: sid, username: u })
+    }
+    if (taskCompletion.dailyTaskKey) {
+      await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
+    }
+  } catch (syncErr) {
+    const msg = syncErr?.response?.data?.error || syncErr?.message || 'تعذّر مزامنة إتمام المهمة.'
+    setError(msg)
+    setSaving(false)
+    return false
+  }
+  return true
+}
+
 /**
  * @param {object} [taskCompletion] — عند تفعيل مسار التجريب: إتمام المهمة اليومية بعد «حفظ المكالمة»
- * @param {string} [taskCompletion.dailyTaskKey]
- * @param {boolean} [taskCompletion.inactiveRecovery] — طابور استعادة غير النشط
- * @param {boolean} [taskCompletion.releaseActiveWorkflow] — طابور نشط بعد الاستبيان
- * @param {() => void} [taskCompletion.onInactiveGoalBurst]
  */
 export default function CallModal({
   store,
@@ -124,9 +163,7 @@ export default function CallModal({
   const [ratings, setRatings] = useState(() => Array(6).fill(0))
   const [suggestions, setSuggestions] = useState('')
   const [inactiveFeedback, setInactiveFeedback] = useState('')
-  /** نتيجة المكالمة — تُسجَّل مع log_call */
   const [outcome, setOutcome] = useState('answered')
-  /** استبيان تهيئة متجر جديد (ثلاثة نعم/لا) — داخل النافذة */
   const [onbYesNo, setOnbYesNo] = useState(() => [null, null, null])
 
   const dbCategory = storeStates[store.id]?.category || store.category || ''
@@ -134,6 +171,17 @@ export default function CallModal({
     () => callType === 'general' && isInactiveMerchantCategory(dbCategory),
     [callType, dbCategory],
   )
+
+  /** مسار مبسّط: استبيان 3 أسئلة فقط + حفظ / لم يرد (DEV أو VITE_APP_STAGING) */
+  const simpleOnboardingFlow = useMemo(
+    () =>
+      IS_SIMPLE_LOG_CALL_MODAL
+      && callType === 'general'
+      && !inactiveFeedbackNeeded
+      && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds),
+    [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded],
+  )
+
   const onboardingNeeded = useMemo(
     () =>
       IS_STAGING_OR_DEV
@@ -149,7 +197,7 @@ export default function CallModal({
       && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
     [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded, outcome],
   )
-  const showOnboarding = onboardingNeeded && outcome === 'answered'
+  const showOnboarding = !simpleOnboardingFlow && onboardingNeeded && outcome === 'answered'
   const inactiveFeedbackOk = inactiveFeedback.trim().length >= MIN_INACTIVE_FEEDBACK_LEN
   const allSurveyRated = ratings.every(r => r >= 1 && r <= 5)
   const allOnboardingYesNo = onbYesNo.every(v => v === true || v === false)
@@ -178,6 +226,121 @@ export default function CallModal({
       next[i] = v
       return next
     })
+  }
+
+  /** مسار مبسّط: تم الرد + حفظ الاستبيان + مكالمة — للبورصة 🔼/🔽 */
+  async function saveAnsweredSimple() {
+    setSaving(true)
+    setError('')
+    if (!allOnboardingYesNo) {
+      setError('يرجى الإجابة بـ «نعم» أو «لا» على الأسئلة الثلاثة قبل حفظ المكالمة.')
+      setSaving(false)
+      return
+    }
+    try {
+      const answers = buildOnboardingYesNoForApi(onbYesNo)
+      if (!answers) {
+        setError('إجابات الاستبيان غير صالحة.')
+        setSaving(false)
+        return
+      }
+      await saveSurvey({
+        store_id: store.id,
+        store_name: store.name,
+        answers,
+        suggestions: '',
+        survey_kind: 'new_merchant_onboarding',
+        user: user?.fullname ?? '',
+        user_role: user?.role ?? '',
+        username: user?.username ?? '',
+      })
+
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome: 'answered',
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
+      onCallSaved(res?.points_awarded ?? 10)
+
+      const ok = await runTaskCompletionAfterAnswered({
+        taskCompletion, user, store, setError, setSaving,
+      })
+      if (!ok) return
+
+      onSaved?.()
+      setTimeout(onClose, 400)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'تعذّر حفظ الاستبيان أو المكالمة.')
+      setSaving(false)
+    }
+  }
+
+  /** مسار مبسّط: لم يرد — طابور لم يتم الرد + إحضار متجر آخر عند الاستعادة */
+  async function saveNoAnswerSimple() {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome: 'no_answer',
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
+      onCallSaved(res?.points_awarded ?? 0)
+
+      if (user?.role === 'active_manager') {
+        const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
+        if (a?.assigned_to === user?.username) {
+          try {
+            await markSurveyNoAnswer({
+              store_id: store.id,
+              store_name: store.name,
+              username: user.username,
+            })
+          } catch { /* */ }
+        }
+      }
+
+      if (
+        IS_STAGING_OR_DEV
+        && taskCompletion?.inactiveRecovery
+        && user?.role === 'inactive_manager'
+        && user?.username
+      ) {
+        try {
+          await markSurveyNoAnswer({
+            store_id: store.id,
+            store_name: store.name,
+            username: user.username,
+            queue: 'inactive',
+          })
+        } catch { /* */ }
+      }
+
+      onSaved?.()
+      setTimeout(onClose, 400)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function submitCall() {
@@ -294,31 +457,10 @@ export default function CallModal({
       }
 
       if (IS_STAGING_OR_DEV && taskCompletion && user?.username && outcome === 'answered') {
-        const u = user.username
-        const sid = store.id
-        const sname = store.name
-        try {
-          if (taskCompletion.inactiveRecovery && user?.role === 'inactive_manager') {
-            const cir = await completeInactiveQueueSuccess({
-              store_id: sid,
-              store_name: sname,
-              username: u,
-            })
-            if (cir?.goal_just_met) {
-              taskCompletion.onInactiveGoalBurst?.()
-            }
-          } else if (taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager') {
-            await releaseAfterSurvey({ store_id: sid, username: u })
-          }
-          if (taskCompletion.dailyTaskKey) {
-            await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
-          }
-        } catch (syncErr) {
-          const msg = syncErr?.response?.data?.error || syncErr?.message || 'تعذّر مزامنة إتمام المهمة.'
-          setError(msg)
-          setSaving(false)
-          return
-        }
+        const ok = await runTaskCompletionAfterAnswered({
+          taskCompletion, user, store, setError, setSaving,
+        })
+        if (!ok) return
       }
 
       onSaved?.()
@@ -334,6 +476,11 @@ export default function CallModal({
     }
   }
 
+  const modalWide = simpleOnboardingFlow
+    || surveyNeeded
+    || inactiveFeedbackNeeded
+    || showOnboarding
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <motion.div
@@ -342,11 +489,10 @@ export default function CallModal({
         exit={{   scale: 0.92, opacity: 0, y: 20 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${
-          surveyNeeded || inactiveFeedbackNeeded || showOnboarding ? 'max-w-lg' : 'max-w-md'
+          modalWide ? 'max-w-lg' : 'max-w-md'
         }`}
         style={{ fontFamily: "'Cairo', sans-serif" }}
       >
-        {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #1e0a3c, #2d1466)' }} className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -358,12 +504,16 @@ export default function CallModal({
               </div>
               <div>
                 <h3 className="font-black text-white text-base">تسجيل مكالمة</h3>
-                <div className="text-purple-300 text-xs max-w-[240px] min-w-0">
+                {simpleOnboardingFlow && (
+                  <p className="text-violet-200/95 text-[11px] mt-0.5">استبيان التهيئة — أجب عن الأسئلة ثم احفظ أو اختر «لم يرد»</p>
+                )}
+                <div className="text-purple-300 text-xs max-w-[240px] min-w-0 mt-0.5">
                   <StoreNameWithId store={store} nameClassName="text-purple-200" idClassName="font-mono text-purple-300/95" />
                 </div>
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors"
             >
@@ -371,7 +521,7 @@ export default function CallModal({
             </button>
           </div>
 
-          {!DISABLE_POINTS_AND_PERFORMANCE && (
+          {!simpleOnboardingFlow && !DISABLE_POINTS_AND_PERFORMANCE && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-white/50 text-xs flex items-center gap-1">
@@ -400,154 +550,213 @@ export default function CallModal({
           )}
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-4 flex-1 overflow-y-auto min-h-0" dir="rtl">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
           )}
 
-          <div className="space-y-2">
-            <p className="text-sm font-black text-slate-900">نتيجة المكالمة</p>
-            <div className="grid grid-cols-2 gap-2">
-              {OUTCOME_OPTIONS.map(o => {
-                const selected = outcome === o.id
-                const Oc = o.Icon
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => setOutcome(o.id)}
-                    className={`flex items-center gap-2 rounded-xl border-2 px-2.5 py-2.5 text-[11px] sm:text-xs font-bold transition-all text-right ${
-                      selected
-                        ? 'border-violet-600 bg-violet-50 text-violet-950 shadow-sm ring-1 ring-violet-200'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Oc
-                      size={17}
-                      className={`shrink-0 ${selected ? 'text-violet-700' : 'text-slate-400'}`}
-                      strokeWidth={2.2}
-                    />
-                    <span className="leading-snug flex-1 min-w-0">{o.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {inactiveFeedbackNeeded && outcome === 'answered' && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
-              <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
-              <p className="text-[11px] text-amber-900/85 leading-relaxed">
-                ملاحظة إلزامية للمتاجر غير النشطة — اكتب ما دار في المحادثة ({MIN_INACTIVE_FEEDBACK_LEN} أحرف فأكثر).
-              </p>
-              <textarea
-                value={inactiveFeedback}
-                onChange={e => setInactiveFeedback(e.target.value)}
-                rows={5}
-                placeholder="اكتب ملخص رد المتجر..."
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y min-h-[120px]"
-              />
-              <p className="text-[11px] text-slate-500 tabular-nums">
-                {inactiveFeedback.trim().length}/{MIN_INACTIVE_FEEDBACK_LEN} حرفاً على الأقل
-              </p>
-            </div>
-          )}
-
-          {showOnboarding && (
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
-              <div>
-                <h4 className="text-sm font-black text-violet-900">استبيان تهيئة المتجر</h4>
-                <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
-                  ثلاثة أسئلة (نعم / لا) — تُحفظ مع المكالمة عند «تم الرد».
-                </p>
+          {simpleOnboardingFlow ? (
+            <>
+              <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+                {SIMPLE_ONBOARDING_HEADINGS.map((heading, i) => {
+                  const q = NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV[i]
+                  return (
+                    <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                      <p className="text-xs font-black text-violet-800 mb-1">{heading}</p>
+                      <p className="text-sm text-slate-800 leading-relaxed mb-3">{q.text}</p>
+                      <YesNoRow value={onbYesNo[i]} onChange={v => setOnboardingYn(i, v)} />
+                    </div>
+                  )
+                })}
               </div>
-              {NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV.map((q, i) => (
-                <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
-                  <p className="text-[10px] font-bold text-violet-700 mb-1">{q.section}</p>
-                  <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
-                  <YesNoRow value={onbYesNo[i]} onChange={v => setOnboardingYn(i, v)} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {surveyNeeded && (
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
               <div>
-                <h4 className="text-sm font-black text-violet-900">استبيان رضا العميل</h4>
-                <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
-                  عبّي التقييم لكل بند قبل حفظ المكالمة — المقترحات اختيارية.
-                </p>
-              </div>
-              {SATISFACTION_QUESTIONS.map((q, i) => (
-                <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
-                  <p className="text-[10px] font-bold text-violet-700 mb-1">
-                    س{i + 1} — {q.short}
-                  </p>
-                  <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
-                  <StarRow value={ratings[i]} onChange={v => setRating(i, v)} />
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  مقترحات أو ملاحظات إضافية من المتجر
-                </label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">ملاحظات (اختياري)</label>
                 <textarea
-                  value={suggestions}
-                  onChange={e => setSuggestions(e.target.value)}
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
                   rows={3}
-                  placeholder="اختياري — أي ملاحظة يذكرها التاجر تُحفظ مع سجل النظام."
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-y min-h-[80px]"
+                  placeholder="اكتب ملاحظاتك هنا..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400 text-slate-800 text-sm resize-none"
                 />
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <p className="text-sm font-black text-slate-900">نتيجة المكالمة</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {OUTCOME_OPTIONS.map(o => {
+                    const selected = outcome === o.id
+                    const Oc = o.Icon
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => setOutcome(o.id)}
+                        className={`flex items-center gap-2 rounded-xl border-2 px-2.5 py-2.5 text-[11px] sm:text-xs font-bold transition-all text-right ${
+                          selected
+                            ? 'border-violet-600 bg-violet-50 text-violet-950 shadow-sm ring-1 ring-violet-200'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Oc
+                          size={17}
+                          className={`shrink-0 ${selected ? 'text-violet-700' : 'text-slate-400'}`}
+                          strokeWidth={2.2}
+                        />
+                        <span className="leading-snug flex-1 min-w-0">{o.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {inactiveFeedbackNeeded && outcome === 'answered' && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+                  <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
+                  <p className="text-[11px] text-amber-900/85 leading-relaxed">
+                    ملاحظة إلزامية للمتاجر غير النشطة — اكتب ما دار في المحادثة ({MIN_INACTIVE_FEEDBACK_LEN} أحرف فأكثر).
+                  </p>
+                  <textarea
+                    value={inactiveFeedback}
+                    onChange={e => setInactiveFeedback(e.target.value)}
+                    rows={5}
+                    placeholder="اكتب ملخص رد المتجر..."
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y min-h-[120px]"
+                  />
+                  <p className="text-[11px] text-slate-500 tabular-nums">
+                    {inactiveFeedback.trim().length}/{MIN_INACTIVE_FEEDBACK_LEN} حرفاً على الأقل
+                  </p>
+                </div>
+              )}
+
+              {showOnboarding && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+                  <div>
+                    <h4 className="text-sm font-black text-violet-900">استبيان تهيئة المتجر</h4>
+                    <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
+                      ثلاثة أسئلة (نعم / لا) — تُحفظ مع المكالمة عند «تم الرد».
+                    </p>
+                  </div>
+                  {NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV.map((q, i) => (
+                    <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                      <p className="text-[10px] font-bold text-violet-700 mb-1">{q.section}</p>
+                      <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
+                      <YesNoRow value={onbYesNo[i]} onChange={v => setOnboardingYn(i, v)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {surveyNeeded && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-black text-violet-900">استبيان رضا العميل</h4>
+                    <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
+                      عبّي التقييم لكل بند قبل حفظ المكالمة — المقترحات اختيارية.
+                    </p>
+                  </div>
+                  {SATISFACTION_QUESTIONS.map((q, i) => (
+                    <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                      <p className="text-[10px] font-bold text-violet-700 mb-1">
+                        س{i + 1} — {q.short}
+                      </p>
+                      <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
+                      <StarRow value={ratings[i]} onChange={v => setRating(i, v)} />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                      مقترحات أو ملاحظات إضافية من المتجر
+                    </label>
+                    <textarea
+                      value={suggestions}
+                      onChange={e => setSuggestions(e.target.value)}
+                      rows={3}
+                      placeholder="اختياري — أي ملاحظة يذكرها التاجر تُحفظ مع سجل النظام."
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-y min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">ملاحظات (اختياري)</label>
+                <textarea
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  rows={3}
+                  placeholder="اكتب ملاحظاتك هنا..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400 text-slate-800 text-sm resize-none"
+                />
+              </div>
+            </>
           )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">ملاحظات (اختياري)</label>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              rows={3}
-              placeholder="اكتب ملاحظاتك هنا..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400 text-slate-800 text-sm resize-none"
-            />
+        {simpleOnboardingFlow ? (
+          <div className="flex flex-col gap-2 px-5 pb-5">
+            <motion.button
+              type="button"
+              onClick={saveAnsweredSimple}
+              disabled={saving || !allOnboardingYesNo}
+              whileHover={{ scale: saving ? 1 : 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-55 min-h-[48px]"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+              }}
+            >
+              {saving
+                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+              }
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={saveNoAnswerSimple}
+              disabled={saving}
+              whileHover={{ scale: saving ? 1 : 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
+            >
+              {saving ? 'جارٍ التسجيل…' : 'لم يرد'}
+            </motion.button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
-          <motion.button
-            type="button"
-            onClick={submitCall}
-            disabled={
-              saving
-              || (outcome === 'answered' && surveyNeeded && !allSurveyRated)
-              || (outcome === 'answered' && inactiveFeedbackNeeded && !inactiveFeedbackOk)
-              || (outcome === 'answered' && showOnboarding && !allOnboardingYesNo)
-            }
-            whileHover={{ scale: saving ? 1 : 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
-            style={{
-              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-              boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
-            }}
-          >
-            {saving
-              ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-              : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
-            }
-          </motion.button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
-          >
-            إلغاء
-          </button>
-        </div>
+        ) : (
+          <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
+            <motion.button
+              type="button"
+              onClick={submitCall}
+              disabled={
+                saving
+                || (outcome === 'answered' && surveyNeeded && !allSurveyRated)
+                || (outcome === 'answered' && inactiveFeedbackNeeded && !inactiveFeedbackOk)
+                || (outcome === 'answered' && showOnboarding && !allOnboardingYesNo)
+              }
+              whileHover={{ scale: saving ? 1 : 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+              }}
+            >
+              {saving
+                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+              }
+            </motion.button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
+            >
+              إلغاء
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   )
