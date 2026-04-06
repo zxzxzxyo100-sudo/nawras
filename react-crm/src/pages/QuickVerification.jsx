@@ -44,45 +44,69 @@ function satisfactionPercent(row) {
   return Math.min(100, Math.round((avg / 5) * 100))
 }
 
-/** شريط تنقّل علوي بعرض الشاشة — بنفسجي خافت + عنوان + الرضا العالمي (أخضر كبير) */
+/** شريط علوي بنفسجي النظام — عنوان أبيض + الرضا العالمي بعرض رقمي */
 function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
+  const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
+  const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
     <header
-      className="w-full border-b border-violet-300/25 bg-gradient-to-l from-[#ddd6f3] via-[#e8e0f5] to-[#e4dcf7] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
+      className="relative w-full overflow-hidden border-b border-violet-900/20 bg-gradient-to-l from-violet-800 via-violet-700 to-violet-800 shadow-[0_12px_40px_-12px_rgba(76,29,149,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
-      <div className="flex w-full min-w-0 flex-col gap-8 px-4 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-12 xl:px-16 2xl:px-20">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(90deg, #fff 0px, #fff 1px, transparent 1px, transparent 8px)',
+        }}
+      />
+      <div className="relative flex w-full min-w-0 flex-col items-stretch gap-6 px-4 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:py-4 lg:pl-10 lg:pr-12">
         <div className="min-w-0 flex-1 text-right">
-          <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-violet-600/70">تنفيذي</p>
-          <h1 className="mt-1 text-3xl font-black leading-tight tracking-tight text-violet-950 sm:text-4xl md:text-[2.35rem]">
-            التحقيق السريع
-          </h1>
-          <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-violet-800/75">
-            مركز الأزمات — استبيانات غير الراضين فقط لتركيز القيادة على الأولويات.
+          <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-violet-200/90">Executive</p>
+          <div className="mt-1 flex flex-col items-end gap-0.5 sm:flex-row sm:items-baseline sm:justify-end sm:gap-3">
+            <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl md:text-[1.85rem]">التحقيق السريع</h1>
+            <span className="text-sm font-semibold text-white/75 md:text-base">Quick Audit</span>
+          </div>
+          <p className="mt-2 max-w-xl text-xs font-medium leading-relaxed text-violet-100/85 md:text-sm">
+            مركز الأزمات — عرض غير الراضين فقط.
           </p>
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/45 px-3.5 py-2 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md">
-              <TrendingUp size={15} className="shrink-0 text-violet-600" strokeWidth={2.2} />
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
+              <TrendingUp size={14} className="shrink-0 text-emerald-300" strokeWidth={2.2} />
               النمو {loading ? '—' : `${growth}%`}
             </span>
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/45 px-3.5 py-2 text-xs font-bold text-violet-900 shadow-sm backdrop-blur-md">
-              <Timer size={15} className="shrink-0 text-violet-600" strokeWidth={2.2} />
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
+              <Timer size={14} className="shrink-0 text-cyan-200" strokeWidth={2.2} />
               سرعة الحل {loading ? '—' : `${resolution}%`}
             </span>
           </div>
         </div>
 
         <div className="flex w-full shrink-0 justify-center lg:w-auto lg:justify-end">
-          <div
-            className="flex min-w-[200px] flex-col items-center justify-center rounded-3xl border border-emerald-400/35 bg-gradient-to-b from-emerald-50/95 to-white px-10 py-7 text-center shadow-[0_16px_48px_-12px_rgba(16,185,129,0.28),0_4px_16px_-4px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:min-w-[240px] sm:px-12"
-          >
-            <p className="text-[11px] font-black uppercase tracking-widest text-emerald-800/85">الرضا العالمي</p>
-            <p className="mt-1 text-5xl font-black tabular-nums leading-none text-emerald-600 sm:text-6xl md:text-7xl">
-              {loading ? '—' : `${globalSat}%`}
-            </p>
-            <span className="mt-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200/80 bg-white/90 text-lg font-bold text-emerald-600 shadow-inner">
-              ✓
-            </span>
+          <div className="flex min-w-[min(100%,280px)] flex-col gap-2 rounded-2xl border border-white/25 bg-white/10 px-6 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md sm:min-w-[300px] sm:flex-row sm:items-center sm:gap-6 sm:px-8 sm:py-5">
+            <div className="text-center sm:text-right">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">الرضا العالمي</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-white/70">Global Satisfaction</p>
+            </div>
+            <div
+              className="flex items-center justify-center gap-1 rounded-xl border border-emerald-400/40 bg-slate-950/35 px-3 py-2 shadow-[inset_0_0_24px_rgba(16,185,129,0.15),0_0_32px_-8px_rgba(52,211,153,0.35)]"
+              aria-live="polite"
+            >
+              {loading ? (
+                <span className="text-4xl font-black tabular-nums text-emerald-300 sm:text-5xl">—</span>
+              ) : (
+                sat.split('').map((ch, i) => (
+                  <span
+                    key={`${i}-${ch}`}
+                    className="flex h-[2.5rem] w-[1.65rem] items-center justify-center rounded-md border border-emerald-500/30 bg-gradient-to-b from-emerald-500/25 to-emerald-900/40 text-2xl font-black tabular-nums text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.25)] sm:h-[2.85rem] sm:w-[1.85rem] sm:text-3xl"
+                  >
+                    {ch}
+                  </span>
+                ))
+              )}
+              {!loading ? (
+                <span className="mr-1 text-3xl font-black text-emerald-400 sm:text-4xl">%</span>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -93,10 +117,10 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
 function MerchantLogo({ name, storeId }) {
   const ch = (name || String(storeId) || '?').trim().slice(0, 1)
   return (
-    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-rose-200/60 bg-gradient-to-br from-white to-rose-50/80 shadow-inner">
-      <span className="text-2xl font-black text-rose-900/80">{ch}</span>
-      <span className="absolute -bottom-1 -left-1 flex h-7 w-7 items-center justify-center rounded-lg border border-violet-200/80 bg-white/95 shadow-md backdrop-blur-sm">
-        <Store size={14} className="text-violet-600" strokeWidth={2} />
+    <div className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/90 shadow-inner">
+      <span className="text-xl font-black text-violet-900">{ch}</span>
+      <span className="absolute -bottom-0.5 -left-0.5 flex h-6 w-6 items-center justify-center rounded-md border border-violet-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
+        <Store size={12} className="text-violet-600" strokeWidth={2} />
       </span>
     </div>
   )
@@ -104,6 +128,7 @@ function MerchantLogo({ name, storeId }) {
 
 function CrisisCard({ row, onOpen, layoutId }) {
   const kindLabel = row.survey_kind === 'new_merchant_onboarding' ? 'تهيئة' : 'CSAT نشط'
+  const displayName = row.store_name || `متجر #${row.store_id}`
 
   return (
     <motion.button
@@ -115,22 +140,28 @@ function CrisisCard({ row, onOpen, layoutId }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="group flex aspect-square max-h-[280px] w-full flex-col rounded-3xl border border-rose-200/80 bg-white/95 p-5 text-right shadow-[0_20px_50px_-18px_rgba(244,63,94,0.22),0_8px_28px_-8px_rgba(15,23,42,0.08),0_0_0_1px_rgba(251,113,133,0.12)_inset] ring-1 ring-rose-200/30 transition hover:border-rose-300 hover:shadow-[0_24px_56px_-16px_rgba(244,63,94,0.32),0_12px_32px_-8px_rgba(15,23,42,0.1)]"
+      className="group flex aspect-square max-h-[220px] w-full flex-col overflow-hidden rounded-2xl border border-violet-200/50 bg-white text-right shadow-[0_12px_36px_-16px_rgba(76,29,149,0.18),0_4px_20px_-8px_rgba(15,23,42,0.06)] transition hover:border-violet-300/80 hover:shadow-[0_18px_44px_-14px_rgba(76,29,149,0.22)]"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <MerchantLogo name={row.store_name} storeId={row.store_id} />
-        <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-rose-800">
-          <Flame size={12} className="text-rose-600" />
-          أولوية عالية
+      <div className="flex w-full min-h-[3rem] shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-violet-700 to-violet-600 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+        <span className="min-w-0 flex-1 truncate text-right text-[13px] font-black leading-tight text-white">{displayName}</span>
+        <span className="shrink-0 rounded-md border border-white/25 bg-white/15 px-2 py-0.5 text-[10px] font-black text-white backdrop-blur-sm">
+          غير راضٍ
         </span>
       </div>
-      <p className="line-clamp-2 min-h-[2.75rem] text-lg font-black leading-snug text-slate-900">{row.store_name || `متجر #${row.store_id}`}</p>
-      <p className="mt-1 text-[12px] font-semibold tabular-nums text-slate-500">
-        #{row.store_id} · {kindLabel}
-      </p>
-      <div className="mt-auto flex items-center justify-between border-t border-rose-100/80 pt-4">
-        <span className="text-[11px] font-bold text-violet-500 opacity-0 transition group-hover:opacity-100">تفاصيل ←</span>
-        <span className="rounded-lg bg-rose-100/80 px-2 py-1 text-[11px] font-black text-rose-800">غير راضٍ</span>
+      <div className="flex min-h-0 flex-1 flex-col p-3.5">
+        <div className="mb-1 flex items-start justify-between gap-2">
+          <MerchantLogo name={row.store_name} storeId={row.store_id} />
+          <span className="inline-flex items-center gap-0.5 rounded-full border border-rose-200/90 bg-rose-50 px-2 py-0.5 text-[9px] font-black text-rose-800">
+            <Flame size={11} className="text-rose-600" />
+            أولوية عالية
+          </span>
+        </div>
+        <p className="text-[11px] font-semibold tabular-nums text-slate-600">
+          #{row.store_id} · {kindLabel}
+        </p>
+        <div className="mt-auto flex items-center justify-end border-t border-violet-100/90 pt-2.5">
+          <span className="text-[10px] font-bold text-violet-600 opacity-0 transition group-hover:opacity-100">تفاصيل ←</span>
+        </div>
       </div>
     </motion.button>
   )
@@ -195,8 +226,9 @@ function DetailDrawer({
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
             className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-violet-200/50 bg-white/95 shadow-[-16px_0_56px_-16px_rgba(76,29,149,0.2)] backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-violet-100/80 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 border-b border-violet-100/80 bg-gradient-to-l from-violet-50/90 to-white/95 px-5 py-4 backdrop-blur-sm">
               <div className="min-w-0 text-right">
+                <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">تفاصيل</p>
                 <p id="qv-drawer-title" className="truncate text-lg font-black text-violet-950">
                   {row.store_name || `متجر #${row.store_id}`}
                 </p>
@@ -435,7 +467,10 @@ export default function QuickVerification() {
   const solvedTotal = solvedOnb.length + solvedActive.length
 
   return (
-    <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div
+      className="min-h-screen bg-gradient-to-b from-white via-violet-50/[0.35] to-white pb-24"
+      style={{ fontFamily: "'Cairo', sans-serif" }}
+    >
       <div className="sticky top-0 z-40 shadow-[0_8px_30px_-12px_rgba(76,29,149,0.12)]">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
         <div className="w-full border-b border-violet-100/90 bg-white/95 backdrop-blur-md">
@@ -526,7 +561,7 @@ export default function QuickVerification() {
                 {crisisOnb.length === 0 ? (
                   <p className="text-sm text-slate-400">لا توجد حالات في هذا القسم.</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <AnimatePresence mode="popLayout">
                       {crisisOnb.map(row => (
                         <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
@@ -544,7 +579,7 @@ export default function QuickVerification() {
                 {crisisActive.length === 0 ? (
                   <p className="text-sm text-slate-400">لا توجد حالات في هذا القسم.</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <AnimatePresence mode="popLayout">
                       {crisisActive.map(row => (
                         <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
