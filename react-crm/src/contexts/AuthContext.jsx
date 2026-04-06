@@ -5,12 +5,12 @@ const AuthContext = createContext(null)
 
 export const ROLES = {
   /** مسار الاحتضان (incubation) حصراً للمدير التنفيذي */
-  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'tasks', 'users', 'vip_merchants', 'manager_analytics'] },
+  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'tasks', 'users', 'vip_merchants', 'manager_analytics'] },
   /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم + المهام اليومية */
-  active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks'] },
-  inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks'] },
+  active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks', 'quick_verification'] },
+  inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks', 'quick_verification'] },
   /** موظف مبيعات / احتضان: متاجر جديدة + مهام — دون واجهة «مسار الاحتضان» */
-  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'tasks'] },
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'tasks', 'quick_verification'] },
 }
 
 export function AuthProvider({ children }) {
