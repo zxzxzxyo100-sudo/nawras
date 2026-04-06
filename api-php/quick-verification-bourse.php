@@ -344,10 +344,75 @@ foreach ($byStaffA as $pack) {
     ];
 }
 
+/** تجميدات اليوم — للمدير التنفيذي فقط (مرفق سبب التجميد للتحقيق السريع) */
+$freezeRows = [];
+if ($userRole === 'executive') {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS qv_freeze_alerts (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            store_id INT NOT NULL,
+            store_name VARCHAR(512) NULL,
+            freeze_reason TEXT NOT NULL,
+            frozen_by VARCHAR(255) NULL,
+            frozen_by_username VARCHAR(100) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_created (created_at),
+            INDEX idx_store (store_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_freeze_resolutions (
+            freeze_alert_id INT NOT NULL PRIMARY KEY,
+            resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            resolved_by VARCHAR(100) NULL DEFAULT NULL,
+            executive_notes TEXT NULL DEFAULT NULL,
+            INDEX idx_resolved_at (resolved_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $pdo->exec('ALTER TABLE quick_verification_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+        } catch (Throwable $e) {
+        }
+        $stF = $pdo->query("
+            SELECT a.id, a.store_id, a.store_name, a.freeze_reason, a.frozen_by, a.frozen_by_username, a.created_at,
+              qfr.resolved_at AS qv_resolved_at, qfr.resolved_by AS qv_resolved_by, qfr.executive_notes AS qv_executive_notes
+            FROM qv_freeze_alerts a
+            LEFT JOIN quick_verification_freeze_resolutions qfr ON qfr.freeze_alert_id = a.id
+            WHERE DATE(a.created_at) = CURDATE()
+            ORDER BY a.created_at DESC
+        ");
+        if ($stF) {
+            while ($fr = $stF->fetch(PDO::FETCH_ASSOC)) {
+                $qvAt = $fr['qv_resolved_at'] ?? null;
+                $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
+                $fid = (int) ($fr['id'] ?? 0);
+                $freezeRows[] = [
+                    'id' => 'freeze_' . $fid,
+                    'freeze_alert_id' => $fid,
+                    'survey_kind' => 'freeze_alert',
+                    'store_id' => (int) ($fr['store_id'] ?? 0),
+                    'store_name' => $fr['store_name'] !== '' && $fr['store_name'] !== null ? (string) $fr['store_name'] : ('#' . (int) ($fr['store_id'] ?? 0)),
+                    'store_category' => 'frozen',
+                    'staff_username' => trim((string) ($fr['frozen_by_username'] ?? '')),
+                    'staff_fullname' => trim((string) ($fr['frozen_by'] ?? '')),
+                    'freeze_reason' => trim((string) ($fr['freeze_reason'] ?? '')),
+                    'arrow' => 'down',
+                    'suggestions' => trim((string) ($fr['freeze_reason'] ?? '')),
+                    'created_at' => $fr['created_at'],
+                    'resolved' => $resolved,
+                    'resolved_at' => $resolved ? $fr['qv_resolved_at'] : null,
+                    'resolved_by' => $resolved ? trim((string) ($fr['qv_resolved_by'] ?? '')) : null,
+                    'executive_notes' => $resolved ? trim((string) ($fr['qv_executive_notes'] ?? '')) : null,
+                ];
+            }
+        }
+    } catch (Throwable $e) {
+        $freezeRows = [];
+    }
+}
+
 echo json_encode([
     'success' => true,
     'rows' => $rows,
     'staff_summary' => $staff_summary,
     'active_csat_rows' => $activeCsatRows,
     'active_csat_staff_summary' => $active_csat_staff_summary,
+    'freeze_rows' => $freezeRows,
 ], JSON_UNESCAPED_UNICODE);
