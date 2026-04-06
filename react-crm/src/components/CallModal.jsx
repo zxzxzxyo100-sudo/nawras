@@ -18,7 +18,7 @@ import { useStores }           from '../contexts/StoresContext'
 import { usePoints, DAILY_GOAL } from '../contexts/PointsContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import {
-  SATISFACTION_QUESTIONS,
+  getSatisfactionQuestionsForUi,
   needsActiveSatisfactionSurvey,
   isInactiveMerchantCategory,
 } from '../constants/satisfactionSurvey'
@@ -158,6 +158,8 @@ export default function CallModal({
   const { user } = useAuth()
   const { storeStates, surveyByStoreId, assignments, newMerchantOnboardingDoneIds } = useStores()
   const { onCallSaved, todayCalls, goalPct } = usePoints()
+
+  const satisfactionQuestionsUi = useMemo(() => getSatisfactionQuestionsForUi(), [])
 
   const [note,    setNote]    = useState('')
   const [saving,  setSaving]  = useState(false)
@@ -665,7 +667,7 @@ export default function CallModal({
                       عبّي التقييم لكل بند قبل حفظ المكالمة — المقترحات اختيارية.
                     </p>
                   </div>
-                  {SATISFACTION_QUESTIONS.map((q, i) => (
+                  {satisfactionQuestionsUi.map((q, i) => (
                     <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
                       <p className="text-[10px] font-bold text-violet-700 mb-1">
                         س{i + 1} — {q.short}

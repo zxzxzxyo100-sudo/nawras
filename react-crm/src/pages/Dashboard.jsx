@@ -10,7 +10,7 @@ import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
   Award, Activity, ArrowUpRight, Baby, ClipboardList,
-  BarChart3, ArrowBigUp, ArrowBigDown, Loader2,
+  BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -380,7 +380,7 @@ export default function Dashboard() {
             <div>
               <h2 className="text-base font-black text-white tracking-tight">بورصة الرضا اليوم</h2>
               <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
-                أسهم من استبيانات «تم الرد» اليوم؛ أخضر صعوداً إذا كل التقييمات ≥4، أحمر هبوطاً إن وُجد ≤3.
+                أسهم من استبيانات «تم الرد» اليوم: تهيئة جدد (نعم/لا)، وتجار نشطون بمتوسط ستة نجوم — أخضر / أصفر / أحمر.
               </p>
             </div>
           </div>
@@ -401,7 +401,9 @@ export default function Dashboard() {
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
               {staffMissions.slice(0, 9).map(row => {
-                const up = row.satisfaction_arrow === 'up'
+                const arrow = row.satisfaction_arrow
+                const up = arrow === 'up'
+                const mid = arrow === 'mid'
                 return (
                   <li
                     key={row.username}
@@ -415,6 +417,10 @@ export default function Dashboard() {
                       {up ? (
                         <span className="inline-flex" title="رضا إيجابي">
                           <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                        </span>
+                      ) : mid ? (
+                        <span className="inline-flex" title="محايد / يحتاج متابعة">
+                          <ArrowLeftRight size={22} strokeWidth={2.5} className="text-amber-400" aria-hidden />
                         </span>
                       ) : (
                         <span className="inline-flex" title="فجوة في التقييم">
