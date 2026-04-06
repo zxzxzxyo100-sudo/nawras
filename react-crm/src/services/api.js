@@ -171,6 +171,21 @@ export const getManagerAnalytics = (params) =>
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)
 
+/** التحقيق السريع — استبيانات اليوم (تهيئة + CSAT نشط) */
+export const getQuickVerificationBourse = (params = {}) =>
+  http
+    .get('/quick-verification-bourse.php', {
+      params: {
+        user_role: params.user_role ?? 'executive',
+        username: params.username ?? '',
+      },
+    })
+    .then(r => r.data)
+
+/** تسجيل حل إشكالية تدقيق — استبيان اليوم */
+export const postQuickVerificationResolveAudit = data =>
+  http.post('/quick-verification-resolve-audit.php', data).then(r => r.data)
+
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http
