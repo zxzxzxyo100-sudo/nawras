@@ -15,7 +15,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getManagerAnalytics } from '../services/api'
+import { getDailyStaffSatisfaction } from '../services/api'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
 function SeagullMark({ size = 100, opacity = 0.07 }) {
@@ -111,11 +111,7 @@ export default function Dashboard() {
     setMissionsLoading(true)
     setMissionsErr('')
     try {
-      const res = await getManagerAnalytics({
-        year: new Date().getFullYear(),
-        period: 'yearly',
-        user_role: 'executive',
-      })
+      const res = await getDailyStaffSatisfaction()
       if (res?.success) {
         setStaffMissions(Array.isArray(res.daily_staff_missions) ? res.daily_staff_missions : [])
       } else {
@@ -376,25 +372,16 @@ export default function Dashboard() {
           transition={{ duration: 0.45, delay: 0.28 }}
           className="rounded-2xl border border-slate-700/80 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 lg:p-5 shadow-xl text-white"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                <BarChart3 size={20} className="text-emerald-300" aria-hidden />
-              </div>
-              <div>
-                <h2 className="text-base font-black text-white tracking-tight">بورصة الرضا اليوم</h2>
-                <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
-                  أسهم من استبيانات «تم الرد» اليوم؛ أخضر صعوداً إذا كل التقييمات ≥4، أحمر هبوطاً إن وُجد ≤3.
-                </p>
-              </div>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+              <BarChart3 size={20} className="text-emerald-300" aria-hidden />
             </div>
-            <button
-              type="button"
-              onClick={() => navigate('/analytics/manager')}
-              className="shrink-0 text-xs font-bold text-violet-300 hover:text-white border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 px-3 py-2 rounded-xl transition-colors"
-            >
-              تحليلات المدير ←
-            </button>
+            <div>
+              <h2 className="text-base font-black text-white tracking-tight">بورصة الرضا اليوم</h2>
+              <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">
+                أسهم من استبيانات «تم الرد» اليوم؛ أخضر صعوداً إذا كل التقييمات ≥4، أحمر هبوطاً إن وُجد ≤3.
+              </p>
+            </div>
           </div>
 
           {missionsErr && (
