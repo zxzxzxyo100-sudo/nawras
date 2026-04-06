@@ -274,7 +274,8 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           tasks.push({
             id: `${store.id}-new-onboarding-am`,
             store,
-            priority: 'normal',
+            /** عالية: تظهر في «الكل» و«عالية الأولوية»؛ عند «لم يُرد» تنتقل لقائمة no_answer عبر taskIsNoAnswer */
+            priority: 'high',
             type: 'new_merchant_onboarding',
             label: stagingAm?.label ?? 'استبيان تهيئة — متجر مُسنَد إليك',
             incubationBadge: stagingAm?.incubationBadge,
