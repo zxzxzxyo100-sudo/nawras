@@ -61,7 +61,7 @@ function taskIsNoAnswer(task, callLogs, assignments) {
   const log = callLogs[task.store.id] || {}
   const top = latestCallEntry(log)
   if (top && String(top.outcome ?? '').trim() === 'no_answer') return true
-  if (task.type === 'assigned_store' && assignments) {
+  if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
     const a = assignments[String(task.store.id)] || assignments[task.store.id]
     if (a?.workflow_status === 'no_answer') return true
   }
@@ -220,14 +220,26 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           store.bucket === 'incubating'
           && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
         const shipDesc = daysSinceShip < 999 ? `آخر شحنة قبل ${daysSinceShip} يوم` : 'لا توجد شحنات بعد'
-        tasks.push({
-          id: `${store.id}-assigned`, store,
-          priority: daysSinceShip >= 10 ? 'high' : 'normal',
-          type: 'assigned_store', label: 'متجر مُسنَد إليك',
-          desc: needsOnboarding && IS_STAGING_OR_DEV
-            ? `${shipDesc} — اضغط «اتصل» لفتح استبيان التهيئة (ثلاثة أسئلة) مباشرة`
-            : shipDesc,
-        })
+        /** مسؤول المتاجر: مهمة استبيان التهيئة منفصلة (نفس مسار المكالمة المبسّط) — لا تُكرَّر مع «متجر مُسنَد» */
+        if (needsOnboarding) {
+          tasks.push({
+            id: `${store.id}-new-onboarding-am`,
+            store,
+            priority: 'normal',
+            type: 'new_merchant_onboarding',
+            label: 'استبيان تهيئة — متجر مُسنَد إليك',
+            desc: IS_STAGING_OR_DEV
+              ? `${shipDesc} — اضغط «اتصل» لفتح استبيان التهيئة (ثلاثة أسئلة) ثم «حفظ المكالمة» أو «لم يرد»`
+              : `${shipDesc} — أكمل استبيان التهيئة من «اتصل» ثم سجّل المكالمة`,
+          })
+        } else {
+          tasks.push({
+            id: `${store.id}-assigned`, store,
+            priority: daysSinceShip >= 10 ? 'high' : 'normal',
+            type: 'assigned_store', label: 'متجر مُسنَد إليك',
+            desc: shipDesc,
+          })
+        }
       }
     }
   })
@@ -332,6 +344,7 @@ function TaskCard({
     typeof onNoAnswerWorkflow === 'function'
     && (
       (task.type === 'assigned_store' && userRole === 'active_manager')
+      || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
       || task.type === 'recovery_call'
     )
   return (
@@ -541,22 +554,25 @@ export default function Tasks() {
       dailyTaskKey: selectedTask.id,
       inactiveRecovery:
         selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive',
+      /** إطلاق سير العمل بعد الاستبيان: متجر مُسنَد أو مهمة «استبيان تهيئة» لمسؤول المتاجر */
       releaseActiveWorkflow:
-        selectedTask.type === 'assigned_store' && user.role === 'active_manager',
+        user.role === 'active_manager'
+        && (selectedTask.type === 'assigned_store'
+          || selectedTask.type === 'new_merchant_onboarding'),
       onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
     }
   }, [selectedTask, user?.username, user?.role])
 
   /**
-   * مع VITE_APP_STAGING=1: افتح نافذة «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة دون النافذة المنفصلة القديمة.
-   * — مسؤول المتاجر + متجر مُسنَد يحتاج تهيئة، أو
-   * — مدير الاحتضان/تنفيذي + مهمة «استبيان تهيئة متجر جديد».
+   * مع VITE_APP_STAGING=1: افتح «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة.
+   * — مسؤول المتاجر: مهمة استبيان التهيئة المسندة أو متجر مُسنَد بعد إتمام الاستبيان؛
+   * — مدير الاحتضان/تنفيذي: مهمة «استبيان تهيئة متجر جديد».
    */
   const drawerAutoOpenCallModal = useMemo(() => {
     if (!selectedTask || !IS_SIMPLE_LOG_CALL_MODAL) return false
     const needs = needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
     if (!needs) return false
-    if (user?.role === 'active_manager' && selectedTask.type === 'assigned_store') return true
+    if (user?.role === 'active_manager' && selectedTask.type === 'new_merchant_onboarding') return true
     if (
       selectedTask.type === 'new_merchant_onboarding'
       && ['incubation_manager', 'executive'].includes(user?.role)
@@ -706,7 +722,10 @@ export default function Tasks() {
         setFilter('no_answer')
         return
       }
-      if (task.type === 'assigned_store') {
+      if (
+        task.type === 'assigned_store'
+        || (task.type === 'new_merchant_onboarding' && user?.role === 'active_manager')
+      ) {
         await markSurveyNoAnswer({
           store_id: task.store.id,
           store_name: task.store.name,
