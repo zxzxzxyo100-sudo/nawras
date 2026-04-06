@@ -26,6 +26,7 @@ import {
   Package,
   Flame,
   Search,
+  AlertCircle,
 } from 'lucide-react'
 import {
   Radar,
@@ -65,6 +66,10 @@ const SOFT_CORAL_ICON = '#E11D48'
 const CORPORATE_ORANGE = '#FB923C'
 /** عتبة شحنات عالية + 🔽 = أولوية قصوى */
 const HIGH_SHIPMENT_THRESHOLD = 50
+/** لوحة إنجازات المدير — تجريبي */
+const EXEC_STAT_NAVY = '#1E293B'
+const ACHIEVE_RED = '#EF4444'
+const ACHIEVE_GREEN = '#10B981'
 /** توافق مع الشريط العلوي القديم */
 const NEON_GREEN = PASTEL_GREEN_ICON
 const CRIMSON = SOFT_CORAL_ICON
@@ -686,7 +691,7 @@ export default function QuickVerification() {
 
   return (
     <div
-      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-28 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
+      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-8 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
       dir="rtl"
       style={{
         fontFamily: "'Cairo', sans-serif",
@@ -975,6 +980,106 @@ export default function QuickVerification() {
           </ul>
         )}
       </section>
+
+      {IS_VITE_APP_STAGING && (
+        <section className="mx-auto w-full max-w-6xl" aria-label="لوحة إنجازات المدير">
+          <div
+            className="rounded-2xl border bg-white p-4 shadow-[0_8px_30px_rgba(15,23,42,0.07)] md:p-6"
+            style={{ borderColor: CARD_BORDER }}
+          >
+            <p
+              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.12em] md:text-xs"
+              style={{ color: EXEC_STAT_NAVY }}
+            >
+              لوحة إنجازات المدير
+            </p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
+              <div
+                className="flex flex-col rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
+                style={{ borderColor: '#E2E8F0' }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: 'rgba(239, 68, 68, 0.12)' }}
+                  >
+                    <AlertCircle size={24} strokeWidth={2.2} style={{ color: ACHIEVE_RED }} aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                      إجمالي المشاكل المكتشفة
+                    </p>
+                    <p
+                      className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
+                      style={{ color: EXEC_STAT_NAVY }}
+                    >
+                      {execMetrics.totalProblems}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="flex flex-col rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
+                style={{ borderColor: '#E2E8F0' }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: 'rgba(16, 185, 129, 0.12)' }}
+                  >
+                    <CheckCircle2 size={24} strokeWidth={2.2} style={{ color: ACHIEVE_GREEN }} aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                      مشاكل تم حلها
+                    </p>
+                    <p
+                      className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
+                      style={{ color: EXEC_STAT_NAVY }}
+                    >
+                      {execMetrics.resolvedProblems}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="flex flex-col justify-between rounded-xl border bg-white p-4 shadow-md transition-shadow hover:shadow-lg md:p-5"
+                style={{ borderColor: '#E2E8F0' }}
+              >
+                <p className="text-sm font-bold md:text-[15px]" style={{ color: EXEC_STAT_NAVY }}>
+                  نسبة الإنجاز %
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <span
+                    className="text-3xl font-black tabular-nums md:text-4xl"
+                    style={{ color: EXEC_STAT_NAVY }}
+                  >
+                    {execMetrics.pct}%
+                  </span>
+                  <div
+                    className="h-3 min-w-[140px] flex-1 overflow-hidden rounded-full"
+                    style={{ background: PAGE_BG_STAGING }}
+                    role="progressbar"
+                    aria-valuenow={execMetrics.pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-500 ease-out"
+                      style={{
+                        width: `${execMetrics.pct}%`,
+                        background: `linear-gradient(90deg, ${ACHIEVE_GREEN}, ${CORPORATE_ORANGE})`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section
         className={
@@ -1389,59 +1494,6 @@ export default function QuickVerification() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {IS_VITE_APP_STAGING && (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-[500] border-t px-3 py-3 md:px-5"
-          style={{
-            background: '#FFFFFF',
-            borderColor: CARD_BORDER,
-            boxShadow: '0 -8px 32px rgba(15, 23, 42, 0.06)',
-          }}
-          dir="rtl"
-        >
-          <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm sm:justify-start">
-              <span style={{ color: SLATE_SECONDARY }}>
-                <span className="font-black" style={{ color: NAVY }}>
-                  إجمالي المشاكل المكتشفة:
-                </span>{' '}
-                <span className="font-black tabular-nums">{execMetrics.totalProblems}</span>
-                <span className="mx-1 opacity-60" aria-hidden>
-                  🔽
-                </span>
-              </span>
-              <span style={{ color: SLATE_SECONDARY }}>
-                <span className="font-black" style={{ color: NAVY }}>
-                  مشاكل تم حلها:
-                </span>{' '}
-                <span className="font-black tabular-nums text-emerald-700">{execMetrics.resolvedProblems}</span>
-              </span>
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-md sm:flex-row sm:items-center sm:gap-3">
-              <span className="shrink-0 text-xs font-black" style={{ color: SLATE_SECONDARY }}>
-                نسبة الإنجاز {execMetrics.pct}%
-              </span>
-              <div
-                className="h-2.5 w-full overflow-hidden rounded-full sm:flex-1"
-                style={{ background: PAGE_BG_STAGING }}
-                role="progressbar"
-                aria-valuenow={execMetrics.pct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-500 ease-out"
-                  style={{
-                    width: `${execMetrics.pct}%`,
-                    background: `linear-gradient(90deg, ${PASTEL_GREEN_ICON}, ${CORPORATE_ORANGE})`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
