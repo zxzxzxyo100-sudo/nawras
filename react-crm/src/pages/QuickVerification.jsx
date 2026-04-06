@@ -16,6 +16,9 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 
+/** بنفسجي موحّد مع هوية الشريط الجانبي — واجهة التحقيق السريع فقط */
+const QA_PURPLE = '#4B0082'
+
 function rowMatchesQuery(row, q) {
   if (!q.trim()) return true
   const s = q.trim().toLowerCase()
@@ -44,67 +47,67 @@ function satisfactionPercent(row) {
   return Math.min(100, Math.round((avg / 5) * 100))
 }
 
-/** شريط علوي بنفسجي النظام — عنوان أبيض + الرضا العالمي بعرض رقمي */
+/** شريط علوي بلون موحّد #4B0082 — عنوان أبيض + الرضا العالمي */
 function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
   const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
     <header
-      className="relative w-full overflow-hidden border-b border-violet-900/20 bg-gradient-to-l from-violet-800 via-violet-700 to-violet-800 shadow-[0_12px_40px_-12px_rgba(76,29,149,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
-      style={{ fontFamily: "'Cairo', sans-serif" }}
+      className="relative w-full overflow-hidden border-b border-black/20 shadow-[0_12px_40px_-12px_rgba(75,0,130,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]"
+      style={{ fontFamily: "'Cairo', sans-serif", backgroundColor: QA_PURPLE }}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.06]"
         style={{
           backgroundImage: 'repeating-linear-gradient(90deg, #fff 0px, #fff 1px, transparent 1px, transparent 8px)',
         }}
       />
       <div className="relative flex w-full min-w-0 flex-col items-stretch gap-6 px-4 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:gap-8 lg:py-4 lg:pl-10 lg:pr-12">
         <div className="min-w-0 flex-1 text-right">
-          <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-violet-200/90">Executive</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/80">Executive</p>
           <div className="mt-1 flex flex-col items-end gap-0.5 sm:flex-row sm:items-baseline sm:justify-end sm:gap-3">
             <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl md:text-[1.85rem]">التحقيق السريع</h1>
-            <span className="text-sm font-semibold text-white/75 md:text-base">Quick Audit</span>
+            <span className="text-sm font-semibold text-white/80 md:text-base">Quick Audit</span>
           </div>
-          <p className="mt-2 max-w-xl text-xs font-medium leading-relaxed text-violet-100/85 md:text-sm">
+          <p className="mt-2 max-w-xl text-xs font-medium leading-relaxed text-white/85 md:text-sm">
             مركز الأزمات — عرض غير الراضين فقط.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
-              <TrendingUp size={14} className="shrink-0 text-emerald-300" strokeWidth={2.2} />
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
+              <TrendingUp size={14} className="shrink-0 text-white" strokeWidth={2.2} />
               النمو {loading ? '—' : `${growth}%`}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
-              <Timer size={14} className="shrink-0 text-cyan-200" strokeWidth={2.2} />
+            <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-md">
+              <Timer size={14} className="shrink-0 text-white" strokeWidth={2.2} />
               سرعة الحل {loading ? '—' : `${resolution}%`}
             </span>
           </div>
         </div>
 
         <div className="flex w-full shrink-0 justify-center lg:w-auto lg:justify-end">
-          <div className="flex min-w-[min(100%,280px)] flex-col gap-2 rounded-2xl border border-white/25 bg-white/10 px-6 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md sm:min-w-[300px] sm:flex-row sm:items-center sm:gap-6 sm:px-8 sm:py-5">
+          <div className="flex min-w-[min(100%,280px)] flex-col gap-2 rounded-2xl border border-white/25 bg-white/10 px-6 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-md sm:min-w-[300px] sm:flex-row sm:items-center sm:gap-6 sm:px-8 sm:py-5">
             <div className="text-center sm:text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">الرضا العالمي</p>
-              <p className="mt-0.5 text-[11px] font-semibold text-white/70">Global Satisfaction</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90">الرضا العالمي</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-white/75">Global Satisfaction</p>
             </div>
             <div
-              className="flex items-center justify-center gap-1 rounded-xl border border-emerald-400/40 bg-slate-950/35 px-3 py-2 shadow-[inset_0_0_24px_rgba(16,185,129,0.15),0_0_32px_-8px_rgba(52,211,153,0.35)]"
+              className="flex items-center justify-center gap-1 rounded-xl border border-white/30 bg-black/20 px-3 py-2"
               aria-live="polite"
             >
               {loading ? (
-                <span className="text-4xl font-black tabular-nums text-emerald-300 sm:text-5xl">—</span>
+                <span className="text-4xl font-black tabular-nums text-white sm:text-5xl">—</span>
               ) : (
                 sat.split('').map((ch, i) => (
                   <span
                     key={`${i}-${ch}`}
-                    className="flex h-[2.5rem] w-[1.65rem] items-center justify-center rounded-md border border-emerald-500/30 bg-gradient-to-b from-emerald-500/25 to-emerald-900/40 text-2xl font-black tabular-nums text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.25)] sm:h-[2.85rem] sm:w-[1.85rem] sm:text-3xl"
+                    className="flex h-[2.5rem] w-[1.65rem] items-center justify-center rounded-md border border-white/25 bg-white/10 text-2xl font-black tabular-nums text-white sm:h-[2.85rem] sm:w-[1.85rem] sm:text-3xl"
                   >
                     {ch}
                   </span>
                 ))
               )}
               {!loading ? (
-                <span className="mr-1 text-3xl font-black text-emerald-400 sm:text-4xl">%</span>
+                <span className="mr-1 text-3xl font-black text-white sm:text-4xl">%</span>
               ) : null}
             </div>
           </div>
@@ -117,10 +120,10 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
 function MerchantLogo({ name, storeId }) {
   const ch = (name || String(storeId) || '?').trim().slice(0, 1)
   return (
-    <div className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/90 shadow-inner">
-      <span className="text-xl font-black text-violet-900">{ch}</span>
-      <span className="absolute -bottom-0.5 -left-0.5 flex h-6 w-6 items-center justify-center rounded-md border border-violet-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
-        <Store size={12} className="text-violet-600" strokeWidth={2} />
+    <div className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-xl border border-[#4B0082]/20 bg-gradient-to-br from-white to-violet-50/90 shadow-inner">
+      <span className="text-xl font-black text-[#4B0082]">{ch}</span>
+      <span className="absolute -bottom-0.5 -left-0.5 flex h-6 w-6 items-center justify-center rounded-md border border-[#4B0082]/25 bg-white/95 shadow-sm backdrop-blur-sm">
+        <Store size={12} className="text-[#4B0082]" strokeWidth={2} />
       </span>
     </div>
   )
@@ -140,9 +143,12 @@ function CrisisCard({ row, onOpen, layoutId }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-      className="group flex aspect-square max-h-[220px] w-full flex-col overflow-hidden rounded-2xl border border-violet-200/50 bg-white text-right shadow-[0_12px_36px_-16px_rgba(76,29,149,0.18),0_4px_20px_-8px_rgba(15,23,42,0.06)] transition hover:border-violet-300/80 hover:shadow-[0_18px_44px_-14px_rgba(76,29,149,0.22)]"
+      className="group flex aspect-square max-h-[220px] w-full flex-col overflow-hidden rounded-2xl border border-[#4B0082]/20 bg-white text-right shadow-[0_12px_36px_-16px_rgba(75,0,130,0.14),0_4px_20px_-8px_rgba(15,23,42,0.06)] transition hover:border-[#4B0082]/45 hover:shadow-[0_18px_44px_-14px_rgba(75,0,130,0.2)]"
     >
-      <div className="flex w-full min-h-[3rem] shrink-0 items-center justify-between gap-2 bg-gradient-to-l from-violet-700 to-violet-600 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+      <div
+        className="flex w-full min-h-[3rem] shrink-0 items-center justify-between gap-2 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+        style={{ backgroundColor: QA_PURPLE }}
+      >
         <span className="min-w-0 flex-1 truncate text-right text-[13px] font-black leading-tight text-white">{displayName}</span>
         <span className="shrink-0 rounded-md border border-white/25 bg-white/15 px-2 py-0.5 text-[10px] font-black text-white backdrop-blur-sm">
           غير راضٍ
@@ -159,8 +165,8 @@ function CrisisCard({ row, onOpen, layoutId }) {
         <p className="text-[11px] font-semibold tabular-nums text-slate-600">
           #{row.store_id} · {kindLabel}
         </p>
-        <div className="mt-auto flex items-center justify-end border-t border-violet-100/90 pt-2.5">
-          <span className="text-[10px] font-bold text-violet-600 opacity-0 transition group-hover:opacity-100">تفاصيل ←</span>
+        <div className="mt-auto flex items-center justify-end border-t border-[#4B0082]/10 pt-2.5">
+          <span className="text-[10px] font-bold text-[#4B0082] opacity-0 transition group-hover:opacity-100">تفاصيل ←</span>
         </div>
       </div>
     </motion.button>
@@ -181,7 +187,7 @@ function SolvedRow({ row, onOpen }) {
         <p className="truncate font-bold text-slate-900">{row.store_name}</p>
         <p className="text-[11px] text-slate-500">#{row.store_id}</p>
         {row.executive_notes ? (
-          <p className="mt-1 line-clamp-1 text-[11px] text-violet-700">تعليمات المدير: {row.executive_notes}</p>
+          <p className="mt-1 line-clamp-1 text-[11px] text-[#4B0082]">تعليمات المدير: {row.executive_notes}</p>
         ) : null}
       </div>
       <CheckCircle2 className="shrink-0 text-emerald-600" size={22} />
@@ -224,11 +230,14 @@ function DetailDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
-            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-violet-200/50 bg-white/95 shadow-[-16px_0_56px_-16px_rgba(76,29,149,0.2)] backdrop-blur-xl"
+            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l-2 border-[#4B0082]/45 bg-white/95 shadow-[-16px_0_56px_-16px_rgba(75,0,130,0.22)] backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-violet-100/80 bg-gradient-to-l from-violet-50/90 to-white/95 px-5 py-4 backdrop-blur-sm">
+            <div
+              className="flex items-center justify-between gap-3 border-b border-[#4B0082]/15 px-5 py-4 backdrop-blur-sm"
+              style={{ background: `linear-gradient(to left, rgba(75, 0, 130, 0.08), rgba(255,255,255,0.98))` }}
+            >
               <div className="min-w-0 text-right">
-                <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">تفاصيل</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-[#4B0082]">تفاصيل</p>
                 <p id="qv-drawer-title" className="truncate text-lg font-black text-violet-950">
                   {row.store_name || `متجر #${row.store_id}`}
                 </p>
@@ -237,14 +246,14 @@ function DetailDrawer({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-violet-50/80 text-violet-800 transition hover:bg-violet-100"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#4B0082]/25 bg-[#4B0082]/8 text-[#4B0082] transition hover:bg-[#4B0082]/12"
               >
                 <X size={20} strokeWidth={2} />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-5">
-              <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-violet-600">نتائج الاستبيان</p>
+              <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">نتائج الاستبيان</p>
               {onboarding ? (
                 <ul className="space-y-2">
                   {(row.answers || []).map((a, i) => (
@@ -280,7 +289,7 @@ function DetailDrawer({
 
               {canResolve && !row.resolved ? (
                 <div className="mt-6">
-                  <label htmlFor="exec-notes" className="mb-2 block text-[11px] font-black text-violet-800">
+                  <label htmlFor="exec-notes" className="mb-2 block text-[11px] font-black text-[#4B0082]">
                     ملاحظات المدير
                   </label>
                   <textarea
@@ -290,7 +299,7 @@ function DetailDrawer({
                     value={executiveNotes}
                     onChange={e => onExecutiveNotesChange(e.target.value)}
                     placeholder="تعليمات أو توجيه للفريق…"
-                    className="w-full rounded-xl border border-violet-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-800 shadow-inner outline-none ring-0 placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                    className="w-full rounded-xl border border-[#4B0082]/25 bg-white/90 px-3 py-2.5 text-sm text-slate-800 shadow-inner outline-none ring-0 placeholder:text-slate-400 focus:border-[#4B0082] focus:ring-2 focus:ring-[#4B0082]/15"
                   />
                 </div>
               ) : row.resolved && row.executive_notes ? (
@@ -302,7 +311,7 @@ function DetailDrawer({
             </div>
 
             {canResolve && !row.resolved ? (
-              <div className="border-t border-violet-100/80 p-5">
+              <div className="border-t border-[#4B0082]/12 p-5">
                 <button
                   type="button"
                   onClick={() => onResolve(row.id)}
@@ -471,23 +480,29 @@ export default function QuickVerification() {
       className="min-h-screen bg-gradient-to-b from-white via-violet-50/[0.35] to-white pb-24"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
-      <div className="sticky top-0 z-40 shadow-[0_8px_30px_-12px_rgba(76,29,149,0.12)]">
+      <div className="sticky top-0 z-40 shadow-[0_8px_30px_-12px_rgba(75,0,130,0.35)]">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
-        <div className="w-full border-b border-violet-100/90 bg-white/95 backdrop-blur-md">
+        <div className="w-full border-b border-black/15 backdrop-blur-sm" style={{ backgroundColor: QA_PURPLE }}>
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:px-6">
-          <div className="flex rounded-2xl border border-violet-100/90 bg-violet-50/20 p-1">
+          <div className="flex rounded-2xl border border-white/20 bg-black/15 p-1">
             <button
               type="button"
               onClick={() => setTab('crisis')}
               className={`rounded-xl px-4 py-2 text-xs font-black transition md:text-sm ${
-                tab === 'crisis' ? 'bg-white text-violet-900 shadow-md' : 'text-violet-600/80 hover:text-violet-900'
+                tab === 'crisis' ? 'bg-white text-[#4B0082] shadow-md' : 'text-white/75 hover:bg-white/10 hover:text-white'
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
-                <AlertTriangle size={15} className="text-rose-500" />
+                <AlertTriangle size={15} className={tab === 'crisis' ? 'text-rose-600' : 'text-white'} />
                 مركز الأزمات
                 {crisisTotal > 0 ? (
-                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] text-rose-800">{crisisTotal}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                      tab === 'crisis' ? 'bg-rose-100 text-rose-800' : 'bg-white/20 text-white'
+                    }`}
+                  >
+                    {crisisTotal}
+                  </span>
                 ) : null}
               </span>
             </button>
@@ -495,14 +510,20 @@ export default function QuickVerification() {
               type="button"
               onClick={() => setTab('solved')}
               className={`rounded-xl px-4 py-2 text-xs font-black transition md:text-sm ${
-                tab === 'solved' ? 'bg-white text-violet-900 shadow-md' : 'text-violet-600/80 hover:text-violet-900'
+                tab === 'solved' ? 'bg-white text-[#4B0082] shadow-md' : 'text-white/75 hover:bg-white/10 hover:text-white'
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 size={15} className="text-emerald-600" />
+                <CheckCircle2 size={15} className={tab === 'solved' ? 'text-emerald-600' : 'text-white'} />
                 تم الحل
                 {solvedTotal > 0 ? (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-900">{solvedTotal}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                      tab === 'solved' ? 'bg-emerald-100 text-emerald-900' : 'bg-white/20 text-white'
+                    }`}
+                  >
+                    {solvedTotal}
+                  </span>
                 ) : null}
               </span>
             </button>
@@ -511,9 +532,9 @@ export default function QuickVerification() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-900 shadow-sm hover:bg-violet-50 disabled:opacity-50 md:text-sm"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-white/15 disabled:opacity-50 md:text-sm"
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={loading ? 'animate-spin text-white' : 'text-white'} />
             تحديث
           </button>
           </div>
@@ -522,13 +543,13 @@ export default function QuickVerification() {
 
       <div className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-12">
         <div className="relative mb-8">
-          <Search className="pointer-events-none absolute right-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-violet-300" />
+          <Search className="pointer-events-none absolute right-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#4B0082]/45" />
           <input
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="بحث في الحالات المعروضة…"
-            className="w-full rounded-2xl border border-violet-200/70 bg-white py-4 pr-12 pl-4 text-sm font-medium text-slate-800 shadow-[0_4px_24px_-12px_rgba(76,29,149,0.1)] outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            className="w-full rounded-2xl border border-[#4B0082]/20 bg-white py-4 pr-12 pl-4 text-sm font-medium text-slate-800 shadow-[0_4px_24px_-12px_rgba(75,0,130,0.08)] outline-none placeholder:text-slate-400 focus:border-[#4B0082] focus:ring-2 focus:ring-[#4B0082]/15"
           />
         </div>
 
@@ -541,7 +562,7 @@ export default function QuickVerification() {
 
         {loading && !onboardingRows.length && !activeRows.length ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-violet-500" />
+            <Loader2 className="h-10 w-10 animate-spin text-[#4B0082]" />
           </div>
         ) : tab === 'crisis' ? (
           crisisTotal === 0 ? (
@@ -555,7 +576,7 @@ export default function QuickVerification() {
             <div className="space-y-12">
               <section>
                 <div className="mb-5 flex items-center justify-between">
-                  <h2 className="text-sm font-black uppercase tracking-wide text-violet-800">متاجر جديدة — غير راضٍ</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-[#4B0082]">متاجر جديدة — غير راضٍ</h2>
                   <span className="text-xs font-bold text-slate-400">{crisisOnb.length}</span>
                 </div>
                 {crisisOnb.length === 0 ? (
@@ -573,7 +594,7 @@ export default function QuickVerification() {
 
               <section>
                 <div className="mb-5 flex items-center justify-between">
-                  <h2 className="text-sm font-black uppercase tracking-wide text-violet-800">استبيانات نشطة — غير راضٍ</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-[#4B0082]">استبيانات نشطة — غير راضٍ</h2>
                   <span className="text-xs font-bold text-slate-400">{crisisActive.length}</span>
                 </div>
                 {crisisActive.length === 0 ? (
