@@ -26,9 +26,10 @@ if (!is_array($input)) {
 }
 
 $userRole = trim((string) ($input['user_role'] ?? ''));
-if ($userRole !== 'executive') {
+$allowedRoles = ['executive', 'incubation_manager', 'active_manager', 'inactive_manager'];
+if (!in_array($userRole, $allowedRoles, true)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'غير مصرّح — المدير التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'غير مصرّح.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -58,15 +59,27 @@ try {
 
 try {
     $st = $pdo->prepare('
-        SELECT id FROM surveys
+        SELECT id, submitted_username, performed_by FROM surveys
         WHERE id = ? AND DATE(created_at) = CURDATE()
         LIMIT 1
     ');
     $st->execute([$surveyId]);
-    if (!$st->fetch(PDO::FETCH_ASSOC)) {
+    $surveyRow = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$surveyRow) {
         http_response_code(404);
         echo json_encode(['success' => false, 'error' => 'الاستبيان غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    if ($userRole !== 'executive') {
+        $uname = trim((string) ($surveyRow['submitted_username'] ?? ''));
+        $staffKey = $uname !== '' ? $uname : trim((string) ($surveyRow['performed_by'] ?? ''));
+        $rb = trim((string) $resolvedBy);
+        if ($staffKey === '' || $rb === '' || strcasecmp($staffKey, $rb) !== 0) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'لا يمكن حلّ استبيان غير مسند إليك.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     }
 
     $ins = $pdo->prepare('

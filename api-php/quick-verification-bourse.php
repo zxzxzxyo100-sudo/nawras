@@ -14,10 +14,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$userRole = $_GET['user_role'] ?? '';
-if ($userRole !== 'executive') {
+$userRole = trim((string) ($_GET['user_role'] ?? ''));
+$requestUsername = trim((string) ($_GET['username'] ?? ''));
+$allowedRoles = ['executive', 'incubation_manager', 'active_manager', 'inactive_manager'];
+if (!in_array($userRole, $allowedRoles, true)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'غير مصرّح — المدير التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'غير مصرّح.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($userRole !== 'executive' && $requestUsername === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'اسم المستخدم مطلوب.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -211,6 +218,17 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'تعذّر قراءة الاستبيانات.'], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+if ($userRole !== 'executive') {
+    $rows = array_values(array_filter($rows, function ($r) use ($requestUsername) {
+        $u = isset($r['staff_username']) ? trim((string) $r['staff_username']) : '';
+        return $u !== '' && $u === $requestUsername;
+    }));
+    $activeCsatRows = array_values(array_filter($activeCsatRows, function ($r) use ($requestUsername) {
+        $u = isset($r['staff_username']) ? trim((string) $r['staff_username']) : '';
+        return $u !== '' && $u === $requestUsername;
+    }));
 }
 
 // تجميع حسب الموظف — تهيئة جديدة

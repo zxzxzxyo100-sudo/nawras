@@ -31,6 +31,12 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
 } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
@@ -102,16 +108,12 @@ const PRO = {
   amber: '#D97706',
 }
 
-/** التحقق السريع — تجريبي `VITE_APP_STAGING=1`: نفس لغة لوحة التحكم (عتمة + بطاقات بنفسجية) */
-const STAGING_DASH = {
-  pageBg: 'linear-gradient(180deg, #121214 0%, #18181A 100%)',
-  cardLift: 'linear-gradient(165deg, #1A1A1C 0%, #121214 100%)',
-  headerReflect: 'linear-gradient(165deg, #1e1e22 0%, #141416 100%)',
-  drawerBg: '#141416',
-  gold: '#FBBF24',
-  silver: '#C8C8D0',
-  coral: '#FB7185',
-  green: '#34D399',
+/** التحقق السريع — تجريبي `VITE_APP_STAGING=1`: خلفية بيضاء وبطاقات كبيرة */
+const STAGING_LIGHT = {
+  pageBg: '#FFFFFF',
+  border: '#E5E7EB',
+  text: '#111827',
+  textMuted: '#6B7280',
 }
 
 const fadeUpStaging = {
@@ -119,68 +121,56 @@ const fadeUpStaging = {
   visible: { opacity: 1, y: 0 },
 }
 
-/** كرت إحصاء علوي — نفس أسلوب StoreTypeCard في Dashboard (بدون رابط سفلي) */
+/** كرت إحصاء علوي — بطاقات كبيرة بتدرج + وهج داخلي خفيف */
 function QuickAuditStatCard({ title, value, sub, gradient, glow, icon: Icon }) {
   return (
     <motion.div
       variants={fadeUpStaging}
       initial="hidden"
       animate="visible"
-      whileHover={{ y: -5, boxShadow: `0 14px 40px ${glow}` }}
-      className="group relative w-full overflow-hidden rounded-2xl p-5 text-right"
-      style={{ background: gradient, boxShadow: `0 4px 24px ${glow}` }}
+      whileHover={{ y: -4, boxShadow: `0 18px 44px ${glow}` }}
+      className="group relative w-full overflow-hidden rounded-2xl p-6 text-right shadow-lg"
+      style={{
+        background: gradient,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), 0 6px 28px ${glow}`,
+      }}
     >
-      <div className="absolute inset-0 rounded-2xl bg-white/5 opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="absolute inset-0 rounded-2xl bg-white/[0.07] opacity-0 transition-opacity group-hover:opacity-100" />
       <div
-        className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full opacity-20 blur-2xl"
+        className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full opacity-25 blur-3xl"
         style={{ background: glow }}
       />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="mb-2 text-xs font-medium uppercase tracking-widest text-white/70">{title}</p>
-          <div className="text-3xl font-black leading-none text-white md:text-4xl">{value}</div>
-          {sub ? <p className="mt-2 text-xs text-white/60">{sub}</p> : null}
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/85">{title}</p>
+          <div className="text-3xl font-black leading-none text-white drop-shadow-sm md:text-[2.35rem]">{value}</div>
+          {sub ? <p className="mt-2 text-xs font-medium text-white/75">{sub}</p> : null}
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
-          <Icon size={20} className="text-white" />
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner ring-1 ring-white/20">
+          <Icon size={22} className="text-white" />
         </div>
       </div>
     </motion.div>
   )
 }
 
-/** مؤشر رضا — أيقونات على خلفية داكنة (مرجان / أخضر) */
-function DarkAuditSatisfactionGlyph({ arrow, resolvedDown }) {
+/** مؤشر رضا — صف أبيض مضغوط */
+function LightRowSatisfactionGlyph({ arrow, resolvedDown }) {
   if (resolvedDown) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5">
-        <CheckCircle2 size={22} className="text-emerald-400" strokeWidth={2.2} aria-hidden />
-        <span className="text-xs font-bold text-emerald-300/90">تم الحل</span>
+      <span className="inline-flex items-center gap-1 text-emerald-600">
+        <CheckCircle2 size={18} strokeWidth={2.2} aria-hidden />
+        <span className="text-xs font-bold">تم الحل</span>
       </span>
     )
   }
   if (arrow === 'up') {
-    return (
-      <span className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-        <ArrowBigUp size={26} strokeWidth={2.4} className="text-emerald-400" aria-hidden />
-      </span>
-    )
+    return <ArrowBigUp size={22} strokeWidth={2.4} className="text-emerald-600" aria-hidden />
   }
   if (arrow === 'mid') {
-    return (
-      <span
-        className="inline-flex items-center justify-center rounded-xl border p-3"
-        style={{ borderColor: 'rgba(251, 191, 36, 0.35)', background: 'rgba(251, 191, 36, 0.08)' }}
-      >
-        <ArrowLeftRight size={24} strokeWidth={2.5} style={{ color: STAGING_DASH.gold }} aria-hidden />
-      </span>
-    )
+    return <ArrowLeftRight size={20} strokeWidth={2.5} className="text-amber-500" aria-hidden />
   }
-  return (
-    <span className="inline-flex items-center justify-center rounded-xl border border-rose-500/35 bg-rose-500/10 p-3">
-      <ArrowBigDown size={26} strokeWidth={2.4} className="text-rose-400" aria-hidden />
-    </span>
-  )
+  return <ArrowBigDown size={22} strokeWidth={2.4} className="text-rose-600" aria-hidden />
 }
 
 /** لوحة 2025+ — عتمة + نيون (تجريبي `VITE_APP_STAGING=1` فقط) */
@@ -633,7 +623,7 @@ function AnimatedStars({ value }) {
 }
 
 /** درج التفصيل — داخل نفس الملف (تجريبي فقط) */
-function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
+function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy, auditUser }) {
   const [latestCallNote, setLatestCallNote] = useState(null)
   const [callStage, setCallStage] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -651,7 +641,10 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
     if (!row?.store_id) return
     let cancelled = false
     setLoading(true)
-    getQuickVerificationAuditTimeline(row.store_id)
+    getQuickVerificationAuditTimeline(row.store_id, {
+      user_role: auditUser?.role ?? 'executive',
+      username: auditUser?.username ?? '',
+    })
       .then(d => {
         if (cancelled) return
         setLatestCallNote(d?.latest_call_note || null)
@@ -686,7 +679,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
     return () => {
       cancelled = true
     }
-  }, [row?.store_id])
+  }, [row?.store_id, auditUser?.role, auditUser?.username])
 
   useEffect(() => {
     const onKey = e => {
@@ -715,11 +708,11 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       dir="rtl"
-      style={{ fontFamily: "'Cairo', sans-serif" }}
+      style={{ fontFamily: "'Tajawal', sans-serif" }}
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
         aria-label="إغلاق"
         onClick={onClose}
       />
@@ -728,47 +721,43 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="relative flex h-full w-full max-w-[480px] flex-col border-l border-white/10 shadow-2xl"
-        style={{ background: STAGING_DASH.drawerBg, boxShadow: '0 0 48px rgba(0,0,0,0.5)' }}
+        className="relative flex h-full w-full max-w-[480px] flex-col border-l border-slate-200 bg-white shadow-2xl"
       >
-        <div className="h-1 w-full shrink-0 bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500" />
-        <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-5 py-4"
-          style={{ background: STAGING_DASH.headerReflect }}
-        >
+        <div className="h-1 w-full shrink-0 bg-gradient-to-r from-violet-600 via-purple-500 to-indigo-500" />
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/90 px-5 py-4">
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold text-slate-100">{row.store_name}</p>
+            <p className="truncate text-lg font-black text-slate-900">{row.store_name}</p>
             <p className="mt-0.5 text-xs tabular-nums text-slate-500">#{row.store_id}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+            className="shrink-0 rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100"
           >
             <X size={22} />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-10 overflow-y-auto px-5 py-6 text-slate-200">
+        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-5 py-6 text-slate-800">
           <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">معلومات المكالمة</p>
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">معلومات المكالمة</p>
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
               <div className="flex items-start gap-2">
-                <User size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
+                <User size={16} className="mt-0.5 shrink-0 text-violet-600" aria-hidden />
                 <div>
                   <span className="font-medium text-slate-500">الموظف: </span>
                   {row.staff_fullname || row.staff_username || '—'}
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Calendar size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
+                <Calendar size={16} className="mt-0.5 shrink-0 text-violet-600" aria-hidden />
                 <div>
                   <span className="font-medium text-slate-500">التاريخ والوقت: </span>
                   <span className="tabular-nums">{fmtServerAt(row.created_at)}</span>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <ClipboardList size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
+                <ClipboardList size={16} className="mt-0.5 shrink-0 text-violet-600" aria-hidden />
                 <div>
                   <span className="font-medium text-slate-500">مرحلة المكالمة: </span>
                   {loading ? '…' : callStage != null ? `مكالمة ${callStage}` : 'غير محدد في السجل'}
@@ -778,20 +767,16 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
           </div>
 
           <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">إجابات الاستبيان</p>
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">إجابات الاستبيان</p>
             {row.survey_kind === 'new_merchant_onboarding' && row.answers && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {row.answers.map((a, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl border border-white/10 p-3"
-                    style={{ background: STAGING_DASH.cardLift }}
-                  >
+                  <div key={i} className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="text-lg" style={{ color: a.yes ? STAGING_DASH.green : STAGING_DASH.coral }} aria-hidden>
+                      <span className="text-lg" style={{ color: a.yes ? PRO.green : PRO.red }} aria-hidden>
                         ●
                       </span>
-                      <span className="text-xs font-semibold text-slate-100">{a.label}</span>
+                      <span className="text-xs font-bold text-slate-900">{a.label}</span>
                     </div>
                     <p className="text-[10px] tabular-nums text-slate-500">{fmtServerAt(row.created_at)}</p>
                   </div>
@@ -801,33 +786,29 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             {row.survey_kind === 'active_csat' && row.questions && (
               <>
                 {radarData.length > 0 && (
-                  <div
-                    className="mb-6 h-[200px] w-full rounded-xl border border-white/10 p-2"
-                    style={{ background: '#0c0c0e' }}
-                    dir="ltr"
-                  >
+                  <div className="mb-6 h-[200px] w-full rounded-xl border border-slate-200 bg-white p-2 shadow-inner" dir="ltr">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                        <PolarGrid stroke="#334155" />
-                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#64748b' }} />
                         <PolarRadiusAxis
                           angle={90}
                           domain={[0, 5]}
                           tickCount={6}
-                          tick={{ fontSize: 9, fill: '#94a3b8' }}
+                          tick={{ fontSize: 9, fill: '#64748b' }}
                         />
-                        <Radar name="A" dataKey="score" stroke="#a78bfa" fill="#7c3aed" fillOpacity={0.25} />
+                        <Radar name="A" dataKey="score" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.2} />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
                 )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {row.questions.map((q, i) => (
-                    <div key={i} className="rounded-xl border border-white/10 p-3" style={{ background: STAGING_DASH.cardLift }}>
-                      <p className="mb-2 text-xs font-semibold text-slate-100">{q.label}</p>
+                    <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                      <p className="mb-2 text-xs font-bold text-slate-900">{q.label}</p>
                       <div className="flex items-center justify-between gap-2">
                         <AnimatedStars value={q.value} />
-                        <span className="text-sm font-semibold tabular-nums text-slate-100">{q.value}/5</span>
+                        <span className="text-sm font-semibold tabular-nums text-slate-800">{q.value}/5</span>
                       </div>
                     </div>
                   ))}
@@ -838,11 +819,11 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
 
           <div>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-100">الملاحظات والتعليقات</p>
+              <p className="text-sm font-black text-slate-900">الملاحظات والتعليقات</p>
               <button
                 type="button"
                 onClick={() => void copyNote()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:bg-violet-500"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
               >
                 <Copy size={14} />
                 نسخ
@@ -851,7 +832,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             {(row.suggestions || '').trim() !== '' && (
               <div className="mb-4">
                 <p className="mb-1 text-[11px] font-medium text-slate-500">صوت المتجر (مسجّل)</p>
-                <p className="whitespace-pre-wrap border-b border-white/10 pb-3 text-sm leading-relaxed text-slate-300">
+                <p className="whitespace-pre-wrap border-b border-slate-100 pb-3 text-sm leading-relaxed text-slate-700">
                   {(row.suggestions || '').trim()}
                 </p>
               </div>
@@ -859,7 +840,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             {latestCallNote?.text ? (
               <div>
                 <p className="mb-1 text-[11px] font-medium text-slate-500">ملاحظة المكالمة (الموظف)</p>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{latestCallNote.text}</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{latestCallNote.text}</p>
                 <p className="mt-1 text-[10px] tabular-nums text-slate-500">
                   {latestCallNote.by ? `${latestCallNote.by} — ` : ''}
                   {fmtServerAt(latestCallNote.at)}
@@ -874,12 +855,12 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         </div>
 
         {row.arrow === 'down' && !row.resolved && (
-          <div className="shrink-0 border-t border-white/10 bg-black/20 px-5 py-4">
+          <div className="shrink-0 border-t border-slate-200 bg-slate-50 px-5 py-4">
             <button
               type="button"
               onClick={() => onResolve?.(row.id)}
               disabled={resolveBusy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition-opacity hover:bg-violet-500 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-violet-700 disabled:opacity-60"
             >
               {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
               تم حل المشكلة ✅
@@ -887,7 +868,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
           </div>
         )}
         {row.arrow === 'down' && row.resolved && (
-          <div className="shrink-0 border-t border-emerald-500/30 bg-emerald-950/40 px-5 py-3 text-center text-sm font-semibold text-emerald-300">
+          <div className="shrink-0 border-t border-emerald-200 bg-emerald-50 px-5 py-3 text-center text-sm font-bold text-emerald-800">
             تم تسجيل حل هذه المشكلة
           </div>
         )}
@@ -901,7 +882,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
  * يُفعَّل في التطوير وبناء التجريبي فقط.
  */
 export default function QuickVerification() {
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const { allStores, counts } = useStores()
   const [mainTab, setMainTab] = useState('onboarding')
   const [staffMissions, setStaffMissions] = useState([])
@@ -918,17 +899,23 @@ export default function QuickVerification() {
   /** قيد التدقيق vs سجل الحلول — تجريبي */
   const [auditViewTab, setAuditViewTab] = useState('active')
   const [quickSearch, setQuickSearch] = useState('')
+  /** إخفاء فوري للصف بعد الحل — تجريبي */
+  const [optimisticResolvedIds, setOptimisticResolvedIds] = useState(() => new Set())
 
   const loadAll = useCallback(async () => {
     setLoading(true)
     setErr('')
     try {
-      const d = await getQuickVerificationBourse()
+      const d = await getQuickVerificationBourse({
+        user_role: user?.role || '',
+        username: user?.username || '',
+      })
       if (d?.success) {
         setDetailRows(Array.isArray(d.rows) ? d.rows : [])
         setStaffMissions(Array.isArray(d.staff_summary) ? d.staff_summary : [])
         setActiveDetailRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setActiveStaffMissions(Array.isArray(d.active_csat_staff_summary) ? d.active_csat_staff_summary : [])
+        setOptimisticResolvedIds(new Set())
         return d
       }
       setDetailRows([])
@@ -947,7 +934,7 @@ export default function QuickVerification() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user?.role, user?.username])
 
   const resolveAudit = useCallback(
     async surveyId => {
@@ -956,25 +943,37 @@ export default function QuickVerification() {
       try {
         const res = await postQuickVerificationResolveAudit({
           survey_id: surveyId,
-          user_role: 'executive',
+          user_role: user?.role || 'executive',
           resolved_by: user?.username || '',
         })
         if (!res?.success) {
           setErr(res?.error || 'تعذّر حفظ الحل.')
           return
         }
+        setOptimisticResolvedIds(prev => new Set([...prev, surveyId]))
         const d = await loadAll()
         if (d?.success) {
           setAuditViewTab('resolved')
           setModalRow(null)
+        } else {
+          setOptimisticResolvedIds(prev => {
+            const n = new Set(prev)
+            n.delete(surveyId)
+            return n
+          })
         }
       } catch (e) {
         setErr(e?.response?.data?.error || e?.message || 'تعذّر حفظ الحل.')
+        setOptimisticResolvedIds(prev => {
+          const n = new Set(prev)
+          n.delete(surveyId)
+          return n
+        })
       } finally {
         setResolvingId(null)
       }
     },
-    [loadAll, mainTab, user?.username],
+    [loadAll, user?.username, user?.role],
   )
 
   useEffect(() => {
@@ -1038,6 +1037,39 @@ export default function QuickVerification() {
 
   const stagingDisplayRows = auditViewTab === 'active' ? activeAuditStagingRows : resolvedHistoryRows
 
+  const visibleStagingRows = useMemo(
+    () => stagingDisplayRows.filter(r => !optimisticResolvedIds.has(r.id)),
+    [stagingDisplayRows, optimisticResolvedIds],
+  )
+
+  const isDirectorView = user?.role === 'executive'
+
+  const csatRatioValue = useMemo(() => {
+    const t = satStats.total
+    if (!t) return '—'
+    return `${Math.round((satStats.sat / t) * 100)}%`
+  }, [satStats])
+
+  const directorStaffBarData = useMemo(() => {
+    return (currentStaff || []).map(s => ({
+      name: (s.fullname || s.username || '—').slice(0, 20),
+      surveys: s.answered_surveys_today ?? 0,
+      key: s.username || s.fullname || String(Math.random()),
+    }))
+  }, [currentStaff])
+
+  const myResolvedToday = useMemo(() => {
+    const u = user?.username
+    if (!u) return 0
+    return currentDetails.filter(r => r.staff_username === u && r.arrow === 'down' && r.resolved).length
+  }, [currentDetails, user?.username])
+
+  const myOpenAuditCount = useMemo(() => {
+    const u = user?.username
+    if (!u) return 0
+    return currentDetails.filter(r => r.staff_username === u && r.arrow === 'down' && !r.resolved).length
+  }, [currentDetails, user?.username])
+
   const radarData = useMemo(() => {
     if (!modalRow?.questions?.length) return []
     return modalRow.questions.map(q => ({
@@ -1050,7 +1082,7 @@ export default function QuickVerification() {
   if (!IS_STAGING_OR_DEV) {
     return <Navigate to="/" replace />
   }
-  if (user?.role !== 'executive') {
+  if (!can('quick_verification')) {
     return <Navigate to="/" replace />
   }
 
@@ -1061,39 +1093,34 @@ export default function QuickVerification() {
       className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] pb-10 px-3 md:px-5 pt-4' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
-        fontFamily: "'Cairo', sans-serif",
-        background: IS_VITE_APP_STAGING ? STAGING_DASH.pageBg : DS.bgPage,
+        fontFamily: IS_VITE_APP_STAGING ? "'Tajawal', sans-serif" : "'Cairo', sans-serif",
+        background: IS_VITE_APP_STAGING ? STAGING_LIGHT.pageBg : DS.bgPage,
       }}
     >
       {IS_VITE_APP_STAGING ? (
-        <div className="mx-auto max-w-6xl px-2 pb-12 pt-4 md:px-4">
-          {/* رأس — خط بنفسجي + بطاقة عاكسة */}
+        <div className="mx-auto max-w-6xl px-4 pb-14 pt-6 md:px-6">
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="mb-6 overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
-            style={{ background: STAGING_DASH.headerReflect, boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}
+            className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md"
           >
-            <div className="h-1 w-full bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500" />
-            <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+            <div className="h-1 w-full bg-gradient-to-r from-violet-600 via-purple-500 to-indigo-600" />
+            <div className="space-y-5 px-5 py-5 sm:px-8 sm:py-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-black tracking-tight text-slate-100 md:text-[1.65rem]">
-                    التحقق السريع
-                  </h1>
-                  <p className="mt-1.5 text-sm text-slate-500">
+                  <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[1.7rem]">التحقق السريع</h1>
+                  <p className="mt-1 text-sm text-slate-500">
                     {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'} ·{' '}
-                    <span className="tabular-nums text-slate-400">{satStats.total}</span> استبيان اليوم · راضٍ{' '}
-                    <span className="tabular-nums text-emerald-400/90">{satStats.sat}</span> · غير راضٍ{' '}
-                    <span className="tabular-nums text-rose-400/90">{satStats.uns}</span>
+                    <span className="tabular-nums font-semibold text-slate-700">{satStats.total}</span> استبيان · راضٍ{' '}
+                    <span className="tabular-nums text-emerald-600">{satStats.sat}</span> · غير راضٍ{' '}
+                    <span className="tabular-nums text-rose-600">{satStats.uns}</span>
                   </p>
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center lg:max-w-xl">
                   <label className="relative min-w-0 flex-1">
                     <span className="sr-only">بحث</span>
                     <Search
-                      className="pointer-events-none absolute right-0 top-1/2 z-[1] -translate-y-1/2 text-slate-500"
+                      className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
                       size={18}
                       aria-hidden
                     />
@@ -1102,7 +1129,7 @@ export default function QuickVerification() {
                       value={quickSearch}
                       onChange={e => setQuickSearch(e.target.value)}
                       placeholder="بحث باسم المتجر أو الكود…"
-                      className="w-full rounded-xl border border-white/10 bg-black/25 py-2.5 pr-9 pl-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-10 pl-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
                       autoComplete="off"
                     />
                   </label>
@@ -1110,7 +1137,7 @@ export default function QuickVerification() {
                     type="button"
                     onClick={() => void loadAll()}
                     disabled={loading}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:bg-violet-500 disabled:opacity-50"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/20 hover:bg-violet-700 disabled:opacity-50"
                   >
                     <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
                     تحديث
@@ -1130,10 +1157,10 @@ export default function QuickVerification() {
                     role="tab"
                     aria-selected={satTab === t.id}
                     onClick={() => setSatTab(t.id)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
                       satTab === t.id
-                        ? 'bg-violet-600/90 text-white shadow-md shadow-violet-500/20'
-                        : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                        ? 'bg-violet-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {t.label}
@@ -1141,15 +1168,13 @@ export default function QuickVerification() {
                 ))}
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2" role="tablist" aria-label="نوع الاستبيان">
                   <button
                     type="button"
                     onClick={() => setMainTab('onboarding')}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
-                      mainTab === 'onboarding'
-                        ? 'text-[#FBBF24]'
-                        : 'text-slate-500 hover:text-slate-300'
+                      mainTab === 'onboarding' ? 'text-violet-700 underline decoration-2' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     متاجر جدد
@@ -1158,9 +1183,7 @@ export default function QuickVerification() {
                     type="button"
                     onClick={() => setMainTab('active_csat')}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
-                      mainTab === 'active_csat'
-                        ? 'text-[#FBBF24]'
-                        : 'text-slate-500 hover:text-slate-300'
+                      mainTab === 'active_csat' ? 'text-violet-700 underline decoration-2' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     تجار نشطون
@@ -1171,7 +1194,7 @@ export default function QuickVerification() {
                     type="button"
                     onClick={() => setAuditViewTab('active')}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
-                      auditViewTab === 'active' ? 'text-violet-300' : 'text-slate-500 hover:text-slate-300'
+                      auditViewTab === 'active' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     قيد التدقيق
@@ -1180,7 +1203,7 @@ export default function QuickVerification() {
                     type="button"
                     onClick={() => setAuditViewTab('resolved')}
                     className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
-                      auditViewTab === 'resolved' ? 'text-violet-300' : 'text-slate-500 hover:text-slate-300'
+                      auditViewTab === 'resolved' ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     سجل الحلول
@@ -1190,223 +1213,220 @@ export default function QuickVerification() {
             </div>
           </motion.div>
 
-          {/* 4 بطاقات علوية — نفس أسلوب لوحة التحكم */}
           <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <QuickAuditStatCard
               title="إجمالي المتاجر"
               value={totalStoresCount.toLocaleString('ar-SA')}
-              sub="من سياق المتاجر"
-              gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
-              glow="#7c3aed55"
+              sub="إجمالي من السياق"
+              gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #7c3aed)"
+              glow="#6d28d955"
               icon={Package}
             />
             <QuickAuditStatCard
               title="راضٍ / غير راضٍ"
-              value={
-                <span className="flex flex-wrap items-baseline gap-2 tabular-nums">
-                  <span className="text-emerald-300">{satStats.sat}</span>
-                  <span className="text-white/40">/</span>
-                  <span className="text-rose-300">{satStats.uns}</span>
-                </span>
-              }
-              sub={`${satStats.total} استبيان في التبويب الحالي`}
-              gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
-              glow="#8b5cf655"
+              value={csatRatioValue}
+              sub={`راضٍ ${satStats.sat} · غير راضٍ ${satStats.uns} · من ${satStats.total}`}
+              gradient="linear-gradient(135deg, #047857, #059669, #10b981)"
+              glow="#05966955"
               icon={BarChart3}
             />
             <QuickAuditStatCard
               title="المشاكل المكتشفة"
               value={execMetrics.totalProblems.toLocaleString('ar-SA')}
-              sub="🔽 غير راضٍ في القسم الحالي"
-              gradient="linear-gradient(135deg, #92400e, #d97706)"
-              glow="#d9770655"
+              sub="استبيانات 🔽 في القسم الحالي"
+              gradient="linear-gradient(135deg, #c2410c, #ea580c, #f97316)"
+              glow="#ea580655"
               icon={AlertCircle}
             />
             <QuickAuditStatCard
-              title="تم حلّها"
+              title="مشاكل تم حلها"
               value={execMetrics.resolvedProblems.toLocaleString('ar-SA')}
-              sub={execMetrics.totalProblems ? `إنجاز ${execMetrics.pct}%` : '—'}
-              gradient="linear-gradient(135deg, #065f46, #059669)"
-              glow="#05966955"
+              sub={execMetrics.totalProblems ? `نسبة الإنجاز ${execMetrics.pct}%` : '—'}
+              gradient="linear-gradient(135deg, #3730a3, #4f46e5, #6366f1)"
+              glow="#6366f155"
               icon={CheckCircle2}
             />
           </div>
 
           {err ? (
-            <p
-              className="mb-6 rounded-xl border px-4 py-3 text-sm"
-              style={{
-                borderColor: 'rgba(251, 191, 36, 0.35)',
-                background: 'rgba(251, 191, 36, 0.08)',
-                color: STAGING_DASH.gold,
-              }}
-            >
+            <p className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
               {err}
             </p>
           ) : null}
 
-          {/* ملخص الموظفين — بطاقات */}
           <section className="mb-10">
-            <h2 className="mb-4 text-base font-black text-slate-100">
-              ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+            <h2 className="mb-4 text-lg font-black text-slate-900">
+              {isDirectorView ? 'أداء الموظفين (اليوم)' : 'أداؤك الشخصي'}
+              <span className="mr-2 text-sm font-normal text-slate-500">
+                — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+              </span>
             </h2>
             {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] py-12 text-sm text-slate-500">
-                <Loader2 size={20} className="animate-spin text-violet-400" />
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-14 text-sm text-slate-500 shadow-sm">
+                <Loader2 size={20} className="animate-spin text-violet-600" />
                 جارٍ التحميل…
               </div>
-            ) : !currentStaff?.length ? (
-              <p className="rounded-2xl border border-dashed border-white/15 py-10 text-center text-sm text-slate-500">
-                لا توجد بيانات موظفين اليوم في هذا القسم.
-              </p>
+            ) : isDirectorView ? (
+              !currentStaff?.length ? (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-500">
+                  لا توجد بيانات موظفين اليوم في هذا القسم.
+                </p>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <p className="mb-4 text-sm font-bold text-slate-700">استبيانات مكتملة لكل موظف</p>
+                  <div className="h-[min(420px,28rem)] w-full" dir="ltr">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        layout="vertical"
+                        data={[...directorStaffBarData].reverse()}
+                        margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={108}
+                          tick={{ fontSize: 11, fill: '#334155' }}
+                        />
+                        <RechartsTooltip
+                          cursor={{ fill: '#f8fafc' }}
+                          contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', textAlign: 'right' }}
+                        />
+                        <Bar dataKey="surveys" fill="#6366f1" radius={[0, 8, 8, 0]} name="استبيانات" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )
             ) : (
-              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {currentStaff.map(row => {
-                  const arrow = row.satisfaction_arrow
-                  const up = arrow === 'up'
-                  const mid = arrow === 'mid'
-                  return (
-                    <li
-                      key={row.username || row.fullname}
-                      className="rounded-2xl border border-slate-600/50 bg-slate-800/40 px-4 py-3 shadow-lg backdrop-blur-sm transition hover:border-violet-500/30"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-slate-100">{row.fullname || row.username}</p>
-                          <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                            {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="shrink-0"
-                          onClick={() => {
-                            const u = row.username
-                            const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
-                            const first = u
-                              ? pool.find(dr => dr.staff_username === u)
-                              : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
-                            if (first) setModalRow(first)
-                          }}
-                        >
-                          {up ? (
-                            <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
-                          ) : mid ? (
-                            <ArrowLeftRight size={22} strokeWidth={2.5} style={{ color: STAGING_DASH.gold }} aria-hidden />
-                          ) : (
-                            <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
-                          )}
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="overflow-hidden rounded-2xl shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #0d9488, #059669)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 28px rgba(5,150,105,0.35)',
+                }}
+              >
+                <div className="px-6 py-8 text-white">
+                  <p className="text-sm font-bold text-white/85">مهامك المحلولة اليوم</p>
+                  <p className="mt-2 text-5xl font-black tabular-nums drop-shadow-sm">{myResolvedToday}</p>
+                  <p className="mt-3 text-sm font-medium text-white/90">
+                    متابعة مفتوحة (🔽): <span className="tabular-nums font-black">{myOpenAuditCount}</span>
+                  </p>
+                  <p className="mt-2 text-xs text-white/75">@{user?.username || '—'}</p>
+                </div>
+              </motion.div>
             )}
           </section>
 
-          {/* تغذية المتاجر — بطاقات داكنة */}
           <section>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
-              <h2 className="text-base font-black text-slate-100">
-                {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل'}
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-lg font-black text-slate-900">
+                {auditViewTab === 'active' ? 'قائمة المتاجر — متابعة اليوم' : 'سجل الحلول'}
               </h2>
-              <span className="text-xs font-medium tabular-nums text-slate-500">{stagingDisplayRows.length} سجل</span>
+              <span className="text-xs font-semibold tabular-nums text-slate-500">{stagingDisplayRows.length} سجل</span>
             </div>
             {loading && currentDetails.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 py-16 text-sm text-slate-500">
-                <Loader2 size={22} className="animate-spin text-violet-400" />
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500 shadow-sm">
+                <Loader2 size={22} className="animate-spin text-violet-600" />
                 جارٍ تحميل التفاصيل…
               </div>
             ) : stagingDisplayRows.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-white/15 py-12 text-center text-sm text-slate-500">
+              <p className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-500">
                 {auditViewTab === 'active'
                   ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
                   : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
               </p>
             ) : (
-              <div className="space-y-4">
-                {stagingDisplayRows.map(row => {
-                  const shipN = resolveShipmentCount(allStores, row.store_id)
-                  const resolvedDown = row.arrow === 'down' && !!row.resolved
-                  const isHighRisk =
-                    auditViewTab === 'active' &&
-                    row.arrow === 'down' &&
-                    !row.resolved &&
-                    shipN != null &&
-                    shipN > HIGH_SHIPMENT_THRESHOLD
-                  const showResolve =
-                    auditViewTab === 'active' && row.arrow === 'down' && !row.resolved
-                  return (
-                    <motion.div
-                      key={row.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`rounded-2xl border p-4 shadow-2xl md:p-5 ${
-                        isHighRisk
-                          ? 'border-[#FBBF24]/40 ring-1 ring-[#FBBF24]/35'
-                          : 'border-white/10'
-                      }`}
-                      style={{
-                        background: STAGING_DASH.cardLift,
-                        boxShadow: '0 10px 36px rgba(0,0,0,0.42)',
-                      }}
-                    >
-                      <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[auto_1fr_auto]">
-                        <div className="flex justify-center md:justify-start">
-                          <DarkAuditSatisfactionGlyph arrow={row.arrow} resolvedDown={resolvedDown} />
-                        </div>
-                        <div className="min-w-0 text-center md:text-right">
-                          <p className="text-lg font-black leading-tight" style={{ color: STAGING_DASH.silver }}>
-                            {row.store_name}
-                            {isHighRisk ? (
-                              <span className="mr-2 text-xs font-bold" style={{ color: STAGING_DASH.gold }}>
-                                {' '}
-                                (أولوية)
-                              </span>
+              <div className="flex flex-col gap-3">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {visibleStagingRows.map(row => {
+                    const shipN = resolveShipmentCount(allStores, row.store_id)
+                    const resolvedDown = row.arrow === 'down' && !!row.resolved
+                    const isHighRisk =
+                      auditViewTab === 'active' &&
+                      row.arrow === 'down' &&
+                      !row.resolved &&
+                      shipN != null &&
+                      shipN > HIGH_SHIPMENT_THRESHOLD
+                    const showResolve =
+                      auditViewTab === 'active' && row.arrow === 'down' && !row.resolved
+                    const staffLabel = row.staff_username || row.staff_fullname || '—'
+                    return (
+                      <motion.div
+                        key={row.id}
+                        layout
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{
+                          opacity: 0,
+                          height: 0,
+                          marginBottom: 0,
+                          transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
+                        }}
+                        className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                        style={
+                          isHighRisk
+                            ? { boxShadow: '0 0 0 1px rgba(251, 191, 36, 0.45)' }
+                            : undefined
+                        }
+                      >
+                        <div className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 md:gap-6">
+                            <span className="inline-flex max-w-[7rem] items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                              {staffLabel}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-black text-slate-900">
+                                {row.store_name}
+                                {isHighRisk ? (
+                                  <span className="mr-1.5 text-xs font-bold text-amber-600"> (أولوية)</span>
+                                ) : null}
+                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                                <span className="tabular-nums">#{row.store_id}</span>
+                                <span className="text-slate-300">|</span>
+                                <span className="tabular-nums font-semibold">
+                                  {shipN != null ? shipN.toLocaleString('ar-EG') : '—'} شحنة
+                                </span>
+                              </div>
+                              {auditViewTab === 'resolved' ? (
+                                <p className="mt-1 text-xs text-slate-500">
+                                  مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="shrink-0">
+                              <LightRowSatisfactionGlyph arrow={row.arrow} resolvedDown={resolvedDown} />
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                            {showResolve ? (
+                              <button
+                                type="button"
+                                onClick={() => void resolveAudit(row.id)}
+                                disabled={resolvingId === row.id}
+                                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white shadow-md hover:bg-violet-700 disabled:opacity-60"
+                              >
+                                {resolvingId === row.id ? <Loader2 size={16} className="animate-spin" /> : null}
+                                تم الحل ✅
+                              </button>
                             ) : null}
-                          </p>
-                          <p className="mt-1 text-sm tabular-nums text-slate-500">
-                            #{row.store_id}
-                            <span className="mx-2 text-slate-600">·</span>
-                            {shipN != null ? `${shipN.toLocaleString('ar-EG')} شحنة` : '— شحنة'}
-                          </p>
-                          {auditViewTab === 'resolved' ? (
-                            <p className="mt-2 text-xs text-slate-500">
-                              مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
-                            </p>
-                          ) : null}
-                          {(row.suggestions || '').trim() ? (
-                            <p className="mt-2 line-clamp-2 text-xs text-slate-500">
-                              {textSnippet(row.suggestions, 72)}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-                          {showResolve ? (
                             <button
                               type="button"
-                              onClick={() => void resolveAudit(row.id)}
-                              disabled={resolvingId === row.id}
-                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-violet-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition hover:from-violet-500 hover:to-purple-500 disabled:opacity-60"
+                              onClick={() => setModalRow(row)}
+                              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-violet-700 hover:bg-slate-50"
                             >
-                              {resolvingId === row.id ? <Loader2 size={18} className="animate-spin" /> : null}
-                              تم حل المشكلة ✅
+                              تفاصيل
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => setModalRow(row)}
-                            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-violet-300 transition hover:bg-white/10"
-                          >
-                            تفاصيل
-                          </button>
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )
-                })}
+                      </motion.div>
+                    )
+                  })}
+                </AnimatePresence>
               </div>
             )}
           </section>
@@ -1617,6 +1637,7 @@ export default function QuickVerification() {
             onClose={() => setModalRow(null)}
             onResolve={resolveAudit}
             resolveBusy={resolvingId === modalRow.id}
+            auditUser={{ role: user?.role, username: user?.username }}
           />
         )}
       </AnimatePresence>
