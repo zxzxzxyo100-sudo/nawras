@@ -2,28 +2,23 @@
  * طابور مسؤول المتاجر الجديدة (الاحتضان) — منطق الأداء والرقابة (تجريبي/تطوير فقط).
  */
 
-import {
-  ONBOARD_DAYS_AFTER_CALL1,
-  ONBOARD_DAYS_AFTER_CALL2,
-} from '../constants/onboardingSchedule'
+/** يوم الدورة من الخادم (_cycle_day): المكالمة 1 = 1، المكالمة 2 = 3، المكالمة 3 = 10 */
+export const INCUBATION_PERIODIC_CALL1_CYCLE_DAY = 1
+export const INCUBATION_PERIODIC_CALL2_CYCLE_DAY = 3
+export const INCUBATION_PERIODIC_CALL3_CYCLE_DAY = 10
+
+/** وسوم satisfaction_gap_tags من التحقيق السريع: موظف الاحتضان لم يتصل في المرحلة المذكورة */
+export const QV_MISSED_INC_TAG = {
+  call1: 'qv_missed_inc_call_1',
+  call2: 'qv_missed_inc_call_2',
+  call3: 'qv_missed_inc_call_3',
+}
 
 /** تاريخ اليوم المحلي YYYY-MM-DD (للمطابقة مع مواعيد الاستحقاق) */
 export function localDateYmd(d = new Date()) {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-/** تاريخ تقويمي بعد N يوم من طابع MySQL (محلي) */
-function dueYmdAfterMysql(mysqlDatetime, addDays) {
-  if (!mysqlDatetime) return null
-  const t = new Date(mysqlDatetime)
-  if (Number.isNaN(t.getTime())) return null
-  t.setDate(t.getDate() + addDays)
-  const y = t.getFullYear()
-  const m = String(t.getMonth() + 1).padStart(2, '0')
-  const day = String(t.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
@@ -139,6 +134,65 @@ export function incubationStageCallDocumentedNonNoAnswer(log, storeStateRow, inc
   return true
 }
 
+/**
+ * قراءة وسم «لم يتصل في احتضان» من آخر استبيان للمتجر (get_surveys).
+ */
+export function parseQvMissedIncAlerts(surveyRow) {
+  const empty = { call1: false, call2: false, call3: false }
+  if (!surveyRow) return empty
+  const raw = surveyRow.satisfaction_gap_tags
+  let arr = []
+  if (Array.isArray(raw)) arr = raw
+  else if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const p = JSON.parse(raw)
+      arr = Array.isArray(p) ? p : []
+    } catch {
+      arr = []
+    }
+  }
+  const set = new Set(arr.map(x => String(x).trim()))
+  return {
+    call1: set.has(QV_MISSED_INC_TAG.call1) || set.has('missed_inc_call_1'),
+    call2: set.has(QV_MISSED_INC_TAG.call2) || set.has('missed_inc_call_2'),
+    call3: set.has(QV_MISSED_INC_TAG.call3) || set.has('missed_inc_call_3'),
+  }
+}
+
+/**
+ * متابعة دورية: م1 يوم 1 فقط؛ م2 يوم 3 (أو بين المكالمات نفس اليوم) — بعد فوات يوم 3 بدون تسجيل م2 لا يُعاد الظهور إلا بوسم التحقيق؛ م3 يوم 10 — بعد فوات يوم 10 بدون م3 لا يُعاد الظهور إلا بوسم التحقيق.
+ */
+export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates, surveyRow, qvPrecomputed = null) {
+  const st = storeStates[store.id] || {}
+  const cdRaw = store._cycle_day != null ? Number(store._cycle_day) : (daysInSystem(store) + 1)
+  const cd = Number.isFinite(cdRaw) ? cdRaw : 1
+  const qv = qvPrecomputed ?? parseQvMissedIncAlerts(surveyRow)
+
+  if (!st.inc_call1_at && incBucket === 'call_1') {
+    if (qv.call1) return 'call_1'
+    if (cd === INCUBATION_PERIODIC_CALL1_CYCLE_DAY) return 'call_1'
+    return null
+  }
+
+  const betweenC1C2 = incBucket === 'between_calls' && st.inc_call1_at && !st.inc_call2_at
+  if (!st.inc_call2_at && st.inc_call1_at && (incBucket === 'call_2' || betweenC1C2)) {
+    if (qv.call2) return 'call_2'
+    if (cd > INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return null
+    if (cd === INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return 'call_2'
+    return null
+  }
+
+  const betweenC2C3 = incBucket === 'between_calls' && st.inc_call2_at && !st.inc_call3_at
+  if (!st.inc_call3_at && st.inc_call2_at && (incBucket === 'call_3' || betweenC2C3)) {
+    if (qv.call3) return 'call_3'
+    if (cd > INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return null
+    if (cd === INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return 'call_3'
+    return null
+  }
+
+  return null
+}
+
 export function isOverdueForStage(store, storeStates, days) {
   const st = storeStates[store.id] || {}
   const inc1 = st.inc_call1_at
@@ -163,41 +217,6 @@ export function isOverdueForStage(store, storeStates, days) {
 }
 
 /**
- * متابعة دورية: يظهر المتجر في «يوم اللمس» المتفق فقط
- * — م1: يوم الدورة 1 (من الخادم _cycle_day)؛ م2/m3: يوم استحقاق المكالمة = inc_call* + الأيام في onboardingSchedule؛
- * مع إظهار إضافي عند التأخير المعتمد (نفس تلميحات isOverdueForStage).
- */
-export function isAgreedPeriodicFollowUpDay(incBucket, store, storeStates, days, todayYmd) {
-  const st = storeStates[store.id] || {}
-  const cycleDay = store._cycle_day != null ? Number(store._cycle_day) : (days + 1)
-
-  if (incBucket === 'call_1') {
-    if (st.inc_call1_at) return false
-    if (cycleDay === 1) return true
-    const ov = isOverdueForStage(store, storeStates, days)
-    return ov.overdue && ov.hint === 'لم تُسجَّل المكالمة الأولى بعد'
-  }
-
-  if (incBucket === 'call_2') {
-    if (st.inc_call2_at) return false
-    const due = dueYmdAfterMysql(st.inc_call1_at, ONBOARD_DAYS_AFTER_CALL1)
-    if (due && todayYmd === due) return true
-    const ov = isOverdueForStage(store, storeStates, days)
-    return ov.overdue && ov.hint === 'تأخّر المكالمة الثانية'
-  }
-
-  if (incBucket === 'call_3') {
-    if (st.inc_call3_at) return false
-    const due = dueYmdAfterMysql(st.inc_call2_at, ONBOARD_DAYS_AFTER_CALL2)
-    if (due && todayYmd === due) return true
-    const ov = isOverdueForStage(store, storeStates, days)
-    return ov.overdue && ov.hint === 'تأخّر المكالمة الثالثة'
-  }
-
-  return true
-}
-
-/**
  * مهام مسؤول المتاجر الجديدة (احتضان) — بديل توليد المهام الافتراضي عند تفعيل الوضع الذكي.
  */
 export function generateIncubationOfficerStagingTasks(
@@ -206,6 +225,7 @@ export function generateIncubationOfficerStagingTasks(
   storeStates,
   newMerchantOnboardingDoneIds,
   isStagingOrDev,
+  surveyByStoreId = {},
 ) {
   const today = localDateYmd(new Date())
   const tasks = []
@@ -214,6 +234,10 @@ export function generateIncubationOfficerStagingTasks(
     const log = callLogs[store.id] || {}
     const dbCat = storeStates[store.id]?.category || store.category
     const incBucket = store._inc
+    const surveyRow =
+      surveyByStoreId[store.id]
+      ?? surveyByStoreId[String(store.id)]
+      ?? surveyByStoreId[Number(store.id)]
     const topCall = latestCallEntry(log)
     const lastCallDate = topCall?.date
     const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
@@ -256,11 +280,15 @@ export function generateIncubationOfficerStagingTasks(
       return
     }
 
-    if (['call_1', 'call_2', 'call_3'].includes(incBucket)) {
+    if (['call_1', 'call_2', 'call_3', 'between_calls'].includes(incBucket)) {
+      const qvAlerts = parseQvMissedIncAlerts(surveyRow)
+      const periodicInc = resolvePeriodicIncTouchpoint(incBucket, store, storeStates, surveyRow, qvAlerts)
+      if (!periodicInc) return
+
       const incubationBadge =
-        isStagingOrDev && incBucket === 'call_2'
+        isStagingOrDev && periodicInc === 'call_2'
           ? '⚠️ المكالمة الثانية للمتجر'
-          : isStagingOrDev && incBucket === 'call_3'
+          : isStagingOrDev && periodicInc === 'call_3'
             ? '🚨 المكالمة الثالثة والأخيرة'
             : retro.badge
 
@@ -268,16 +296,17 @@ export function generateIncubationOfficerStagingTasks(
       const overdueInfo = isOverdueForStage(store, storeStates, days)
       const due = isDueForPeriodicStage(store, storeStates, days)
       const needWork = due || overdueInfo.overdue
+      const qvDrivesThis =
+        (periodicInc === 'call_1' && qvAlerts.call1)
+        || (periodicInc === 'call_2' && qvAlerts.call2)
+        || (periodicInc === 'call_3' && qvAlerts.call3)
       const stRow = storeStates[store.id] || {}
-      const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, incBucket)
-
-      /** لا تُدرَج في المتابعة الدورية إلا في «يوم اللمس» المتفق (أو تأخير معتمد) */
-      if (!isAgreedPeriodicFollowUpDay(incBucket, store, storeStates, days, today)) return
+      const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, periodicInc)
 
       const label =
-        incBucket === 'call_1'
+        periodicInc === 'call_1'
           ? 'مسار الاحتضان — المكالمة الأولى'
-          : incBucket === 'call_2'
+          : periodicInc === 'call_2'
             ? 'مسار الاحتضان — المكالمة الثانية'
             : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
 
@@ -285,7 +314,7 @@ export function generateIncubationOfficerStagingTasks(
 
       if (answeredToday) {
         tasks.push({
-          id: `${store.id}-inc-${incBucket}-done`,
+          id: `${store.id}-inc-${periodicInc}-done`,
           store,
           priority: 'normal',
           type: 'new_call',
@@ -298,7 +327,7 @@ export function generateIncubationOfficerStagingTasks(
           moContactedToday: true,
           moOverdue: false,
           moOverdueHint: '',
-          _incBucket: incBucket,
+          _incBucket: periodicInc,
         })
         return
       }
@@ -306,12 +335,12 @@ export function generateIncubationOfficerStagingTasks(
       /** مكالمة هذه المرحلة مُوثَّقة مسبقاً — لا تظهر في المتابعة الدورية؛ تعود مع المكالمة التالية حسب التوقيت */
       if (stageDocumentedOk) return
 
-      if (!needWork && !overdueInfo.overdue) return
+      if (!needWork && !overdueInfo.overdue && !qvDrivesThis) return
 
       tasks.push({
-        id: `${store.id}-inc-${incBucket}`,
+        id: `${store.id}-inc-${periodicInc}`,
         store,
-        priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
+        priority: periodicInc === 'call_1' || periodicInc === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
         label,
         desc: `${descBase} — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة`,
@@ -322,7 +351,7 @@ export function generateIncubationOfficerStagingTasks(
         moContactedToday: false,
         moOverdue: overdueInfo.overdue,
         moOverdueHint: overdueInfo.hint,
-        _incBucket: incBucket,
+        _incBucket: periodicInc,
       })
       return
     }

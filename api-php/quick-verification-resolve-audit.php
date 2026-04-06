@@ -105,6 +105,47 @@ try {
         $executiveNotes !== '' ? $executiveNotes : null,
     ]);
 
+    /** دمج وسوم «لم يتصل موظف الاحتضان» مع satisfaction_gap_tags ليُقرأ من get_surveys ومسار المهام */
+    $qvMissed = $input['qv_missed_inc_calls'] ?? null;
+    if (is_array($qvMissed) && count($qvMissed) > 0) {
+        $allowed = [
+            'qv_missed_inc_call_1' => true,
+            'qv_missed_inc_call_2' => true,
+            'qv_missed_inc_call_3' => true,
+        ];
+        $toAdd = [];
+        foreach ($qvMissed as $tag) {
+            $t = trim((string) $tag);
+            if ($t !== '' && isset($allowed[$t])) {
+                $toAdd[] = $t;
+            }
+        }
+        $toAdd = array_values(array_unique($toAdd));
+        if (count($toAdd) > 0) {
+            try {
+                $pdo->exec('ALTER TABLE surveys ADD COLUMN satisfaction_gap_tags JSON NULL DEFAULT NULL');
+            } catch (Throwable $e) {
+            }
+            $stTags = $pdo->prepare('SELECT satisfaction_gap_tags FROM surveys WHERE id = ? LIMIT 1');
+            $stTags->execute([$surveyId]);
+            $rowT = $stTags->fetch(PDO::FETCH_ASSOC);
+            $existing = [];
+            if ($rowT && !empty($rowT['satisfaction_gap_tags'])) {
+                $dec = json_decode((string) $rowT['satisfaction_gap_tags'], true);
+                if (is_array($dec)) {
+                    foreach ($dec as $x) {
+                        if ($x !== '' && $x !== null) {
+                            $existing[] = (string) $x;
+                        }
+                    }
+                }
+            }
+            $merged = array_values(array_unique(array_merge($existing, $toAdd)));
+            $up = $pdo->prepare('UPDATE surveys SET satisfaction_gap_tags = ? WHERE id = ?');
+            $up->execute([json_encode($merged, JSON_UNESCAPED_UNICODE), $surveyId]);
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'survey_id' => $surveyId,
