@@ -95,6 +95,25 @@ export function isDueForPeriodicStage(store, storeStates, days) {
   return false
 }
 
+/**
+ * هل مكالمة احتضان هذه المرحلة مُوثَّقة (نجاح/محتوى) بحيث لا تُعرَض في «متابعة دورية»
+ * حتى يحين موعد المكالمة التالية حسب الخادم (_inc و inc_call*_at)؟
+ * «عدم رد» لا يُعتبر إتماماً — يبقى المتابعة أو تبويب لم يتم الرد.
+ */
+export function incubationStageCallDocumentedNonNoAnswer(log, storeStateRow, incBucket) {
+  if (!['call_1', 'call_2', 'call_3'].includes(incBucket)) return false
+  const st = storeStateRow || {}
+  if (incBucket === 'call_1' && st.inc_call1_at) return true
+  if (incBucket === 'call_2' && st.inc_call2_at) return true
+  if (incBucket === 'call_3' && st.inc_call3_at) return true
+  const key = incBucket === 'call_1' ? 'inc_call1' : incBucket === 'call_2' ? 'inc_call2' : 'inc_call3'
+  const e = log?.[key]
+  if (!e?.date) return false
+  const o = String(e.outcome ?? '').trim()
+  if (o === 'no_answer') return false
+  return true
+}
+
 export function isOverdueForStage(store, storeStates, days) {
   const st = storeStates[store.id] || {}
   const inc1 = st.inc_call1_at
@@ -189,6 +208,8 @@ export function generateIncubationOfficerStagingTasks(
       const overdueInfo = isOverdueForStage(store, storeStates, days)
       const due = isDueForPeriodicStage(store, storeStates, days)
       const needWork = due || overdueInfo.overdue
+      const stRow = storeStates[store.id] || {}
+      const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, incBucket)
 
       const label =
         incBucket === 'call_1'
@@ -218,6 +239,9 @@ export function generateIncubationOfficerStagingTasks(
         })
         return
       }
+
+      /** مكالمة هذه المرحلة مُوثَّقة مسبقاً — لا تظهر في المتابعة الدورية؛ تعود مع المكالمة التالية حسب التوقيت */
+      if (stageDocumentedOk) return
 
       if (!needWork && !overdueInfo.overdue) return
 
