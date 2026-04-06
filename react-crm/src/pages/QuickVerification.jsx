@@ -26,10 +26,12 @@ function rowMatchesQuery(row, q) {
   const id = String(row.store_id ?? '')
   const name = (row.store_name || '').toLowerCase()
   const staff = (row.staff_username || row.staff_fullname || '').toLowerCase()
-  return id.includes(s) || name.includes(s) || staff.includes(s)
+  const fr = String(row.freeze_reason || '').toLowerCase()
+  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s)
 }
 
 function isSatisfied(row) {
+  if (row.survey_kind === 'freeze_alert') return false
   return row.arrow === 'up'
 }
 
@@ -39,6 +41,7 @@ function isCrisis(row) {
 }
 
 function satisfactionPercent(row) {
+  if (row.survey_kind === 'freeze_alert') return 0
   if (row.survey_kind === 'new_merchant_onboarding') {
     const ans = row.answers || []
     const yes = ans.filter(a => a.yes).length
@@ -131,8 +134,15 @@ function MerchantLogo({ name, storeId }) {
 }
 
 function CrisisCard({ row, onOpen, layoutId }) {
-  const kindLabel = row.survey_kind === 'new_merchant_onboarding' ? 'تهيئة' : 'CSAT نشط'
+  const kindLabel =
+    row.survey_kind === 'freeze_alert'
+      ? 'تجميد'
+      : row.survey_kind === 'new_merchant_onboarding'
+        ? 'تهيئة'
+        : 'CSAT نشط'
   const displayName = row.store_name || `متجر #${row.store_id}`
+  const headerBadge =
+    row.survey_kind === 'freeze_alert' ? 'تجميد — تحقيق' : 'غير راضٍ'
 
   return (
     <motion.button
@@ -152,7 +162,7 @@ function CrisisCard({ row, onOpen, layoutId }) {
       >
         <span className="min-w-0 flex-1 truncate text-right text-[13px] font-black leading-tight text-white">{displayName}</span>
         <span className="shrink-0 rounded-md border border-white/25 bg-white/15 px-2 py-0.5 text-[10px] font-black text-white backdrop-blur-sm">
-          غير راضٍ
+          {headerBadge}
         </span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col p-3.5">
@@ -209,6 +219,7 @@ function DetailDrawer({
   onToggleQvMissedInc,
 }) {
   if (!row) return null
+  const freezeAlert = row.survey_kind === 'freeze_alert'
   const onboarding = row.survey_kind === 'new_merchant_onboarding'
 
   return (
@@ -256,6 +267,27 @@ function DetailDrawer({
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-5">
+              {freezeAlert ? (
+                <>
+                  <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">سبب التجميد</p>
+                  <div className="rounded-xl border border-sky-200/90 bg-sky-50/60 p-4 shadow-inner">
+                    <p className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-900">
+                      {(row.freeze_reason || row.suggestions || '').trim() || '—'}
+                    </p>
+                    <p className="mt-3 text-[11px] text-slate-600">
+                      نُفّذ التجميد بواسطة:{' '}
+                      <span className="font-bold text-slate-800">
+                        {(row.staff_fullname || row.frozen_by || row.staff_username || '—').trim()}
+                      </span>
+                      {row.staff_username ? (
+                        <span className="mr-1 font-mono text-slate-500">({row.staff_username})</span>
+                      ) : null}
+                    </p>
+                  </div>
+                </>
+              ) : null}
+              {!freezeAlert ? (
+                <>
               <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">نتائج الاستبيان</p>
               {onboarding ? (
                 <ul className="space-y-2">
@@ -289,8 +321,10 @@ function DetailDrawer({
                   {(row.suggestions || '').trim() || '— لا توجد ملاحظات —'}
                 </p>
               </div>
+                </>
+              ) : null}
 
-              {canResolve && !row.resolved ? (
+              {canResolve && !row.resolved && !freezeAlert ? (
                 <div className="mt-6 rounded-xl border border-rose-100/90 bg-rose-50/35 p-4 shadow-inner">
                   <p className="mb-1 text-[11px] font-black text-rose-900">إنذار احتضان (اختياري)</p>
                   <p className="mb-3 text-[11px] leading-relaxed text-slate-600">
@@ -355,7 +389,7 @@ function DetailDrawer({
               <div className="border-t border-[#4B0082]/12 p-5">
                 <button
                   type="button"
-                  onClick={() => onResolve(row.id)}
+                  onClick={() => onResolve(row)}
                   disabled={resolveBusy}
                   className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-l from-orange-500 via-amber-500 to-orange-600 py-3.5 text-sm font-black text-white shadow-[0_8px_36px_-4px_rgba(251,146,60,0.5)] transition hover:brightness-105 disabled:opacity-60"
                 >
@@ -381,6 +415,7 @@ export default function QuickVerification() {
   const [err, setErr] = useState('')
   const [onboardingRows, setOnboardingRows] = useState([])
   const [activeRows, setActiveRows] = useState([])
+  const [freezeRows, setFreezeRows] = useState([])
   const [query, setQuery] = useState('')
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
@@ -399,15 +434,18 @@ export default function QuickVerification() {
       if (d?.success) {
         setOnboardingRows(Array.isArray(d.rows) ? d.rows : [])
         setActiveRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
+        setFreezeRows(Array.isArray(d.freeze_rows) ? d.freeze_rows : [])
       } else {
         setErr(d?.error || 'تعذّر التحميل')
         setOnboardingRows([])
         setActiveRows([])
+        setFreezeRows([])
       }
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
       setOnboardingRows([])
       setActiveRows([])
+      setFreezeRows([])
     } finally {
       setLoading(false)
     }
@@ -418,7 +456,7 @@ export default function QuickVerification() {
   }, [load])
 
   const kpis = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows]
+    const all = [...onboardingRows, ...activeRows, ...freezeRows]
     if (!all.length) return { growth: 0, resolution: 100, global: 100 }
     const positive = all.filter(isSatisfied).length
     const growth = Math.round((positive / all.length) * 100)
@@ -428,7 +466,7 @@ export default function QuickVerification() {
     const gSum = all.reduce((acc, r) => acc + satisfactionPercent(r), 0)
     const global = Math.round(gSum / all.length)
     return { growth, resolution, global }
-  }, [onboardingRows, activeRows])
+  }, [onboardingRows, activeRows, freezeRows])
 
   const crisisOnb = useMemo(
     () =>
@@ -441,6 +479,13 @@ export default function QuickVerification() {
     () => activeRows.filter(r => !r.resolved && isCrisis(r) && rowMatchesQuery(r, query)),
     [activeRows, query],
   )
+  const crisisFreeze = useMemo(
+    () =>
+      freezeRows.filter(
+        r => !r.resolved && isCrisis(r) && rowMatchesQuery(r, query),
+      ),
+    [freezeRows, query],
+  )
 
   const solvedOnb = useMemo(
     () => onboardingRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
@@ -449,6 +494,10 @@ export default function QuickVerification() {
   const solvedActive = useMemo(
     () => activeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [activeRows, query],
+  )
+  const solvedFreeze = useMemo(
+    () => freezeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
+    [freezeRows, query],
   )
 
   const toggleQvMissedInc = useCallback(key => {
@@ -471,16 +520,21 @@ export default function QuickVerification() {
   }, [drawerRow])
 
   const resolve = useCallback(
-    async surveyId => {
-      setResolvingId(surveyId)
+    async row => {
+      const isFreeze = row?.survey_kind === 'freeze_alert'
+      const busyKey = isFreeze ? `f-${row.freeze_alert_id}` : row.id
+      setResolvingId(busyKey)
       setErr('')
       try {
         const qvTags = []
-        if (qvMissedInc.c1) qvTags.push(QV_MISSED_INC_TAG.call1)
-        if (qvMissedInc.c2) qvTags.push(QV_MISSED_INC_TAG.call2)
-        if (qvMissedInc.c3) qvTags.push(QV_MISSED_INC_TAG.call3)
+        if (!isFreeze) {
+          if (qvMissedInc.c1) qvTags.push(QV_MISSED_INC_TAG.call1)
+          if (qvMissedInc.c2) qvTags.push(QV_MISSED_INC_TAG.call2)
+          if (qvMissedInc.c3) qvTags.push(QV_MISSED_INC_TAG.call3)
+        }
         const res = await postQuickVerificationResolveAudit({
-          survey_id: surveyId,
+          survey_id: isFreeze ? 0 : row.id,
+          freeze_alert_id: isFreeze ? row.freeze_alert_id : 0,
           user_role: user?.role || 'executive',
           resolved_by: user?.username || '',
           executive_notes: executiveNotes.trim(),
@@ -506,6 +560,7 @@ export default function QuickVerification() {
   const isExec = user?.role === 'executive'
   const canResolveRow = row => {
     if (row.resolved) return false
+    if (row.survey_kind === 'freeze_alert') return isExec
     if (isExec) return true
     const u = (user?.username || '').trim()
     const staff = (row.staff_username || '').trim()
@@ -516,12 +571,13 @@ export default function QuickVerification() {
     if (!drawerRow) return
     const stillOnb = onboardingRows.some(r => r.id === drawerRow.id)
     const stillAct = activeRows.some(r => r.id === drawerRow.id)
-    if (!stillOnb && !stillAct) setDrawerRow(null)
+    const stillFr = freezeRows.some(r => r.id === drawerRow.id)
+    if (!stillOnb && !stillAct && !stillFr) setDrawerRow(null)
     else {
-      const fresh = [...onboardingRows, ...activeRows].find(r => r.id === drawerRow.id)
+      const fresh = [...onboardingRows, ...activeRows, ...freezeRows].find(r => r.id === drawerRow.id)
       if (fresh && fresh.resolved !== drawerRow.resolved) setDrawerRow(fresh)
     }
-  }, [onboardingRows, activeRows, drawerRow])
+  }, [onboardingRows, activeRows, freezeRows, drawerRow])
 
   if (!can('quick_verification')) {
     return <Navigate to="/" replace />
@@ -530,8 +586,8 @@ export default function QuickVerification() {
   const drawerOpen = !!drawerRow
   const drawerCanResolve = drawerRow ? canResolveRow(drawerRow) : false
 
-  const crisisTotal = crisisOnb.length + crisisActive.length
-  const solvedTotal = solvedOnb.length + solvedActive.length
+  const crisisTotal = crisisOnb.length + crisisActive.length + crisisFreeze.length
+  const solvedTotal = solvedOnb.length + solvedActive.length + solvedFreeze.length
 
   return (
     <div
@@ -618,7 +674,7 @@ export default function QuickVerification() {
           </p>
         ) : null}
 
-        {loading && !onboardingRows.length && !activeRows.length ? (
+        {loading && !onboardingRows.length && !activeRows.length && !freezeRows.length ? (
           <div className="flex justify-center py-24">
             <Loader2 className="h-10 w-10 animate-spin text-[#4B0082]" />
           </div>
@@ -667,6 +723,28 @@ export default function QuickVerification() {
                   </div>
                 )}
               </section>
+
+              {isExec ? (
+                <section>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h2 className="text-sm font-black uppercase tracking-wide text-[#4B0082]">
+                      تجميد — مراجعة تنفيذية
+                    </h2>
+                    <span className="text-xs font-bold text-slate-400">{crisisFreeze.length}</span>
+                  </div>
+                  {crisisFreeze.length === 0 ? (
+                    <p className="text-sm text-slate-400">لا توجد تجميدات بانتظار المراجعة اليوم.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <AnimatePresence mode="popLayout">
+                        {crisisFreeze.map(row => (
+                          <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </section>
+              ) : null}
             </div>
           )
         ) : (
@@ -685,6 +763,11 @@ export default function QuickVerification() {
                 {solvedActive.map(row => (
                   <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
                 ))}
+                {isExec
+                  ? solvedFreeze.map(row => (
+                      <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                    ))
+                  : null}
               </>
             )}
           </div>
@@ -696,7 +779,12 @@ export default function QuickVerification() {
         open={drawerOpen}
         onClose={() => setDrawerRow(null)}
         onResolve={resolve}
-        resolveBusy={drawerRow ? resolvingId === drawerRow.id : false}
+        resolveBusy={
+          drawerRow
+            ? resolvingId
+              === (drawerRow.survey_kind === 'freeze_alert' ? `f-${drawerRow.freeze_alert_id}` : drawerRow.id)
+            : false
+        }
         canResolve={drawerCanResolve}
         executiveNotes={executiveNotes}
         onExecutiveNotesChange={setExecutiveNotes}

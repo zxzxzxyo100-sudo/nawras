@@ -1,6 +1,6 @@
 <?php
 /**
- * تسجيل حل مشكلة تدقيق — استبيان اليوم في التحقق السريع (للمدير التنفيذي).
+ * تسجيل حل مشكلة تدقيق — استبيان اليوم في التحقق السريع، أو أرشفة تنبيه تجميد (للمدير التنفيذي).
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
@@ -33,19 +33,90 @@ if (!in_array($userRole, $allowedRoles, true)) {
     exit;
 }
 
+$freezeAlertId = (int) ($input['freeze_alert_id'] ?? 0);
 $surveyId = (int) ($input['survey_id'] ?? 0);
-if ($surveyId <= 0) {
+
+if ($freezeAlertId <= 0 && $surveyId <= 0) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'معرّف الاستبيان مطلوب.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'معرّف الاستبيان أو تنبيه التجميد مطلوب.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($freezeAlertId > 0 && $surveyId > 0) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'أرسل نوعاً واحداً فقط (استبيان أو تجميد).'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 $resolvedBy = trim((string) ($input['resolved_by'] ?? ''));
+$executiveNotes = trim((string) ($input['executive_notes'] ?? ''));
 
 $pdo = getDB();
 
-$executiveNotes = trim((string) ($input['executive_notes'] ?? ''));
+// ── أرشفة تنبيه تجميد (التنفيذي فقط) ─────────────────────────────
+if ($freezeAlertId > 0) {
+    if ($userRole !== 'executive') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'أرشفة تنبيهات التجميد للمدير التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS qv_freeze_alerts (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            store_id INT NOT NULL,
+            store_name VARCHAR(512) NULL,
+            freeze_reason TEXT NOT NULL,
+            frozen_by VARCHAR(255) NULL,
+            frozen_by_username VARCHAR(100) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_created (created_at),
+            INDEX idx_store (store_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_freeze_resolutions (
+            freeze_alert_id INT NOT NULL PRIMARY KEY,
+            resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            resolved_by VARCHAR(100) NULL DEFAULT NULL,
+            executive_notes TEXT NULL DEFAULT NULL,
+            INDEX idx_resolved_at (resolved_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $pdo->exec('ALTER TABLE quick_verification_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+        } catch (Throwable $e) {
+        }
+        $st = $pdo->prepare('SELECT id FROM qv_freeze_alerts WHERE id = ? AND DATE(created_at) = CURDATE() LIMIT 1');
+        $st->execute([$freezeAlertId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'تنبيه التجميد غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $ins = $pdo->prepare('
+            INSERT INTO quick_verification_freeze_resolutions (freeze_alert_id, resolved_at, resolved_by, executive_notes)
+            VALUES (?, NOW(), ?, ?)
+            ON DUPLICATE KEY UPDATE
+                resolved_at = VALUES(resolved_at),
+                resolved_by = VALUES(resolved_by),
+                executive_notes = VALUES(executive_notes)
+        ');
+        $ins->execute([
+            $freezeAlertId,
+            $resolvedBy !== '' ? $resolvedBy : null,
+            $executiveNotes !== '' ? $executiveNotes : null,
+        ]);
+        echo json_encode([
+            'success' => true,
+            'freeze_alert_id' => $freezeAlertId,
+            'resolved' => true,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'تعذّر حفظ الأرشفة.'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 
+// ── استبيان (السلوك السابق) ─────────────────────────────────────
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_resolutions (
         survey_id INT NOT NULL PRIMARY KEY,
@@ -63,7 +134,6 @@ try {
 try {
     $pdo->exec('ALTER TABLE quick_verification_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
 } catch (Throwable $e) {
-    // العمود موجود مسبقاً
 }
 
 try {

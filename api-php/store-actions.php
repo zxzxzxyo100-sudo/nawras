@@ -281,6 +281,33 @@ elseif ($action === 'set_status') {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $actionName, $detail, $oldStatus, $category, $user, $userRole]);
 
+    /** تنبيه للمدير التنفيذي — التحقيق السريع (سبب التجميد) */
+    if ($category === 'frozen' && $freezeReason !== '') {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS qv_freeze_alerts (
+                id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                store_id INT NOT NULL,
+                store_name VARCHAR(512) NULL,
+                freeze_reason TEXT NOT NULL,
+                frozen_by VARCHAR(255) NULL,
+                frozen_by_username VARCHAR(100) NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_created (created_at),
+                INDEX idx_store (store_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $insQv = $pdo->prepare('INSERT INTO qv_freeze_alerts (store_id, store_name, freeze_reason, frozen_by, frozen_by_username) VALUES (?,?,?,?,?)');
+            $insQv->execute([
+                $storeId,
+                (string) $storeName,
+                $freezeReason,
+                (string) $user,
+                trim((string) ($input['username'] ?? '')),
+            ]);
+        } catch (Throwable $e) {
+            // لا نمنع التجميد إن فشل إدراج التنبيه
+        }
+    }
+
     jsonResponse(['success' => true]);
 }
 

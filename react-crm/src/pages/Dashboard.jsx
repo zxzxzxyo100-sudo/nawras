@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -10,12 +10,12 @@ import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
   Award, Activity, ArrowUpRight, Baby, ClipboardList,
-  BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2,
+  BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2, BadgeCheck,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
@@ -106,6 +106,28 @@ export default function Dashboard() {
   const [staffMissions, setStaffMissions] = useState(null)
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
+  const [freezeQvPending, setFreezeQvPending] = useState(null)
+
+  const loadFreezeQvPending = useCallback(async () => {
+    if (user?.role !== 'executive') {
+      setFreezeQvPending(null)
+      return
+    }
+    try {
+      const d = await getQuickVerificationBourse({
+        user_role: 'executive',
+        username: user?.username || '',
+      })
+      if (d?.success) {
+        const fr = Array.isArray(d.freeze_rows) ? d.freeze_rows : []
+        setFreezeQvPending(fr.filter(r => !r.resolved).length)
+      } else {
+        setFreezeQvPending(0)
+      }
+    } catch {
+      setFreezeQvPending(null)
+    }
+  }, [user?.role, user?.username])
 
   const loadStaffSatisfaction = useCallback(async () => {
     if (user?.role !== 'executive' || IS_STAGING_OR_DEV) return
@@ -131,8 +153,13 @@ export default function Dashboard() {
     loadStaffSatisfaction()
   }, [loadStaffSatisfaction])
 
+  useEffect(() => {
+    void loadFreezeQvPending()
+  }, [loadFreezeQvPending, lastLoaded])
+
   function handleDashboardRefresh() {
     reload()
+    void loadFreezeQvPending()
     if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
@@ -287,6 +314,33 @@ export default function Dashboard() {
           ))}
         </div>
       </motion.div>
+
+      {user?.role === 'executive' && can('quick_verification') && freezeQvPending != null && freezeQvPending > 0 ? (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.4, delay: 0.08 }}
+        >
+          <Link
+            to="/quick-verification"
+            className="flex w-full items-center justify-between gap-4 rounded-2xl border border-violet-300/60 bg-gradient-to-l from-violet-600/95 to-[#4B0082] px-5 py-4 text-right text-white shadow-lg shadow-violet-500/20 transition hover:brightness-105"
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                <BadgeCheck size={22} className="text-white" strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-black">التحقيق السريع — تجميدات بانتظار المراجعة</p>
+                <p className="mt-1 text-xs font-medium text-white/85">
+                  {freezeQvPending.toLocaleString('ar-SA')} متجر مُجمَّد اليوم مرفق سبب التجميد للمتابعة التنفيذية.
+                </p>
+              </div>
+            </div>
+            <ArrowUpRight className="shrink-0 text-white/90" size={20} />
+          </Link>
+        </motion.div>
+      ) : null}
 
       {/* ══ Store Type Cards ════════════════════════════════════════ */}
       <motion.div
