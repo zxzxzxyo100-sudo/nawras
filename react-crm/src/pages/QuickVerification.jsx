@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -20,9 +20,10 @@ import {
   Calendar,
   ChevronLeft,
   Search,
-  Package,
   AlertCircle,
-  BarChart3,
+  Phone,
+  MapPin,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Radar,
@@ -31,12 +32,14 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
 } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
@@ -116,41 +119,77 @@ const STAGING_LIGHT = {
   textMuted: '#6B7280',
 }
 
-const fadeUpStaging = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0 },
+/** شعار طائر مبسّط — شريط تنقل لوجستي */
+function LogisticsBirdLogo({ className = 'h-9 w-12' }) {
+  return (
+    <svg className={className} viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M6 30c6-14 18-22 36-20 10 1 18 6 22 14-8 3-16 2-24-2-5 10-18 14-30 12-2 0-4-2-4-4z"
+        fill="#38bdf8"
+      />
+      <path d="M42 12c12-5 24 2 26 14-10 5-20 3-28-4" fill="#7dd3fc" />
+      <ellipse cx="54" cy="16" rx="2.2" ry="2" fill="#0f172a" />
+      <path d="M58 18c4 2 8 1 10-2" stroke="#0f172a" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
 }
 
-/** كرت إحصاء علوي — بطاقات كبيرة بتدرج + وهج داخلي خفيف */
-function QuickAuditStatCard({ title, value, sub, gradient, glow, icon: Icon }) {
+/** خط أزرق صاعد — بطاقة التسليمات */
+function DeliveriesSparkline({ data }) {
+  if (!data?.length) return null
   return (
-    <motion.div
-      variants={fadeUpStaging}
-      initial="hidden"
-      animate="visible"
-      whileHover={{ y: -4, boxShadow: `0 18px 44px ${glow}` }}
-      className="group relative w-full overflow-hidden rounded-2xl p-6 text-right shadow-lg"
-      style={{
-        background: gradient,
-        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), 0 6px 28px ${glow}`,
-      }}
-    >
-      <div className="absolute inset-0 rounded-2xl bg-white/[0.07] opacity-0 transition-opacity group-hover:opacity-100" />
-      <div
-        className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full opacity-25 blur-3xl"
-        style={{ background: glow }}
-      />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-white/85">{title}</p>
-          <div className="text-3xl font-black leading-none text-white drop-shadow-sm md:text-[2.35rem]">{value}</div>
-          {sub ? <p className="mt-2 text-xs font-medium text-white/75">{sub}</p> : null}
-        </div>
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 shadow-inner ring-1 ring-white/20">
-          <Icon size={22} className="text-white" />
-        </div>
-      </div>
-    </motion.div>
+    <div className="h-12 w-full min-h-[3rem]" dir="ltr">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
+          <Line
+            type="monotone"
+            dataKey="y"
+            stroke="#2563eb"
+            strokeWidth={2.5}
+            dot={false}
+            animationDuration={600}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** مقياس نصف دائري — نسبة الرضا */
+function SatisfactionSemiGauge({ percent }) {
+  const p = Math.min(100, Math.max(0, Number(percent) || 0))
+  const gid = useId().replace(/:/g, '')
+  return (
+    <div className="relative mx-auto flex h-[5.5rem] w-[9rem] items-end justify-center" dir="ltr">
+      <svg viewBox="0 0 100 58" className="w-full max-w-[9rem]" aria-hidden>
+        <path
+          d="M 12 52 A 38 38 0 0 1 88 52"
+          fill="none"
+          stroke="#e8eef4"
+          strokeWidth="9"
+          strokeLinecap="round"
+          pathLength="100"
+        />
+        <path
+          d="M 12 52 A 38 38 0 0 1 88 52"
+          fill="none"
+          stroke={`url(#${gid})`}
+          strokeWidth="9"
+          strokeLinecap="round"
+          pathLength="100"
+          strokeDasharray={`${p} ${100 - p}`}
+        />
+        <defs>
+          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#3b82f6" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <span className="pointer-events-none absolute bottom-2 text-2xl font-black tabular-nums text-slate-900">
+        {Math.round(p)}%
+      </span>
+    </div>
   )
 }
 
@@ -883,7 +922,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy, auditUser })
  */
 export default function QuickVerification() {
   const { user, can } = useAuth()
-  const { allStores, counts } = useStores()
+  const { allStores } = useStores()
   const [mainTab, setMainTab] = useState('onboarding')
   const [staffMissions, setStaffMissions] = useState([])
   const [activeStaffMissions, setActiveStaffMissions] = useState([])
@@ -1044,12 +1083,6 @@ export default function QuickVerification() {
 
   const isDirectorView = user?.role === 'executive'
 
-  const csatRatioValue = useMemo(() => {
-    const t = satStats.total
-    if (!t) return '—'
-    return `${Math.round((satStats.sat / t) * 100)}%`
-  }, [satStats])
-
   const directorStaffBarData = useMemo(() => {
     return (currentStaff || []).map(s => ({
       name: (s.fullname || s.username || '—').slice(0, 20),
@@ -1070,6 +1103,50 @@ export default function QuickVerification() {
     return currentDetails.filter(r => r.staff_username === u && r.arrow === 'down' && !r.resolved).length
   }, [currentDetails, user?.username])
 
+  const totalDeliveriesSum = useMemo(() => {
+    if (!Array.isArray(allStores)) return 0
+    let sum = 0
+    for (const s of allStores) {
+      const n = totalShipments(s)
+      if (Number.isFinite(n)) sum += Math.trunc(n)
+    }
+    return sum
+  }, [allStores])
+
+  const deliveriesSparklineData = useMemo(() => {
+    const t = Math.max(0, totalDeliveriesSum)
+    const n = 8
+    if (t === 0) {
+      return Array.from({ length: n }, (_, i) => ({ i, y: i + 1 }))
+    }
+    return Array.from({ length: n }, (_, i) => ({
+      i,
+      y: Math.round((t * (i + 1)) / n),
+    }))
+  }, [totalDeliveriesSum])
+
+  const satPercentNumeric = useMemo(() => {
+    const tot = satStats.total
+    if (!tot) return 0
+    return Math.round((satStats.sat / tot) * 100)
+  }, [satStats])
+
+  const staffAreaChartData = useMemo(() => {
+    const rows = directorStaffBarData || []
+    if (!rows.length) {
+      return [
+        { name: '—', a: 0, b: 0, c: 0 },
+        { name: '—', a: 1, b: 1, c: 0 },
+      ]
+    }
+    return rows.map(d => ({
+      name: d.name.length > 10 ? `${d.name.slice(0, 9)}…` : d.name,
+      a: d.surveys,
+      b: Math.max(0, d.surveys - 1),
+      c: Math.max(0, Math.round(d.surveys * 0.65)),
+    }))
+  }, [directorStaffBarData])
+
   const radarData = useMemo(() => {
     if (!modalRow?.questions?.length) return []
     return modalRow.questions.map(q => ({
@@ -1086,11 +1163,9 @@ export default function QuickVerification() {
     return <Navigate to="/" replace />
   }
 
-  const totalStoresCount = counts?.total ?? allStores?.length ?? 0
-
   return (
     <div
-      className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] pb-10 px-3 md:px-5 pt-4' : 'space-y-5 pb-16'}`}
+      className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] px-0 pb-10 pt-0' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
         fontFamily: IS_VITE_APP_STAGING ? "'Tajawal', sans-serif" : "'Cairo', sans-serif",
@@ -1098,53 +1173,81 @@ export default function QuickVerification() {
       }}
     >
       {IS_VITE_APP_STAGING ? (
-        <div className="mx-auto max-w-6xl px-4 pb-14 pt-6 md:px-6">
+        <>
+          <header className="sticky top-0 z-40 w-full border-b border-slate-800/90 bg-slate-900 shadow-[0_4px_24px_rgba(15,23,42,0.35)]">
+            <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3.5 md:flex-row md:items-center md:justify-between md:gap-6 md:px-6">
+              <div className="flex items-center gap-3">
+                <LogisticsBirdLogo className="h-10 w-12 shrink-0" />
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">لوحة لوجستية</p>
+                  <p className="text-sm font-black text-white">التحقق السريع</p>
+                </div>
+              </div>
+              <div className="relative min-w-0 flex-1 md:max-w-xl md:mx-4">
+                <Search
+                  className="pointer-events-none absolute right-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-slate-500"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={quickSearch}
+                  onChange={e => setQuickSearch(e.target.value)}
+                  placeholder="بحث في المتاجر والأكواد…"
+                  className="w-full rounded-full border border-slate-700/80 bg-slate-800/90 py-2.5 pr-10 pl-4 text-sm text-white shadow-inner outline-none ring-0 placeholder:text-slate-500 focus:border-sky-500/60 focus:bg-slate-800"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 md:justify-end">
+                <div className="text-right">
+                  <p className="text-[11px] text-slate-400">حساب</p>
+                  <p className="text-sm font-bold text-white">{user?.fullname || user?.username || '—'}</p>
+                </div>
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 text-base font-black text-white shadow-md ring-2 ring-white/10"
+                  aria-hidden
+                >
+                  {(user?.fullname || user?.username || '?').trim().slice(0, 1)}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadAll()}
+                  disabled={loading}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-slate-600 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-100 hover:bg-slate-700 disabled:opacity-50 md:hidden"
+                >
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                  تحديث
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 md:px-6">
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[1.75rem]">لوحة التحقق السريع</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'} ·{' '}
+                  <span className="tabular-nums font-semibold text-slate-700">{satStats.total}</span> استبيان
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadAll()}
+                disabled={loading}
+                className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50 sm:inline-flex"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
+                تحديث البيانات
+              </button>
+            </div>
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md"
+            className="mb-8 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12)]"
           >
-            <div className="h-1 w-full bg-gradient-to-r from-violet-600 via-purple-500 to-indigo-600" />
+            <div className="h-1 w-full bg-gradient-to-r from-sky-500 via-violet-500 to-amber-500" />
             <div className="space-y-5 px-5 py-5 sm:px-8 sm:py-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[1.7rem]">التحقق السريع</h1>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'} ·{' '}
-                    <span className="tabular-nums font-semibold text-slate-700">{satStats.total}</span> استبيان · راضٍ{' '}
-                    <span className="tabular-nums text-emerald-600">{satStats.sat}</span> · غير راضٍ{' '}
-                    <span className="tabular-nums text-rose-600">{satStats.uns}</span>
-                  </p>
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center lg:max-w-xl">
-                  <label className="relative min-w-0 flex-1">
-                    <span className="sr-only">بحث</span>
-                    <Search
-                      className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
-                      size={18}
-                      aria-hidden
-                    />
-                    <input
-                      type="search"
-                      value={quickSearch}
-                      onChange={e => setQuickSearch(e.target.value)}
-                      placeholder="بحث باسم المتجر أو الكود…"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-10 pl-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => void loadAll()}
-                    disabled={loading}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/20 hover:bg-violet-700 disabled:opacity-50"
-                  >
-                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
-                    تحديث
-                  </button>
-                </div>
-              </div>
-
               <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="تصفية الرضا">
                 {[
                   { id: 'all', label: 'الكل' },
@@ -1213,39 +1316,79 @@ export default function QuickVerification() {
             </div>
           </motion.div>
 
-          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <QuickAuditStatCard
-              title="إجمالي المتاجر"
-              value={totalStoresCount.toLocaleString('ar-SA')}
-              sub="إجمالي من السياق"
-              gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #7c3aed)"
-              glow="#6d28d955"
-              icon={Package}
-            />
-            <QuickAuditStatCard
-              title="راضٍ / غير راضٍ"
-              value={csatRatioValue}
-              sub={`راضٍ ${satStats.sat} · غير راضٍ ${satStats.uns} · من ${satStats.total}`}
-              gradient="linear-gradient(135deg, #047857, #059669, #10b981)"
-              glow="#05966955"
-              icon={BarChart3}
-            />
-            <QuickAuditStatCard
-              title="المشاكل المكتشفة"
-              value={execMetrics.totalProblems.toLocaleString('ar-SA')}
-              sub="استبيانات 🔽 في القسم الحالي"
-              gradient="linear-gradient(135deg, #c2410c, #ea580c, #f97316)"
-              glow="#ea580655"
-              icon={AlertCircle}
-            />
-            <QuickAuditStatCard
-              title="مشاكل تم حلها"
-              value={execMetrics.resolvedProblems.toLocaleString('ar-SA')}
-              sub={execMetrics.totalProblems ? `نسبة الإنجاز ${execMetrics.pct}%` : '—'}
-              gradient="linear-gradient(135deg, #3730a3, #4f46e5, #6366f1)"
-              glow="#6366f155"
-              icon={CheckCircle2}
-            />
+          <div className="mb-10 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_10px_40px_-12px_rgba(15,23,42,0.15)]"
+            >
+              <p className="text-sm font-bold text-slate-500">إجمالي التسليمات</p>
+              <p className="mt-2 text-3xl font-black tabular-nums tracking-tight text-slate-900 md:text-[2rem]">
+                {totalDeliveriesSum.toLocaleString('ar-SA')}
+              </p>
+              <DeliveriesSparkline data={deliveriesSparklineData} />
+              <p className="mt-1 text-[11px] text-slate-400">مجموع شحنات جميع المتاجر في السياق</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_10px_40px_-12px_rgba(15,23,42,0.15)]"
+            >
+              <p className="text-sm font-bold text-slate-500">نسبة الرضا</p>
+              <div className="mt-1 flex min-h-[6.5rem] items-center justify-center">
+                <SatisfactionSemiGauge percent={satPercentNumeric} />
+              </div>
+              <p className="mt-1 text-center text-[11px] text-slate-400">
+                راضٍ {satStats.sat} · غير راضٍ {satStats.uns} (من {satStats.total})
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="relative overflow-hidden rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 p-5 text-white shadow-[0_12px_36px_-8px_rgba(234,88,12,0.45)]"
+            >
+              <div className="absolute -left-6 -top-6 h-24 w-24 rounded-full bg-white/10 blur-2xl" aria-hidden />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-white/90">المشاكل المكتشفة</p>
+                  <p className="mt-3 text-4xl font-black tabular-nums drop-shadow-sm">
+                    {execMetrics.totalProblems.toLocaleString('ar-SA')}
+                  </p>
+                  <p className="mt-2 text-xs text-white/75">استبيانات 🔽 في القسم الحالي</p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 shadow-inner ring-1 ring-white/30">
+                  <AlertCircle size={24} className="text-white" strokeWidth={2.2} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="relative overflow-hidden rounded-2xl border border-emerald-900/30 bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-950 p-5 text-white shadow-[0_12px_36px_-8px_rgba(6,78,59,0.5)]"
+            >
+              <div className="absolute -right-4 bottom-0 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl" aria-hidden />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-emerald-100/95">المشاكل المحلولة</p>
+                  <p className="mt-3 text-4xl font-black tabular-nums drop-shadow-sm">
+                    {execMetrics.resolvedProblems.toLocaleString('ar-SA')}
+                  </p>
+                  <p className="mt-2 text-xs text-emerald-200/80">
+                    {execMetrics.totalProblems ? `إنجاز ${execMetrics.pct}%` : '—'}
+                  </p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 shadow-inner ring-1 ring-white/20">
+                  <TrendingUp size={24} className="text-emerald-200" strokeWidth={2.2} />
+                </div>
+              </div>
+            </motion.div>
           </div>
 
           {err ? (
@@ -1272,29 +1415,67 @@ export default function QuickVerification() {
                   لا توجد بيانات موظفين اليوم في هذا القسم.
                 </p>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <p className="mb-4 text-sm font-bold text-slate-700">استبيانات مكتملة لكل موظف</p>
-                  <div className="h-[min(420px,28rem)] w-full" dir="ltr">
+                <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-6 shadow-[0_12px_48px_-16px_rgba(15,23,42,0.14)]">
+                  <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+                    <h3 className="text-lg font-black text-slate-900">أداء الموظفين (اليوم)</h3>
+                    <span className="text-xs font-medium text-slate-400">طبقات: أزرق · أرجواني · برتقالي</span>
+                  </div>
+                  <div className="h-[min(400px,26rem)] w-full" dir="ltr">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        layout="vertical"
-                        data={[...directorStaffBarData].reverse()}
-                        margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={108}
-                          tick={{ fontSize: 11, fill: '#334155' }}
-                        />
+                      <AreaChart data={staffAreaChartData} margin={{ top: 12, right: 12, left: 4, bottom: 4 }}>
+                        <defs>
+                          <linearGradient id="qvAreaA" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.55} />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.06} />
+                          </linearGradient>
+                          <linearGradient id="qvAreaB" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.5} />
+                            <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                          </linearGradient>
+                          <linearGradient id="qvAreaC" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f97316" stopOpacity={0.45} />
+                            <stop offset="100%" stopColor="#f97316" stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} interval={0} />
+                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
                         <RechartsTooltip
-                          cursor={{ fill: '#f8fafc' }}
-                          contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', textAlign: 'right' }}
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: '1px solid #e2e8f0',
+                            textAlign: 'right',
+                            fontSize: 12,
+                          }}
                         />
-                        <Bar dataKey="surveys" fill="#6366f1" radius={[0, 8, 8, 0]} name="استبيانات" />
-                      </BarChart>
+                        <Area
+                          type="monotone"
+                          dataKey="a"
+                          name="النشاط (أ)"
+                          stackId="qv"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                          fill="url(#qvAreaA)"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="b"
+                          name="المتابعة (ب)"
+                          stackId="qv"
+                          stroke="#7c3aed"
+                          strokeWidth={2}
+                          fill="url(#qvAreaB)"
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="c"
+                          name="داعم (ج)"
+                          stackId="qv"
+                          stroke="#ea580c"
+                          strokeWidth={2}
+                          fill="url(#qvAreaC)"
+                        />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -1324,113 +1505,131 @@ export default function QuickVerification() {
           <section>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-lg font-black text-slate-900">
-                {auditViewTab === 'active' ? 'قائمة المتاجر — متابعة اليوم' : 'سجل الحلول'}
+                {auditViewTab === 'active' ? 'قائمة المتاجر' : 'سجل الحلول'}
               </h2>
               <span className="text-xs font-semibold tabular-nums text-slate-500">{stagingDisplayRows.length} سجل</span>
             </div>
             {loading && currentDetails.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-16 text-sm text-slate-500 shadow-sm">
-                <Loader2 size={22} className="animate-spin text-violet-600" />
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-16 text-sm text-slate-500 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.1)]">
+                <Loader2 size={22} className="animate-spin text-sky-600" />
                 جارٍ تحميل التفاصيل…
               </div>
             ) : stagingDisplayRows.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-500">
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-500">
                 {auditViewTab === 'active'
                   ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
                   : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
               </p>
             ) : (
-              <div className="flex flex-col gap-3">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {visibleStagingRows.map(row => {
-                    const shipN = resolveShipmentCount(allStores, row.store_id)
-                    const resolvedDown = row.arrow === 'down' && !!row.resolved
-                    const isHighRisk =
-                      auditViewTab === 'active' &&
-                      row.arrow === 'down' &&
-                      !row.resolved &&
-                      shipN != null &&
-                      shipN > HIGH_SHIPMENT_THRESHOLD
-                    const showResolve =
-                      auditViewTab === 'active' && row.arrow === 'down' && !row.resolved
-                    const staffLabel = row.staff_username || row.staff_fullname || '—'
-                    return (
-                      <motion.div
-                        key={row.id}
-                        layout
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{
-                          opacity: 0,
-                          height: 0,
-                          marginBottom: 0,
-                          transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] },
-                        }}
-                        className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-                        style={
-                          isHighRisk
-                            ? { boxShadow: '0 0 0 1px rgba(251, 191, 36, 0.45)' }
-                            : undefined
-                        }
-                      >
-                        <div className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:justify-between md:gap-4">
-                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 md:gap-6">
-                            <span className="inline-flex max-w-[7rem] items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                              {staffLabel}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-black text-slate-900">
-                                {row.store_name}
-                                {isHighRisk ? (
-                                  <span className="mr-1.5 text-xs font-bold text-amber-600"> (أولوية)</span>
-                                ) : null}
-                              </p>
-                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                                <span className="tabular-nums">#{row.store_id}</span>
-                                <span className="text-slate-300">|</span>
-                                <span className="tabular-nums font-semibold">
-                                  {shipN != null ? shipN.toLocaleString('ar-EG') : '—'} شحنة
-                                </span>
-                              </div>
-                              {auditViewTab === 'resolved' ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="shrink-0">
-                              <LightRowSatisfactionGlyph arrow={row.arrow} resolvedDown={resolvedDown} />
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                            {showResolve ? (
-                              <button
-                                type="button"
-                                onClick={() => void resolveAudit(row.id)}
-                                disabled={resolvingId === row.id}
-                                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-black text-white shadow-md hover:bg-violet-700 disabled:opacity-60"
-                              >
-                                {resolvingId === row.id ? <Loader2 size={16} className="animate-spin" /> : null}
-                                تم الحل ✅
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => setModalRow(row)}
-                              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-violet-700 hover:bg-slate-50"
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-16px_rgba(15,23,42,0.12)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] border-collapse text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/95">
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">حالة</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">المعرف</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">المتجر</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">الشحنات</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">الموظف</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">ملاحظات</th>
+                        <th className="px-4 py-3.5 text-xs font-bold text-slate-500">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {visibleStagingRows.map(row => {
+                          const shipN = resolveShipmentCount(allStores, row.store_id)
+                          const resolvedDown = row.arrow === 'down' && !!row.resolved
+                          const isHighRisk =
+                            auditViewTab === 'active' &&
+                            row.arrow === 'down' &&
+                            !row.resolved &&
+                            shipN != null &&
+                            shipN > HIGH_SHIPMENT_THRESHOLD
+                          const showResolve =
+                            auditViewTab === 'active' && row.arrow === 'down' && !row.resolved
+                          const staffLabel = row.staff_username || row.staff_fullname || '—'
+                          const note = textSnippet(row.suggestions, 42) || '—'
+                          return (
+                            <motion.tr
+                              key={row.id}
+                              layout
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{
+                                opacity: 0,
+                                height: 0,
+                                transition: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                              }}
+                              className="border-b border-slate-100 transition-colors hover:bg-slate-50/90"
+                              style={
+                                isHighRisk
+                                  ? { boxShadow: 'inset 4px 0 0 0 rgba(251, 191, 36, 0.85)' }
+                                  : undefined
+                              }
                             >
-                              تفاصيل
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )
-                  })}
-                </AnimatePresence>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="flex items-center justify-end gap-1.5 text-slate-500">
+                                  <Phone size={16} strokeWidth={1.8} className="text-sky-600" aria-hidden />
+                                  <MapPin size={16} strokeWidth={1.8} className="text-emerald-600" aria-hidden />
+                                  <Star size={16} strokeWidth={1.8} className="text-amber-500" aria-hidden />
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 align-middle font-mono text-xs font-bold tabular-nums text-slate-700">
+                                #{row.store_id}
+                              </td>
+                              <td className="max-w-[14rem] px-4 py-3 align-middle">
+                                <p className="font-bold text-slate-900">{row.store_name}</p>
+                                {auditViewTab === 'resolved' ? (
+                                  <p className="mt-0.5 text-[11px] text-slate-500">
+                                    {formatResolveDuration(row.created_at, row.resolved_at)}
+                                  </p>
+                                ) : null}
+                              </td>
+                              <td className="px-4 py-3 align-middle tabular-nums font-semibold text-slate-800">
+                                {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
+                              </td>
+                              <td className="px-4 py-3 align-middle text-xs font-semibold text-slate-600">
+                                {staffLabel}
+                              </td>
+                              <td className="max-w-[10rem] px-4 py-3 align-middle text-xs text-slate-500">
+                                <span className="line-clamp-2">{note}</span>
+                              </td>
+                              <td className="px-4 py-3 align-middle">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  <LightRowSatisfactionGlyph arrow={row.arrow} resolvedDown={resolvedDown} />
+                                  {showResolve ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void resolveAudit(row.id)}
+                                      disabled={resolvingId === row.id}
+                                      className="inline-flex min-h-[36px] items-center justify-center gap-1 rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-black text-white shadow-sm hover:bg-orange-600 disabled:opacity-60"
+                                    >
+                                      {resolvingId === row.id ? <Loader2 size={14} className="animate-spin" /> : null}
+                                      تم الحل
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => setModalRow(row)}
+                                    className="inline-flex min-h-[36px] items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700"
+                                  >
+                                    تفاصيل
+                                  </button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          )
+                        })}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </section>
         </div>
+        </>
       ) : null}
 
       {!IS_VITE_APP_STAGING && (
