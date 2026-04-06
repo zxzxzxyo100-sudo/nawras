@@ -2,6 +2,31 @@
  * طابور مسؤول المتاجر الجديدة (الاحتضان) — منطق الأداء والرقابة (تجريبي/تطوير فقط).
  */
 
+import {
+  ONBOARD_DAYS_AFTER_CALL1,
+  ONBOARD_DAYS_AFTER_CALL2,
+} from '../constants/onboardingSchedule'
+
+/** تاريخ اليوم المحلي YYYY-MM-DD (للمطابقة مع مواعيد الاستحقاق) */
+export function localDateYmd(d = new Date()) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** تاريخ تقويمي بعد N يوم من طابع MySQL (محلي) */
+function dueYmdAfterMysql(mysqlDatetime, addDays) {
+  if (!mysqlDatetime) return null
+  const t = new Date(mysqlDatetime)
+  if (Number.isNaN(t.getTime())) return null
+  t.setDate(t.getDate() + addDays)
+  const y = t.getFullYear()
+  const m = String(t.getMonth() + 1).padStart(2, '0')
+  const day = String(t.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function daysInSystem(store) {
   const raw = store?.registered_at
   if (!raw) return 0
@@ -138,6 +163,41 @@ export function isOverdueForStage(store, storeStates, days) {
 }
 
 /**
+ * متابعة دورية: يظهر المتجر في «يوم اللمس» المتفق فقط
+ * — م1: يوم الدورة 1 (من الخادم _cycle_day)؛ م2/m3: يوم استحقاق المكالمة = inc_call* + الأيام في onboardingSchedule؛
+ * مع إظهار إضافي عند التأخير المعتمد (نفس تلميحات isOverdueForStage).
+ */
+export function isAgreedPeriodicFollowUpDay(incBucket, store, storeStates, days, todayYmd) {
+  const st = storeStates[store.id] || {}
+  const cycleDay = store._cycle_day != null ? Number(store._cycle_day) : (days + 1)
+
+  if (incBucket === 'call_1') {
+    if (st.inc_call1_at) return false
+    if (cycleDay === 1) return true
+    const ov = isOverdueForStage(store, storeStates, days)
+    return ov.overdue && ov.hint === 'لم تُسجَّل المكالمة الأولى بعد'
+  }
+
+  if (incBucket === 'call_2') {
+    if (st.inc_call2_at) return false
+    const due = dueYmdAfterMysql(st.inc_call1_at, ONBOARD_DAYS_AFTER_CALL1)
+    if (due && todayYmd === due) return true
+    const ov = isOverdueForStage(store, storeStates, days)
+    return ov.overdue && ov.hint === 'تأخّر المكالمة الثانية'
+  }
+
+  if (incBucket === 'call_3') {
+    if (st.inc_call3_at) return false
+    const due = dueYmdAfterMysql(st.inc_call2_at, ONBOARD_DAYS_AFTER_CALL2)
+    if (due && todayYmd === due) return true
+    const ov = isOverdueForStage(store, storeStates, days)
+    return ov.overdue && ov.hint === 'تأخّر المكالمة الثالثة'
+  }
+
+  return true
+}
+
+/**
  * مهام مسؤول المتاجر الجديدة (احتضان) — بديل توليد المهام الافتراضي عند تفعيل الوضع الذكي.
  */
 export function generateIncubationOfficerStagingTasks(
@@ -147,7 +207,7 @@ export function generateIncubationOfficerStagingTasks(
   newMerchantOnboardingDoneIds,
   isStagingOrDev,
 ) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateYmd(new Date())
   const tasks = []
 
   allStores.forEach(store => {
@@ -210,6 +270,9 @@ export function generateIncubationOfficerStagingTasks(
       const needWork = due || overdueInfo.overdue
       const stRow = storeStates[store.id] || {}
       const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, incBucket)
+
+      /** لا تُدرَج في المتابعة الدورية إلا في «يوم اللمس» المتفق (أو تأخير معتمد) */
+      if (!isAgreedPeriodicFollowUpDay(incBucket, store, storeStates, days, today)) return
 
       const label =
         incBucket === 'call_1'
