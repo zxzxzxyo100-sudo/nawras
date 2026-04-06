@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Phone, RefreshCw, CheckCircle, X, ClipboardList,
@@ -12,14 +12,23 @@ import StoreNameWithId from '../components/StoreNameWithId'
 import {
   getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow,
   completeInactiveQueueSuccess,
+  postMerchantOfficerAutomation,
 } from '../services/api'
+import {
+  generateMerchantOfficerStagingTasks,
+  daysInSystem,
+  countAnsweredCalls,
+} from '../utils/merchantOfficerQueue'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
-import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV } from '../config/envFlags'
+import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
 
 const MIN_TASK_NOTE_LENGTH = 10
+
+/** طابور مسؤول المتاجر الذكي: تجريبي (VITE_APP_STAGING=1) أو تطوير محلي فقط */
+const MO_OFFICER_SMART = IS_VITE_APP_STAGING || Boolean(import.meta.env.DEV)
 
 function storeHasShipped(store) {
   if (!store) return false
@@ -158,6 +167,18 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       })
     }
     return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
+  }
+
+  /** مسؤول المتاجر — منطق التجريب/التطوير: طابور رجعي 14 يوماً + تبويبات */
+  if (userRole === 'active_manager' && MO_OFFICER_SMART && username && assignments) {
+    return generateMerchantOfficerStagingTasks(
+      allStores,
+      callLogs,
+      storeStates,
+      username,
+      assignments,
+      newMerchantOnboardingDoneIds,
+    )
   }
 
   const tasks = []
@@ -370,6 +391,99 @@ function CallButton({ onClick }) {
   )
 }
 
+/** صف مهمّة خفيف — مسؤول المتاجر (تجريبي) */
+function MerchantOfficerTaskRow({
+  task,
+  index,
+  onCall,
+  onDone,
+  onNoAnswerWorkflow,
+  noAnswerLoading,
+  userRole,
+  doneDisabled,
+  hideDoneButton,
+  taskIsNoAnswerFn,
+  callLogs,
+  assignments,
+}) {
+  const noAns = taskIsNoAnswerFn(task, callLogs, assignments)
+  const showNoAnswer =
+    typeof onNoAnswerWorkflow === 'function'
+    && ((task.type === 'assigned_store' && userRole === 'active_manager')
+      || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
+      || task.type === 'recovery_call')
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.15) }}
+      className={`flex flex-wrap items-center gap-3 border-b border-slate-100 bg-white px-3 py-3 sm:px-4 ${
+        noAns ? 'border-r-4 border-r-amber-400 bg-amber-50/40' : ''
+      } ${task.moOverdue ? 'bg-rose-50/30' : ''}`}
+    >
+      <div className="min-w-0 flex-1 text-right">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="font-bold text-slate-900 text-sm">
+            <StoreNameWithId
+              store={task.store}
+              nameClassName="font-bold text-slate-900 text-sm"
+              idClassName="font-mono text-xs text-slate-500"
+            />
+          </span>
+          {task.incubationBadge ? (
+            <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-900">
+              {task.incubationBadge}
+            </span>
+          ) : null}
+          {task.moOverdue ? (
+            <span className="rounded-md bg-amber-200/90 px-2 py-0.5 text-[10px] font-black text-amber-950">
+              تنبيه: {task.moOverdueHint}
+            </span>
+          ) : null}
+          {task.moContactedToday ? (
+            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-900">تم التواصل اليوم</span>
+          ) : null}
+        </div>
+        <p className="mt-1 text-xs text-slate-600">
+          كود المتجر: <span className="font-mono font-bold">{task.moStoreCode ?? task.store.id}</span>
+          {' — '}
+          <span className="tabular-nums">{task.moDays ?? '—'}</span> يوماً في النظام
+          {task.moRetro ? (
+            <span className="mr-2 text-violet-800 font-semibold">{task.moRetro.label}</span>
+          ) : null}
+        </p>
+        {task.desc ? <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">{task.desc}</p> : null}
+      </div>
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+        <CallButton onClick={() => onCall(task)} />
+        {showNoAnswer && (
+          <motion.button
+            type="button"
+            onClick={() => onNoAnswerWorkflow(task)}
+            disabled={noAnswerLoading}
+            whileHover={{ scale: noAnswerLoading ? 1 : 1.04 }}
+            className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 disabled:opacity-50"
+          >
+            عدم الرد
+          </motion.button>
+        )}
+        {!hideDoneButton && (
+          <motion.button
+            type="button"
+            onClick={() => onDone(task)}
+            disabled={doneDisabled}
+            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-45"
+          >
+            تم
+          </motion.button>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════
 // بطاقة المهمة المتحركة
 // ══════════════════════════════════════════════════════════════════
@@ -560,6 +674,9 @@ export default function Tasks() {
   /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
   const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
   const [filter, setFilter]     = useState('all') // 'all' | 'high' | 'no_answer'
+  /** تبويبات مسؤول المتاجر (تجريبي): متابعة دورية | تم التواصل */
+  const [moTab, setMoTab] = useState('periodic')
+  const moSweepLoadedRef = useRef(null)
   const [dismissErr, setDismissErr] = useState('')
   /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
   const [pendingDoneTask, setPendingDoneTask] = useState(null)
@@ -604,6 +721,45 @@ export default function Tasks() {
   useEffect(() => {
     loadInactiveWf()
   }, [loadInactiveWf, lastLoaded])
+
+  /** ترحيل آلي: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
+  useEffect(() => {
+    if (!MO_OFFICER_SMART || user?.role !== 'active_manager' || !user?.username || !lastLoaded) return
+    if (moSweepLoadedRef.current === lastLoaded) return
+    moSweepLoadedRef.current = lastLoaded
+    let cancelled = false
+    ;(async () => {
+      let anyReload = false
+      for (const store of allStores) {
+        const a = assignments[String(store.id)] || assignments[store.id]
+        if (a?.assigned_to !== user.username) continue
+        const log = callLogs[store.id] || {}
+        const d = daysInSystem(store)
+        const ship = Number(store.total_shipments ?? 0) > 0
+          || (store.last_shipment_date && store.last_shipment_date !== 'لا يوجد')
+          ? 1
+          : 0
+        const answered = countAnsweredCalls(log)
+        try {
+          const r = await postMerchantOfficerAutomation({
+            user_role: 'active_manager',
+            username: user.username,
+            store_id: store.id,
+            store_name: store.name || '',
+            days_in_system: d,
+            total_shipments: ship,
+            answered_call_count: answered,
+          })
+          if (r?.success && r?.rule && r.rule !== 'none') anyReload = true
+        } catch {
+          /* ignore */
+        }
+        if (cancelled) return
+      }
+      if (anyReload && !cancelled) await reload()
+    })()
+    return () => { cancelled = true }
+  }, [lastLoaded, user?.role, user?.username, allStores, assignments, callLogs, reload])
 
   const drawerTaskCompletion = useMemo(() => {
     if (!IS_STAGING_OR_DEV || !selectedTask || !user?.username) return undefined
@@ -687,11 +843,30 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
+  const isMoStaging = user?.role === 'active_manager' && MO_OFFICER_SMART
+
+  const moPeriodicTasks = useMemo(() => {
+    if (!isMoStaging) return mainTasks
+    return [
+      ...noAnswerTasks,
+      ...mainTasks.filter(t => !t.moContactedToday),
+    ]
+  }, [isMoStaging, mainTasks, noAnswerTasks])
+
+  const moContactedTasks = useMemo(() => {
+    if (!isMoStaging) return []
+    return mainTasks.filter(t => t.moContactedToday)
+  }, [isMoStaging, mainTasks])
+
   const displayed = useMemo(() => {
+    if (isMoStaging) {
+      if (moTab === 'contacted') return moContactedTasks
+      return moPeriodicTasks
+    }
     if (filter === 'no_answer') return noAnswerTasks
     if (filter === 'high') return mainTasks.filter(t => t.priority === 'high')
     return mainTasks
-  }, [filter, mainTasks, noAnswerTasks])
+  }, [isMoStaging, moTab, moPeriodicTasks, moContactedTasks, filter, mainTasks, noAnswerTasks])
 
   async function dismissTaskOnly(id) {
     setDismissErr('')
@@ -934,6 +1109,11 @@ export default function Tasks() {
                 </p>
               </>
             )}
+            {isMoStaging && (
+              <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
+                وضع مسؤول المتاجر (تجريبي): متابعة دورية حسب الأيام 0–2 / 3–9 / 10–13؛ يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+              </p>
+            )}
             {pendingTasks.length > 0 && (
               <p className="text-white/40 text-sm mt-2">
                 {mainTasks.length.toLocaleString('ar-SA')} في القائمة الرئيسية
@@ -972,40 +1152,103 @@ export default function Tasks() {
         transition={{ duration: 0.4, delay: 0.18 }}
         className="flex flex-wrap gap-2"
       >
-        {[
-          { val: 'all',  label: 'الكل',             count: mainTasks.length },
-          { val: 'high', label: 'عالية الأولوية',   count: highCountMain },
-          { val: 'no_answer', label: 'متاجر لم ترد', count: noAnswerTasks.length },
-        ].map(tab => (
-          <motion.button
-            key={tab.val}
-            onClick={() => setFilter(tab.val)}
-            whileTap={{ scale: 0.97 }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              filter === tab.val
-                ? 'text-white shadow-lg'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-            style={filter === tab.val ? (
-              tab.val === 'no_answer'
-                ? {
-                    background: 'linear-gradient(135deg, #d97706, #b45309)',
-                    boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
-                  }
-                : {
-                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                    boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
-                  }
-            ) : {}}
-          >
-            {tab.label}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-              filter === tab.val ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-            }`}>
-              {tab.count}
-            </span>
-          </motion.button>
-        ))}
+        {isMoStaging ? (
+          <>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('periodic')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'periodic'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'periodic'
+                  ? {
+                      background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                      boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                    }
+                  : {}
+              }
+            >
+              متابعة دورية
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'periodic' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {moPeriodicTasks.length}
+              </span>
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('contacted')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'contacted'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'contacted'
+                  ? {
+                      background: 'linear-gradient(135deg, #059669, #047857)',
+                      boxShadow: '0 4px 14px rgba(5,150,105,0.35)',
+                    }
+                  : {}
+              }
+            >
+              تم التواصل
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'contacted' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {moContactedTasks.length}
+              </span>
+            </motion.button>
+          </>
+        ) : (
+          [
+            { val: 'all', label: 'الكل', count: mainTasks.length },
+            { val: 'high', label: 'عالية الأولوية', count: highCountMain },
+            { val: 'no_answer', label: 'متاجر لم ترد', count: noAnswerTasks.length },
+          ].map(tab => (
+            <motion.button
+              key={tab.val}
+              onClick={() => setFilter(tab.val)}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                filter === tab.val
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                filter === tab.val
+                  ? tab.val === 'no_answer'
+                    ? {
+                        background: 'linear-gradient(135deg, #d97706, #b45309)',
+                        boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                      }
+                    : {
+                        background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                        boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                      }
+                  : {}
+              }
+            >
+              {tab.label}
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  filter === tab.val ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </motion.button>
+          ))
+        )}
       </motion.div>
 
       {/* ══ قائمة المهام ════════════════════════════════════════════ */}
@@ -1066,6 +1309,28 @@ export default function Tasks() {
               const blockDone =
                 task.type === 'assigned_store'
                 && needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)
+              const useMoRow =
+                isMoStaging
+                && (task.moDays != null || task.type === 'new_merchant_onboarding')
+              if (useMoRow) {
+                return (
+                  <MerchantOfficerTaskRow
+                    key={task.id}
+                    task={task}
+                    index={i}
+                    onCall={handleTaskCall}
+                    onDone={requestDone}
+                    userRole={user?.role}
+                    onNoAnswerWorkflow={handleNoAnswerWorkflow}
+                    noAnswerLoading={noAnswerLoadingId === task.id}
+                    doneDisabled={blockDone}
+                    hideDoneButton={IS_STAGING_OR_DEV}
+                    taskIsNoAnswerFn={taskIsNoAnswer}
+                    callLogs={callLogs}
+                    assignments={assignments}
+                  />
+                )
+              }
               return (
                 <TaskCard
                   key={task.id}

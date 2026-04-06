@@ -119,6 +119,10 @@ export const getAssignments = () =>
 export const assignStore = (data) =>
   http.post('/store-actions.php?action=assign_store', data).then(r => r.data)
 
+/** أتمتة مسؤول المتاجر (تجريبي): يوم 14 / يوم 11 أداء */
+export const postMerchantOfficerAutomation = (data) =>
+  http.post('/merchant-officer-automation.php', data).then(r => r.data)
+
 // ─── استبيان رضا العميل (متاجر نشط) ───────────────────────────────────────
 export const getSurveys = () =>
   http.get('/store-actions.php?action=get_surveys').then(r => r.data)

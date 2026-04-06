@@ -230,7 +230,7 @@ if (!empty($new)) {
         }
         $ids = array_keys($new);
         $ph = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category FROM store_states WHERE store_id IN ($ph)");
+        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category, state_reason FROM store_states WHERE store_id IN ($ph)");
         $stmt->execute(array_map('intval', $ids));
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $dbMap[(int) $row['store_id']] = $row;
@@ -257,6 +257,20 @@ foreach ($new as $id => $s) {
     $inc2 = $db['inc_call2_at'] ?? null;
     $inc3 = $db['inc_call3_at'] ?? null;
     $dbCat = $db['category'] ?? '';
+
+    // مسار مسؤول المتاجر: تصنيف صريح غير نشط ساخن من قاعدة البيانات
+    if ($db && $dbCat === 'hot_inactive' && (isset($db['state_reason']) ? (string) $db['state_reason'] : '') === 'mo_d14_no_ship') {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'hot_inactive';
+        $s['_mo_auto_hot'] = true;
+        $result['hot_inactive'][] = $s;
+        $counts['hot_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
 
     // تخريج يدوي إلى نشط من الواجهة
     if ($db && in_array($dbCat, ['active', 'active_shipping'], true) && empty($inc3)) {
