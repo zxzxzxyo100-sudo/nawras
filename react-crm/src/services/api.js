@@ -167,6 +167,12 @@ export const getAssignmentStatus = (storeId, username) =>
 export const getManagerAnalytics = (params) =>
   http.get('/manager-analytics.php', { params }).then(r => r.data)
 
+/** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
+export const getInactiveRecoveryDailyStatus = () =>
+  http
+    .get('/inactive-daily-status.php', { params: { user_role: 'executive' } })
+    .then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http

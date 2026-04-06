@@ -15,6 +15,7 @@ import {
 } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
+import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -475,6 +476,8 @@ export default function Tasks() {
   const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
   /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
   const [inactiveWf, setInactiveWf] = useState(null)
+  /** لإطلاق الاحتفال فور استجابة goal_just_met */
+  const [goalBurstNonce, setGoalBurstNonce] = useState(0)
 
   const loadInactiveWf = useCallback(async () => {
     if (user?.role !== 'inactive_manager' || !user?.username) return
@@ -563,11 +566,14 @@ export default function Tasks() {
           store_name: task.store.name,
           username: user.username,
         })
+        if (res?.goal_just_met) {
+          setGoalBurstNonce(n => n + 1)
+        }
         await dismissTaskOnly(task.id)
         await reload()
         await loadInactiveWf()
         loadDismissals()
-        if (res?.daily_target_reached) {
+        if (res?.daily_target_reached && !res?.goal_just_met) {
           setToastMsg('تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.')
         }
       } catch (e) {
@@ -686,6 +692,16 @@ export default function Tasks() {
 
   return (
     <div className="space-y-5 pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      {user?.role === 'inactive_manager' && user?.username && (
+        <InactiveGoalCelebration
+          username={user.username}
+          successfulCount={inactiveWf?.daily_successful_contacts ?? 0}
+          target={inactiveWf?.inactive_daily_target ?? 50}
+          dailyTargetReached={inactiveWf?.daily_target_reached}
+          burstNonce={goalBurstNonce}
+        />
+      )}
+
       <AnimatePresence>
         {toastMsg && (
           <motion.div
@@ -750,14 +766,20 @@ export default function Tasks() {
                   {inactiveWf.target ?? 50} متجراً غير نشط
                 </p>
                 <p
-                  className={`text-sm mt-1.5 font-bold ${
-                    inactiveWf.daily_target_reached ? 'text-emerald-300' : 'text-amber-200/95'
+                  className={`text-sm mt-1.5 flex flex-wrap items-center gap-2 ${
+                    inactiveWf.daily_target_reached ? 'text-emerald-200' : 'text-amber-200/95'
                   }`}
                 >
-                  اتصالات ناجحة اليوم:{' '}
-                  {(inactiveWf.daily_successful_contacts ?? 0).toLocaleString('ar-SA')} /{' '}
-                  {inactiveWf.inactive_daily_target ?? 50}
-                  {inactiveWf.daily_target_reached && ' — تم بلوغ الهدف'}
+                  <span className="font-bold">اتصالات ناجحة اليوم:</span>
+                  <InactiveGoalCounterBadge
+                    successfulCount={inactiveWf.daily_successful_contacts ?? 0}
+                    target={inactiveWf.inactive_daily_target ?? 50}
+                    dailyTargetReached={inactiveWf.daily_target_reached}
+                    className={inactiveWf.daily_target_reached ? 'text-emerald-200' : ''}
+                  />
+                  {inactiveWf.daily_target_reached && (
+                    <span className="text-emerald-200/90 font-medium">— تم بلوغ الهدف</span>
+                  )}
                 </p>
               </>
             )}

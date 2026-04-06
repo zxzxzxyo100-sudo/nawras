@@ -8,6 +8,7 @@ import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getMyWorkflow } from '../services/api'
+import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
 import { formatCallOutcome } from '../constants/callOutcomes'
 import {
   isRestoredCategory,
@@ -287,6 +288,15 @@ export default function HotInactive() {
 
   return (
     <div className="space-y-5" dir="rtl">
+      {user?.role === 'inactive_manager' && user?.username && (
+        <InactiveGoalCelebration
+          username={user.username}
+          successfulCount={inactiveWfSummary?.daily_successful_contacts ?? 0}
+          target={inactiveWfSummary?.inactive_daily_target ?? 50}
+          dailyTargetReached={inactiveWfSummary?.daily_target_reached}
+          burstNonce={0}
+        />
+      )}
       {user?.role === 'inactive_manager' && inactiveWfSummary && (
         <div
           className={`rounded-2xl border px-4 py-3 shadow-sm ${
@@ -295,10 +305,13 @@ export default function HotInactive() {
               : 'border-amber-200/90 bg-amber-50/90 text-amber-950'
           }`}
         >
-          <p className="font-black text-sm">
-            اتصالات ناجحة اليوم:{' '}
-            {(inactiveWfSummary.daily_successful_contacts ?? 0).toLocaleString('ar-SA')} /{' '}
-            {inactiveWfSummary.inactive_daily_target ?? 50}
+          <p className="font-black text-sm flex flex-wrap items-center gap-2">
+            <span>اتصالات ناجحة اليوم:</span>
+            <InactiveGoalCounterBadge
+              successfulCount={inactiveWfSummary.daily_successful_contacts ?? 0}
+              target={inactiveWfSummary.inactive_daily_target ?? 50}
+              dailyTargetReached={inactiveWfSummary.daily_target_reached}
+            />
           </p>
           {inactiveWfSummary.daily_target_reached ? (
             <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
