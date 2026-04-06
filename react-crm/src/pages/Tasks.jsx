@@ -15,7 +15,7 @@ import {
   postMerchantOfficerAutomation,
 } from '../services/api'
 import {
-  generateMerchantOfficerStagingTasks,
+  generateIncubationOfficerStagingTasks,
   daysInSystem,
   countAnsweredCalls,
 } from '../utils/merchantOfficerQueue'
@@ -40,7 +40,7 @@ function storeHasShipped(store) {
 
 /** نوع المكالمة لـ log_call حسب مفتاح المهمة */
 function taskIdToCallType(taskId) {
-  const m = String(taskId).match(/-inc-(call_[123])$/)
+  const m = String(taskId).match(/-inc-(call_[123])(?:-done)?$/)
   if (m) {
     const n = m[1].replace('call_', '')
     return `inc_call${n}`
@@ -169,15 +169,14 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
   }
 
-  /** مسؤول المتاجر — منطق التجريب/التطوير: طابور رجعي 14 يوماً + تبويبات */
-  if (userRole === 'active_manager' && MO_OFFICER_SMART && username && assignments) {
-    return generateMerchantOfficerStagingTasks(
+  /** مسؤول المتاجر الجديدة — منطق التجريب/التطوير: طابور احتضان + تبويبات (لا يعتمد على الإسناد) */
+  if (userRole === 'incubation_manager' && MO_OFFICER_SMART) {
+    return generateIncubationOfficerStagingTasks(
       allStores,
       callLogs,
       storeStates,
-      username,
-      assignments,
       newMerchantOnboardingDoneIds,
+      IS_STAGING_OR_DEV,
     )
   }
 
@@ -411,6 +410,8 @@ function MerchantOfficerTaskRow({
     typeof onNoAnswerWorkflow === 'function'
     && ((task.type === 'assigned_store' && userRole === 'active_manager')
       || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
+      || (task.type === 'new_call' && userRole === 'incubation_manager')
+      || (task.type === 'new_merchant_onboarding' && userRole === 'incubation_manager')
       || task.type === 'recovery_call')
   return (
     <motion.div
@@ -722,17 +723,22 @@ export default function Tasks() {
     loadInactiveWf()
   }, [loadInactiveWf, lastLoaded])
 
-  /** ترحيل آلي: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
+  /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
-    if (!MO_OFFICER_SMART || user?.role !== 'active_manager' || !user?.username || !lastLoaded) return
+    if (!MO_OFFICER_SMART || user?.role !== 'incubation_manager' || !user?.username || !lastLoaded) return
     if (moSweepLoadedRef.current === lastLoaded) return
     moSweepLoadedRef.current = lastLoaded
     let cancelled = false
+    function storeInIncubationSweep(s) {
+      if (s.bucket === 'incubating') return true
+      if (s._inc) return true
+      const d = daysInSystem(s)
+      return d >= 1 && d <= 20
+    }
     ;(async () => {
       let anyReload = false
       for (const store of allStores) {
-        const a = assignments[String(store.id)] || assignments[store.id]
-        if (a?.assigned_to !== user.username) continue
+        if (!storeInIncubationSweep(store)) continue
         const log = callLogs[store.id] || {}
         const d = daysInSystem(store)
         const ship = Number(store.total_shipments ?? 0) > 0
@@ -742,7 +748,7 @@ export default function Tasks() {
         const answered = countAnsweredCalls(log)
         try {
           const r = await postMerchantOfficerAutomation({
-            user_role: 'active_manager',
+            user_role: 'incubation_manager',
             username: user.username,
             store_id: store.id,
             store_name: store.name || '',
@@ -759,7 +765,7 @@ export default function Tasks() {
       if (anyReload && !cancelled) await reload()
     })()
     return () => { cancelled = true }
-  }, [lastLoaded, user?.role, user?.username, allStores, assignments, callLogs, reload])
+  }, [lastLoaded, user?.role, user?.username, allStores, callLogs, reload])
 
   const drawerTaskCompletion = useMemo(() => {
     if (!IS_STAGING_OR_DEV || !selectedTask || !user?.username) return undefined
@@ -843,7 +849,7 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
-  const isMoStaging = user?.role === 'active_manager' && MO_OFFICER_SMART
+  const isMoStaging = user?.role === 'incubation_manager' && MO_OFFICER_SMART
 
   const moPeriodicTasks = useMemo(() => {
     if (!isMoStaging) return mainTasks
@@ -961,9 +967,29 @@ export default function Tasks() {
         setFilter('no_answer')
         return
       }
+      if (task.type === 'new_call' && user?.role === 'incubation_manager') {
+        const res = await logCall({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          call_type: taskIdToCallType(task.id),
+          outcome: 'no_answer',
+          note: '',
+          performed_by: user?.fullname || user?.username || '',
+          performed_role: user?.role,
+          registration_date: task.store.registered_at || null,
+        })
+        if (!DISABLE_POINTS_AND_PERFORMANCE) {
+          onCallSaved(res?.points_awarded ?? 0)
+        }
+        await reload()
+        loadDismissals()
+        setFilter('no_answer')
+        return
+      }
       if (
         task.type === 'assigned_store'
         || (task.type === 'new_merchant_onboarding' && user?.role === 'active_manager')
+        || (task.type === 'new_merchant_onboarding' && user?.role === 'incubation_manager')
       ) {
         await markSurveyNoAnswer({
           store_id: task.store.id,
@@ -1111,7 +1137,7 @@ export default function Tasks() {
             )}
             {isMoStaging && (
               <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
-                وضع مسؤول المتاجر (تجريبي): متابعة دورية حسب الأيام 0–2 / 3–9 / 10–13؛ يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+                وضع مسؤول المتاجر الجديدة (تجريبي): متابعة دورية حسب الأيام 0–2 / 3–9 / 10–13؛ يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
               </p>
             )}
             {pendingTasks.length > 0 && (
@@ -1311,7 +1337,9 @@ export default function Tasks() {
                 && needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)
               const useMoRow =
                 isMoStaging
-                && (task.moDays != null || task.type === 'new_merchant_onboarding')
+                && (task.moDays != null
+                  || task.type === 'new_merchant_onboarding'
+                  || task.type === 'recovery_call')
               if (useMoRow) {
                 return (
                   <MerchantOfficerTaskRow

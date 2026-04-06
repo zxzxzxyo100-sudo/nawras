@@ -1,5 +1,5 @@
 /**
- * طابور مسؤول المتاجر النشطة — منطق الأداء والرقابة (تجريبي/تطوير فقط).
+ * طابور مسؤول المتاجر الجديدة (الاحتضان) — منطق الأداء والرقابة (تجريبي/تطوير فقط).
  */
 
 export function daysInSystem(store) {
@@ -50,14 +50,6 @@ export function countAnsweredCalls(log) {
   }).length
 }
 
-export function isContactedAnsweredToday(log, todayIso) {
-  return Object.values(log || {}).some(c => {
-    if (!c?.date || !String(c.date).startsWith(todayIso)) return false
-    const o = String(c.outcome ?? '').trim()
-    return o === 'answered' || o === ''
-  })
-}
-
 function onboardingDoneForStore(doneSet, storeId) {
   if (!doneSet || storeId == null) return false
   return doneSet.has(storeId) || doneSet.has(String(storeId)) || doneSet.has(Number(storeId))
@@ -82,6 +74,14 @@ function hideDailyTaskDueToCallToday(log, todayIso) {
   const top = latestCallEntry(log)
   if (!top?.date || !String(top.date).startsWith(todayIso)) return false
   return String(top.outcome ?? '').trim() !== 'no_answer'
+}
+
+export function isContactedAnsweredToday(log, todayIso) {
+  return Object.values(log || {}).some(c => {
+    if (!c?.date || !String(c.date).startsWith(todayIso)) return false
+    const o = String(c.outcome ?? '').trim()
+    return o === 'answered' || o === ''
+  })
 }
 
 export function isDueForPeriodicStage(store, storeStates, days) {
@@ -118,44 +118,137 @@ export function isOverdueForStage(store, storeStates, days) {
   return { overdue: false, hint: '' }
 }
 
-export function generateMerchantOfficerStagingTasks(
+/**
+ * مهام مسؤول المتاجر الجديدة (احتضان) — بديل توليد المهام الافتراضي عند تفعيل الوضع الذكي.
+ */
+export function generateIncubationOfficerStagingTasks(
   allStores,
   callLogs,
   storeStates,
-  username,
-  assignments,
   newMerchantOnboardingDoneIds,
+  isStagingOrDev,
 ) {
   const today = new Date().toISOString().split('T')[0]
   const tasks = []
 
   allStores.forEach(store => {
-    const asgn = assignments[String(store.id)] || assignments[store.id]
-    if (!asgn || asgn.assigned_to !== username) return
+    const log = callLogs[store.id] || {}
+    const dbCat = storeStates[store.id]?.category || store.category
+    const incBucket = store._inc
+    const topCall = latestCallEntry(log)
+    const lastCallDate = topCall?.date
+    const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
+    const daysSinceLast = lastCallDate
+      ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
+      : 999
 
     const cat = storeStates[store.id]?.category || store.category || ''
     if (cat === 'hot_inactive' || cat === 'frozen') return
 
-    const log = callLogs[store.id] || {}
     const days = daysInSystem(store)
     const retro = retroStageMeta(days)
 
     if (days >= 14 && !storeHasShipped(store)) return
     if (days >= 11 && storeHasShipped(store) && countAnsweredCalls(log) === 0) return
 
-    const needsOnboarding =
+    if (
       store.bucket === 'incubating'
       && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
-
-    if (needsOnboarding) {
-      tasks.push({
-        id: `${store.id}-new-onboarding-am`,
+    ) {
+      const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
+      const base = {
+        id: `${store.id}-new-onboarding`,
         store,
-        priority: 'high',
+        priority: 'normal',
         type: 'new_merchant_onboarding',
-        label: 'استبيان تهيئة — متجر مُسنَد',
-        desc: `يوم ${days} في النظام — كود ${store.id} — ${retro.label}`,
+        label: 'استبيان تهيئة متجر جديد',
+        desc: isStagingOrDev
+          ? `يوم ${days} — كود ${store.id} — ${retro.label} — اضغط «اتصل» للاستبيان`
+          : `قيّم تجربة التاجر — يوم ${days} في النظام`,
         incubationBadge: retro.badge,
+        moDays: days,
+        moRetro: retro,
+        moStoreCode: store.id,
+        moContactedToday: answeredToday,
+        moOverdue: false,
+        moOverdueHint: '',
+      }
+      tasks.push(base)
+      return
+    }
+
+    if (['call_1', 'call_2', 'call_3'].includes(incBucket)) {
+      const incubationBadge =
+        isStagingOrDev && incBucket === 'call_2'
+          ? '⚠️ المكالمة الثانية للمتجر'
+          : isStagingOrDev && incBucket === 'call_3'
+            ? '🚨 المكالمة الثالثة والأخيرة'
+            : retro.badge
+
+      const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
+      const overdueInfo = isOverdueForStage(store, storeStates, days)
+      const due = isDueForPeriodicStage(store, storeStates, days)
+      const needWork = due || overdueInfo.overdue
+
+      const label =
+        incBucket === 'call_1'
+          ? 'مسار الاحتضان — المكالمة الأولى'
+          : incBucket === 'call_2'
+            ? 'مسار الاحتضان — المكالمة الثانية'
+            : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
+
+      const descBase = `سجّل المكالمة — يوم ${days} — كود ${store.id} — ${retro.label}`
+
+      if (answeredToday) {
+        tasks.push({
+          id: `${store.id}-inc-${incBucket}-done`,
+          store,
+          priority: 'normal',
+          type: 'new_call',
+          label: 'تم التواصل اليوم',
+          desc: `${descBase}`,
+          incubationBadge,
+          moDays: days,
+          moRetro: retro,
+          moStoreCode: store.id,
+          moContactedToday: true,
+          moOverdue: false,
+          moOverdueHint: '',
+          _incBucket: incBucket,
+        })
+        return
+      }
+
+      if (!needWork && !overdueInfo.overdue) return
+
+      tasks.push({
+        id: `${store.id}-inc-${incBucket}`,
+        store,
+        priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
+        type: 'new_call',
+        label,
+        desc: `${descBase} — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة`,
+        incubationBadge,
+        moDays: days,
+        moRetro: retro,
+        moStoreCode: store.id,
+        moContactedToday: false,
+        moOverdue: overdueInfo.overdue,
+        moOverdueHint: overdueInfo.hint,
+        _incBucket: incBucket,
+      })
+      return
+    }
+
+    if (incBucket === 'never_started') {
+      if (callTodayHidesTask) return
+      tasks.push({
+        id: `${store.id}-never`,
+        store,
+        priority: daysSinceLast >= 3 ? 'high' : 'normal',
+        type: 'recovery_call',
+        label: 'استعادة — لم تبدأ بعد',
+        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم — يوم ${days}` : `لم يُتصل به قط — يوم ${days}`,
         moDays: days,
         moRetro: retro,
         moStoreCode: store.id,
@@ -166,52 +259,23 @@ export function generateMerchantOfficerStagingTasks(
       return
     }
 
-    const answeredToday = isContactedAnsweredToday(log, today)
-    const due = isDueForPeriodicStage(store, storeStates, days)
-    const overdueInfo = isOverdueForStage(store, storeStates, days)
-    const needWork = due || overdueInfo.overdue
-
-    const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
-      ? Math.floor((Date.now() - new Date(store.last_shipment_date)) / 86400000)
-      : 999
-    const shipDesc = daysSinceShip < 999 ? `آخر شحنة قبل ${daysSinceShip} يوم` : 'لا توجد شحنات بعد'
-
-    if (answeredToday && hideDailyTaskDueToCallToday(log, today)) {
+    if (incBucket === 'restoring') {
+      if (callTodayHidesTask) return
       tasks.push({
-        id: `${store.id}-assigned-mo-done`,
+        id: `${store.id}-restoring`,
         store,
-        priority: 'normal',
-        type: 'assigned_store',
-        label: 'تم التواصل اليوم',
-        desc: `${shipDesc} — ${retro.label} — يوم ${days} — كود: ${store.id}`,
-        incubationBadge: retro.badge,
+        priority: daysSinceLast >= 2 ? 'high' : 'normal',
+        type: 'recovery_call',
+        label: 'متابعة جاري الاستعادة',
+        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'يحتاج متابعة',
         moDays: days,
         moRetro: retro,
         moStoreCode: store.id,
-        moContactedToday: true,
+        moContactedToday: false,
         moOverdue: false,
         moOverdueHint: '',
       })
-      return
     }
-
-    if (!needWork) return
-
-    tasks.push({
-      id: `${store.id}-assigned-mo`,
-      store,
-      priority: overdueInfo.overdue || daysSinceShip >= 10 ? 'high' : 'normal',
-      type: 'assigned_store',
-      label: 'متابعة دورية — متجر مُسنَد',
-      desc: `${shipDesc} — ${retro.label} — يوم ${days} — كود: ${store.id}`,
-      incubationBadge: retro.badge,
-      moDays: days,
-      moRetro: retro,
-      moStoreCode: store.id,
-      moContactedToday: false,
-      moOverdue: overdueInfo.overdue,
-      moOverdueHint: overdueInfo.hint,
-    })
   })
 
   return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
