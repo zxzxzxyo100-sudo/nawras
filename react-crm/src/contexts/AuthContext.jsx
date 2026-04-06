@@ -9,8 +9,8 @@ export const ROLES = {
   /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم + المهام اليومية */
   active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks', 'quick_verification'] },
   inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks', 'quick_verification'] },
-  /** موظف مبيعات / احتضان: متاجر جديدة + مهام — دون واجهة «مسار الاحتضان» */
-  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'tasks', 'quick_verification'] },
+  /** موظف مبيعات / احتضان: متاجر جديدة + مهام — دون التحقيق السريع (للتنفيذي والفرق الأخرى) */
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'tasks'] },
 }
 
 export function AuthProvider({ children }) {
