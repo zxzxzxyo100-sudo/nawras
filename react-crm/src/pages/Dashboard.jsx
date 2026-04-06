@@ -364,7 +364,7 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* ══ بورصة رضا الموظفين — على التجريبي تُعرض من صفحة «التحقق السريع» ══ */}
+      {/* ══ بورصة رضا الموظفين — التجريبي يخفي هذا القسم (انظر IS_STAGING_OR_DEV) ══ */}
       {user?.role === 'executive' && !IS_STAGING_OR_DEV && (
         <motion.div
           variants={fadeUp}

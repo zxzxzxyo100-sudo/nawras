@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock, BarChart3, ShieldCheck,
+  ChevronDown, Circle, Layers, Lock, BarChart3,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
@@ -11,9 +11,6 @@ import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
-  ...(IS_STAGING_OR_DEV
-    ? [{ to: '/quick-verification', label: 'التحقق السريع', icon: ShieldCheck, view: 'quick_verification' }]
-    : []),
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
@@ -402,7 +399,7 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', ...(IS_STAGING_OR_DEV ? ['/quick-verification'] : []), '/kanban'] },
+  { label: 'الرئيسية',  keys: ['/', '/kanban'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',

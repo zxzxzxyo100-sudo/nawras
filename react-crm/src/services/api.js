@@ -171,33 +171,6 @@ export const getManagerAnalytics = (params) =>
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)
 
-/** التحقق السريع — استبيانات تهيئة المتاجر الجديدة اليوم (تفاصيل الصفوف) */
-export const getQuickVerificationBourse = (params = {}) =>
-  http
-    .get('/quick-verification-bourse.php', {
-      params: {
-        user_role: params.user_role ?? 'executive',
-        username: params.username ?? '',
-      },
-    })
-    .then(r => r.data)
-
-/** جدول زمني + آخر ملاحظة مكالمة — للدرج التفصيلي (تجريبي) */
-export const getQuickVerificationAuditTimeline = (storeId, params = {}) =>
-  http
-    .get('/quick-verification-audit-timeline.php', {
-      params: {
-        user_role: params.user_role ?? 'executive',
-        username: params.username ?? '',
-        store_id: storeId,
-      },
-    })
-    .then(r => r.data)
-
-/** تسجيل حل مشكلة تدقيق (استبيان اليوم) — للمدير التنفيذي */
-export const postQuickVerificationResolveAudit = (data) =>
-  http.post('/quick-verification-resolve-audit.php', data).then(r => r.data)
-
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http
