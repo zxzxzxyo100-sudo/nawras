@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { X, Phone, Zap, Star } from 'lucide-react'
+import {
+  X, Phone, Zap, Star, CheckCircle2, PhoneOff, Undo2, PhoneCall,
+} from 'lucide-react'
 import {
   logCall,
   saveSurvey,
@@ -20,8 +22,50 @@ import {
   needsActiveSatisfactionSurvey,
   isInactiveMerchantCategory,
 } from '../constants/satisfactionSurvey'
+import {
+  NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV,
+  needsNewMerchantOnboardingSurvey,
+  buildOnboardingYesNoForApi,
+} from '../constants/newMerchantOnboardingSurvey'
 
 const MIN_INACTIVE_FEEDBACK_LEN = 10
+
+/** أزرار نتيجة المكالمة — مطابقة للواجهة */
+const OUTCOME_OPTIONS = [
+  { id: 'answered', label: 'تم الرد', Icon: CheckCircle2 },
+  { id: 'no_answer', label: 'لم يرد', Icon: PhoneOff },
+  { id: 'busy', label: 'مشغول', Icon: Undo2 },
+  { id: 'callback', label: 'طلب معاودة الاتصال', Icon: PhoneCall },
+]
+
+function YesNoRow({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-2 flex-row-reverse justify-end" dir="rtl">
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-colors ${
+          value === true
+            ? 'bg-emerald-600 border-emerald-600 text-white'
+            : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'
+        }`}
+      >
+        نعم
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-colors ${
+          value === false
+            ? 'bg-rose-600 border-rose-600 text-white'
+            : 'bg-white border-slate-200 text-slate-600 hover:border-rose-300'
+        }`}
+      >
+        لا
+      </button>
+    </div>
+  )
+}
 
 function StarRow({ value, onChange }) {
   return (
@@ -71,7 +115,7 @@ export default function CallModal({
   taskCompletion = null,
 }) {
   const { user } = useAuth()
-  const { storeStates, surveyByStoreId, assignments } = useStores()
+  const { storeStates, surveyByStoreId, assignments, newMerchantOnboardingDoneIds } = useStores()
   const { onCallSaved, todayCalls, goalPct } = usePoints()
 
   const [note,    setNote]    = useState('')
@@ -80,21 +124,35 @@ export default function CallModal({
   const [ratings, setRatings] = useState(() => Array(6).fill(0))
   const [suggestions, setSuggestions] = useState('')
   const [inactiveFeedback, setInactiveFeedback] = useState('')
+  /** نتيجة المكالمة — تُسجَّل مع log_call */
+  const [outcome, setOutcome] = useState('answered')
+  /** استبيان تهيئة متجر جديد (ثلاثة نعم/لا) — داخل النافذة */
+  const [onbYesNo, setOnbYesNo] = useState(() => [null, null, null])
 
   const dbCategory = storeStates[store.id]?.category || store.category || ''
   const inactiveFeedbackNeeded = useMemo(
     () => callType === 'general' && isInactiveMerchantCategory(dbCategory),
     [callType, dbCategory],
   )
+  const onboardingNeeded = useMemo(
+    () =>
+      IS_STAGING_OR_DEV
+      && callType === 'general'
+      && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds),
+    [callType, store, newMerchantOnboardingDoneIds],
+  )
   const surveyNeeded = useMemo(
     () =>
       callType === 'general'
+      && outcome === 'answered'
       && !inactiveFeedbackNeeded
       && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
-    [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded],
+    [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded, outcome],
   )
+  const showOnboarding = onboardingNeeded && outcome === 'answered'
   const inactiveFeedbackOk = inactiveFeedback.trim().length >= MIN_INACTIVE_FEEDBACK_LEN
   const allSurveyRated = ratings.every(r => r >= 1 && r <= 5)
+  const allOnboardingYesNo = onbYesNo.every(v => v === true || v === false)
 
   useEffect(() => {
     setNote('')
@@ -102,6 +160,8 @@ export default function CallModal({
     setRatings(Array(6).fill(0))
     setSuggestions('')
     setInactiveFeedback('')
+    setOutcome('answered')
+    setOnbYesNo([null, null, null])
   }, [store.id])
 
   function setRating(i, v) {
@@ -112,48 +172,86 @@ export default function CallModal({
     })
   }
 
-  async function handleSave() {
+  function setOnboardingYn(i, v) {
+    setOnbYesNo(prev => {
+      const next = [...prev]
+      next[i] = v
+      return next
+    })
+  }
+
+  async function submitCall() {
     setSaving(true)
     setError('')
-    if (inactiveFeedbackNeeded && !inactiveFeedbackOk) {
-      setError(`يرجى كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».`)
-      setSaving(false)
-      return
-    }
-    if (surveyNeeded && !allSurveyRated) {
-      setError('يرجى تقييم كل الأسئلة الستة من 1 إلى 5 قبل حفظ المكالمة.')
-      setSaving(false)
-      return
-    }
-    try {
-      if (inactiveFeedbackNeeded) {
-        await saveSurvey({
-          store_id: store.id,
-          store_name: store.name,
-          survey_kind: 'inactive_feedback',
-          inactive_feedback: inactiveFeedback.trim(),
-          user: user?.fullname ?? '',
-          user_role: user?.role ?? '',
-          username: user?.username ?? '',
-        })
-      } else if (surveyNeeded) {
-        await saveSurvey({
-          store_id: store.id,
-          store_name: store.name,
-          answers: ratings,
-          suggestions: suggestions.trim(),
-          user: user?.fullname ?? '',
-          user_role: user?.role ?? '',
-          username: user?.username ?? '',
-        })
+
+    if (outcome === 'answered') {
+      if (inactiveFeedbackNeeded && !inactiveFeedbackOk) {
+        setError('يرجى كتابة 10 أحرف على الأقل في «ماذا قال المتجر؟».')
+        setSaving(false)
+        return
       }
+      if (surveyNeeded && !allSurveyRated) {
+        setError('يرجى تقييم كل الأسئلة الستة من 1 إلى 5 قبل حفظ المكالمة.')
+        setSaving(false)
+        return
+      }
+      if (showOnboarding && !allOnboardingYesNo) {
+        setError('يرجى الإجابة بـ «نعم» أو «لا» على الأسئلة الثلاثة قبل حفظ المكالمة.')
+        setSaving(false)
+        return
+      }
+    }
+
+    try {
+      if (outcome === 'answered') {
+        if (inactiveFeedbackNeeded) {
+          await saveSurvey({
+            store_id: store.id,
+            store_name: store.name,
+            survey_kind: 'inactive_feedback',
+            inactive_feedback: inactiveFeedback.trim(),
+            user: user?.fullname ?? '',
+            user_role: user?.role ?? '',
+            username: user?.username ?? '',
+          })
+        } else if (surveyNeeded) {
+          await saveSurvey({
+            store_id: store.id,
+            store_name: store.name,
+            answers: ratings,
+            suggestions: suggestions.trim(),
+            user: user?.fullname ?? '',
+            user_role: user?.role ?? '',
+            username: user?.username ?? '',
+          })
+        }
+        if (showOnboarding) {
+          const answers = buildOnboardingYesNoForApi(onbYesNo)
+          if (!answers) {
+            setError('إجابات الاستبيان غير صالحة.')
+            setSaving(false)
+            return
+          }
+          await saveSurvey({
+            store_id: store.id,
+            store_name: store.name,
+            answers,
+            suggestions: '',
+            survey_kind: 'new_merchant_onboarding',
+            user: user?.fullname ?? '',
+            user_role: user?.role ?? '',
+            username: user?.username ?? '',
+          })
+        }
+      }
+
       const payload = {
-        store_id:       store.id,
-        store_name:     store.name,
-        call_type:      callType,
-        outcome:        'answered',
-        note,
-        performed_by:   user?.fullname || user?.username || '',
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome,
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
         performed_role: user?.role,
         registration_date: store.registered_at || null,
       }
@@ -162,10 +260,40 @@ export default function CallModal({
       }
       const res = await logCall(payload)
 
-      const pts = res?.points_awarded ?? 10
+      const pts = res?.points_awarded ?? (outcome === 'answered' ? 10 : 0)
       onCallSaved(pts)
 
-      if (IS_STAGING_OR_DEV && taskCompletion && user?.username) {
+      if (outcome === 'no_answer' && user?.role === 'active_manager') {
+        const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
+        if (a?.assigned_to === user?.username) {
+          try {
+            await markSurveyNoAnswer({
+              store_id: store.id,
+              store_name: store.name,
+              username: user.username,
+            })
+          } catch { /* */ }
+        }
+      }
+
+      if (
+        outcome === 'no_answer'
+        && IS_STAGING_OR_DEV
+        && taskCompletion?.inactiveRecovery
+        && user?.role === 'inactive_manager'
+        && user?.username
+      ) {
+        try {
+          await markSurveyNoAnswer({
+            store_id: store.id,
+            store_name: store.name,
+            username: user.username,
+            queue: 'inactive',
+          })
+        } catch { /* */ }
+      }
+
+      if (IS_STAGING_OR_DEV && taskCompletion && user?.username && outcome === 'answered') {
         const u = user.username
         const sid = store.id
         const sname = store.name
@@ -194,77 +322,14 @@ export default function CallModal({
       }
 
       onSaved?.()
-
-      // أغلق الـ Modal بعد لحظة قصيرة
       setTimeout(onClose, 400)
     } catch (e) {
       const msg =
         e?.response?.data?.error
-        || (inactiveFeedbackNeeded || surveyNeeded ? 'تعذّر حفظ الاستبيان أو المكالمة.' : 'فشل حفظ المكالمة، حاول مرة أخرى')
+        || (inactiveFeedbackNeeded || surveyNeeded || showOnboarding
+          ? 'تعذّر حفظ الاستبيان أو المكالمة.'
+          : 'فشل حفظ المكالمة، حاول مرة أخرى')
       setError(msg)
-      setSaving(false)
-    }
-  }
-
-  async function handleNoAnswer() {
-    setSaving(true)
-    setError('')
-    try {
-      const payload = {
-        store_id: store.id,
-        store_name: store.name,
-        call_type: callType,
-        outcome: 'no_answer',
-        note: note.trim(),
-        performed_by: user?.fullname || user?.username || '',
-        performed_role: user?.role,
-        registration_date: store.registered_at || null,
-      }
-      if (callType === 'inc_call3') {
-        payload.has_shipped = storeHasShipped(store)
-      }
-      const res = await logCall(payload)
-      const pts = res?.points_awarded ?? 0
-      onCallSaved(pts)
-
-      if (user?.role === 'active_manager') {
-        const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
-        if (a?.assigned_to === user?.username) {
-          try {
-            await markSurveyNoAnswer({
-              store_id: store.id,
-              store_name: store.name,
-              username: user.username,
-            })
-          } catch {
-            /* ليس في طابور سير العمل النشط */
-          }
-        }
-      }
-
-      if (
-        IS_STAGING_OR_DEV
-        && taskCompletion?.inactiveRecovery
-        && user?.role === 'inactive_manager'
-        && user?.username
-      ) {
-        try {
-          await markSurveyNoAnswer({
-            store_id: store.id,
-            store_name: store.name,
-            username: user.username,
-            queue: 'inactive',
-          })
-        } catch {
-          /* لا تعيين في الطابور */
-        }
-      }
-
-      onSaved?.()
-      setTimeout(onClose, 400)
-    } catch (e) {
-      setError(e?.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
-    } finally {
       setSaving(false)
     }
   }
@@ -276,7 +341,9 @@ export default function CallModal({
         animate={{ scale: 1,    opacity: 1, y: 0  }}
         exit={{   scale: 0.92, opacity: 0, y: 20 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
-        className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${surveyNeeded || inactiveFeedbackNeeded ? 'max-w-lg' : 'max-w-md'}`}
+        className={`bg-white rounded-3xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${
+          surveyNeeded || inactiveFeedbackNeeded || showOnboarding ? 'max-w-lg' : 'max-w-md'
+        }`}
         style={{ fontFamily: "'Cairo', sans-serif" }}
       >
         {/* Header */}
@@ -339,7 +406,36 @@ export default function CallModal({
             <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>
           )}
 
-          {inactiveFeedbackNeeded && (
+          <div className="space-y-2">
+            <p className="text-sm font-black text-slate-900">نتيجة المكالمة</p>
+            <div className="grid grid-cols-2 gap-2">
+              {OUTCOME_OPTIONS.map(o => {
+                const selected = outcome === o.id
+                const Oc = o.Icon
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => setOutcome(o.id)}
+                    className={`flex items-center gap-2 rounded-xl border-2 px-2.5 py-2.5 text-[11px] sm:text-xs font-bold transition-all text-right ${
+                      selected
+                        ? 'border-violet-600 bg-violet-50 text-violet-950 shadow-sm ring-1 ring-violet-200'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Oc
+                      size={17}
+                      className={`shrink-0 ${selected ? 'text-violet-700' : 'text-slate-400'}`}
+                      strokeWidth={2.2}
+                    />
+                    <span className="leading-snug flex-1 min-w-0">{o.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {inactiveFeedbackNeeded && outcome === 'answered' && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
               <h4 className="text-sm font-black text-amber-950">ماذا قال المتجر؟</h4>
               <p className="text-[11px] text-amber-900/85 leading-relaxed">
@@ -355,6 +451,24 @@ export default function CallModal({
               <p className="text-[11px] text-slate-500 tabular-nums">
                 {inactiveFeedback.trim().length}/{MIN_INACTIVE_FEEDBACK_LEN} حرفاً على الأقل
               </p>
+            </div>
+          )}
+
+          {showOnboarding && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-black text-violet-900">استبيان تهيئة المتجر</h4>
+                <p className="text-[11px] text-violet-800/90 mt-1 leading-relaxed">
+                  ثلاثة أسئلة (نعم / لا) — تُحفظ مع المكالمة عند «تم الرد».
+                </p>
+              </div>
+              {NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV.map((q, i) => (
+                <div key={q.id} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                  <p className="text-[10px] font-bold text-violet-700 mb-1">{q.section}</p>
+                  <p className="text-sm text-slate-800 leading-relaxed mb-2">{q.text}</p>
+                  <YesNoRow value={onbYesNo[i]} onChange={v => setOnboardingYn(i, v)} />
+                </div>
+              ))}
             </div>
           )}
 
@@ -403,43 +517,36 @@ export default function CallModal({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-2 px-5 pb-5">
+        <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
           <motion.button
             type="button"
-            onClick={handleNoAnswer}
-            disabled={saving}
-            whileHover={{ scale: saving ? 1 : 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
+            onClick={submitCall}
+            disabled={
+              saving
+              || (outcome === 'answered' && surveyNeeded && !allSurveyRated)
+              || (outcome === 'answered' && inactiveFeedbackNeeded && !inactiveFeedbackOk)
+              || (outcome === 'answered' && showOnboarding && !allOnboardingYesNo)
+            }
+            whileHover={{ scale: saving ? 1 : 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+              boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+            }}
           >
-            {saving ? 'جارٍ التسجيل…' : 'لم يتم الرد — يبقى المتجر في المهام اليومية'}
+            {saving
+              ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+              : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+            }
           </motion.button>
-          <div className="flex gap-3">
-            <motion.button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || (surveyNeeded && !allSurveyRated) || (inactiveFeedbackNeeded && !inactiveFeedbackOk)}
-              whileHover={{ scale: saving ? 1 : 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{
-                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
-              }}
-            >
-              {saving
-                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
-              }
-            </motion.button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
-            >
-              إلغاء
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
+          >
+            إلغاء
+          </button>
         </div>
       </motion.div>
     </div>
