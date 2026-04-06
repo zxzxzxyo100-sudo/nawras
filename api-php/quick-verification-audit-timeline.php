@@ -13,10 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$userRole = $_GET['user_role'] ?? '';
-if ($userRole !== 'executive') {
+$userRole = trim((string) ($_GET['user_role'] ?? ''));
+$requestUsername = trim((string) ($_GET['username'] ?? ''));
+$allowedRoles = ['executive', 'incubation_manager', 'active_manager', 'inactive_manager'];
+if (!in_array($userRole, $allowedRoles, true)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'غير مصرّح — المدير التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'غير مصرّح.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -27,7 +29,33 @@ if ($storeId <= 0) {
     exit;
 }
 
+if ($userRole !== 'executive') {
+    if ($requestUsername === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'اسم المستخدم مطلوب.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 $pdo = getDB();
+
+if ($userRole !== 'executive') {
+    $chk = $pdo->prepare('
+        SELECT id FROM surveys
+        WHERE store_id = ? AND DATE(created_at) = CURDATE()
+        AND (
+            TRIM(COALESCE(submitted_username, \'\')) = ?
+            OR TRIM(COALESCE(performed_by, \'\')) = ?
+        )
+        LIMIT 1
+    ');
+    $chk->execute([$storeId, $requestUsername, $requestUsername]);
+    if (!$chk->fetch(PDO::FETCH_ASSOC)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'غير مصرّح بعرض هذا المتجر.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
 
 function nawras_outcome_ar($o) {
     $o = (string) $o;
