@@ -7,7 +7,9 @@ import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from './StoreNameWithId'
 import {
   NEW_MERCHANT_ONBOARDING_QUESTIONS,
+  NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV,
   buildOnboardingAnswersForApi,
+  buildOnboardingYesNoForApi,
 } from '../constants/newMerchantOnboardingSurvey'
 
 function StarRow({ value, onChange }) {
@@ -35,6 +37,35 @@ function StarRow({ value, onChange }) {
   )
 }
 
+function YesNoRow({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-2 flex-row-reverse justify-end" dir="rtl">
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-colors ${
+          value === true
+            ? 'bg-emerald-600 border-emerald-600 text-white'
+            : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'
+        }`}
+      >
+        نعم
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`px-4 py-2 rounded-xl text-sm font-bold border-2 transition-colors ${
+          value === false
+            ? 'bg-rose-600 border-rose-600 text-white'
+            : 'bg-white border-slate-200 text-slate-600 hover:border-rose-300'
+        }`}
+      >
+        لا
+      </button>
+    </div>
+  )
+}
+
 /**
  * استبيان تهيئة المتاجر الجديدة — ثلاثة أسئلة (لوحة متاجر جديدة / مهام يومية فقط)
  */
@@ -46,14 +77,20 @@ export default function NewMerchantOnboardingModal({
   dailyTaskKey,
 }) {
   const { user } = useAuth()
+  const useDevSurvey = IS_STAGING_OR_DEV
+  const questions = useDevSurvey ? NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV : NEW_MERCHANT_ONBOARDING_QUESTIONS
+
   const [ratings, setRatings] = useState(() => [0, 0, 0])
+  const [yesNo, setYesNo] = useState(() => [null, null, null])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const allStarsSet = ratings.every(r => r >= 1 && r <= 5)
+  const allStarsSet = !useDevSurvey && ratings.every(r => r >= 1 && r <= 5)
+  const allYesNoSet = useDevSurvey && yesNo.every(v => v === true || v === false)
 
   useEffect(() => {
     setRatings([0, 0, 0])
+    setYesNo([null, null, null])
     setError('')
   }, [store?.id])
 
@@ -65,16 +102,30 @@ export default function NewMerchantOnboardingModal({
     })
   }
 
+  function setYn(i, v) {
+    setYesNo(prev => {
+      const next = [...prev]
+      next[i] = v
+      return next
+    })
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!allStarsSet) {
-      setError(IS_STAGING_OR_DEV
-        ? 'يرجى تقييم الأسئلة الثلاثة بالنجوم قبل حفظ الاستبيان.'
-        : 'يرجى تقييم الأسئلة الثلاثة بالنجوم قبل «تم».')
+    if (useDevSurvey) {
+      if (!allYesNoSet) {
+        setError('يرجى الإجابة بنعم أو لا على الأسئلة الثلاثة قبل حفظ الاستبيان.')
+        return
+      }
+    } else if (!allStarsSet) {
+      setError('يرجى تقييم الأسئلة الثلاثة بالنجوم قبل حفظ الاستبيان.')
       return
     }
-    const answers = buildOnboardingAnswersForApi(ratings)
+
+    const answers = useDevSurvey
+      ? buildOnboardingYesNoForApi(yesNo)
+      : buildOnboardingAnswersForApi(ratings)
     if (!answers) {
       setError('تقييم غير صالح.')
       return
@@ -104,6 +155,8 @@ export default function NewMerchantOnboardingModal({
       setSaving(false)
     }
   }
+
+  const canSubmit = useDevSurvey ? allYesNoSet : allStarsSet
 
   return (
     <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
@@ -151,7 +204,9 @@ export default function NewMerchantOnboardingModal({
                 />
               </p>
               <p className="text-amber-200/90 text-[11px] mt-2 leading-relaxed">
-                ثلاثة أسئلة — مرر المؤشر على أيقونة المعلومات لإرشاد الموظف أثناء المكالمة.
+                {useDevSurvey
+                  ? 'ثلاثة أسئلة (نعم / لا) — أثناء المكالمة.'
+                  : 'ثلاثة أسئلة — مرر المؤشر على أيقونة المعلومات لإرشاد الموظف أثناء المكالمة.'}
               </p>
             </div>
           </div>
@@ -166,7 +221,7 @@ export default function NewMerchantOnboardingModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5 space-y-4">
-            {NEW_MERCHANT_ONBOARDING_QUESTIONS.map((q, i) => (
+            {questions.map((q, i) => (
               <div
                 key={q.id}
                 className="rounded-xl border border-slate-100 bg-slate-50/90 p-3 sm:p-4 shadow-sm"
@@ -184,7 +239,11 @@ export default function NewMerchantOnboardingModal({
                   </span>
                 </div>
                 <p className="text-sm text-slate-800 leading-relaxed mb-3">{q.text}</p>
-                <StarRow value={ratings[i]} onChange={v => setRating(i, v)} />
+                {useDevSurvey ? (
+                  <YesNoRow value={yesNo[i]} onChange={v => setYn(i, v)} />
+                ) : (
+                  <StarRow value={ratings[i]} onChange={v => setRating(i, v)} />
+                )}
               </div>
             ))}
 
@@ -206,10 +265,10 @@ export default function NewMerchantOnboardingModal({
               </button>
               <button
                 type="submit"
-                disabled={saving || !allStarsSet}
+                disabled={saving || !canSubmit}
                 className="w-full sm:flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-black transition-colors"
               >
-                {saving ? 'جارٍ الحفظ…' : (IS_STAGING_OR_DEV ? 'حفظ الاستبيان' : 'تم')}
+                {saving ? 'جارٍ الحفظ…' : 'حفظ الاستبيان'}
               </button>
             </div>
           </div>

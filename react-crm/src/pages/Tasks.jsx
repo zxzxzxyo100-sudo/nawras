@@ -126,6 +126,12 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       : 999
 
     if (['call_1', 'call_2', 'call_3'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
+      const incubationBadge =
+        IS_STAGING_OR_DEV && incBucket === 'call_2'
+          ? '⚠️ المكالمة الثانية للمتجر'
+          : IS_STAGING_OR_DEV && incBucket === 'call_3'
+            ? '🚨 المكالمة الثالثة والأخيرة'
+            : null
       tasks.push({
         id: `${store.id}-inc-${incBucket}`, store,
         priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
@@ -135,6 +141,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
               : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
         desc: 'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة',
+        incubationBadge,
       })
     }
 
@@ -150,7 +157,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
         type: 'new_merchant_onboarding',
         label: 'استبيان تهيئة متجر جديد',
         desc: IS_STAGING_OR_DEV
-          ? 'قيّم تجربة التاجر من الاستبيان ثلاثي الأسئلة — أو من لوحة المتاجر الجديدة'
+          ? 'اضغط «اتصل» ليظهر استبيان التهيئة (ثلاثة أسئلة) فوراً، ثم سجّل المكالمة من البطاقة — أو من لوحة المتاجر الجديدة'
           : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة',
       })
     }
@@ -308,7 +315,7 @@ function TaskCard({
   userRole,
   doneDisabled,
   hideDoneButton,
-  onOpenOnboarding,
+  callButtonLabel,
 }) {
   const s = TYPE_STYLES[task.type] || TYPE_STYLES.followup_call
   const handleDone = () => {
@@ -355,6 +362,11 @@ function TaskCard({
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${s.badge}`}>
             {task.label}
           </span>
+          {task.incubationBadge && (
+            <span className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-amber-100 text-amber-900 border border-amber-200/80 flex-shrink-0 max-w-[14rem] leading-snug">
+              {task.incubationBadge}
+            </span>
+          )}
           {task.priority === 'high' && (
             <motion.span
               className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold flex-shrink-0"
@@ -370,7 +382,7 @@ function TaskCard({
 
       {/* أزرار الإجراء */}
       <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-        <CallButton onClick={() => onCall(task)} />
+        <CallButton label={callButtonLabel} onClick={() => onCall(task)} />
         {showNoAnswer && (
           <motion.button
             type="button"
@@ -381,22 +393,6 @@ function TaskCard({
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
           >
             عدم الرد
-          </motion.button>
-        )}
-        {hideDoneButton && task.type === 'new_merchant_onboarding' && (
-          <motion.button
-            type="button"
-            onClick={() => onOpenOnboarding?.(task)}
-            whileHover={{ scale: 1.06, y: -1 }}
-            whileTap={{ scale: 0.9 }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
-            style={{
-              background: 'linear-gradient(135deg, #6d28d9, #5b21b6)',
-              boxShadow: '0 4px 12px rgba(109,40,217,0.35)',
-            }}
-          >
-            <ClipboardList size={12} />
-            استبيان التهيئة
           </motion.button>
         )}
         {!hideDoneButton && (
@@ -543,6 +539,14 @@ export default function Tasks() {
       onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
     }
   }, [selectedTask, user?.username, user?.role])
+
+  function handleTaskCall(taskRow) {
+    if (IS_STAGING_OR_DEV && taskRow.type === 'new_merchant_onboarding') {
+      setPendingOnboardingTask(taskRow)
+      return
+    }
+    setSelectedTask(taskRow)
+  }
 
   useEffect(() => {
     if (!toastMsg) return undefined
@@ -955,14 +959,13 @@ export default function Tasks() {
                   key={task.id}
                   task={task}
                   index={i}
-                  onCall={taskRow => setSelectedTask(taskRow)}
+                  onCall={handleTaskCall}
                   onDone={requestDone}
                   userRole={user?.role}
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
                   doneDisabled={blockDone}
                   hideDoneButton={IS_STAGING_OR_DEV}
-                  onOpenOnboarding={setPendingOnboardingTask}
                 />
               )
             })}
@@ -986,9 +989,13 @@ export default function Tasks() {
           dailyTaskKey={pendingOnboardingTask.id}
           onClose={() => setPendingOnboardingTask(null)}
           onSaved={async () => {
+            const t = pendingOnboardingTask
             setPendingOnboardingTask(null)
             await reload()
             loadDismissals()
+            if (t && IS_STAGING_OR_DEV) {
+              setSelectedTask(t)
+            }
           }}
         />
       )}
