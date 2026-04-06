@@ -175,6 +175,14 @@ export const getDailyStaffSatisfaction = () =>
 export const getQuickVerificationBourse = () =>
   http.get('/quick-verification-bourse.php', { params: { user_role: 'executive' } }).then(r => r.data)
 
+/** جدول زمني + آخر ملاحظة مكالمة — للدرج التفصيلي (تجريبي) */
+export const getQuickVerificationAuditTimeline = (storeId) =>
+  http
+    .get('/quick-verification-audit-timeline.php', {
+      params: { user_role: 'executive', store_id: storeId },
+    })
+    .then(r => r.data)
+
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http

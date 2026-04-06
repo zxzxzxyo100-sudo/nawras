@@ -37,6 +37,7 @@ $activeCsatRows = [];
 try {
     $st = $pdo->query("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
+          COALESCE(ss.category, '') AS store_category,
           s.q1_delivery, s.q2_collection, s.q3_support,
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
@@ -87,6 +88,7 @@ try {
             'survey_kind' => 'new_merchant_onboarding',
             'store_id' => (int) $r['store_id'],
             'store_name' => $r['store_name'] !== '' ? $r['store_name'] : ('#' . $r['store_id']),
+            'store_category' => trim((string) ($r['store_category'] ?? '')),
             'staff_username' => $staffKey,
             'staff_fullname' => $fullname,
             'answers' => $answers,
@@ -99,6 +101,7 @@ try {
 
     $stA = $pdo->query("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
+          COALESCE(ss.category, '') AS store_category,
           s.q1_delivery, s.q2_collection, s.q3_support, s.q4_app, s.q5_payments, s.q6_returns,
           s.satisfaction_score, s.satisfaction_gap_tags,
           s.suggestions,
@@ -166,6 +169,7 @@ try {
             'survey_kind' => 'active_csat',
             'store_id' => (int) $r['store_id'],
             'store_name' => $r['store_name'] !== '' ? $r['store_name'] : ('#' . $r['store_id']),
+            'store_category' => trim((string) ($r['store_category'] ?? '')),
             'staff_username' => $staffKey,
             'staff_fullname' => $fullname,
             'avg' => round($avg, 2),

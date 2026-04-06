@@ -23,8 +23,15 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
-import { IS_STAGING_OR_DEV } from '../config/envFlags'
+import { IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
 import { getQuickVerificationBourse } from '../services/api'
+import QuickVerificationAuditDrawer from '../components/QuickVerificationAuditDrawer'
+
+function textSnippet(s, max = 64) {
+  const t = (s || '').trim()
+  if (!t) return ''
+  return t.length > max ? `${t.slice(0, max)}…` : t
+}
 
 function MiniStars({ value }) {
   const v = Math.max(0, Math.min(5, Number(value) || 0))
@@ -262,6 +269,11 @@ export default function QuickVerification() {
           </h2>
           <span className="text-xs text-slate-500 tabular-nums">{filteredDetails.length} سجل</span>
         </div>
+        {IS_VITE_APP_STAGING && (
+          <p className="px-4 py-2 text-[11px] text-slate-500 border-b border-slate-100 bg-slate-50/50">
+            وضع التجريبي: انقر صفاً لفتح درج التدقيق التفصيلي (استبيان + جدول زمني).
+          </p>
+        )}
         {loading && currentDetails.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-16 text-slate-400 text-sm">
             <Loader2 size={22} className="animate-spin" />
@@ -274,12 +286,18 @@ export default function QuickVerification() {
             <table className="w-full text-sm text-right">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-slate-600 text-xs">
+                  {IS_VITE_APP_STAGING && (
+                    <th className="px-4 py-2 font-bold w-20 tabular-nums">الكود</th>
+                  )}
                   <th className="px-4 py-2 font-bold">المتجر</th>
                   {mainTab === 'active_csat' && (
                     <th className="px-4 py-2 font-bold w-28">المتوسط</th>
                   )}
                   <th className="px-4 py-2 font-bold">الموظف</th>
                   <th className="px-4 py-2 font-bold w-28">المؤشر</th>
+                  {IS_VITE_APP_STAGING && (
+                    <th className="px-4 py-2 font-bold min-w-[140px] max-w-[220px]">ملاحظات (معاينة)</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -294,6 +312,9 @@ export default function QuickVerification() {
                       if (e.key === 'Enter') setModalRow(row)
                     }}
                   >
+                    {IS_VITE_APP_STAGING && (
+                      <td className="px-4 py-3 tabular-nums text-slate-600 font-bold text-xs">#{row.store_id}</td>
+                    )}
                     <td className="px-4 py-3 font-medium text-slate-900">{row.store_name}</td>
                     {mainTab === 'active_csat' && (
                       <td className="px-4 py-3 tabular-nums font-bold text-slate-800">{row.avg}</td>
@@ -304,6 +325,11 @@ export default function QuickVerification() {
                         <ArrowForState arrow={row.arrow} />
                       </span>
                     </td>
+                    {IS_VITE_APP_STAGING && (
+                      <td className="px-4 py-3 text-xs text-slate-600 max-w-[220px] leading-snug">
+                        {textSnippet(row.suggestions) || '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -313,7 +339,17 @@ export default function QuickVerification() {
       </section>
 
       <AnimatePresence>
-        {modalRow && (
+        {modalRow && IS_VITE_APP_STAGING && (
+          <QuickVerificationAuditDrawer
+            key={modalRow.id}
+            row={modalRow}
+            onClose={() => setModalRow(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {modalRow && !IS_VITE_APP_STAGING && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
