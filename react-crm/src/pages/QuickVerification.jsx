@@ -20,6 +20,10 @@ import {
   User,
   Calendar,
   ChevronLeft,
+  LayoutGrid,
+  Smile,
+  Frown,
+  Package,
 } from 'lucide-react'
 import {
   Radar,
@@ -30,12 +34,71 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
+import { useStores } from '../contexts/StoresContext'
 import { IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
 import { getQuickVerificationBourse, getQuickVerificationAuditTimeline } from '../services/api'
+import { totalShipments, parcelsInRangeDisplay } from '../utils/storeFields'
 
 const SUCCESS = '#28C76F'
 const DANGER = '#EA5455'
 const NAVY = '#1e3a5f'
+/** أخضر نيون للرضا */
+const NEON_GREEN = '#00E676'
+/** قرمزي عميق لعدم الرضا */
+const CRIMSON = '#B71C1C'
+/** برتقالي مؤسسي للإحصائيات */
+const CORPORATE_ORANGE = '#FF9F43'
+const PAGE_BG_STAGING = '#F8F9FA'
+
+function resolveShipmentCount(allStores, storeId) {
+  if (storeId == null || !Array.isArray(allStores)) return null
+  const s = allStores.find(
+    x => x?.id === storeId || String(x?.id) === String(storeId) || Number(x?.id) === Number(storeId),
+  )
+  if (!s) return null
+  const life = totalShipments(s)
+  const range = parcelsInRangeDisplay(s)
+  const n = life > 0 ? life : range
+  return Number.isFinite(n) ? Math.trunc(n) : 0
+}
+
+/** سهم رضا بتوهج نيون / قرمزي */
+function StagingSatisfactionArrow({ arrow }) {
+  if (arrow === 'up') {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-white"
+        style={{
+          boxShadow: `0 0 22px ${NEON_GREEN}88, 0 0 40px ${NEON_GREEN}44`,
+          color: NEON_GREEN,
+        }}
+      >
+        <ArrowBigUp size={26} strokeWidth={2.6} aria-hidden />
+      </span>
+    )
+  }
+  if (arrow === 'mid') {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-amber-100"
+        style={{ boxShadow: '0 0 18px rgba(245,158,11,0.35)' }}
+      >
+        <ArrowLeftRight size={24} strokeWidth={2.5} className="text-amber-500" aria-hidden />
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-white"
+      style={{
+        boxShadow: `0 0 22px ${CRIMSON}99, 0 0 38px ${CRIMSON}55`,
+        color: CRIMSON,
+      }}
+    >
+      <ArrowBigDown size={26} strokeWidth={2.6} aria-hidden />
+    </span>
+  )
+}
 
 function textSnippet(s, max = 64) {
   const t = (s || '').trim()
@@ -353,6 +416,7 @@ function StagingAuditDrawer({ row, onClose }) {
  */
 export default function QuickVerification() {
   const { user } = useAuth()
+  const { allStores } = useStores()
   const [mainTab, setMainTab] = useState('onboarding')
   const [staffMissions, setStaffMissions] = useState([])
   const [activeStaffMissions, setActiveStaffMissions] = useState([])
@@ -440,53 +504,88 @@ export default function QuickVerification() {
   }
 
   return (
-    <div className="space-y-5 pb-16" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div
+      className={IS_VITE_APP_STAGING ? 'space-y-6 pb-16 px-3 md:px-5 pt-1' : 'space-y-5 pb-16'}
+      dir="rtl"
+      style={{
+        fontFamily: "'Cairo', sans-serif",
+        ...(IS_VITE_APP_STAGING ? { background: PAGE_BG_STAGING } : {}),
+      }}
+    >
       {/* رأس الصفحة */}
       {IS_VITE_APP_STAGING ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
+        <div className="rounded-2xl border-2 border-slate-200/90 bg-white px-5 py-6 shadow-[0_4px_24px_rgba(30,58,95,0.06)]">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+            <div className="flex items-start gap-4 min-w-0">
               <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md"
-                style={{ background: `linear-gradient(135deg, ${NAVY}, #334155)` }}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg"
+                style={{
+                  background: `linear-gradient(145deg, ${NAVY} 0%, #2c5282 100%)`,
+                  border: `1px solid ${CORPORATE_ORANGE}55`,
+                }}
               >
-                <ShieldCheck size={24} className="text-emerald-400" />
+                <ShieldCheck size={28} className="text-white" strokeWidth={2.2} />
               </div>
               <div>
-                <h1 className="text-xl font-black tracking-tight" style={{ color: NAVY }}>
+                <h1
+                  className="text-2xl font-black tracking-tight leading-tight"
+                  style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                >
                   التحقق السريع
                 </h1>
-                <p className="text-slate-500 text-sm mt-1">
+                <p className="text-slate-500 text-sm mt-1.5 font-medium">
                   لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-800">
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm border-2 bg-white"
+                style={{ borderColor: NAVY, color: NAVY }}
+              >
+                <LayoutGrid size={18} style={{ color: CORPORATE_ORANGE }} aria-hidden />
                 الإجمالي
-                <span className="tabular-nums rounded-lg bg-white px-2 py-0.5 border border-slate-200">
+                <span
+                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
+                  style={{ background: `${CORPORATE_ORANGE}18`, color: NAVY }}
+                >
                   {satStats.total}
                 </span>
               </span>
               <span
-                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold"
-                style={{ borderColor: SUCCESS, color: SUCCESS, background: 'rgba(40,199,111,0.08)' }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 text-sm font-black bg-white shadow-sm"
+                style={{ borderColor: NEON_GREEN, color: NAVY }}
               >
-                راضٍ 🔼
-                <span className="tabular-nums rounded-lg bg-white/80 px-2 py-0.5">{satStats.sat}</span>
+                <Smile size={18} style={{ color: NEON_GREEN }} strokeWidth={2.4} aria-hidden />
+                راضٍ
+                <ArrowBigUp size={16} style={{ color: NEON_GREEN }} className="opacity-90" aria-hidden />
+                <span
+                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
+                  style={{ background: `${NEON_GREEN}14`, color: NAVY }}
+                >
+                  {satStats.sat}
+                </span>
               </span>
               <span
-                className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold"
-                style={{ borderColor: DANGER, color: DANGER, background: 'rgba(234,84,85,0.08)' }}
+                className="inline-flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 text-sm font-black bg-white shadow-sm"
+                style={{ borderColor: CRIMSON, color: NAVY }}
               >
-                غير راضٍ 🔽
-                <span className="tabular-nums rounded-lg bg-white/80 px-2 py-0.5">{satStats.uns}</span>
+                <Frown size={18} style={{ color: CRIMSON }} strokeWidth={2.4} aria-hidden />
+                غير راضٍ
+                <ArrowBigDown size={16} style={{ color: CRIMSON }} className="opacity-90" aria-hidden />
+                <span
+                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
+                  style={{ background: `${CRIMSON}12`, color: NAVY }}
+                >
+                  {satStats.uns}
+                </span>
               </span>
               <button
                 type="button"
                 onClick={() => void loadAll()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold border-2 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 shadow-sm"
+                style={{ color: NAVY }}
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 تحديث
@@ -645,7 +744,13 @@ export default function QuickVerification() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <section
+        className={
+          IS_VITE_APP_STAGING
+            ? 'rounded-2xl border border-slate-200/90 bg-[#F8F9FA] shadow-[0_2px_20px_rgba(15,23,42,0.04)] overflow-hidden'
+            : 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
+        }
+      >
         {!IS_VITE_APP_STAGING && (
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
             <h2 className="text-sm font-black text-slate-900">
@@ -655,7 +760,7 @@ export default function QuickVerification() {
           </div>
         )}
         {IS_VITE_APP_STAGING && (
-          <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
+          <div className="px-5 py-4 border-b border-slate-200/80 bg-white/90 flex items-center justify-between gap-2">
             <h2 className="text-base font-black" style={{ color: NAVY }}>
               سجلات المتاجر (اليوم)
             </h2>
@@ -670,50 +775,66 @@ export default function QuickVerification() {
         ) : filteredDetails.length === 0 ? (
           <p className="text-slate-500 text-sm py-12 text-center">لا توجد سجلات مطابقة.</p>
         ) : IS_VITE_APP_STAGING ? (
-          <div className="divide-y divide-slate-100 bg-white">
+          <div className="px-3 md:px-4 pb-6 pt-2 space-y-4">
             {filteredDetails.map(row => {
-              const isUp = row.arrow === 'up'
-              const isDown = row.arrow === 'down'
-              const glow = isDown
-                ? '0 0 24px rgba(234,84,85,0.55)'
-                : isUp
-                  ? '0 0 24px rgba(40,199,111,0.5)'
-                  : '0 0 16px rgba(245,158,11,0.35)'
+              const shipN = resolveShipmentCount(allStores, row.store_id)
               return (
-                <div
+                <motion.div
                   key={row.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 hover:bg-slate-50/80 transition-colors"
+                  layout
+                  className="group rounded-2xl border border-slate-200/90 bg-white px-5 py-5 md:px-6 md:py-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_12px_40px_rgba(15,23,42,0.08)]"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="shrink-0 rounded-full bg-slate-100 text-slate-600 text-xs font-black px-3 py-1.5 tabular-nums border border-slate-200">
-                      #{row.store_id}
-                    </span>
-                    <p className="font-black text-base truncate" style={{ color: NAVY }}>
-                      {row.store_name}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-center shrink-0">
-                    <div
-                      className="inline-flex items-center justify-center rounded-2xl p-3 bg-white border border-slate-100"
-                      style={{ boxShadow: glow }}
-                    >
-                      <ArrowForState arrow={row.arrow} />
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                    {/* الهوية + القوة التشغيلية — خط أفقي واحد */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 min-w-0 flex-1">
+                      <div className="min-w-0 flex-1">
+                        <h3
+                          className="text-lg md:text-xl font-black leading-snug tracking-tight truncate"
+                          style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                        >
+                          {row.store_name}
+                        </h3>
+                        <p className="mt-1 text-xs font-bold text-slate-500 tabular-nums tracking-wide">
+                          كود المتجر{' '}
+                          <span className="inline-block rounded-lg bg-slate-100 text-slate-700 px-2 py-0.5 border border-slate-200/90">
+                            #{row.store_id}
+                          </span>
+                        </p>
+                      </div>
+                      <div
+                        className="shrink-0 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 border border-slate-200/80"
+                        style={{ background: 'linear-gradient(180deg, #f1f5f9 0%, #e8ecf0 100%)' }}
+                        title="عدد الشحنات (من بيانات المتجر)"
+                      >
+                        <Package size={18} className="text-slate-500 shrink-0" aria-hidden />
+                        <span className="text-[11px] font-bold text-slate-500 uppercase">الشحنات</span>
+                        <span className="text-base font-black tabular-nums text-slate-900">
+                          {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-600">شحنة</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-row flex-wrap items-center justify-between lg:justify-end gap-4 lg:gap-6">
+                      <div className="flex items-center justify-center shrink-0">
+                        <StagingSatisfactionArrow arrow={row.arrow} />
+                      </div>
+                      <div className="flex items-center gap-3 min-w-0 flex-1 lg:max-w-[240px] lg:flex-initial lg:justify-end">
+                        <p className="text-xs text-slate-500 truncate flex-1 text-right lg:text-right font-medium">
+                          {textSnippet(row.suggestions, 20) || '—'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setModalRow(row)}
+                          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-300 bg-transparent px-4 py-2 text-xs font-black transition-colors text-[#1e3a5f] hover:bg-[#1e3a5f] hover:border-[#1e3a5f] hover:text-white"
+                        >
+                          عرض التفاصيل
+                          <ChevronLeft size={14} className="opacity-70" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 justify-between sm:justify-end min-w-0 sm:max-w-[220px]">
-                    <p className="text-xs text-slate-500 truncate flex-1 text-right">
-                      {textSnippet(row.suggestions, 20) || '—'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setModalRow(row)}
-                      className="shrink-0 inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 shadow-sm"
-                    >
-                      عرض التفاصيل
-                      <ChevronLeft size={14} className="opacity-60" />
-                    </button>
-                  </div>
-                </div>
+                </motion.div>
               )
             })}
           </div>
