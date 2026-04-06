@@ -81,6 +81,52 @@ function onboardingDoneForStore(doneSet, storeId) {
   return doneSet.has(storeId) || doneSet.has(String(storeId)) || doneSet.has(Number(storeId))
 }
 
+/**
+ * مسؤول المتاجر النشطة — التجريب/التطوير: وسوم صف المهمة حسب مرحلة الاحتضان (_inc).
+ * [مكالمة أولى] جديد؛ [مكالمة ثانية] بعد 3 أيام؛ [مكالمة ثالثة] بعد 10 أيام.
+ */
+function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
+  if (needsOnboarding) {
+    return {
+      label: 'استبيان تهيئة — مُسنَد',
+      incubationBadge: '[استبيان جديد]',
+      descHint: 'استبيان التهيئة (نعم/لا) — ثم حفظ المكالمة أو لم يرد',
+    }
+  }
+  switch (incBucket) {
+    case 'call_1':
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: '[مكالمة أولى]',
+        descHint: 'جديد — المكالمة الأولى',
+      }
+    case 'call_2':
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: '[مكالمة ثانية]',
+        descHint: 'بعد 3 أيام من إتمام المكالمة الأولى',
+      }
+    case 'call_3':
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: '[مكالمة ثالثة]',
+        descHint: 'بعد 10 أيام من إتمام المكالمة الثانية',
+      }
+    case 'between_calls':
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: '[بين المكالمات]',
+        descHint: 'انتظار نافذة المكالمة التالية',
+      }
+    default:
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: null,
+        descHint: '',
+      }
+  }
+}
+
 function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
   const today = new Date().toISOString().split('T')[0]
 
@@ -220,6 +266,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           store.bucket === 'incubating'
           && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
         const shipDesc = daysSinceShip < 999 ? `آخر شحنة قبل ${daysSinceShip} يوم` : 'لا توجد شحنات بعد'
+        const stagingAm = IS_STAGING_OR_DEV
+          ? activeManagerStagingCallPhase(incBucket, needsOnboarding)
+          : null
         /** مسؤول المتاجر: مهمة استبيان التهيئة منفصلة (نفس مسار المكالمة المبسّط) — لا تُكرَّر مع «متجر مُسنَد» */
         if (needsOnboarding) {
           tasks.push({
@@ -227,17 +276,24 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             store,
             priority: 'normal',
             type: 'new_merchant_onboarding',
-            label: 'استبيان تهيئة — متجر مُسنَد إليك',
-            desc: IS_STAGING_OR_DEV
-              ? `${shipDesc} — اضغط «اتصل» لفتح استبيان التهيئة (ثلاثة أسئلة) ثم «حفظ المكالمة» أو «لم يرد»`
+            label: stagingAm?.label ?? 'استبيان تهيئة — متجر مُسنَد إليك',
+            incubationBadge: stagingAm?.incubationBadge,
+            desc: stagingAm
+              ? `${shipDesc} — ${stagingAm.descHint} — اضغط «اتصل»`
               : `${shipDesc} — أكمل استبيان التهيئة من «اتصل» ثم سجّل المكالمة`,
           })
         } else {
+          const descBase = shipDesc
+          const desc = stagingAm?.descHint
+            ? `${descBase} — ${stagingAm.descHint} — اضغط «تسجيل مكالمة»`
+            : descBase
           tasks.push({
             id: `${store.id}-assigned`, store,
             priority: daysSinceShip >= 10 ? 'high' : 'normal',
-            type: 'assigned_store', label: 'متجر مُسنَد إليك',
-            desc: shipDesc,
+            type: 'assigned_store',
+            label: stagingAm?.label ?? 'متجر مُسنَد إليك',
+            incubationBadge: stagingAm?.incubationBadge ?? undefined,
+            desc,
           })
         }
       }
