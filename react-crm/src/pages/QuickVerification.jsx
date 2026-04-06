@@ -5,21 +5,17 @@ import {
   Search,
   RefreshCw,
   Loader2,
-  CheckCircle2,
   TrendingUp,
   Timer,
   Globe2,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
+  X,
+  Sparkles,
+  ClipboardList,
+  CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
-
-const PURPLE = {
-  glow: 'rgba(124, 58, 237, 0.35)',
-  border: 'rgba(91, 33, 182, 0.25)',
-}
 
 function rowMatchesQuery(row, q) {
   if (!q.trim()) return true
@@ -44,216 +40,192 @@ function satisfactionPercent(row) {
   return Math.min(100, Math.round((avg / 5) * 100))
 }
 
-function KpiDigit({ label, value, sub, icon: Icon, accent }) {
+function GlassIcon({ children, className = '' }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border px-5 py-4 text-right shadow-lg"
-      style={{
-        background: 'linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,245,255,0.9))',
-        borderColor: PURPLE.border,
-        boxShadow: `0 12px 40px -12px ${PURPLE.glow}, inset 0 1px 0 rgba(255,255,255,0.9)`,
-      }}
+    <span
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-violet-200/60 bg-white/70 shadow-[0_4px_16px_-4px_rgba(91,33,182,0.2)] backdrop-blur-md ${className}`}
     >
-      <div
-        className="pointer-events-none absolute -left-6 -top-10 h-24 w-24 rounded-full opacity-40 blur-2xl"
-        style={{ background: accent }}
-        aria-hidden
-      />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-violet-600/90">{label}</p>
-          <p className="mt-1 text-3xl font-black tabular-nums tracking-tight text-violet-950 md:text-[2rem]">
-            {value}
-            <span className="mr-1 text-lg font-bold text-violet-400">%</span>
-          </p>
-          {sub ? <p className="mt-1 text-[11px] font-medium text-slate-500">{sub}</p> : null}
-        </div>
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-violet-200/80 bg-white/90 shadow-inner"
-          style={{ boxShadow: `0 0 24px ${PURPLE.glow}` }}
-        >
-          <Icon size={22} className="text-violet-700" strokeWidth={2.2} />
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-function Tag({ children, tone = 'slate' }) {
-  const map = {
-    slate: 'bg-slate-100 text-slate-700 border-slate-200',
-    green: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    amber: 'bg-amber-50 text-amber-900 border-amber-200',
-    rose: 'bg-rose-50 text-rose-800 border-rose-200',
-    violet: 'bg-violet-50 text-violet-900 border-violet-200',
-  }
-  return (
-    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-bold ${map[tone]}`}>
       {children}
     </span>
   )
 }
 
-function SurveyCard({ row, onResolve, resolveBusy, canResolve }) {
-  const sat = isSatisfied(row)
-  const pct = satisfactionPercent(row)
-  const [savedFlash, setSavedFlash] = useState(false)
-  const [detailOpen, setDetailOpen] = useState(!sat)
-
-  const onboarding = row.survey_kind === 'new_merchant_onboarding'
-  const tier = row.tier || 'green'
-  const tierTag =
-    tier === 'green' ? (
-      <Tag tone="green">ممتاز</Tag>
-    ) : tier === 'yellow' ? (
-      <Tag tone="amber">متوسط</Tag>
-    ) : (
-      <Tag tone="rose">يحتاج متابعة</Tag>
-    )
+/** شريط علوي رفيع — مؤشرات تنفيذية */
+function ExecutiveThinBar({ growth, resolution, global, loading }) {
+  const Item = ({ icon: Icon, label, value }) => (
+    <div className="flex min-w-0 flex-1 items-center justify-center gap-2.5 border-l border-violet-200/40 px-3 py-1 first:border-l-0 md:gap-3 md:px-4">
+      <GlassIcon>
+        <Icon size={16} className="text-violet-700" strokeWidth={2.2} />
+      </GlassIcon>
+      <div className="min-w-0 text-right">
+        <p className="truncate text-[10px] font-bold uppercase tracking-wider text-violet-500/90 md:text-[11px]">{label}</p>
+        <p className="text-lg font-black tabular-nums leading-none text-violet-950 md:text-xl">
+          {loading ? '—' : `${value}%`}
+        </p>
+      </div>
+    </div>
+  )
 
   return (
-    <motion.div
-      layout
-      className="rounded-2xl border border-purple-200/40 bg-white/75 p-4 shadow-[0_8px_32px_-12px_rgba(76,29,149,0.12)] backdrop-blur-md"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-black text-slate-900">{row.store_name || `متجر #${row.store_id}`}</p>
-          <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-slate-500">
-            #{row.store_id} · {row.staff_fullname || row.staff_username || '—'}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {onboarding ? (
-              sat ? (
-                <Tag tone="green">راضٍ</Tag>
-              ) : (
-                <Tag tone="rose">غير راضٍ</Tag>
-              )
-            ) : (
-              <>
-                {sat ? <Tag tone="green">راضٍ</Tag> : row.arrow === 'mid' ? <Tag tone="amber">محايد</Tag> : <Tag tone="rose">غير راضٍ</Tag>}
-                {!sat || tier !== 'green' ? tierTag : null}
-              </>
-            )}
-          </div>
+    <div className="border-b border-violet-200/35 bg-gradient-to-l from-white via-violet-50/30 to-white shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 md:py-2.5">
+        <div className="shrink-0 text-right md:pl-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">لوحة تنفيذية</p>
+          <p className="text-sm font-black text-violet-950 md:text-base">أداء المدير التنفيذي</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {sat ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSavedFlash(true)
-                window.setTimeout(() => setSavedFlash(false), 2400)
-              }}
-              className="rounded-xl bg-gradient-to-l from-violet-700 to-purple-700 px-4 py-2 text-xs font-black text-white shadow-md shadow-violet-500/25 transition hover:from-violet-600 hover:to-purple-600"
-            >
-              حفظ الاستبيان
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDetailOpen(v => !v)}
-              className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-1.5 text-xs font-bold text-violet-900"
-            >
-              {detailOpen ? (
-                <>
-                  طي التقرير
-                  <ChevronUp size={14} />
-                </>
-              ) : (
-                <>
-                  عرض التقرير
-                  <ChevronDown size={14} />
-                </>
-              )}
-            </button>
-          )}
+        <div className="flex min-w-0 flex-1 items-stretch justify-end rounded-xl border border-violet-100/80 bg-white/50 py-2 shadow-sm backdrop-blur-sm md:max-w-3xl">
+          <Item icon={TrendingUp} label="النمو" value={growth} />
+          <Item icon={Timer} label="سرعة الحل" value={resolution} />
+          <Item icon={Globe2} label="الرضا العالمي" value={global} />
         </div>
       </div>
+    </div>
+  )
+}
 
-      <AnimatePresence mode="wait">
-        {sat && savedFlash ? (
-          <motion.div
-            key="ok"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-4 flex items-center justify-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/90 py-6"
+function MerchantRow({ row, onOpen, layoutId }) {
+  const sat = isSatisfied(row)
+  const pct = satisfactionPercent(row)
+  const kindLabel = row.survey_kind === 'new_merchant_onboarding' ? 'تهيئة' : 'نشط'
+
+  return (
+    <motion.button
+      type="button"
+      layout
+      layoutId={layoutId}
+      onClick={() => onOpen(row)}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+      className={`group flex w-full items-center gap-3 border-b border-violet-100/60 px-4 py-3.5 text-right transition hover:bg-violet-50/40 ${
+        sat ? 'bg-white' : 'bg-rose-50/45 hover:bg-rose-50/65'
+      } `}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold tracking-tight text-slate-900 md:text-base">{row.store_name || `متجر #${row.store_id}`}</p>
+        <p className="mt-0.5 text-[11px] font-medium tabular-nums text-slate-500">
+          #{row.store_id} · {row.staff_fullname || row.staff_username || '—'} ·{' '}
+          <span className="text-violet-600/80">{kindLabel}</span>
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {sat ? (
+          <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-[13px] font-black tabular-nums text-emerald-700 shadow-sm">
+            {pct}%
+          </span>
+        ) : (
+          <span className="rounded-full border border-rose-200/70 bg-white/80 px-2.5 py-1 text-[11px] font-bold text-rose-700">
+            يتطلب متابعة
+          </span>
+        )}
+        <span className="text-[11px] font-bold text-violet-400 opacity-0 transition group-hover:opacity-100">تفاصيل ←</span>
+      </div>
+    </motion.button>
+  )
+}
+
+function DetailDrawer({ row, open, onClose, onResolve, resolveBusy, canResolve }) {
+  if (!row) return null
+  const onboarding = row.survey_kind === 'new_merchant_onboarding'
+
+  return (
+    <AnimatePresence>
+      {open ? (
+        <>
+          <motion.button
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[60] bg-slate-900/25 backdrop-blur-[2px]"
+            aria-label="إغلاق"
+            onClick={onClose}
+          />
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qv-drawer-title"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 420, damping: 38 }}
+            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-violet-200/50 bg-white/92 shadow-[-12px_0_48px_-12px_rgba(76,29,149,0.18)] backdrop-blur-xl"
           >
-            <CheckCircle2 className="text-emerald-600" size={40} strokeWidth={2.2} />
-            <div>
-              <p className="text-center text-sm font-bold text-emerald-900">تم التسجيل بنجاح</p>
-              <p className="text-center text-4xl font-black tabular-nums text-emerald-700">{pct}%</p>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {!sat && (
-        <AnimatePresence>
-          {detailOpen ? (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 space-y-4 border-t border-purple-100/80 pt-4"
-            >
-              <div>
-                <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-violet-700">إجابات الاستبيان</p>
-                {onboarding ? (
-                  <ul className="space-y-2">
-                    {(row.answers || []).map((a, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white/90 px-3 py-2 text-sm"
-                      >
-                        <span className="font-semibold text-slate-800">{a.label}</span>
-                        <span className={a.yes ? 'font-black text-emerald-600' : 'font-black text-rose-600'}>{a.yes ? 'نعم' : 'لا'}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <ul className="space-y-2">
-                    {(row.questions || []).map((q, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white/90 px-3 py-2 text-sm"
-                      >
-                        <span className="font-semibold text-slate-800">{q.label}</span>
-                        <span className="tabular-nums font-black text-violet-800">
-                          {q.value}/5
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            <div className="flex items-center justify-between gap-3 border-b border-violet-100/80 px-5 py-4">
+              <div className="min-w-0 text-right">
+                <p id="qv-drawer-title" className="truncate text-lg font-black text-violet-950">
+                  {row.store_name || `متجر #${row.store_id}`}
+                </p>
+                <p className="text-[12px] font-semibold text-slate-500">#{row.store_id}</p>
               </div>
-              <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
-                <p className="mb-1 text-[11px] font-black text-amber-900/90">ملاحظات الموظف</p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-100 bg-violet-50/80 text-violet-800 transition hover:bg-violet-100"
+              >
+                <X size={20} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-violet-600">إجابات الاستبيان</p>
+              {onboarding ? (
+                <ul className="space-y-2">
+                  {(row.answers || []).map((a, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-100/90 bg-white/90 px-3 py-2.5 text-sm shadow-sm"
+                    >
+                      <span className="font-semibold text-slate-800">{a.label}</span>
+                      <span className={a.yes ? 'font-black text-emerald-600' : 'font-black text-rose-600'}>{a.yes ? 'نعم' : 'لا'}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <ul className="space-y-2">
+                  {(row.questions || []).map((q, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-100/90 bg-white/90 px-3 py-2.5 text-sm shadow-sm"
+                    >
+                      <span className="font-semibold text-slate-800">{q.label}</span>
+                      <span className="tabular-nums font-black text-violet-800">{q.value}/5</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-6 rounded-xl border border-amber-100/90 bg-amber-50/40 p-4 shadow-inner">
+                <p className="mb-2 text-[11px] font-black text-amber-900/90">ملاحظات الموظف</p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                  {(row.suggestions || '').trim() || '— لا توجد ملاحظات مسجّلة —'}
+                  {(row.suggestions || '').trim() || '— لا توجد ملاحظات —'}
                 </p>
               </div>
-              {canResolve && !row.resolved ? (
+            </div>
+
+            {!isSatisfied(row) && canResolve && !row.resolved ? (
+              <div className="border-t border-violet-100/80 p-5">
                 <button
                   type="button"
                   onClick={() => onResolve(row.id)}
                   disabled={resolveBusy}
-                  className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-l from-orange-500 via-amber-500 to-orange-600 px-4 py-3.5 text-sm font-black text-white shadow-[0_0_32px_rgba(251,146,60,0.45)] transition hover:brightness-105 disabled:opacity-60"
+                  className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-l from-orange-500 via-amber-500 to-orange-600 py-3.5 text-sm font-black text-white shadow-[0_8px_32px_-4px_rgba(251,146,60,0.45)] transition hover:brightness-105 disabled:opacity-60"
                 >
-                  <span className="pointer-events-none absolute inset-0 bg-white/10 opacity-30 blur-xl" aria-hidden />
+                  <span className="pointer-events-none absolute inset-0 bg-white/15 blur-xl" aria-hidden />
                   <span className="relative">{resolveBusy ? 'جارٍ التنفيذ…' : 'حل الإشكالية'}</span>
                 </button>
-              ) : row.resolved ? (
-                <p className="text-center text-xs font-bold text-emerald-700">تم تسجيل الحل ✓</p>
-              ) : null}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      )}
-    </motion.div>
+              </div>
+            ) : row.resolved ? (
+              <div className="border-t border-emerald-100/80 bg-emerald-50/30 px-5 py-4 text-center text-sm font-bold text-emerald-800">
+                تم تسجيل الحل سابقاً
+              </div>
+            ) : null}
+          </motion.aside>
+        </>
+      ) : null}
+    </AnimatePresence>
   )
 }
 
@@ -265,6 +237,8 @@ export default function QuickVerification() {
   const [activeRows, setActiveRows] = useState([])
   const [query, setQuery] = useState('')
   const [resolvingId, setResolvingId] = useState(null)
+  const [tab, setTab] = useState('active')
+  const [drawerRow, setDrawerRow] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -295,29 +269,30 @@ export default function QuickVerification() {
     void load()
   }, [load])
 
-  const filteredOnb = useMemo(
-    () => onboardingRows.filter(r => rowMatchesQuery(r, query)),
-    [onboardingRows, query],
-  )
-  const filteredActive = useMemo(() => activeRows.filter(r => rowMatchesQuery(r, query)), [activeRows, query])
-
   const kpis = useMemo(() => {
     const all = [...onboardingRows, ...activeRows]
-    if (!all.length) {
-      return { growth: 0, resolution: 100, global: 100 }
-    }
+    if (!all.length) return { growth: 0, resolution: 100, global: 100 }
     const positive = all.filter(isSatisfied).length
     const growth = Math.round((positive / all.length) * 100)
-
     const issues = all.filter(r => !isSatisfied(r))
     const resolved = issues.filter(r => r.resolved).length
     const resolution = issues.length ? Math.round((resolved / issues.length) * 100) : 100
-
     const gSum = all.reduce((acc, r) => acc + satisfactionPercent(r), 0)
     const global = Math.round(gSum / all.length)
-
     return { growth, resolution, global }
   }, [onboardingRows, activeRows])
+
+  const pendingOnb = useMemo(
+    () => onboardingRows.filter(r => !r.resolved && rowMatchesQuery(r, query)),
+    [onboardingRows, query],
+  )
+  const pendingActive = useMemo(() => activeRows.filter(r => !r.resolved && rowMatchesQuery(r, query)), [activeRows, query])
+
+  const solvedOnb = useMemo(
+    () => onboardingRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
+    [onboardingRows, query],
+  )
+  const solvedActive = useMemo(() => activeRows.filter(r => r.resolved && rowMatchesQuery(r, query)), [activeRows, query])
 
   const resolve = useCallback(
     async surveyId => {
@@ -333,6 +308,8 @@ export default function QuickVerification() {
           setErr(res?.error || 'تعذّر الحفظ')
           return
         }
+        setDrawerRow(null)
+        setTab('solved')
         await load()
       } catch (e) {
         setErr(e?.response?.data?.error || e?.message || 'خطأ')
@@ -352,75 +329,77 @@ export default function QuickVerification() {
     return u && staff && staff === u
   }
 
+  useEffect(() => {
+    if (!drawerRow) return
+    const stillOnb = onboardingRows.some(r => r.id === drawerRow.id)
+    const stillAct = activeRows.some(r => r.id === drawerRow.id)
+    if (!stillOnb && !stillAct) setDrawerRow(null)
+    else {
+      const fresh = [...onboardingRows, ...activeRows].find(r => r.id === drawerRow.id)
+      if (fresh && fresh.resolved !== drawerRow.resolved) setDrawerRow(fresh)
+    }
+  }, [onboardingRows, activeRows, drawerRow])
+
   if (!can('quick_verification')) {
     return <Navigate to="/" replace />
   }
 
+  const drawerOpen = !!drawerRow
+  const drawerCanResolve = drawerRow ? canResolveRow(drawerRow) : false
+
   return (
-    <div
-      className="min-h-screen bg-white pb-16"
-      style={{ fontFamily: "'Cairo', sans-serif" }}
-    >
-      <div
-        className="border-b border-violet-200/50 bg-gradient-to-l from-white via-violet-50/40 to-white shadow-[0_8px_30px_-18px_rgba(76,29,149,0.15)]"
-      >
-        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-violet-600/90">لوحة تنفيذية</p>
-              <h1 className="text-2xl font-black text-violet-950 md:text-[1.65rem]">أداء المدير التنفيذي</h1>
-              <p className="mt-1 text-sm text-slate-500">مؤشرات رقمية محدّثة من استبيانات اليوم</p>
-            </div>
+    <div className="min-h-screen bg-white pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      <div className="sticky top-0 z-40 border-b border-violet-100/80 bg-white/90 backdrop-blur-md">
+        <ExecutiveThinBar growth={kpis.growth} resolution={kpis.resolution} global={kpis.global} loading={loading} />
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 md:px-6">
+          <div className="flex rounded-xl border border-violet-100/90 bg-violet-50/30 p-1">
             <button
               type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-bold text-violet-900 shadow-sm hover:bg-violet-50 disabled:opacity-50"
+              onClick={() => setTab('active')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition md:px-4 md:text-sm ${
+                tab === 'active' ? 'bg-white text-violet-900 shadow-sm' : 'text-violet-600/80 hover:text-violet-900'
+              }`}
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              تحديث
+              <ClipboardList size={16} className="opacity-80" />
+              المتابعة
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('solved')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition md:px-4 md:text-sm ${
+                tab === 'solved' ? 'bg-white text-violet-900 shadow-sm' : 'text-violet-600/80 hover:text-violet-900'
+              }`}
+            >
+              <CheckCircle2 size={16} className="opacity-80" />
+              تم الحل
             </button>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <KpiDigit
-              label="النمو"
-              value={kpis.growth}
-              sub="نسبة النتائج الإيجابية اليوم"
-              icon={TrendingUp}
-              accent="#a78bfa"
-            />
-            <KpiDigit
-              label="سرعة الحل"
-              value={kpis.resolution}
-              sub="حالات الإشكاليات المُغلقة / المفتوحة"
-              icon={Timer}
-              accent="#c4b5fd"
-            />
-            <KpiDigit
-              label="الرضا العالمي"
-              value={kpis.global}
-              sub="متوسط مؤشر الرضا المحسوب"
-              icon={Globe2}
-              accent="#7c3aed"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-bold text-violet-900 shadow-sm hover:bg-violet-50 disabled:opacity-50 md:text-sm"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            تحديث
+          </button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        <div className="relative mb-8">
-          <Search className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-violet-400" />
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+        <div className="relative mb-6">
+          <Search className="pointer-events-none absolute right-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-violet-300" />
           <input
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="ابحث عن متجر، معرّف، أو موظف…"
-            className="w-full rounded-2xl border border-violet-200/80 bg-white/90 py-4 pr-12 pl-4 text-sm font-semibold text-slate-900 shadow-inner outline-none ring-0 placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+            placeholder="بحث متاجر، معرّف، موظف…"
+            className="w-full rounded-2xl border border-violet-200/70 bg-white/95 py-3.5 pr-11 pl-4 text-sm font-medium text-slate-800 shadow-[0_2px_20px_-8px_rgba(76,29,149,0.12)] outline-none ring-0 placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           />
         </div>
 
         {err ? (
-          <p className="mb-6 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          <p className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
             <AlertTriangle size={18} />
             {err}
           </p>
@@ -428,60 +407,85 @@ export default function QuickVerification() {
 
         {loading && !onboardingRows.length && !activeRows.length ? (
           <div className="flex justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-violet-600" />
+            <Loader2 className="h-10 w-10 animate-spin text-violet-500" />
+          </div>
+        ) : tab === 'active' ? (
+          <div className="overflow-hidden rounded-2xl border border-violet-200/40 bg-white/60 shadow-[0_12px_40px_-24px_rgba(76,29,149,0.12)]">
+            {pendingOnb.length === 0 && pendingActive.length === 0 ? (
+              <p className="px-4 py-16 text-center text-sm text-slate-500">لا توجد سجلات مطابقة للبحث أو للمتابعة اليوم.</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 border-b border-violet-100/80 bg-violet-50/20 px-4 py-2">
+                  <Sparkles size={14} className="text-violet-500" />
+                  <span className="text-[12px] font-black text-violet-800">المتاجر الجديدة</span>
+                </div>
+                <AnimatePresence mode="popLayout">
+                  {pendingOnb.length === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-slate-400">لا توجد عناصر في هذا القسم.</p>
+                  ) : (
+                    pendingOnb.map(row => (
+                      <MerchantRow
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-${row.id}`}
+                        onOpen={setDrawerRow}
+                      />
+                    ))
+                  )}
+                </AnimatePresence>
+
+                <div className="flex items-center gap-2 border-b border-t border-violet-100/80 bg-violet-50/20 px-4 py-2">
+                  <Sparkles size={14} className="text-violet-500" />
+                  <span className="text-[12px] font-black text-violet-800">الاستبيانات النشطة</span>
+                </div>
+                <AnimatePresence mode="popLayout">
+                  {pendingActive.length === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-slate-400">لا توجد عناصر في هذا القسم.</p>
+                  ) : (
+                    pendingActive.map(row => (
+                      <MerchantRow
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-${row.id}`}
+                        onOpen={setDrawerRow}
+                      />
+                    ))
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10">
-            <section>
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <h2 className="text-lg font-black text-violet-950">المتاجر الجديدة</h2>
-                <span className="text-xs font-bold tabular-nums text-slate-400">{filteredOnb.length}</span>
-              </div>
-              <div className="space-y-4">
-                {filteredOnb.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/30 py-12 text-center text-sm text-slate-500">
-                    لا توجد استبيانات تهيئة مطابقة.
-                  </p>
-                ) : (
-                  filteredOnb.map(row => (
-                    <SurveyCard
-                      key={row.id}
-                      row={row}
-                      onResolve={resolve}
-                      resolveBusy={resolvingId === row.id}
-                      canResolve={canResolveRow(row)}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section>
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <h2 className="text-lg font-black text-violet-950">الاستبيانات النشطة</h2>
-                <span className="text-xs font-bold tabular-nums text-slate-400">{filteredActive.length}</span>
-              </div>
-              <div className="space-y-4">
-                {filteredActive.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/30 py-12 text-center text-sm text-slate-500">
-                    لا توجد استبيانات تجار نشطين مطابقة.
-                  </p>
-                ) : (
-                  filteredActive.map(row => (
-                    <SurveyCard
-                      key={row.id}
-                      row={row}
-                      onResolve={resolve}
-                      resolveBusy={resolvingId === row.id}
-                      canResolve={canResolveRow(row)}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
+          <div className="overflow-hidden rounded-2xl border border-emerald-200/30 bg-white/60 shadow-[0_12px_40px_-24px_rgba(16,185,129,0.08)]">
+            <div className="border-b border-emerald-100/80 bg-emerald-50/25 px-4 py-2 text-[12px] font-black text-emerald-900">
+              استبيانات تم حلّ إشكالياتها
+            </div>
+            <AnimatePresence mode="popLayout">
+              {solvedOnb.length === 0 && solvedActive.length === 0 ? (
+                <p className="px-4 py-12 text-center text-sm text-slate-500">لا توجد سجلات بعد.</p>
+              ) : (
+                <>
+                  {solvedOnb.map(row => (
+                    <MerchantRow key={row.id} row={row} layoutId={`qv-s-${row.id}`} onOpen={setDrawerRow} />
+                  ))}
+                  {solvedActive.map(row => (
+                    <MerchantRow key={row.id} row={row} layoutId={`qv-s-${row.id}`} onOpen={setDrawerRow} />
+                  ))}
+                </>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>
+
+      <DetailDrawer
+        row={drawerRow}
+        open={drawerOpen}
+        onClose={() => setDrawerRow(null)}
+        onResolve={resolve}
+        resolveBusy={drawerRow ? resolvingId === drawerRow.id : false}
+        canResolve={drawerCanResolve}
+      />
     </div>
   )
 }
