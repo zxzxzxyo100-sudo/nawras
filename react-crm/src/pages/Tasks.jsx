@@ -621,14 +621,17 @@ export default function Tasks() {
   }, [selectedTask, user?.username, user?.role])
 
   /**
-   * مع VITE_APP_STAGING=1: افتح «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة.
-   * — مسؤول المتاجر: مهمة استبيان التهيئة المسندة أو متجر مُسنَد بعد إتمام الاستبيان؛
-   * — مدير الاحتضان/تنفيذي: مهمة «استبيان تهيئة متجر جديد».
+   * فتح «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة عند الحاجة لاستبيان التهيئة.
+   * — مسؤول المتاجر: دائماً عند الحاجة (جميع المهام: استبيان جديد أو متابعة قديمة).
+   * — التجريبي: + مدير الاحتضان / تنفيذي لمهمة «استبيان تهيئة متجر جديد».
    */
   const drawerAutoOpenCallModal = useMemo(() => {
-    if (!selectedTask || !IS_SIMPLE_LOG_CALL_MODAL) return false
+    if (!selectedTask) return false
     const needs = needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
     if (!needs) return false
+    const allowAuto =
+      IS_SIMPLE_LOG_CALL_MODAL || user?.role === 'active_manager'
+    if (!allowAuto) return false
     if (user?.role === 'active_manager' && selectedTask.type === 'new_merchant_onboarding') return true
     if (
       selectedTask.type === 'new_merchant_onboarding'
@@ -638,13 +641,17 @@ export default function Tasks() {
   }, [user?.role, selectedTask, newMerchantOnboardingDoneIds])
 
   function handleTaskCall(taskRow) {
-    // التجريبي/التطوير: استبيان التهيئة داخل CallModal الموحّد (لا NewMerchantOnboardingModal منفصلة)
-    if (taskRow.type === 'new_merchant_onboarding' && IS_SIMPLE_LOG_CALL_MODAL) {
+    /** استبيان التهيئة: الدرج + CallModal — مسؤول المتاجر دائماً؛ التجريبي لباقي الأدوار عند تفعيل النافذة المبسّطة */
+    if (taskRow.type === 'new_merchant_onboarding') {
+      if (IS_SIMPLE_LOG_CALL_MODAL || user?.role === 'active_manager') {
+        setSelectedTask(taskRow)
+        return
+      }
+      if (IS_STAGING_OR_DEV) {
+        setPendingOnboardingTask(taskRow)
+        return
+      }
       setSelectedTask(taskRow)
-      return
-    }
-    if (IS_STAGING_OR_DEV && taskRow.type === 'new_merchant_onboarding') {
-      setPendingOnboardingTask(taskRow)
       return
     }
     setSelectedTask(taskRow)
