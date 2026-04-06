@@ -160,23 +160,21 @@ export function parseQvMissedIncAlerts(surveyRow) {
 }
 
 /**
- * متابعة دورية: م1 يوم 1 فقط؛ م2 يوم 3 (أو بين المكالمات نفس اليوم) — بعد فوات يوم 3 بدون تسجيل م2 لا يُعاد الظهور إلا بوسم التحقيق؛ م3 يوم 10 — بعد فوات يوم 10 بدون م3 لا يُعاد الظهور إلا بوسم التحقيق.
+ * متابعة دورية: م1 يوم 1 فقط؛ م2 يوم 3؛ م3 يوم 10 — بدون استثناء أيام أخرى (لا 2 ولا 5 ولا 9).
+ * بعد فوات النافذة (يوم > 3 بدون م2، يوم > 10 بدون م3) لا يُعاد الظهور في هذه القائمة.
  */
-export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates, surveyRow, qvPrecomputed = null) {
+export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates) {
   const st = storeStates[store.id] || {}
   const cdRaw = store._cycle_day != null ? Number(store._cycle_day) : (daysInSystem(store) + 1)
   const cd = Number.isFinite(cdRaw) ? cdRaw : 1
-  const qv = qvPrecomputed ?? parseQvMissedIncAlerts(surveyRow)
 
   if (!st.inc_call1_at && incBucket === 'call_1') {
-    if (qv.call1) return 'call_1'
     if (cd === INCUBATION_PERIODIC_CALL1_CYCLE_DAY) return 'call_1'
     return null
   }
 
   const betweenC1C2 = incBucket === 'between_calls' && st.inc_call1_at && !st.inc_call2_at
   if (!st.inc_call2_at && st.inc_call1_at && (incBucket === 'call_2' || betweenC1C2)) {
-    if (qv.call2) return 'call_2'
     if (cd > INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return null
     if (cd === INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return 'call_2'
     return null
@@ -184,7 +182,6 @@ export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates, surv
 
   const betweenC2C3 = incBucket === 'between_calls' && st.inc_call2_at && !st.inc_call3_at
   if (!st.inc_call3_at && st.inc_call2_at && (incBucket === 'call_3' || betweenC2C3)) {
-    if (qv.call3) return 'call_3'
     if (cd > INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return null
     if (cd === INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return 'call_3'
     return null
@@ -225,7 +222,6 @@ export function generateIncubationOfficerStagingTasks(
   storeStates,
   newMerchantOnboardingDoneIds,
   isStagingOrDev,
-  surveyByStoreId = {},
 ) {
   const today = localDateYmd(new Date())
   const tasks = []
@@ -234,10 +230,6 @@ export function generateIncubationOfficerStagingTasks(
     const log = callLogs[store.id] || {}
     const dbCat = storeStates[store.id]?.category || store.category
     const incBucket = store._inc
-    const surveyRow =
-      surveyByStoreId[store.id]
-      ?? surveyByStoreId[String(store.id)]
-      ?? surveyByStoreId[Number(store.id)]
     const topCall = latestCallEntry(log)
     const lastCallDate = topCall?.date
     const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
@@ -254,10 +246,19 @@ export function generateIncubationOfficerStagingTasks(
     if (days >= 14 && !storeHasShipped(store)) return
     if (days >= 11 && storeHasShipped(store) && countAnsweredCalls(log) === 0) return
 
+    const cdRaw = store._cycle_day != null ? Number(store._cycle_day) : (days + 1)
+    const cycleDay = Number.isFinite(cdRaw) ? cdRaw : 1
+    const onMoTouchDay =
+      cycleDay === INCUBATION_PERIODIC_CALL1_CYCLE_DAY
+      || cycleDay === INCUBATION_PERIODIC_CALL2_CYCLE_DAY
+      || cycleDay === INCUBATION_PERIODIC_CALL3_CYCLE_DAY
+
     if (
       store.bucket === 'incubating'
       && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
     ) {
+      /** استبيان التهيئة: يظهر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 أو 5 أو 9…) */
+      if (!onMoTouchDay) return
       const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
       const base = {
         id: `${store.id}-new-onboarding`,
@@ -281,8 +282,7 @@ export function generateIncubationOfficerStagingTasks(
     }
 
     if (['call_1', 'call_2', 'call_3', 'between_calls'].includes(incBucket)) {
-      const qvAlerts = parseQvMissedIncAlerts(surveyRow)
-      const periodicInc = resolvePeriodicIncTouchpoint(incBucket, store, storeStates, surveyRow, qvAlerts)
+      const periodicInc = resolvePeriodicIncTouchpoint(incBucket, store, storeStates)
       if (!periodicInc) return
 
       const incubationBadge =
@@ -296,10 +296,6 @@ export function generateIncubationOfficerStagingTasks(
       const overdueInfo = isOverdueForStage(store, storeStates, days)
       const due = isDueForPeriodicStage(store, storeStates, days)
       const needWork = due || overdueInfo.overdue
-      const qvDrivesThis =
-        (periodicInc === 'call_1' && qvAlerts.call1)
-        || (periodicInc === 'call_2' && qvAlerts.call2)
-        || (periodicInc === 'call_3' && qvAlerts.call3)
       const stRow = storeStates[store.id] || {}
       const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, periodicInc)
 
@@ -335,7 +331,7 @@ export function generateIncubationOfficerStagingTasks(
       /** مكالمة هذه المرحلة مُوثَّقة مسبقاً — لا تظهر في المتابعة الدورية؛ تعود مع المكالمة التالية حسب التوقيت */
       if (stageDocumentedOk) return
 
-      if (!needWork && !overdueInfo.overdue && !qvDrivesThis) return
+      if (!needWork && !overdueInfo.overdue) return
 
       tasks.push({
         id: `${store.id}-inc-${periodicInc}`,
@@ -357,6 +353,7 @@ export function generateIncubationOfficerStagingTasks(
     }
 
     if (incBucket === 'never_started') {
+      if (!onMoTouchDay) return
       if (callTodayHidesTask) return
       tasks.push({
         id: `${store.id}-never`,
@@ -376,6 +373,7 @@ export function generateIncubationOfficerStagingTasks(
     }
 
     if (incBucket === 'restoring') {
+      if (!onMoTouchDay) return
       if (callTodayHidesTask) return
       tasks.push({
         id: `${store.id}-restoring`,
