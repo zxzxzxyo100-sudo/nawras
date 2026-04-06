@@ -87,8 +87,8 @@ function taskIsNoAnswer(task, callLogs, assignments) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// توليد المهام — مسار الاحتضان: المكالمات 1–3 فقط عند استحقاقها (يوم 1؛ بعد X/Y يوماً من إتمام السابقة)
-// «بين المكالمات» لا تُدرَج هنا — تُدار من واجهة المدير التنفيذي في مسار الاحتضان
+// توليد المهام — مسار الاحتضان (الوضع الذكي): لمسات دورية يوم 1 / 3 / 10 من دورة التسجيل؛
+// بين المكالمات يُدرَج يوم 3 و 10 فقط؛ فوات النافذة يخفي المهمة إلا بوسم التحقيق السريع في الاستبيان.
 // ══════════════════════════════════════════════════════════════════
 function onboardingDoneForStore(doneSet, storeId) {
   if (!doneSet || storeId == null) return false
@@ -141,7 +141,7 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
   }
 }
 
-function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds, surveyByStoreId) {
   const today = new Date().toISOString().split('T')[0]
 
   /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
@@ -182,6 +182,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       storeStates,
       newMerchantOnboardingDoneIds,
       IS_STAGING_OR_DEV,
+      surveyByStoreId || {},
     )
   }
 
@@ -862,8 +863,9 @@ export default function Tasks() {
     () => generateTasks(
       allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
       newMerchantOnboardingDoneIds,
+      surveyByStoreId,
     ),
-    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds]
+    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds, surveyByStoreId]
   )
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))

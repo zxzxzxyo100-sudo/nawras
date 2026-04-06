@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
+import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
 
 /** بنفسجي موحّد مع هوية الشريط الجانبي — واجهة التحقيق السريع فقط */
 const QA_PURPLE = '#4B0082'
@@ -204,6 +205,8 @@ function DetailDrawer({
   canResolve,
   executiveNotes,
   onExecutiveNotesChange,
+  qvMissedInc,
+  onToggleQvMissedInc,
 }) {
   if (!row) return null
   const onboarding = row.survey_kind === 'new_merchant_onboarding'
@@ -288,6 +291,44 @@ function DetailDrawer({
               </div>
 
               {canResolve && !row.resolved ? (
+                <div className="mt-6 rounded-xl border border-rose-100/90 bg-rose-50/35 p-4 shadow-inner">
+                  <p className="mb-1 text-[11px] font-black text-rose-900">إنذار احتضان (اختياري)</p>
+                  <p className="mb-3 text-[11px] leading-relaxed text-slate-600">
+                    إن وُجد تقصير في الاتصال بمسار الاحتضان، حدّد المرحلة؛ تُدمَج الوسوم مع الاستبيان وتُستخدم لإظهار متابعة لمسؤول الاحتضان.
+                  </p>
+                  <div className="flex flex-col gap-2.5">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                        checked={qvMissedInc.c1}
+                        onChange={() => onToggleQvMissedInc('c1')}
+                      />
+                      لم يتصل موظف الاحتضان — المكالمة الأولى (يوم 1)
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                        checked={qvMissedInc.c2}
+                        onChange={() => onToggleQvMissedInc('c2')}
+                      />
+                      لم يتصل — المكالمة الثانية (يوم 3)
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                        checked={qvMissedInc.c3}
+                        onChange={() => onToggleQvMissedInc('c3')}
+                      />
+                      لم يتصل — المكالمة الثالثة (يوم 10)
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
+              {canResolve && !row.resolved ? (
                 <div className="mt-6">
                   <label htmlFor="exec-notes" className="mb-2 block text-[11px] font-black text-[#4B0082]">
                     ملاحظات المدير
@@ -345,6 +386,7 @@ export default function QuickVerification() {
   const [tab, setTab] = useState('crisis')
   const [drawerRow, setDrawerRow] = useState(null)
   const [executiveNotes, setExecutiveNotes] = useState('')
+  const [qvMissedInc, setQvMissedInc] = useState({ c1: false, c2: false, c3: false })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -409,12 +451,23 @@ export default function QuickVerification() {
     [activeRows, query],
   )
 
+  const toggleQvMissedInc = useCallback(key => {
+    setQvMissedInc(prev => ({ ...prev, [key]: !prev[key] }))
+  }, [])
+
   useEffect(() => {
     if (!drawerRow) {
       setExecutiveNotes('')
+      setQvMissedInc({ c1: false, c2: false, c3: false })
       return
     }
     setExecutiveNotes(drawerRow.executive_notes || '')
+    const tags = drawerRow.gap_tags || []
+    setQvMissedInc({
+      c1: tags.includes(QV_MISSED_INC_TAG.call1),
+      c2: tags.includes(QV_MISSED_INC_TAG.call2),
+      c3: tags.includes(QV_MISSED_INC_TAG.call3),
+    })
   }, [drawerRow])
 
   const resolve = useCallback(
@@ -422,11 +475,16 @@ export default function QuickVerification() {
       setResolvingId(surveyId)
       setErr('')
       try {
+        const qvTags = []
+        if (qvMissedInc.c1) qvTags.push(QV_MISSED_INC_TAG.call1)
+        if (qvMissedInc.c2) qvTags.push(QV_MISSED_INC_TAG.call2)
+        if (qvMissedInc.c3) qvTags.push(QV_MISSED_INC_TAG.call3)
         const res = await postQuickVerificationResolveAudit({
           survey_id: surveyId,
           user_role: user?.role || 'executive',
           resolved_by: user?.username || '',
           executive_notes: executiveNotes.trim(),
+          qv_missed_inc_calls: qvTags,
         })
         if (!res?.success) {
           setErr(res?.error || 'تعذّر الحفظ')
@@ -442,7 +500,7 @@ export default function QuickVerification() {
         setResolvingId(null)
       }
     },
-    [load, user?.role, user?.username, executiveNotes],
+    [load, user?.role, user?.username, executiveNotes, qvMissedInc],
   )
 
   const isExec = user?.role === 'executive'
@@ -642,6 +700,8 @@ export default function QuickVerification() {
         canResolve={drawerCanResolve}
         executiveNotes={executiveNotes}
         onExecutiveNotesChange={setExecutiveNotes}
+        qvMissedInc={qvMissedInc}
+        onToggleQvMissedInc={toggleQvMissedInc}
       />
     </div>
   )
