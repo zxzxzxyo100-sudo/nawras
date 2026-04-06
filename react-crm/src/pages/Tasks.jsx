@@ -28,12 +28,11 @@ import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
-import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
+import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV } from '../config/envFlags'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
-/** طابور مسؤول المتاجر الذكي: تجريبي (VITE_APP_STAGING=1) أو تطوير محلي فقط */
-const MO_OFFICER_SMART = IS_VITE_APP_STAGING || Boolean(import.meta.env.DEV)
+/** مسؤول الاحتضان: طابور المهام بأيام الدورة 1 و 3 و 10 (مصدر التاريخ `_cycle_day` من الخادم) */
 
 function storeHasShipped(store) {
   if (!store) return false
@@ -175,7 +174,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   }
 
   /** مسؤول المتاجر الجديدة — منطق التجريب/التطوير: طابور احتضان + تبويبات (لا يعتمد على الإسناد) */
-  if (userRole === 'incubation_manager' && MO_OFFICER_SMART) {
+  if (userRole === 'incubation_manager') {
     return generateIncubationOfficerStagingTasks(
       allStores,
       callLogs,
@@ -455,7 +454,22 @@ function MerchantOfficerTaskRow({
         <p className="mt-1 text-xs text-slate-600">
           كود المتجر: <span className="font-mono font-bold">{task.moStoreCode ?? task.store.id}</span>
           {' — '}
-          <span className="tabular-nums">{task.moDays ?? '—'}</span> يوماً في النظام
+          {task.moCycleDay != null ? (
+            <>
+              يوم الدورة <span className="font-mono font-bold tabular-nums text-violet-900">{task.moCycleDay}</span>
+              من 14
+              {task.moDays != null ? (
+                <>
+                  {' '}
+                  (<span className="tabular-nums">{task.moDays}</span> يوماً مضت منذ التسجيل)
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <span className="tabular-nums">{task.moDays ?? '—'}</span> يوماً في النظام
+            </>
+          )}
           {task.moRetro ? (
             <span className="mr-2 text-violet-800 font-semibold">{task.moRetro.label}</span>
           ) : null}
@@ -758,7 +772,7 @@ export default function Tasks() {
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
-    if (!MO_OFFICER_SMART || user?.role !== 'incubation_manager' || !user?.username || !lastLoaded) return
+    if (user?.role !== 'incubation_manager' || !user?.username || !lastLoaded) return
     if (moSweepLoadedRef.current === lastLoaded) return
     moSweepLoadedRef.current = lastLoaded
     let cancelled = false
@@ -882,7 +896,7 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
-  const isMoStaging = user?.role === 'incubation_manager' && MO_OFFICER_SMART
+  const isMoStaging = user?.role === 'incubation_manager'
 
   const bizDateKeyCold = useMemo(() => getBizDateKeyAt9am(new Date(nowTick)), [nowTick])
 
@@ -1514,6 +1528,7 @@ export default function Tasks() {
               const useMoRow =
                 isMoStaging
                 && (task.moDays != null
+                  || task.moCycleDay != null
                   || task.type === 'new_merchant_onboarding'
                   || task.type === 'recovery_call')
               if (useMoRow) {

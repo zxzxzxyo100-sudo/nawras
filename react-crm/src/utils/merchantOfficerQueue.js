@@ -30,6 +30,28 @@ export function daysInSystem(store) {
   return Math.floor((Date.now() - t) / 86400000)
 }
 
+/**
+ * يوم دورة الاحتضان 1…14 — مطابق لـ api-php/all-stores.php (incubation_cycle_day).
+ * يُفضَّل `_cycle_day` من الخادم إن وُجد.
+ */
+export function getIncubationCycleDay(store) {
+  const raw = store?._cycle_day
+  if (raw != null && raw !== '') {
+    const n = Number(raw)
+    if (Number.isFinite(n)) return Math.min(14, Math.max(1, Math.floor(n)))
+  }
+  const days = daysInSystem(store)
+  return Math.min(14, Math.max(1, days + 1))
+}
+
+export function isMoPeriodicTouchCycleDay(cycleDay) {
+  return (
+    cycleDay === INCUBATION_PERIODIC_CALL1_CYCLE_DAY
+    || cycleDay === INCUBATION_PERIODIC_CALL2_CYCLE_DAY
+    || cycleDay === INCUBATION_PERIODIC_CALL3_CYCLE_DAY
+  )
+}
+
 export function retroStageMeta(days) {
   if (days <= 2) {
     return {
@@ -165,8 +187,7 @@ export function parseQvMissedIncAlerts(surveyRow) {
  */
 export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates) {
   const st = storeStates[store.id] || {}
-  const cdRaw = store._cycle_day != null ? Number(store._cycle_day) : (daysInSystem(store) + 1)
-  const cd = Number.isFinite(cdRaw) ? cdRaw : 1
+  const cd = getIncubationCycleDay(store)
 
   if (!st.inc_call1_at && incBucket === 'call_1') {
     if (cd === INCUBATION_PERIODIC_CALL1_CYCLE_DAY) return 'call_1'
@@ -246,19 +267,14 @@ export function generateIncubationOfficerStagingTasks(
     if (days >= 14 && !storeHasShipped(store)) return
     if (days >= 11 && storeHasShipped(store) && countAnsweredCalls(log) === 0) return
 
-    const cdRaw = store._cycle_day != null ? Number(store._cycle_day) : (days + 1)
-    const cycleDay = Number.isFinite(cdRaw) ? cdRaw : 1
-    const onMoTouchDay =
-      cycleDay === INCUBATION_PERIODIC_CALL1_CYCLE_DAY
-      || cycleDay === INCUBATION_PERIODIC_CALL2_CYCLE_DAY
-      || cycleDay === INCUBATION_PERIODIC_CALL3_CYCLE_DAY
+    const cycleDay = getIncubationCycleDay(store)
+    /** أي مهمة في هذه الصفحة فقط في أيام الموعد 1 و 3 و 10 (لا يوم 2 ولا 9…) */
+    if (!isMoPeriodicTouchCycleDay(cycleDay)) return
 
     if (
       store.bucket === 'incubating'
       && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
     ) {
-      /** استبيان التهيئة: يظهر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 أو 5 أو 9…) */
-      if (!onMoTouchDay) return
       const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
       const base = {
         id: `${store.id}-new-onboarding`,
@@ -267,10 +283,11 @@ export function generateIncubationOfficerStagingTasks(
         type: 'new_merchant_onboarding',
         label: 'استبيان تهيئة متجر جديد',
         desc: isStagingOrDev
-          ? `يوم ${days} — كود ${store.id} — ${retro.label} — اضغط «اتصل» للاستبيان`
-          : `قيّم تجربة التاجر — يوم ${days} في النظام`,
+          ? `يوم الدورة ${cycleDay} من 14 — كود ${store.id} — ${retro.label} — اضغط «اتصل» للاستبيان`
+          : `قيّم تجربة التاجر — يوم الدورة ${cycleDay} من 14`,
         incubationBadge: retro.badge,
         moDays: days,
+        moCycleDay: cycleDay,
         moRetro: retro,
         moStoreCode: store.id,
         moContactedToday: answeredToday,
@@ -306,7 +323,7 @@ export function generateIncubationOfficerStagingTasks(
             ? 'مسار الاحتضان — المكالمة الثانية'
             : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
 
-      const descBase = `سجّل المكالمة — يوم ${days} — كود ${store.id} — ${retro.label}`
+      const descBase = `سجّل المكالمة — يوم الدورة ${cycleDay} من 14 — كود ${store.id} — ${retro.label}`
 
       if (answeredToday) {
         tasks.push({
@@ -317,13 +334,14 @@ export function generateIncubationOfficerStagingTasks(
           label: 'تم التواصل اليوم',
           desc: `${descBase}`,
           incubationBadge,
-          moDays: days,
-          moRetro: retro,
-          moStoreCode: store.id,
-          moContactedToday: true,
-          moOverdue: false,
-          moOverdueHint: '',
-          _incBucket: periodicInc,
+        moDays: days,
+        moCycleDay: cycleDay,
+        moRetro: retro,
+        moStoreCode: store.id,
+        moContactedToday: true,
+        moOverdue: false,
+        moOverdueHint: '',
+        _incBucket: periodicInc,
         })
         return
       }
@@ -342,6 +360,7 @@ export function generateIncubationOfficerStagingTasks(
         desc: `${descBase} — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة`,
         incubationBadge,
         moDays: days,
+        moCycleDay: cycleDay,
         moRetro: retro,
         moStoreCode: store.id,
         moContactedToday: false,
@@ -353,7 +372,6 @@ export function generateIncubationOfficerStagingTasks(
     }
 
     if (incBucket === 'never_started') {
-      if (!onMoTouchDay) return
       if (callTodayHidesTask) return
       tasks.push({
         id: `${store.id}-never`,
@@ -361,8 +379,11 @@ export function generateIncubationOfficerStagingTasks(
         priority: daysSinceLast >= 3 ? 'high' : 'normal',
         type: 'recovery_call',
         label: 'استعادة — لم تبدأ بعد',
-        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم — يوم ${days}` : `لم يُتصل به قط — يوم ${days}`,
+        desc: lastCallDate
+          ? `آخر تواصل قبل ${daysSinceLast} يوم — يوم الدورة ${cycleDay}`
+          : `لم يُتصل به قط — يوم الدورة ${cycleDay}`,
         moDays: days,
+        moCycleDay: cycleDay,
         moRetro: retro,
         moStoreCode: store.id,
         moContactedToday: false,
@@ -373,7 +394,6 @@ export function generateIncubationOfficerStagingTasks(
     }
 
     if (incBucket === 'restoring') {
-      if (!onMoTouchDay) return
       if (callTodayHidesTask) return
       tasks.push({
         id: `${store.id}-restoring`,
@@ -381,8 +401,9 @@ export function generateIncubationOfficerStagingTasks(
         priority: daysSinceLast >= 2 ? 'high' : 'normal',
         type: 'recovery_call',
         label: 'متابعة جاري الاستعادة',
-        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم` : 'يحتاج متابعة',
+        desc: lastCallDate ? `آخر تواصل قبل ${daysSinceLast} يوم — يوم الدورة ${cycleDay}` : `يحتاج متابعة — يوم الدورة ${cycleDay}`,
         moDays: days,
+        moCycleDay: cycleDay,
         moRetro: retro,
         moStoreCode: store.id,
         moContactedToday: false,
