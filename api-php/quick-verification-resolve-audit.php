@@ -44,17 +44,26 @@ $resolvedBy = trim((string) ($input['resolved_by'] ?? ''));
 
 $pdo = getDB();
 
+$executiveNotes = trim((string) ($input['executive_notes'] ?? ''));
+
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_resolutions (
         survey_id INT NOT NULL PRIMARY KEY,
         resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         resolved_by VARCHAR(100) NULL DEFAULT NULL,
+        executive_notes TEXT NULL DEFAULT NULL,
         INDEX idx_resolved_at (resolved_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'تعذّر تهيئة التخزين.'], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+try {
+    $pdo->exec('ALTER TABLE quick_verification_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+} catch (Throwable $e) {
+    // العمود موجود مسبقاً
 }
 
 try {
@@ -83,13 +92,18 @@ try {
     }
 
     $ins = $pdo->prepare('
-        INSERT INTO quick_verification_resolutions (survey_id, resolved_at, resolved_by)
-        VALUES (?, NOW(), ?)
+        INSERT INTO quick_verification_resolutions (survey_id, resolved_at, resolved_by, executive_notes)
+        VALUES (?, NOW(), ?, ?)
         ON DUPLICATE KEY UPDATE
             resolved_at = VALUES(resolved_at),
-            resolved_by = VALUES(resolved_by)
+            resolved_by = VALUES(resolved_by),
+            executive_notes = VALUES(executive_notes)
     ');
-    $ins->execute([$surveyId, $resolvedBy !== '' ? $resolvedBy : null]);
+    $ins->execute([
+        $surveyId,
+        $resolvedBy !== '' ? $resolvedBy : null,
+        $executiveNotes !== '' ? $executiveNotes : null,
+    ]);
 
     echo json_encode([
         'success' => true,
