@@ -458,17 +458,32 @@ function MerchantOfficerTaskRow({
         {task.desc ? <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">{task.desc}</p> : null}
       </div>
       <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-        <CallButton onClick={() => onCall(task)} />
-        {showNoAnswer && (
+        {task.moContactedToday ? (
           <motion.button
             type="button"
-            onClick={() => onNoAnswerWorkflow(task)}
-            disabled={noAnswerLoading}
-            whileHover={{ scale: noAnswerLoading ? 1 : 1.04 }}
-            className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 disabled:opacity-50"
+            onClick={() => onCall(task)}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
           >
-            عدم الرد
+            <ClipboardList size={14} className="text-slate-500" aria-hidden />
+            سجل
           </motion.button>
+        ) : (
+          <>
+            <CallButton onClick={() => onCall(task)} />
+            {showNoAnswer && (
+              <motion.button
+                type="button"
+                onClick={() => onNoAnswerWorkflow(task)}
+                disabled={noAnswerLoading}
+                whileHover={{ scale: noAnswerLoading ? 1 : 1.04 }}
+                className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 disabled:opacity-50"
+              >
+                عدم الرد
+              </motion.button>
+            )}
+          </>
         )}
         {!hideDoneButton && (
           <motion.button
