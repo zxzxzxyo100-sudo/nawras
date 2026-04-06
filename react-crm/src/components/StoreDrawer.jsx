@@ -24,7 +24,17 @@ const CATEGORY_LABELS = {
   recovered:  { label: 'تم الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
 }
 
-export default function StoreDrawer({ store, onClose, workflowAssignmentStatus = null }) {
+export default function StoreDrawer({
+  store,
+  onClose,
+  workflowAssignmentStatus = null,
+  /** إتمام المهمة اليومية بعد «حفظ المكالمة» (التجريب/التطوير) — يُمرَّر إلى CallModal */
+  taskCompletion = null,
+  /** يُنفَّذ بعد حفظ المكالمة بالإضافة إلى تحديث المتاجر */
+  extraOnSaved = null,
+  /** نوع المكالمة لـ log_call (مثلاً inc_call1 لمسار الاحتضان) */
+  callType = 'general',
+}) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
@@ -381,8 +391,13 @@ export default function StoreDrawer({ store, onClose, workflowAssignmentStatus =
       {showCallModal && (
         <CallModal
           store={store}
+          callType={callType}
           onClose={() => setShowCallModal(false)}
-          onSaved={reload}
+          onSaved={() => {
+            reload()
+            extraOnSaved?.()
+          }}
+          taskCompletion={taskCompletion}
         />
       )}
     </>

@@ -36,6 +36,92 @@ function ensure_incubation_call_columns(PDO $pdo) {
     $done = true;
 }
 
+/** اتجاه الرضا للوحة المدير (🔼/🔽) + وسوم الفجوة [إدخال]/[تتبع]/[مهام] */
+function ensure_surveys_satisfaction_columns(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec('ALTER TABLE surveys ADD COLUMN satisfaction_score VARCHAR(16) NULL DEFAULT NULL');
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec('ALTER TABLE surveys ADD COLUMN satisfaction_gap_tags JSON NULL DEFAULT NULL');
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
+/**
+ * @param array $q ستة أعداد 1–5
+ * @return array{score:string,tags:array}
+ */
+function nawras_compute_satisfaction(array $q, $surveyKind) {
+    $tags = [];
+    if ($surveyKind === 'new_merchant_onboarding') {
+        $labelsOnb = ['[إدخال]', '[تتبع]', '[مهام]'];
+        for ($i = 0; $i < 3; $i++) {
+            $v = (int) ($q[$i] ?? 0);
+            if ($v <= 3) {
+                $tags[] = $labelsOnb[$i];
+            }
+        }
+        $tags = array_values(array_unique($tags));
+        $anyBad = false;
+        for ($i = 0; $i < 3; $i++) {
+            if ((int) ($q[$i] ?? 0) <= 3) {
+                $anyBad = true;
+                break;
+            }
+        }
+        $allGood = (int) ($q[0] ?? 0) >= 4 && (int) ($q[1] ?? 0) >= 4 && (int) ($q[2] ?? 0) >= 4;
+        if ($anyBad) {
+            return ['score' => 'down', 'tags' => $tags];
+        }
+        if ($allGood) {
+            return ['score' => 'up', 'tags' => []];
+        }
+
+        return ['score' => 'down', 'tags' => $tags];
+    }
+
+    $bucket = [
+        0 => '[إدخال]', 1 => '[إدخال]',
+        2 => '[تتبع]', 3 => '[تتبع]',
+        4 => '[مهام]', 5 => '[مهام]',
+    ];
+    for ($i = 0; $i < 6; $i++) {
+        $v = (int) ($q[$i] ?? 0);
+        if ($v <= 3) {
+            $tags[] = $bucket[$i];
+        }
+    }
+    $tags = array_values(array_unique($tags));
+    $anyBad = false;
+    for ($i = 0; $i < 6; $i++) {
+        if ((int) ($q[$i] ?? 0) <= 3) {
+            $anyBad = true;
+            break;
+        }
+    }
+    $allGood = true;
+    for ($i = 0; $i < 6; $i++) {
+        if ((int) ($q[$i] ?? 0) < 4) {
+            $allGood = false;
+            break;
+        }
+    }
+    if ($anyBad) {
+        return ['score' => 'down', 'tags' => $tags];
+    }
+    if ($allGood) {
+        return ['score' => 'up', 'tags' => []];
+    }
+
+    return ['score' => 'down', 'tags' => $tags];
+}
+
 /** نوع السجل في الاستبيان: نشط (CSAT) مقابل ملاحظة نصية لمتجر غير نشط */
 function ensure_surveys_survey_kind(PDO $pdo) {
     static $done = false;
@@ -506,10 +592,18 @@ elseif ($action === 'save_survey') {
     }
     $submittedUser = trim((string) ($input['username'] ?? ''));
 
+    ensure_surveys_satisfaction_columns($pdo);
+
     if ($surveyKind === 'new_merchant_onboarding') {
-        $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new_merchant_onboarding')")
-            ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
+        $metaNm = nawras_compute_satisfaction($q, 'new_merchant_onboarding');
+        $gapNm = json_encode($metaNm['tags'], JSON_UNESCAPED_UNICODE);
+        $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind, satisfaction_score, satisfaction_gap_tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new_merchant_onboarding', ?, ?)")
+            ->execute([
+                $storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '',
+                $submittedUser !== '' ? $submittedUser : null,
+                $metaNm['score'], $gapNm,
+            ]);
 
         $detail = sprintf(
             'استبيان تهيئة متجر جديد (1–5): إدخال الطلبات=%d، تتبع الشحنات=%d، أنواع المهام=%d.',
@@ -529,9 +623,15 @@ elseif ($action === 'save_survey') {
         jsonResponse(['success' => false, 'error' => 'نوع الاستبيان غير مدعوم.'], 400);
     }
 
-    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active_csat')")
-        ->execute([$storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '', $submittedUser !== '' ? $submittedUser : null]);
+    $metaA = nawras_compute_satisfaction($q, 'active_csat');
+    $gapA = json_encode($metaA['tags'], JSON_UNESCAPED_UNICODE);
+    $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind, satisfaction_score, satisfaction_gap_tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active_csat', ?, ?)")
+        ->execute([
+            $storeId, $q[0], $q[1], $q[2], $q[3], $q[4], $q[5], $suggestions, $input['user'] ?? '',
+            $submittedUser !== '' ? $submittedUser : null,
+            $metaA['score'], $gapA,
+        ]);
 
     $detail = sprintf(
         'تقييمات (1–5): سرعة التوصيل=%d، التجميع=%d، الدعم=%d، المنظومة=%d، التسويات=%d، المرجوعات=%d.',

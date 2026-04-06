@@ -1,7 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { X, Phone, Zap, Star } from 'lucide-react'
-import { logCall, saveSurvey, markSurveyNoAnswer } from '../services/api'
+import {
+  logCall,
+  saveSurvey,
+  markSurveyNoAnswer,
+  markDailyTaskDone,
+  completeInactiveQueueSuccess,
+  releaseAfterSurvey,
+} from '../services/api'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import StoreNameWithId         from './StoreNameWithId'
 import { useAuth }             from '../contexts/AuthContext'
 import { useStores }           from '../contexts/StoresContext'
@@ -48,7 +56,20 @@ function storeHasShipped(store) {
   return Boolean(d && d !== 'لا يوجد')
 }
 
-export default function CallModal({ store, callType = 'general', onClose, onSaved }) {
+/**
+ * @param {object} [taskCompletion] — عند تفعيل مسار التجريب: إتمام المهمة اليومية بعد «حفظ المكالمة»
+ * @param {string} [taskCompletion.dailyTaskKey]
+ * @param {boolean} [taskCompletion.inactiveRecovery] — طابور استعادة غير النشط
+ * @param {boolean} [taskCompletion.releaseActiveWorkflow] — طابور نشط بعد الاستبيان
+ * @param {() => void} [taskCompletion.onInactiveGoalBurst]
+ */
+export default function CallModal({
+  store,
+  callType = 'general',
+  onClose,
+  onSaved,
+  taskCompletion = null,
+}) {
   const { user } = useAuth()
   const { storeStates, surveyByStoreId, assignments } = useStores()
   const { onCallSaved, todayCalls, goalPct } = usePoints()
@@ -143,6 +164,35 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
 
       const pts = res?.points_awarded ?? 10
       onCallSaved(pts)
+
+      if (IS_STAGING_OR_DEV && taskCompletion && user?.username) {
+        const u = user.username
+        const sid = store.id
+        const sname = store.name
+        try {
+          if (taskCompletion.inactiveRecovery && user?.role === 'inactive_manager') {
+            const cir = await completeInactiveQueueSuccess({
+              store_id: sid,
+              store_name: sname,
+              username: u,
+            })
+            if (cir?.goal_just_met) {
+              taskCompletion.onInactiveGoalBurst?.()
+            }
+          } else if (taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager') {
+            await releaseAfterSurvey({ store_id: sid, username: u })
+          }
+          if (taskCompletion.dailyTaskKey) {
+            await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
+          }
+        } catch (syncErr) {
+          const msg = syncErr?.response?.data?.error || syncErr?.message || 'تعذّر مزامنة إتمام المهمة.'
+          setError(msg)
+          setSaving(false)
+          return
+        }
+      }
+
       onSaved?.()
 
       // أغلق الـ Modal بعد لحظة قصيرة
@@ -189,6 +239,24 @@ export default function CallModal({ store, callType = 'general', onClose, onSave
           } catch {
             /* ليس في طابور سير العمل النشط */
           }
+        }
+      }
+
+      if (
+        IS_STAGING_OR_DEV
+        && taskCompletion?.inactiveRecovery
+        && user?.role === 'inactive_manager'
+        && user?.username
+      ) {
+        try {
+          await markSurveyNoAnswer({
+            store_id: store.id,
+            store_name: store.name,
+            username: user.username,
+            queue: 'inactive',
+          })
+        } catch {
+          /* لا تعيين في الطابور */
         }
       }
 
