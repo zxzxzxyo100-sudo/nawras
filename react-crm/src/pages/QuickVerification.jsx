@@ -24,6 +24,8 @@ import {
   Smile,
   Frown,
   Package,
+  Flame,
+  Search,
 } from 'lucide-react'
 import {
   Radar,
@@ -61,6 +63,8 @@ const SOFT_CORAL_BG = '#FFE4E6'
 const SOFT_CORAL_ICON = '#E11D48'
 /** برتقالي خفيف للإحصائيات */
 const CORPORATE_ORANGE = '#FB923C'
+/** عتبة شحنات عالية + 🔽 = أولوية قصوى */
+const HIGH_SHIPMENT_THRESHOLD = 50
 /** توافق مع الشريط العلوي القديم */
 const NEON_GREEN = PASTEL_GREEN_ICON
 const CRIMSON = SOFT_CORAL_ICON
@@ -148,6 +152,45 @@ function fmtServerAt(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return String(iso)
   return d.toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/** مدة من اكتشاف المشكلة (created_at) حتى الحل (resolved_at) */
+function formatResolveDuration(createdIso, resolvedIso) {
+  if (!createdIso || !resolvedIso) return '—'
+  const a = new Date(createdIso).getTime()
+  const b = new Date(resolvedIso).getTime()
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return '—'
+  const ms = b - a
+  const mins = Math.floor(ms / 60000)
+  const hrs = Math.floor(mins / 60)
+  const days = Math.floor(hrs / 24)
+  if (days > 0) return `${days} يوم ${hrs % 24} س`
+  if (hrs > 0) return `${hrs} ساعة ${mins % 60} د`
+  if (mins > 0) return `${mins} دقيقة`
+  const sec = Math.max(1, Math.floor(ms / 1000))
+  return `${sec} ثانية`
+}
+
+function rowMatchesQuickSearch(row, qRaw) {
+  const q = (qRaw || '').trim().toLowerCase()
+  if (!q) return true
+  const name = (row.store_name || '').toLowerCase()
+  const code = String(row.store_id ?? '')
+  return name.includes(q) || code.includes(q) || code === q
+}
+
+function sortActiveAuditRows(rows, allStores) {
+  return [...rows].sort((a, b) => {
+    const sa = resolveShipmentCount(allStores, a.store_id) ?? 0
+    const sb = resolveShipmentCount(allStores, b.store_id) ?? 0
+    const ra = a.arrow === 'down' && !a.resolved && sa > HIGH_SHIPMENT_THRESHOLD ? 1 : 0
+    const rb = b.arrow === 'down' && !b.resolved && sb > HIGH_SHIPMENT_THRESHOLD ? 1 : 0
+    if (rb !== ra) return rb - ra
+    if (ra && rb) return sb - sa
+    const ta = new Date(a.created_at || 0).getTime()
+    const tb = new Date(b.created_at || 0).getTime()
+    return tb - ta
+  })
 }
 
 function MiniStars({ value }) {
@@ -502,6 +545,9 @@ export default function QuickVerification() {
   /** تبويبات الرضا — تجريبي فقط */
   const [satTab, setSatTab] = useState('all')
   const [resolvingId, setResolvingId] = useState(null)
+  /** قيد التدقيق vs سجل الحلول — تجريبي */
+  const [auditViewTab, setAuditViewTab] = useState('active')
+  const [quickSearch, setQuickSearch] = useState('')
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -549,12 +595,8 @@ export default function QuickVerification() {
         }
         const d = await loadAll()
         if (d?.success) {
-          const pool = mainTab === 'onboarding' ? d.rows : d.active_csat_rows
-          const arr = Array.isArray(pool) ? pool : []
-          const updated = arr.find(r => r.id === surveyId)
-          if (updated) {
-            setModalRow(prev => (prev && prev.id === surveyId ? updated : prev))
-          }
+          setAuditViewTab('resolved')
+          setModalRow(null)
         }
       } catch (e) {
         setErr(e?.response?.data?.error || e?.message || 'تعذّر حفظ الحل.')
@@ -604,6 +646,27 @@ export default function QuickVerification() {
     }
     return currentDetails.filter(r => r.arrow === 'down' || r.tier === 'red')
   }, [currentDetails, redOnly, mainTab, satTab])
+
+  /** واجهة التدقيق: بدون المُحلّة من قائمة المتابعة؛ سجل الحلول منفصل */
+  const activeAuditStagingRows = useMemo(() => {
+    if (!IS_VITE_APP_STAGING) return []
+    let rows = filteredDetails.filter(r => !(r.arrow === 'down' && r.resolved))
+    rows = rows.filter(r => rowMatchesQuickSearch(r, quickSearch))
+    return sortActiveAuditRows(rows, allStores)
+  }, [filteredDetails, quickSearch, allStores])
+
+  const resolvedHistoryRows = useMemo(() => {
+    if (!IS_VITE_APP_STAGING) return []
+    let rows = currentDetails.filter(r => r.arrow === 'down' && r.resolved)
+    rows = rows.filter(r => rowMatchesQuickSearch(r, quickSearch))
+    return [...rows].sort((a, b) => {
+      const ta = new Date(a.resolved_at || 0).getTime()
+      const tb = new Date(b.resolved_at || 0).getTime()
+      return tb - ta
+    })
+  }, [currentDetails, quickSearch])
+
+  const stagingDisplayRows = auditViewTab === 'active' ? activeAuditStagingRows : resolvedHistoryRows
 
   const radarData = useMemo(() => {
     if (!modalRow?.questions?.length) return []
@@ -805,6 +868,54 @@ export default function QuickVerification() {
         </div>
       )}
 
+      {IS_VITE_APP_STAGING && (
+        <div
+          className="flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-sm md:flex-row md:items-stretch md:justify-between"
+          style={{ borderColor: CARD_BORDER }}
+        >
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setAuditViewTab('active')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${
+                auditViewTab === 'active'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              قيد التدقيق
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuditViewTab('resolved')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${
+                auditViewTab === 'resolved'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              سجل الحلول
+            </button>
+          </div>
+          <div className="relative min-h-[44px] min-w-0 flex-1 md:max-w-lg">
+            <Search
+              className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
+              size={18}
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={quickSearch}
+              onChange={e => setQuickSearch(e.target.value)}
+              placeholder="بحث فوري: اسم المتجر أو كود المتجر…"
+              className="w-full rounded-xl border py-2.5 pr-10 pl-3 text-sm font-medium outline-none focus:ring-2 focus:ring-slate-300"
+              style={{ borderColor: CARD_BORDER, color: NAVY }}
+              autoComplete="off"
+            />
+          </div>
+        </div>
+      )}
+
       {err && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">{err}</p>
       )}
@@ -883,14 +994,14 @@ export default function QuickVerification() {
         )}
         {IS_VITE_APP_STAGING && (
           <div
-            className="px-5 py-4 border-b bg-white flex items-center justify-between gap-2"
+            className="px-5 py-4 border-b bg-white flex flex-wrap items-center justify-between gap-2"
             style={{ borderColor: CARD_BORDER }}
           >
             <h2 className="text-base font-black" style={{ color: NAVY }}>
-              سجلات المتاجر (اليوم)
+              {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
             </h2>
             <span className="text-xs font-bold tabular-nums" style={{ color: SLATE_SECONDARY }}>
-              {filteredDetails.length} عرض
+              {stagingDisplayRows.length} عرض
             </span>
           </div>
         )}
@@ -899,88 +1010,155 @@ export default function QuickVerification() {
             <Loader2 size={22} className="animate-spin" />
             جارٍ تحميل التفاصيل…
           </div>
+        ) : IS_VITE_APP_STAGING ? (
+          stagingDisplayRows.length === 0 ? (
+            <p className="text-slate-500 text-sm py-12 text-center px-4">
+              {auditViewTab === 'active'
+                ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
+                : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
+            </p>
+          ) : (
+            <div className="px-3 md:px-4 pb-6 pt-2">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {stagingDisplayRows.map(row => {
+                  const shipN = resolveShipmentCount(allStores, row.store_id)
+                  const resolvedDown = row.arrow === 'down' && !!row.resolved
+                  const isHighRisk =
+                    auditViewTab === 'active' &&
+                    row.arrow === 'down' &&
+                    !row.resolved &&
+                    shipN != null &&
+                    shipN > HIGH_SHIPMENT_THRESHOLD
+
+                  return (
+                    <motion.div
+                      key={row.id}
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        ...(isHighRisk
+                          ? {
+                              boxShadow: [
+                                '0 0 0 0px rgba(220,38,38,0.12)',
+                                '0 0 0 5px rgba(220,38,38,0.28)',
+                              ],
+                            }
+                          : {}),
+                      }}
+                      transition={
+                        isHighRisk
+                          ? {
+                              opacity: { duration: 0.2 },
+                              layout: { duration: 0.25 },
+                              boxShadow: {
+                                repeat: Infinity,
+                                duration: 1.35,
+                                repeatType: 'reverse',
+                                ease: 'easeInOut',
+                              },
+                            }
+                          : { opacity: { duration: 0.2 }, layout: { duration: 0.25 } }
+                      }
+                      exit={{
+                        opacity: 0,
+                        scale: 0.98,
+                        transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] },
+                      }}
+                      className="group mb-4 rounded-2xl border bg-white px-4 py-4 md:px-5 md:py-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
+                      style={{
+                        borderWidth: isHighRisk ? 2 : 1,
+                        borderColor: isHighRisk ? 'rgba(220, 38, 38, 0.55)' : CARD_BORDER,
+                        ...(resolvedDown && !isHighRisk
+                          ? {
+                              borderColor: `${PASTEL_GREEN_ICON}55`,
+                              boxShadow: '0 0 0 1px rgba(16,185,129,0.12)',
+                            }
+                          : {}),
+                      }}
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="grid min-w-0 flex-1 grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-4">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                <span
+                                  className="max-w-full text-xl font-black leading-tight tracking-tight md:text-2xl"
+                                  style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
+                                  title={row.store_name}
+                                >
+                                  {row.store_name}
+                                </span>
+                                <span
+                                  className="text-sm font-semibold tabular-nums md:text-base"
+                                  style={{ color: '#94a3b8' }}
+                                >
+                                  #{row.store_id}
+                                </span>
+                              </div>
+                              {isHighRisk ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-rose-700">
+                                  <Flame size={12} className="shrink-0" aria-hidden />
+                                  High Risk
+                                </span>
+                              ) : null}
+                            </div>
+                            {auditViewTab === 'resolved' ? (
+                              <p className="mt-2 text-xs font-bold" style={{ color: PASTEL_GREEN_ICON }}>
+                                مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div
+                            className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
+                            style={{ borderColor: CARD_BORDER, background: '#FFFFFF' }}
+                            title="عدد الشحنات (من بيانات المتجر)"
+                          >
+                            <Package size={17} style={{ color: SLATE_SECONDARY }} className="shrink-0" aria-hidden />
+                            <span className="text-[11px] font-bold" style={{ color: SLATE_SECONDARY }}>
+                              الشحنات
+                            </span>
+                            <span className="text-base font-black tabular-nums" style={{ color: NAVY }}>
+                              {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div
+                          className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
+                          style={{ borderColor: CARD_BORDER }}
+                        >
+                          <div className="flex items-center justify-center shrink-0">
+                            <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
+                          </div>
+                          <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
+                            <p
+                              className="truncate flex-1 text-right text-xs font-medium lg:text-right"
+                              style={{ color: SLATE_SECONDARY }}
+                            >
+                              {textSnippet(row.suggestions, 24) || '—'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setModalRow(row)}
+                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors"
+                              style={{ borderColor: CARD_BORDER, color: NAVY }}
+                            >
+                              عرض التفاصيل
+                              <ChevronLeft size={14} className="opacity-70" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+            </div>
+          )
         ) : filteredDetails.length === 0 ? (
           <p className="text-slate-500 text-sm py-12 text-center">لا توجد سجلات مطابقة.</p>
-        ) : IS_VITE_APP_STAGING ? (
-          <div className="px-3 md:px-4 pb-6 pt-2 space-y-4">
-            {filteredDetails.map(row => {
-              const shipN = resolveShipmentCount(allStores, row.store_id)
-              const resolvedDown = row.arrow === 'down' && !!row.resolved
-              return (
-                <motion.div
-                  key={row.id}
-                  layout
-                  className="group rounded-2xl border bg-white px-4 py-4 md:px-5 md:py-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-                  style={{
-                    borderColor: CARD_BORDER,
-                    ...(resolvedDown ? { borderColor: `${PASTEL_GREEN_ICON}55`, boxShadow: '0 0 0 1px rgba(16,185,129,0.12)' } : {}),
-                  }}
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="grid min-w-0 flex-1 grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-x-4">
-                      <h3
-                        className="min-w-0 text-lg font-black leading-snug tracking-tight truncate sm:text-xl"
-                        style={{ color: NAVY, fontFeatureSettings: '"kern" 1' }}
-                        title={row.store_name}
-                      >
-                        {row.store_name}
-                      </h3>
-                      <div className="flex items-center justify-start sm:justify-center">
-                        <span
-                          className="inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-black tabular-nums"
-                          style={{
-                            borderColor: CARD_BORDER,
-                            background: PAGE_BG_STAGING,
-                            color: SLATE_SECONDARY,
-                          }}
-                        >
-                          كود {row.store_id}
-                        </span>
-                      </div>
-                      <div
-                        className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
-                        style={{ borderColor: CARD_BORDER, background: '#FFFFFF' }}
-                        title="عدد الشحنات (من بيانات المتجر)"
-                      >
-                        <Package size={17} style={{ color: SLATE_SECONDARY }} className="shrink-0" aria-hidden />
-                        <span className="text-[11px] font-bold" style={{ color: SLATE_SECONDARY }}>
-                          الشحنات
-                        </span>
-                        <span className="text-base font-black tabular-nums" style={{ color: NAVY }}>
-                          {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
-                      style={{ borderColor: CARD_BORDER }}
-                    >
-                      <div className="flex items-center justify-center shrink-0">
-                        <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
-                      </div>
-                      <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
-                        <p
-                          className="truncate flex-1 text-right text-xs font-medium lg:text-right"
-                          style={{ color: SLATE_SECONDARY }}
-                        >
-                          {textSnippet(row.suggestions, 24) || '—'}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setModalRow(row)}
-                          className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors"
-                          style={{ borderColor: CARD_BORDER, color: NAVY }}
-                        >
-                          عرض التفاصيل
-                          <ChevronLeft size={14} className="opacity-70" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-right">
