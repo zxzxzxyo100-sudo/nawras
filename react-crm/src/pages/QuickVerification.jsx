@@ -20,13 +20,8 @@ import {
   User,
   Calendar,
   ChevronLeft,
-  LayoutGrid,
-  Smile,
-  Frown,
-  Package,
   Flame,
   Search,
-  AlertCircle,
 } from 'lucide-react'
 import {
   Radar,
@@ -276,6 +271,28 @@ function CrystalRubyGlyph({ className = '' }) {
   )
 }
 
+/** شريط تقدّم مقسّم — وضع الوثيقة الفاتح (تجريبي) */
+function DocumentEnergyBar({ pct }) {
+  const n = 14
+  const filled = Math.round((pct / 100) * n)
+  return (
+    <div className="flex w-full items-center gap-0.5" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      {Array.from({ length: n }).map((_, i) => (
+        <div
+          key={i}
+          className="h-2 flex-1 rounded-sm"
+          style={{
+            background:
+              i < filled
+                ? `linear-gradient(180deg, ${DS.progressFrom} 0%, ${DS.progressTo} 100%)`
+                : '#E2E8F0',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function SegmentedEnergyBar({ pct }) {
   const n = 14
   const filled = Math.round((pct / 100) * n)
@@ -306,6 +323,41 @@ function SegmentedEnergyBar({ pct }) {
   )
 }
 
+/** شريط حالة تنفيذي — أرقام بجانب بعض مع فواصل عمودية */
+function ExecStatusStrip({ execMetrics }) {
+  const { totalProblems, resolvedProblems, pct } = execMetrics
+  return (
+    <div
+      className="flex flex-col border-b sm:flex-row sm:flex-wrap sm:items-stretch"
+      style={{ borderColor: DS.border, background: 'rgba(241,245,249,0.65)' }}
+    >
+      <div
+        className="flex flex-1 items-center justify-center gap-2 px-4 py-3 sm:min-w-0 sm:justify-start sm:border-e"
+        style={{ borderColor: DS.border }}
+      >
+        <span className="text-xs font-semibold text-slate-500">إجمالي المشاكل</span>
+        <span className="text-xl font-black tabular-nums text-slate-900">{totalProblems}</span>
+      </div>
+      <div
+        className="flex flex-1 items-center justify-center gap-2 px-4 py-3 sm:min-w-0 sm:justify-start sm:border-e"
+        style={{ borderColor: DS.border }}
+      >
+        <span className="text-xs font-semibold text-slate-500">مشاكل تم حلّها</span>
+        <span className="text-xl font-black tabular-nums text-slate-900">{resolvedProblems}</span>
+      </div>
+      <div className="flex min-w-0 flex-[1.15] flex-col justify-center gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex shrink-0 items-baseline gap-2">
+          <span className="text-xs font-semibold text-slate-500">نسبة الإنجاز</span>
+          <span className="text-xl font-black tabular-nums text-slate-900">{pct}%</span>
+        </div>
+        <div className="min-w-0 flex-1 sm:max-w-md">
+          <DocumentEnergyBar pct={pct} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const glassPanel =
   'backdrop-blur-[20px] bg-white/[0.06] border border-cyan-400/20 shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]'
 
@@ -321,53 +373,8 @@ function resolveShipmentCount(allStores, storeId) {
   return Number.isFinite(n) ? Math.trunc(n) : 0
 }
 
-/** سهم رضا — الوضع الفاتح (DS) أو النيون الزجاجي (تجريبي) */
+/** سهم رضا — بطاقات DS الهادئة (موحّد للتجريبي والعادي) */
 function StagingSatisfactionArrow({ arrow, resolvedDown }) {
-  if (IS_VITE_APP_STAGING) {
-    const base = `${glassPanel} rounded-2xl`
-    if (resolvedDown) {
-      return (
-        <span className={`inline-flex items-center gap-2 px-3 py-2.5 ${base}`}>
-          <motion.span
-            animate={{ opacity: [0.75, 1, 0.75] }}
-            transition={{ duration: 2.8, repeat: Infinity }}
-          >
-            <CheckCircle2 size={22} strokeWidth={2} style={{ color: FV.emeraldCore }} aria-hidden />
-          </motion.span>
-          <span className="text-xs font-black" style={{ color: FV.silver }}>
-            تم الحل
-          </span>
-        </span>
-      )
-    }
-    if (arrow === 'up') {
-      return (
-        <motion.span
-          className={`inline-flex items-center justify-center p-3 ${base}`}
-          animate={{ boxShadow: [`0 0 16px ${FV.cyan}33`, `0 0 28px ${FV.emeraldCore}44`, `0 0 16px ${FV.cyan}33`] }}
-          transition={{ duration: 3.5, repeat: Infinity }}
-        >
-          <ArrowBigUp size={26} strokeWidth={2.2} style={{ color: FV.emeraldCore }} aria-hidden />
-        </motion.span>
-      )
-    }
-    if (arrow === 'mid') {
-      return (
-        <span className={`inline-flex items-center justify-center p-3 ${base}`}>
-          <ArrowLeftRight size={24} strokeWidth={2.4} style={{ color: FV.violet }} aria-hidden />
-        </span>
-      )
-    }
-    return (
-      <motion.span
-        className={`inline-flex items-center justify-center p-3 ${base}`}
-        animate={{ boxShadow: [`0 0 14px ${FV.rubyCore}44`, `0 0 26px ${FV.magenta}55`, `0 0 14px ${FV.rubyCore}44`] }}
-        transition={{ duration: 2.8, repeat: Infinity }}
-      >
-        <ArrowBigDown size={26} strokeWidth={2.2} style={{ color: FV.rubyCore }} aria-hidden />
-      </motion.span>
-    )
-  }
   if (resolvedDown) {
     return (
       <span
@@ -522,11 +529,7 @@ function AnimatedStars({ value }) {
           <Star
             size={20}
             strokeWidth={n <= v ? 0 : 1.5}
-            style={
-              n <= v
-                ? { color: FV.cyan, fill: FV.cyan, filter: `drop-shadow(0 0 6px ${FV.cyan}88)` }
-                : { color: FV.silverDim, fill: 'transparent', opacity: 0.45 }
-            }
+            className={n <= v ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}
           />
         </motion.span>
       ))}
@@ -1058,138 +1061,312 @@ export default function QuickVerification() {
 
   return (
     <div
-      className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] space-y-6 pb-10 px-3 md:px-5 pt-2' : 'space-y-5 pb-16'}`}
+      className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] pb-10 px-3 md:px-5 pt-4' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
         fontFamily: "'Cairo', sans-serif",
-        ...(IS_VITE_APP_STAGING ? { background: 'transparent' } : {}),
+        background: DS.bgPage,
       }}
     >
+      {/* تجريبي: وثيقة واحدة — خلفية رمادية فاتحة + لوحة بيضاء موحّدة */}
       {IS_VITE_APP_STAGING ? (
-        <>
-          <FuturisticAmbientBg />
-          <WireframeMapBackdrop />
-        </>
-      ) : null}
-
-      {/* رأس الصفحة */}
-      {IS_VITE_APP_STAGING ? (
-        <div className={`relative overflow-hidden rounded-2xl px-5 py-6 md:px-7 md:py-7 ${glassPanel}`}>
-          <div
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{
-              background:
-                'linear-gradient(125deg, rgba(255,255,255,0.12) 0%, transparent 42%, rgba(0,242,254,0.06) 100%)',
-            }}
-            aria-hidden
-          />
-          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-start gap-4 min-w-0">
-              <PrismShieldLogo size={56} />
-              <div className="min-w-0">
-                <h1
-                  className="text-2xl font-black tracking-tight md:text-3xl"
-                  style={{
-                    color: FV.silver,
-                    fontFeatureSettings: '"kern" 1',
-                    textShadow: `0 0 40px ${FV.cyan}33`,
-                  }}
+        <div className="mx-auto max-w-6xl">
+          <div className="overflow-hidden rounded-xl border bg-white shadow-sm" style={{ borderColor: DS.border }}>
+            {/* شريط عنوان موحّد: العنوان + فلاتر الرضا + تحديث */}
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900">
+                  <ShieldCheck size={20} className="text-emerald-400" aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg font-black leading-tight text-slate-900 md:text-xl">التحقق السريع</h1>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
+                    <span className="mx-2 text-slate-300">·</span>
+                    <span className="tabular-nums">{satStats.total} إجمالي</span>
+                    <span className="mx-1.5 text-slate-300">·</span>
+                    <span className="tabular-nums text-emerald-700">{satStats.sat} راضٍ</span>
+                    <span className="mx-1.5 text-slate-300">·</span>
+                    <span className="tabular-nums text-rose-700">{satStats.uns} غير راضٍ</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div
+                  className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                  role="tablist"
+                  aria-label="تصفية حسب الرضا"
                 >
-                  التحقق السريع
-                </h1>
-                <p className="mt-1.5 text-sm font-medium" style={{ color: FV.silverDim }}>
-                  لوحة مراقبة الاستبيانات — {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'}
-                </p>
+                  {[
+                    { id: 'all', label: 'الكل' },
+                    { id: 'down', label: 'غير راضٍ' },
+                    { id: 'up', label: 'راضٍ' },
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={satTab === t.id}
+                      onClick={() => setSatTab(t.id)}
+                      className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
+                        satTab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/80 hover:text-slate-800'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadAll()}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
+                  تحديث
+                </button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-black ${glassPanel}`}
-                style={{ color: FV.silver }}
+
+            {/* شريط أدوات: تبويب القسم + التدقيق + بحث */}
+            <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-2.5 md:flex-row md:items-center md:justify-between md:gap-4">
+              <div
+                className="inline-flex w-fit max-w-full flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                role="tablist"
+                aria-label="نوع الاستبيان"
               >
-                <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.6, repeat: Infinity }}>
-                  <LayoutGrid size={18} style={{ color: FV.cyan }} strokeWidth={1.8} aria-hidden />
-                </motion.span>
-                الإجمالي
-                <span
-                  className="tabular-nums rounded-lg px-2.5 py-0.5 font-black"
-                  style={{
-                    background: 'rgba(0,242,254,0.12)',
-                    color: FV.silver,
-                    border: `1px solid ${FV.edgeSoft}`,
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setMainTab('onboarding')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
+                    mainTab === 'onboarding' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'
+                  }`}
                 >
-                  {satStats.total}
-                </span>
-              </span>
-              <span className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-black ${glassPanel}`}>
-                <CrystalEmeraldGlyph />
-                <span style={{ color: FV.silver }}>راضٍ</span>
-                <ArrowBigUp size={16} style={{ color: FV.emeraldCore }} aria-hidden />
-                <span
-                  className="tabular-nums rounded-lg px-2 py-0.5 font-black"
-                  style={{
-                    background: 'rgba(52,245,197,0.1)',
-                    color: FV.emeraldCore,
-                    border: `1px solid rgba(52,245,197,0.25)`,
-                  }}
+                  <Store size={16} strokeWidth={1.8} />
+                  متاجر جدد
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMainTab('active_csat')}
+                  className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
+                    mainTab === 'active_csat' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'
+                  }`}
                 >
-                  {satStats.sat}
-                </span>
-              </span>
-              <span className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-black ${glassPanel}`}>
-                <CrystalRubyGlyph />
-                <span style={{ color: FV.silver }}>غير راضٍ</span>
-                <ArrowBigDown size={16} style={{ color: FV.rubyCore }} aria-hidden />
-                <span
-                  className="tabular-nums rounded-lg px-2 py-0.5 font-black"
-                  style={{
-                    background: 'rgba(255,45,107,0.1)',
-                    color: FV.rubyCore,
-                    border: `1px solid rgba(255,45,107,0.28)`,
-                  }}
-                >
-                  {satStats.uns}
-                </span>
-              </span>
-              <motion.button
-                type="button"
-                onClick={() => void loadAll()}
-                disabled={loading}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${glassPanel}`}
-                style={{ color: FV.silver, borderColor: FV.edge }}
-              >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
-                تحديث
-              </motion.button>
+                  <Truck size={16} strokeWidth={1.8} />
+                  تجار نشطون
+                </button>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-2">
+                <div className="inline-flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setAuditViewTab('active')}
+                    className={`rounded-md px-3 py-1.5 text-sm font-black transition-colors ${
+                      auditViewTab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white'
+                    }`}
+                  >
+                    قيد التدقيق
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditViewTab('resolved')}
+                    className={`rounded-md px-3 py-1.5 text-sm font-black transition-colors ${
+                      auditViewTab === 'resolved' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white'
+                    }`}
+                  >
+                    سجل الحلول
+                  </button>
+                </div>
+                <div className="relative min-h-[40px] min-w-0 flex-1 md:max-w-md">
+                  <Search
+                    className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
+                    size={18}
+                    aria-hidden
+                  />
+                  <input
+                    type="search"
+                    value={quickSearch}
+                    onChange={e => setQuickSearch(e.target.value)}
+                    placeholder="بحث: اسم المتجر أو الكود…"
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2 pr-9 pl-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-200"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <ExecStatusStrip execMetrics={execMetrics} />
+
+            {err ? (
+              <p className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">{err}</p>
+            ) : null}
+
+            {IS_VITE_APP_STAGING ? (
+              <div className="border-t border-slate-100">
+                <div className="border-b border-slate-100 bg-slate-50/50 px-4 py-2">
+                  <h2 className="text-xs font-black uppercase tracking-wide text-slate-500">
+                    ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+                  </h2>
+                </div>
+                {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
+                    <Loader2 size={20} className="animate-spin" />
+                    جارٍ التحميل…
+                  </div>
+                ) : !currentStaff?.length ? (
+                  <p className="py-6 text-center text-sm text-slate-500">لا توجد بيانات موظفين اليوم في هذا القسم.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {currentStaff.map(row => {
+                      const arrow = row.satisfaction_arrow
+                      const up = arrow === 'up'
+                      const mid = arrow === 'mid'
+                      return (
+                        <li
+                          key={row.username || row.fullname}
+                          className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">{row.fullname || row.username}</p>
+                            <p className="truncate text-[11px] text-slate-500">
+                              {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg p-1 -m-1 text-slate-600 transition-colors hover:bg-slate-100"
+                            onClick={() => {
+                              const u = row.username
+                              const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
+                              const first = u
+                                ? pool.find(dr => dr.staff_username === u)
+                                : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
+                              if (first) setModalRow(first)
+                            }}
+                            title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
+                          >
+                            {up ? (
+                              <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-600" aria-hidden />
+                            ) : mid ? (
+                              <ArrowLeftRight size={22} strokeWidth={2.5} className="text-amber-500" aria-hidden />
+                            ) : (
+                              <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-600" aria-hidden />
+                            )}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+
+            <div className="border-t border-slate-100 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                <h2 className="text-sm font-black text-slate-900">
+                  {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
+                </h2>
+                <span className="text-xs font-medium tabular-nums text-slate-500">{stagingDisplayRows.length} عرض</span>
+              </div>
+              {loading && currentDetails.length === 0 ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+                  <Loader2 size={22} className="animate-spin" />
+                  جارٍ تحميل التفاصيل…
+                </div>
+              ) : stagingDisplayRows.length === 0 ? (
+                <p className="px-4 py-12 text-center text-sm text-slate-500">
+                  {auditViewTab === 'active'
+                    ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
+                    : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {stagingDisplayRows.map(row => {
+                    const shipN = resolveShipmentCount(allStores, row.store_id)
+                    const resolvedDown = row.arrow === 'down' && !!row.resolved
+                    const isHighRisk =
+                      auditViewTab === 'active' &&
+                      row.arrow === 'down' &&
+                      !row.resolved &&
+                      shipN != null &&
+                      shipN > HIGH_SHIPMENT_THRESHOLD
+                    return (
+                      <div
+                        key={row.id}
+                        className={`flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${
+                          isHighRisk ? 'border-s-4 border-rose-500 bg-rose-50/40' : ''
+                        } ${resolvedDown && !isHighRisk ? 'bg-emerald-50/25' : ''}`}
+                      >
+                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-2">
+                          <span className="max-w-full text-lg font-bold leading-snug text-slate-900" title={row.store_name}>
+                            {row.store_name}
+                          </span>
+                          <span className="text-xs tabular-nums text-slate-400">#{row.store_id}</span>
+                          <span
+                            className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700"
+                            title="عدد الشحنات (من بيانات المتجر)"
+                          >
+                            {shipN != null ? shipN.toLocaleString('ar-EG') : '—'} شحنة
+                          </span>
+                          {isHighRisk ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-rose-700">
+                              <Flame size={12} aria-hidden />
+                              High Risk
+                            </span>
+                          ) : null}
+                          {auditViewTab === 'resolved' ? (
+                            <span className="w-full basis-full text-xs font-semibold text-emerald-800 sm:basis-auto">
+                              مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:max-w-[min(100%,28rem)]">
+                          <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
+                          <p className="max-w-[220px] flex-1 truncate text-right text-xs text-slate-500">
+                            {textSnippet(row.suggestions, 40) || '—'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setModalRow(row)}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm transition-colors hover:bg-slate-50"
+                          >
+                            عرض التفاصيل
+                            <ChevronLeft size={14} className="opacity-60" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
+      ) : null}
+
+      {!IS_VITE_APP_STAGING && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900">
               <ShieldCheck size={22} className="text-emerald-400" />
             </div>
             <div>
               <h1 className="text-xl font-black text-slate-900">التحقق السريع</h1>
-              <p className="text-slate-600 text-sm mt-0.5">
+              <p className="mt-0.5 text-sm text-slate-600">
                 {mainTab === 'onboarding'
                   ? 'استبيان تهيئة المتجر الجديد (ثلاثة أسئلة نعم/لا): الكل نعم 🔼، أي لا 🔽.'
                   : 'استبيان رضا التجار النشطين — ستة محاور بنجوم 1–5: المتوسط ≥4 🔼، 3–3.9 ↔️، أقل من 3 🔽.'}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setRedOnly(v => !v)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors ${
                 redOnly
-                  ? 'bg-rose-600 border-rose-600 text-white'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  ? 'border-rose-600 bg-rose-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
               <Filter size={16} />
@@ -1199,7 +1376,7 @@ export default function QuickVerification() {
               type="button"
               onClick={() => void loadAll()}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               تحديث
@@ -1208,558 +1385,120 @@ export default function QuickVerification() {
         </div>
       )}
 
-      <div
-        className={`flex flex-wrap gap-2 rounded-2xl p-2 ${IS_VITE_APP_STAGING ? glassPanel : 'border'}`}
-        style={
-          IS_VITE_APP_STAGING
-            ? undefined
-            : { borderColor: DS.border, background: 'rgba(255,255,255,0.7)' }
-        }
-      >
-        <button
-          type="button"
-          onClick={() => setMainTab('onboarding')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            IS_VITE_APP_STAGING
-              ? mainTab === 'onboarding'
-                ? 'border text-white shadow-[0_0_20px_rgba(0,242,254,0.25)]'
-                : 'border border-transparent text-slate-400 hover:bg-white/5'
-              : mainTab === 'onboarding'
-                ? 'bg-white shadow-sm border text-slate-900'
-                : 'text-slate-600 hover:bg-white/90 border border-transparent'
-          }`}
-          style={
-            IS_VITE_APP_STAGING
-              ? mainTab === 'onboarding'
-                ? {
-                    borderColor: FV.edge,
-                    background: `linear-gradient(135deg, rgba(0,242,254,0.15) 0%, rgba(218,34,255,0.1) 100%)`,
-                  }
-                : undefined
-              : mainTab === 'onboarding'
-                ? { borderColor: DS.border }
-                : undefined
-          }
+      {!IS_VITE_APP_STAGING && (
+        <div
+          className="flex flex-wrap gap-2 rounded-2xl border p-2"
+          style={{ borderColor: DS.border, background: 'rgba(255,255,255,0.7)' }}
         >
-          <Store size={18} style={IS_VITE_APP_STAGING ? { color: FV.cyan } : undefined} strokeWidth={1.8} />
-          متاجر جدد (تهيئة)
-        </button>
-        <button
-          type="button"
-          onClick={() => setMainTab('active_csat')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-            IS_VITE_APP_STAGING
-              ? mainTab === 'active_csat'
-                ? 'border text-white shadow-[0_0_20px_rgba(79,172,254,0.28)]'
-                : 'border border-transparent text-slate-400 hover:bg-white/5'
-              : mainTab === 'active_csat'
-                ? 'bg-white shadow-sm border text-slate-900'
-                : 'text-slate-600 hover:bg-white/90 border border-transparent'
-          }`}
-          style={
-            IS_VITE_APP_STAGING
-              ? mainTab === 'active_csat'
-                ? {
-                    borderColor: FV.edge,
-                    background: `linear-gradient(135deg, rgba(79,172,254,0.18) 0%, rgba(218,34,255,0.12) 100%)`,
-                  }
-                : undefined
-              : mainTab === 'active_csat'
-                ? { borderColor: DS.border }
-                : undefined
-          }
-        >
-          <Truck size={18} style={IS_VITE_APP_STAGING ? { color: FV.violet } : undefined} strokeWidth={1.8} />
-          تجار نشطون (CSAT)
-        </button>
-      </div>
-
-      {IS_VITE_APP_STAGING && (
-        <div className={`flex flex-wrap gap-2 rounded-2xl p-2 ${glassPanel}`}>
-          {[
-            { id: 'all', label: 'الكل' },
-            { id: 'down', label: 'غير راضٍ 🔽' },
-            { id: 'up', label: 'راضي 🔼' },
-          ].map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setSatTab(t.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                satTab === t.id ? 'text-white shadow-[0_0_18px_rgba(0,242,254,0.35)]' : 'text-slate-400 hover:bg-white/5'
-              }`}
-              style={
-                satTab === t.id
-                  ? {
-                      background: `linear-gradient(100deg, ${FV.cyan}22 0%, ${FV.magenta}18 100%)`,
-                      border: `1px solid ${FV.edge}`,
-                    }
-                  : undefined
-              }
-            >
-              {t.label}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => setMainTab('onboarding')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+              mainTab === 'onboarding'
+                ? 'border bg-white text-slate-900 shadow-sm'
+                : 'border border-transparent text-slate-600 hover:bg-white/90'
+            }`}
+            style={mainTab === 'onboarding' ? { borderColor: DS.border } : undefined}
+          >
+            <Store size={18} strokeWidth={1.8} />
+            متاجر جدد (تهيئة)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMainTab('active_csat')}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+              mainTab === 'active_csat'
+                ? 'border bg-white text-slate-900 shadow-sm'
+                : 'border border-transparent text-slate-600 hover:bg-white/90'
+            }`}
+            style={mainTab === 'active_csat' ? { borderColor: DS.border } : undefined}
+          >
+            <Truck size={18} strokeWidth={1.8} />
+            تجار نشطون (CSAT)
+          </button>
         </div>
       )}
 
-      {IS_VITE_APP_STAGING && (
-        <div className={`flex flex-col gap-3 rounded-2xl p-3 md:flex-row md:items-stretch md:justify-between ${glassPanel}`}>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setAuditViewTab('active')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
-                auditViewTab === 'active' ? 'text-white' : 'text-slate-400 hover:bg-white/5'
-              }`}
-              style={
-                auditViewTab === 'active'
-                  ? {
-                      background: `linear-gradient(100deg, rgba(0,242,254,0.2) 0%, rgba(79,172,254,0.15) 100%)`,
-                      border: `1px solid ${FV.edge}`,
-                      boxShadow: `0 0 22px ${FV.cyan}22`,
-                    }
-                  : undefined
-              }
-            >
-              قيد التدقيق
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuditViewTab('resolved')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition-all ${
-                auditViewTab === 'resolved' ? 'text-white' : 'text-slate-400 hover:bg-white/5'
-              }`}
-              style={
-                auditViewTab === 'resolved'
-                  ? {
-                      background: `linear-gradient(100deg, rgba(218,34,255,0.18) 0%, rgba(79,172,254,0.14) 100%)`,
-                      border: `1px solid ${FV.edge}`,
-                      boxShadow: `0 0 22px ${FV.magenta}28`,
-                    }
-                  : undefined
-              }
-            >
-              سجل الحلول
-            </button>
-          </div>
-          <div className="relative min-h-[44px] min-w-0 flex-1 md:max-w-lg">
-            <Search
-              className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2"
-              size={18}
-              style={{ color: FV.cyan }}
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={quickSearch}
-              onChange={e => setQuickSearch(e.target.value)}
-              placeholder="بحث فوري: اسم المتجر أو كود المتجر…"
-              className={`w-full rounded-xl py-2.5 pr-10 pl-3 text-sm font-medium outline-none transition-all ${glassPanel}`}
-              style={{
-                color: FV.silver,
-                borderColor: FV.edgeSoft,
-              }}
-              autoComplete="off"
-            />
-          </div>
-        </div>
-      )}
+      {err && !IS_VITE_APP_STAGING ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{err}</p>
+      ) : null}
 
-      {err && (
-        <p
-          className={`text-sm rounded-xl px-4 py-2 ${IS_VITE_APP_STAGING ? `${glassPanel} text-amber-200 border-amber-400/30` : 'text-amber-800 bg-amber-50 border border-amber-200'}`}
-        >
-          {err}
-        </p>
-      )}
-
-      <section
-        className={
-          IS_VITE_APP_STAGING
-            ? `relative overflow-hidden rounded-2xl p-4 lg:p-6 ${glassPanel}`
-            : 'rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 lg:p-5 text-white shadow-lg ring-1 ring-white/5'
-        }
-      >
-        {IS_VITE_APP_STAGING ? (
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.07]"
-            style={{
-              background:
-                'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,242,254,0.4) 2px, rgba(0,242,254,0.4) 3px)',
-            }}
-            aria-hidden
-          />
-        ) : null}
-        <h2
-          className={`text-sm font-black mb-3 tracking-tight ${IS_VITE_APP_STAGING ? 'relative text-cyan-100/95' : 'text-slate-100'}`}
-        >
-          ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
-        </h2>
-        {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
-          <div
-            className={`relative z-10 flex items-center justify-center gap-2 py-8 text-sm ${IS_VITE_APP_STAGING ? 'text-slate-400' : 'text-slate-400'}`}
-          >
-            <Loader2 size={20} className="animate-spin" />
-            جارٍ التحميل…
-          </div>
-        ) : !currentStaff?.length ? (
-          <p
-            className={`relative z-10 text-sm py-6 text-center ${IS_VITE_APP_STAGING ? 'text-slate-500' : 'text-slate-500'}`}
-          >
-            لا توجد بيانات موظفين اليوم في هذا القسم.
-          </p>
-        ) : (
-          <ul className="relative z-10 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
-            {currentStaff.map(row => {
-              const arrow = row.satisfaction_arrow
-              const up = arrow === 'up'
-              const mid = arrow === 'mid'
-              const fx = IS_VITE_APP_STAGING
-              return (
-                <li
-                  key={row.username || row.fullname}
-                  className={
-                    fx
-                      ? `rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 ${glassPanel}`
-                      : 'rounded-xl border border-slate-600/40 bg-slate-800/35 px-3 py-2.5 flex items-center justify-between gap-2 backdrop-blur-sm'
-                  }
-                >
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`font-bold text-sm truncate ${fx ? 'text-slate-100' : 'text-slate-50'}`}
-                    >
-                      {row.fullname || row.username}
-                    </p>
-                    <p className={`text-[10px] truncate ${fx ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={`flex items-center gap-1.5 shrink-0 cursor-pointer rounded-lg p-1 -m-1 transition-colors ${fx ? 'hover:bg-white/5' : 'hover:bg-white/10'}`}
-                    onClick={() => {
-                      const u = row.username
-                      const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
-                      const first = u
-                        ? pool.find(dr => dr.staff_username === u)
-                        : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
-                      if (first) setModalRow(first)
-                    }}
-                    title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
-                  >
-                    {up ? (
-                      <motion.span
-                        animate={fx ? { filter: ['drop-shadow(0 0 4px rgba(52,245,197,0.4))', 'drop-shadow(0 0 12px rgba(52,245,197,0.85))'] } : undefined}
-                        transition={fx ? { duration: 2.4, repeat: Infinity, repeatType: 'reverse' } : undefined}
-                      >
-                        <ArrowBigUp
-                          size={22}
-                          strokeWidth={2.5}
-                          style={{ color: fx ? FV.emeraldCore : '#34D399' }}
-                          aria-hidden
-                        />
-                      </motion.span>
-                    ) : mid ? (
-                      <ArrowLeftRight
-                        size={22}
-                        strokeWidth={2.5}
-                        style={{ color: fx ? FV.violet : DS.amber.muted }}
-                        aria-hidden
-                      />
-                    ) : (
-                      <motion.span
-                        animate={fx ? { filter: ['drop-shadow(0 0 6px rgba(255,0,85,0.55))', 'drop-shadow(0 0 16px rgba(255,45,107,0.95))'] } : undefined}
-                        transition={fx ? { duration: 1.8, repeat: Infinity, repeatType: 'reverse' } : undefined}
-                      >
-                        <ArrowBigDown
-                          size={22}
-                          strokeWidth={2.5}
-                          style={{ color: fx ? FV.rubyCore : '#FB7185' }}
-                          aria-hidden
-                        />
-                      </motion.span>
-                    )}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      {IS_VITE_APP_STAGING && (
-        <section className="mx-auto w-full max-w-6xl" aria-label="لوحة إنجازات المدير">
-          <div className={`rounded-2xl p-4 md:p-6 ${glassPanel}`}>
-            <p
-              className="mb-4 text-center text-[11px] font-black uppercase tracking-[0.18em] md:text-xs"
-              style={{ color: FV.silverDim }}
-            >
-              لوحة إنجازات المدير
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
-              <div className={`flex flex-col rounded-xl p-4 md:p-5 ${glassPanel}`}>
-                <div className="flex items-start gap-3">
-                  <motion.div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: 'rgba(255,45,107,0.12)', border: `1px solid ${FV.rubyCore}44` }}
-                    animate={{ boxShadow: [`0 0 12px ${FV.rubyCore}33`, `0 0 22px ${FV.magenta}44`] }}
-                    transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse' }}
-                  >
-                    <AlertCircle size={24} strokeWidth={2} style={{ color: FV.rubyCore }} aria-hidden />
-                  </motion.div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: FV.silverDim }}>
-                      إجمالي المشاكل المكتشفة
-                    </p>
-                    <p
-                      className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: FV.silver, textShadow: `0 0 24px ${FV.cyan}22` }}
-                    >
-                      {execMetrics.totalProblems}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`flex flex-col rounded-xl p-4 md:p-5 ${glassPanel}`}>
-                <div className="flex items-start gap-3">
-                  <motion.div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: 'rgba(52,245,197,0.1)', border: `1px solid ${FV.emeraldCore}44` }}
-                    animate={{ boxShadow: [`0 0 12px ${FV.emeraldCore}33`, `0 0 22px ${FV.cyan}44`] }}
-                    transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse', delay: 0.5 }}
-                  >
-                    <CheckCircle2 size={24} strokeWidth={2} style={{ color: FV.emeraldCore }} aria-hidden />
-                  </motion.div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold leading-snug md:text-[15px]" style={{ color: FV.silverDim }}>
-                      مشاكل تم حلها
-                    </p>
-                    <p
-                      className="mt-2 text-3xl font-black tabular-nums tracking-tight md:text-4xl"
-                      style={{ color: FV.silver, textShadow: `0 0 24px ${FV.emeraldCore}22` }}
-                    >
-                      {execMetrics.resolvedProblems}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`flex flex-col justify-between rounded-xl p-4 md:p-5 ${glassPanel}`}>
-                <p className="text-sm font-bold md:text-[15px]" style={{ color: FV.silverDim }}>
-                  نسبة الإنجاز %
-                </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <span
-                    className="text-3xl font-black tabular-nums md:text-4xl shrink-0"
-                    style={{ color: FV.silver }}
-                  >
-                    {execMetrics.pct}%
-                  </span>
-                  <div className="min-w-0 flex-1 pt-1">
-                    <SegmentedEnergyBar pct={execMetrics.pct} />
-                  </div>
-                </div>
-              </div>
+      {!IS_VITE_APP_STAGING && (
+        <section className="rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-4 text-white shadow-lg ring-1 ring-white/5 lg:p-5">
+          <h2 className="mb-3 text-sm font-black tracking-tight text-slate-100">
+            ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+          </h2>
+          {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
+            <div className="relative z-10 flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
+              <Loader2 size={20} className="animate-spin" />
+              جارٍ التحميل…
             </div>
-          </div>
+          ) : !currentStaff?.length ? (
+            <p className="relative z-10 py-6 text-center text-sm text-slate-500">لا توجد بيانات موظفين اليوم في هذا القسم.</p>
+          ) : (
+            <ul className="relative z-10 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              {currentStaff.map(row => {
+                const arrow = row.satisfaction_arrow
+                const up = arrow === 'up'
+                const mid = arrow === 'mid'
+                return (
+                  <li
+                    key={row.username || row.fullname}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-600/40 bg-slate-800/35 px-3 py-2.5 backdrop-blur-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-50">{row.fullname || row.username}</p>
+                      <p className="truncate text-[10px] text-slate-400">
+                        {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="-m-1 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-white/10"
+                      onClick={() => {
+                        const u = row.username
+                        const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
+                        const first = u
+                          ? pool.find(dr => dr.staff_username === u)
+                          : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
+                        if (first) setModalRow(first)
+                      }}
+                      title="عرض تفاصيل استبيان مرتبط بهذا الموظف إن وُجد"
+                    >
+                      {up ? (
+                        <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                      ) : mid ? (
+                        <ArrowLeftRight size={22} strokeWidth={2.5} className="text-amber-400" aria-hidden />
+                      ) : (
+                        <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </section>
       )}
 
-      <section
-        className={
-          IS_VITE_APP_STAGING
-            ? `rounded-2xl overflow-hidden ${glassPanel}`
-            : 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
-        }
-      >
-        {!IS_VITE_APP_STAGING && (
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
+      {!IS_VITE_APP_STAGING && (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
             <h2 className="text-sm font-black text-slate-900">
               {mainTab === 'onboarding' ? 'استبيانات تهيئة المتاجر (اليوم)' : 'تجار نشطون — متوسط الرضا (اليوم)'}
             </h2>
-            <span className="text-xs text-slate-500 tabular-nums">{filteredDetails.length} سجل</span>
+            <span className="text-xs tabular-nums text-slate-500">{filteredDetails.length} سجل</span>
           </div>
-        )}
-        {IS_VITE_APP_STAGING && (
-          <div
-            className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4"
-            style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.03)' }}
-          >
-            <h2 className="text-base font-black" style={{ color: FV.silver }}>
-              {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل المُغلقة'}
-            </h2>
-            <span className="text-xs font-bold tabular-nums" style={{ color: FV.silverDim }}>
-              {stagingDisplayRows.length} عرض
-            </span>
-          </div>
-        )}
-        {loading && currentDetails.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-slate-400 text-sm">
-            <Loader2 size={22} className="animate-spin" />
-            جارٍ تحميل التفاصيل…
-          </div>
-        ) : IS_VITE_APP_STAGING ? (
-          stagingDisplayRows.length === 0 ? (
-            <p className="py-12 text-center px-4 text-sm" style={{ color: FV.silverDim }}>
-              {auditViewTab === 'active'
-                ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
-                : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
-            </p>
-          ) : (
-            <div className="px-3 md:px-4 pb-6 pt-2">
-              <AnimatePresence mode="popLayout" initial={false}>
-                {stagingDisplayRows.map(row => {
-                  const shipN = resolveShipmentCount(allStores, row.store_id)
-                  const resolvedDown = row.arrow === 'down' && !!row.resolved
-                  const isHighRisk =
-                    auditViewTab === 'active' &&
-                    row.arrow === 'down' &&
-                    !row.resolved &&
-                    shipN != null &&
-                    shipN > HIGH_SHIPMENT_THRESHOLD
-
-                  return (
-                    <motion.div
-                      key={row.id}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                        ...(isHighRisk
-                          ? {
-                              boxShadow: [
-                                '0 0 0 0px rgba(255,45,107,0.25)',
-                                '0 0 0 8px rgba(218,34,255,0.35)',
-                              ],
-                            }
-                          : {}),
-                      }}
-                      transition={
-                        isHighRisk
-                          ? {
-                              opacity: { duration: 0.2 },
-                              layout: { duration: 0.25 },
-                              boxShadow: {
-                                repeat: Infinity,
-                                duration: 1.35,
-                                repeatType: 'reverse',
-                                ease: 'easeInOut',
-                              },
-                            }
-                          : { opacity: { duration: 0.2 }, layout: { duration: 0.25 } }
-                      }
-                      exit={{
-                        opacity: 0,
-                        scale: 0.98,
-                        transition: { duration: 0.38, ease: [0.4, 0, 0.2, 1] },
-                      }}
-                      className={`group mb-4 rounded-2xl px-4 py-4 md:px-5 md:py-4 transition-all duration-300 hover:-translate-y-0.5 ${glassPanel}`}
-                      style={{
-                        borderWidth: isHighRisk ? 2 : 1,
-                        borderColor: isHighRisk ? 'rgba(255,45,107,0.55)' : FV.edgeSoft,
-                        ...(resolvedDown && !isHighRisk
-                          ? {
-                              borderColor: `${FV.emeraldCore}66`,
-                              boxShadow: `0 0 20px ${FV.emeraldCore}22`,
-                            }
-                          : {}),
-                      }}
-                    >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="grid min-w-0 flex-1 grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-4">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                <span
-                                  className="max-w-full text-xl font-black leading-tight tracking-tight md:text-2xl"
-                                  style={{ color: FV.silver, fontFeatureSettings: '"kern" 1' }}
-                                  title={row.store_name}
-                                >
-                                  {row.store_name}
-                                </span>
-                                <span
-                                  className="text-sm font-semibold tabular-nums md:text-base"
-                                  style={{ color: FV.silverDim }}
-                                >
-                                  #{row.store_id}
-                                </span>
-                              </div>
-                              {isHighRisk ? (
-                                <span
-                                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black uppercase tracking-wide"
-                                  style={{
-                                    borderColor: 'rgba(255,45,107,0.5)',
-                                    background: 'rgba(218,34,255,0.12)',
-                                    color: FV.rubyCore,
-                                    boxShadow: `0 0 14px ${FV.rubyCore}44`,
-                                  }}
-                                >
-                                  <Flame size={12} className="shrink-0" aria-hidden />
-                                  High Risk
-                                </span>
-                              ) : null}
-                            </div>
-                            {auditViewTab === 'resolved' ? (
-                              <p className="mt-2 text-xs font-bold" style={{ color: FV.emeraldCore }}>
-                                مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div
-                            className="inline-flex w-fit max-w-full items-center gap-2 rounded-xl border px-3 py-2 sm:justify-self-end"
-                            style={{ borderColor: FV.edgeSoft, background: 'rgba(255,255,255,0.04)' }}
-                            title="عدد الشحنات (من بيانات المتجر)"
-                          >
-                            <Package size={17} style={{ color: FV.cyan }} className="shrink-0" aria-hidden />
-                            <span className="text-[11px] font-bold" style={{ color: FV.silverDim }}>
-                              الشحنات
-                            </span>
-                            <span className="text-base font-black tabular-nums" style={{ color: FV.silver }}>
-                              {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div
-                          className="flex flex-row flex-wrap items-center justify-between gap-3 border-t pt-3 lg:border-t-0 lg:pt-0 lg:justify-end lg:gap-5 lg:pl-2"
-                          style={{ borderColor: 'rgba(0,242,254,0.12)' }}
-                        >
-                          <div className="flex items-center justify-center shrink-0">
-                            <StagingSatisfactionArrow arrow={row.arrow} resolvedDown={resolvedDown} />
-                          </div>
-                          <div className="flex min-w-0 flex-1 items-center gap-3 lg:max-w-[260px] lg:flex-initial lg:justify-end">
-                            <p
-                              className="truncate flex-1 text-right text-xs font-medium lg:text-right"
-                              style={{ color: FV.silverDim }}
-                            >
-                              {textSnippet(row.suggestions, 24) || '—'}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setModalRow(row)}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border bg-transparent px-3.5 py-2 text-xs font-black transition-colors hover:bg-white/5"
-                              style={{ borderColor: FV.edge, color: FV.cyan }}
-                            >
-                              عرض التفاصيل
-                              <ChevronLeft size={14} className="opacity-70" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
+          {loading && currentDetails.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+              <Loader2 size={22} className="animate-spin" />
+              جارٍ تحميل التفاصيل…
             </div>
-          )
-        ) : filteredDetails.length === 0 ? (
-          <p className="text-slate-500 text-sm py-12 text-center">لا توجد سجلات مطابقة.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
+          ) : filteredDetails.length === 0 ? (
+            <p className="py-12 text-center text-sm text-slate-500">لا توجد سجلات مطابقة.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-slate-600 text-xs">
                   <th className="px-4 py-2 font-bold">المتجر</th>
@@ -1795,10 +1534,11 @@ export default function QuickVerification() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       <AnimatePresence>
         {modalRow && IS_VITE_APP_STAGING && (
