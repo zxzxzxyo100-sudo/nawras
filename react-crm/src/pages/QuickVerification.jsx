@@ -20,6 +20,9 @@ import {
   Calendar,
   ChevronLeft,
   Search,
+  Package,
+  AlertCircle,
+  BarChart3,
 } from 'lucide-react'
 import {
   Radar,
@@ -97,6 +100,87 @@ const PRO = {
   green: '#16A34A',
   red: '#DC2626',
   amber: '#D97706',
+}
+
+/** التحقق السريع — تجريبي `VITE_APP_STAGING=1`: نفس لغة لوحة التحكم (عتمة + بطاقات بنفسجية) */
+const STAGING_DASH = {
+  pageBg: 'linear-gradient(180deg, #121214 0%, #18181A 100%)',
+  cardLift: 'linear-gradient(165deg, #1A1A1C 0%, #121214 100%)',
+  headerReflect: 'linear-gradient(165deg, #1e1e22 0%, #141416 100%)',
+  drawerBg: '#141416',
+  gold: '#FBBF24',
+  silver: '#C8C8D0',
+  coral: '#FB7185',
+  green: '#34D399',
+}
+
+const fadeUpStaging = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0 },
+}
+
+/** كرت إحصاء علوي — نفس أسلوب StoreTypeCard في Dashboard (بدون رابط سفلي) */
+function QuickAuditStatCard({ title, value, sub, gradient, glow, icon: Icon }) {
+  return (
+    <motion.div
+      variants={fadeUpStaging}
+      initial="hidden"
+      animate="visible"
+      whileHover={{ y: -5, boxShadow: `0 14px 40px ${glow}` }}
+      className="group relative w-full overflow-hidden rounded-2xl p-5 text-right"
+      style={{ background: gradient, boxShadow: `0 4px 24px ${glow}` }}
+    >
+      <div className="absolute inset-0 rounded-2xl bg-white/5 opacity-0 transition-opacity group-hover:opacity-100" />
+      <div
+        className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full opacity-20 blur-2xl"
+        style={{ background: glow }}
+      />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="mb-2 text-xs font-medium uppercase tracking-widest text-white/70">{title}</p>
+          <div className="text-3xl font-black leading-none text-white md:text-4xl">{value}</div>
+          {sub ? <p className="mt-2 text-xs text-white/60">{sub}</p> : null}
+        </div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
+          <Icon size={20} className="text-white" />
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+/** مؤشر رضا — أيقونات على خلفية داكنة (مرجان / أخضر) */
+function DarkAuditSatisfactionGlyph({ arrow, resolvedDown }) {
+  if (resolvedDown) {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-2.5">
+        <CheckCircle2 size={22} className="text-emerald-400" strokeWidth={2.2} aria-hidden />
+        <span className="text-xs font-bold text-emerald-300/90">تم الحل</span>
+      </span>
+    )
+  }
+  if (arrow === 'up') {
+    return (
+      <span className="inline-flex items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+        <ArrowBigUp size={26} strokeWidth={2.4} className="text-emerald-400" aria-hidden />
+      </span>
+    )
+  }
+  if (arrow === 'mid') {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-xl border p-3"
+        style={{ borderColor: 'rgba(251, 191, 36, 0.35)', background: 'rgba(251, 191, 36, 0.08)' }}
+      >
+        <ArrowLeftRight size={24} strokeWidth={2.5} style={{ color: STAGING_DASH.gold }} aria-hidden />
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center justify-center rounded-xl border border-rose-500/35 bg-rose-500/10 p-3">
+      <ArrowBigDown size={26} strokeWidth={2.4} className="text-rose-400" aria-hidden />
+    </span>
+  )
 }
 
 /** لوحة 2025+ — عتمة + نيون (تجريبي `VITE_APP_STAGING=1` فقط) */
@@ -369,90 +453,6 @@ function ExecStatusStrip({ execMetrics }) {
   )
 }
 
-/** شريط إحصائيات تنفيذية — صف واحد + خط تقدم أخضر بسيط */
-function MinimalExecStrip({ execMetrics }) {
-  const { totalProblems, resolvedProblems, pct } = execMetrics
-  return (
-    <div className="w-full">
-      <div className="flex flex-col items-stretch gap-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div className="flex flex-1 flex-wrap items-stretch justify-center gap-0 sm:justify-start">
-          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
-            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
-              إجمالي المكتشفة
-            </span>
-            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
-              {totalProblems}
-            </span>
-          </div>
-          <div className="hidden w-px self-stretch sm:block" style={{ background: PRO.border }} aria-hidden />
-          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
-            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
-              تم حلّها
-            </span>
-            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
-              {resolvedProblems}
-            </span>
-          </div>
-          <div className="hidden w-px self-stretch sm:block" style={{ background: PRO.border }} aria-hidden />
-          <div className="flex min-w-[7.5rem] flex-col gap-0.5 px-4 py-0.5 text-center sm:min-w-[9rem] sm:text-right">
-            <span className="text-[11px] font-medium tracking-wide" style={{ color: PRO.textMuted }}>
-              نسبة الإنجاز
-            </span>
-            <span className="text-2xl font-semibold tabular-nums tracking-tight" style={{ color: PRO.text }}>
-              {pct}%
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="mt-6 h-1 w-full overflow-hidden rounded-full" style={{ background: PRO.border }}>
-        <div
-          className="h-full rounded-full transition-[width] duration-500 ease-out"
-          style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: PRO.green }}
-          role="progressbar"
-          aria-valuenow={pct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        />
-      </div>
-    </div>
-  )
-}
-
-/** مؤشر رضا بسيط — نقطة خضراء / حمراء */
-function MinimalSatisfactionDot({ arrow, resolvedDown }) {
-  if (resolvedDown) {
-    return (
-      <span className="inline-flex items-center gap-2">
-        <span className="select-none text-base leading-none" style={{ color: PRO.green }} aria-hidden>
-          ●
-        </span>
-        <span className="text-xs font-medium" style={{ color: PRO.textMuted }}>
-          تم الحل
-        </span>
-      </span>
-    )
-  }
-  if (arrow === 'up') {
-    return (
-      <span className="select-none text-xl leading-none" style={{ color: PRO.green }} title="راضٍ" aria-hidden>
-        ●
-      </span>
-    )
-  }
-  if (arrow === 'mid') {
-    return (
-      <span className="select-none text-xl leading-none text-slate-400" title="محايد" aria-hidden>
-        ●
-      </span>
-    )
-  }
-  return (
-    <span className="select-none text-xl leading-none" style={{ color: PRO.red }} title="غير راضٍ" aria-hidden>
-      ●
-    </span>
-  )
-}
-
 const glassPanel =
   'backdrop-blur-[20px] bg-white/[0.06] border border-cyan-400/20 shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]'
 
@@ -715,12 +715,11 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       dir="rtl"
-      style={{ fontFamily: "'Tajawal', sans-serif" }}
+      style={{ fontFamily: "'Cairo', sans-serif" }}
     >
       <button
         type="button"
-        className="absolute inset-0"
-        style={{ background: 'rgba(15, 23, 42, 0.35)' }}
+        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
         aria-label="إغلاق"
         onClick={onClose}
       />
@@ -729,58 +728,49 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className="relative flex h-full w-full max-w-[480px] flex-col border-l bg-white shadow-xl"
-        style={{ borderColor: PRO.border }}
+        className="relative flex h-full w-full max-w-[480px] flex-col border-l border-white/10 shadow-2xl"
+        style={{ background: STAGING_DASH.drawerBg, boxShadow: '0 0 48px rgba(0,0,0,0.5)' }}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: PRO.border }}>
+        <div className="h-1 w-full shrink-0 bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500" />
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-5 py-4"
+          style={{ background: STAGING_DASH.headerReflect }}
+        >
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold" style={{ color: PRO.text }}>
-              {row.store_name}
-            </p>
-            <p className="mt-0.5 text-xs tabular-nums" style={{ color: PRO.textMuted }}>
-              #{row.store_id}
-            </p>
+            <p className="truncate text-lg font-bold text-slate-100">{row.store_name}</p>
+            <p className="mt-0.5 text-xs tabular-nums text-slate-500">#{row.store_id}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 transition-colors hover:bg-gray-100"
-            style={{ color: PRO.textMuted }}
+            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
           >
             <X size={22} />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-10 overflow-y-auto px-5 py-6">
+        <div className="min-h-0 flex-1 space-y-10 overflow-y-auto px-5 py-6 text-slate-200">
           <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wide" style={{ color: PRO.textMuted }}>
-              معلومات المكالمة
-            </p>
-            <div className="space-y-3 text-sm" style={{ color: PRO.text }}>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">معلومات المكالمة</p>
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm">
               <div className="flex items-start gap-2">
-                <User size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <User size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
                 <div>
-                  <span className="font-medium" style={{ color: PRO.textMuted }}>
-                    الموظف:{' '}
-                  </span>
+                  <span className="font-medium text-slate-500">الموظف: </span>
                   {row.staff_fullname || row.staff_username || '—'}
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Calendar size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <Calendar size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
                 <div>
-                  <span className="font-medium" style={{ color: PRO.textMuted }}>
-                    التاريخ والوقت:{' '}
-                  </span>
+                  <span className="font-medium text-slate-500">التاريخ والوقت: </span>
                   <span className="tabular-nums">{fmtServerAt(row.created_at)}</span>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <ClipboardList size={16} className="mt-0.5 shrink-0 opacity-50" aria-hidden />
+                <ClipboardList size={16} className="mt-0.5 shrink-0 text-violet-400/80" aria-hidden />
                 <div>
-                  <span className="font-medium" style={{ color: PRO.textMuted }}>
-                    مرحلة المكالمة:{' '}
-                  </span>
+                  <span className="font-medium text-slate-500">مرحلة المكالمة: </span>
                   {loading ? '…' : callStage != null ? `مكالمة ${callStage}` : 'غير محدد في السجل'}
                 </div>
               </div>
@@ -788,28 +778,22 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
           </div>
 
           <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wide" style={{ color: PRO.textMuted }}>
-              إجابات الاستبيان
-            </p>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">إجابات الاستبيان</p>
             {row.survey_kind === 'new_merchant_onboarding' && row.answers && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {row.answers.map((a, i) => (
                   <div
                     key={i}
-                    className="border-b pb-4 sm:border sm:p-3 sm:pb-3"
-                    style={{ borderColor: PRO.border }}
+                    className="rounded-xl border border-white/10 p-3"
+                    style={{ background: STAGING_DASH.cardLift }}
                   >
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="text-lg" style={{ color: a.yes ? PRO.green : PRO.red }} aria-hidden>
+                      <span className="text-lg" style={{ color: a.yes ? STAGING_DASH.green : STAGING_DASH.coral }} aria-hidden>
                         ●
                       </span>
-                      <span className="text-xs font-semibold" style={{ color: PRO.text }}>
-                        {a.label}
-                      </span>
+                      <span className="text-xs font-semibold text-slate-100">{a.label}</span>
                     </div>
-                    <p className="text-[10px] tabular-nums" style={{ color: PRO.textMuted }}>
-                      {fmtServerAt(row.created_at)}
-                    </p>
+                    <p className="text-[10px] tabular-nums text-slate-500">{fmtServerAt(row.created_at)}</p>
                   </div>
                 ))}
               </div>
@@ -818,42 +802,32 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
               <>
                 {radarData.length > 0 && (
                   <div
-                    className="mb-6 h-[200px] w-full rounded-lg border p-2 bg-white"
-                    style={{ borderColor: PRO.border }}
+                    className="mb-6 h-[200px] w-full rounded-xl border border-white/10 p-2"
+                    style={{ background: '#0c0c0e' }}
                     dir="ltr"
                   >
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-                        <PolarGrid stroke={PRO.border} />
-                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: PRO.textMuted }} />
+                        <PolarGrid stroke="#334155" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: '#94a3b8' }} />
                         <PolarRadiusAxis
                           angle={90}
                           domain={[0, 5]}
                           tickCount={6}
-                          tick={{ fontSize: 9, fill: PRO.textMuted }}
+                          tick={{ fontSize: 9, fill: '#94a3b8' }}
                         />
-                        <Radar
-                          name="A"
-                          dataKey="score"
-                          stroke={PRO.accent}
-                          fill={PRO.accent}
-                          fillOpacity={0.18}
-                        />
+                        <Radar name="A" dataKey="score" stroke="#a78bfa" fill="#7c3aed" fillOpacity={0.25} />
                       </RadarChart>
                     </ResponsiveContainer>
                   </div>
                 )}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {row.questions.map((q, i) => (
-                    <div key={i} className="border-b pb-4 sm:border sm:p-3" style={{ borderColor: PRO.border }}>
-                      <p className="mb-2 text-xs font-semibold" style={{ color: PRO.text }}>
-                        {q.label}
-                      </p>
+                    <div key={i} className="rounded-xl border border-white/10 p-3" style={{ background: STAGING_DASH.cardLift }}>
+                      <p className="mb-2 text-xs font-semibold text-slate-100">{q.label}</p>
                       <div className="flex items-center justify-between gap-2">
                         <AnimatedStars value={q.value} />
-                        <span className="text-sm font-semibold tabular-nums" style={{ color: PRO.text }}>
-                          {q.value}/5
-                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-slate-100">{q.value}/5</span>
                       </div>
                     </div>
                   ))}
@@ -864,14 +838,11 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
 
           <div>
             <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold" style={{ color: PRO.text }}>
-                الملاحظات والتعليقات
-              </p>
+              <p className="text-sm font-semibold text-slate-100">الملاحظات والتعليقات</p>
               <button
                 type="button"
                 onClick={() => void copyNote()}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: PRO.accent }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:bg-violet-500"
               >
                 <Copy size={14} />
                 نسخ
@@ -879,59 +850,44 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
             </div>
             {(row.suggestions || '').trim() !== '' && (
               <div className="mb-4">
-                <p className="mb-1 text-[11px] font-medium" style={{ color: PRO.textMuted }}>
-                  صوت المتجر (مسجّل)
-                </p>
-                <p
-                  className="whitespace-pre-wrap border-b pb-3 text-sm leading-relaxed"
-                  style={{ borderColor: PRO.border, color: PRO.text }}
-                >
+                <p className="mb-1 text-[11px] font-medium text-slate-500">صوت المتجر (مسجّل)</p>
+                <p className="whitespace-pre-wrap border-b border-white/10 pb-3 text-sm leading-relaxed text-slate-300">
                   {(row.suggestions || '').trim()}
                 </p>
               </div>
             )}
             {latestCallNote?.text ? (
               <div>
-                <p className="mb-1 text-[11px] font-medium" style={{ color: PRO.textMuted }}>
-                  ملاحظة المكالمة (الموظف)
-                </p>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: PRO.text }}>
-                  {latestCallNote.text}
-                </p>
-                <p className="mt-1 text-[10px] tabular-nums" style={{ color: PRO.textMuted }}>
+                <p className="mb-1 text-[11px] font-medium text-slate-500">ملاحظة المكالمة (الموظف)</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{latestCallNote.text}</p>
+                <p className="mt-1 text-[10px] tabular-nums text-slate-500">
                   {latestCallNote.by ? `${latestCallNote.by} — ` : ''}
                   {fmtServerAt(latestCallNote.at)}
                 </p>
               </div>
             ) : (
               !((row.suggestions || '').trim()) && (
-                <p className="text-sm" style={{ color: PRO.textMuted }}>
-                  لا توجد ملاحظات نصية في هذا السجل.
-                </p>
+                <p className="text-sm text-slate-500">لا توجد ملاحظات نصية في هذا السجل.</p>
               )
             )}
           </div>
         </div>
 
         {row.arrow === 'down' && !row.resolved && (
-          <div className="shrink-0 border-t px-5 py-4" style={{ borderColor: PRO.border, background: PRO.surface }}>
+          <div className="shrink-0 border-t border-white/10 bg-black/20 px-5 py-4">
             <button
               type="button"
               onClick={() => onResolve?.(row.id)}
               disabled={resolveBusy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              style={{ background: PRO.accent }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition-opacity hover:bg-violet-500 disabled:opacity-60"
             >
               {resolveBusy ? <Loader2 size={18} className="animate-spin" /> : null}
-              تم حل المشكلة
+              تم حل المشكلة ✅
             </button>
           </div>
         )}
         {row.arrow === 'down' && row.resolved && (
-          <div
-            className="shrink-0 border-t px-5 py-3 text-center text-sm font-semibold"
-            style={{ borderColor: PRO.border, color: '#15803D', background: '#F0FDF4' }}
-          >
+          <div className="shrink-0 border-t border-emerald-500/30 bg-emerald-950/40 px-5 py-3 text-center text-sm font-semibold text-emerald-300">
             تم تسجيل حل هذه المشكلة
           </div>
         )}
@@ -946,7 +902,7 @@ function StagingAuditDrawer({ row, onClose, onResolve, resolveBusy }) {
  */
 export default function QuickVerification() {
   const { user } = useAuth()
-  const { allStores } = useStores()
+  const { allStores, counts } = useStores()
   const [mainTab, setMainTab] = useState('onboarding')
   const [staffMissions, setStaffMissions] = useState([])
   const [activeStaffMissions, setActiveStaffMissions] = useState([])
@@ -1098,44 +1054,47 @@ export default function QuickVerification() {
     return <Navigate to="/" replace />
   }
 
+  const totalStoresCount = counts?.total ?? allStores?.length ?? 0
+
   return (
     <div
       className={`relative isolate ${IS_VITE_APP_STAGING ? 'min-h-[100vh] pb-10 px-3 md:px-5 pt-4' : 'space-y-5 pb-16'}`}
       dir="rtl"
       style={{
-        fontFamily: IS_VITE_APP_STAGING ? "'Tajawal', sans-serif" : "'Cairo', sans-serif",
-        background: IS_VITE_APP_STAGING ? PRO.bg : DS.bgPage,
+        fontFamily: "'Cairo', sans-serif",
+        background: IS_VITE_APP_STAGING ? STAGING_DASH.pageBg : DS.bgPage,
       }}
     >
       {IS_VITE_APP_STAGING ? (
-        <div className="mx-auto max-w-6xl px-4 pb-12 pt-8">
-          <div className="overflow-hidden rounded-2xl" style={{ background: PRO.surface }}>
-            {/* إحصائيات — أعلى الصفحة */}
-            <div className="border-b bg-white px-6 py-6 sm:px-8" style={{ borderColor: PRO.border }}>
-              <MinimalExecStrip execMetrics={execMetrics} />
-            </div>
-
-            {/* رأس موحّد: عنوان + بحث مدمج + تحديث */}
-            <div className="space-y-6 border-b bg-white px-6 py-6 sm:px-8" style={{ borderColor: PRO.border }}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-8">
+        <div className="mx-auto max-w-6xl px-2 pb-12 pt-4 md:px-4">
+          {/* رأس — خط بنفسجي + بطاقة عاكسة */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="mb-6 overflow-hidden rounded-2xl border border-white/10 shadow-2xl"
+            style={{ background: STAGING_DASH.headerReflect, boxShadow: '0 12px 40px rgba(0,0,0,0.45)' }}
+          >
+            <div className="h-1 w-full bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500" />
+            <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-bold tracking-tight md:text-[1.65rem]" style={{ color: PRO.text }}>
+                  <h1 className="text-2xl font-black tracking-tight text-slate-100 md:text-[1.65rem]">
                     التحقق السريع
                   </h1>
-                  <p className="mt-1.5 text-sm font-normal" style={{ color: PRO.textMuted }}>
+                  <p className="mt-1.5 text-sm text-slate-500">
                     {mainTab === 'onboarding' ? 'متاجر جدد' : 'تجار نشطون'} ·{' '}
-                    <span className="tabular-nums">{satStats.total}</span> إجمالي · راضٍ{' '}
-                    <span className="tabular-nums">{satStats.sat}</span> · غير راضٍ{' '}
-                    <span className="tabular-nums">{satStats.uns}</span>
+                    <span className="tabular-nums text-slate-400">{satStats.total}</span> استبيان اليوم · راضٍ{' '}
+                    <span className="tabular-nums text-emerald-400/90">{satStats.sat}</span> · غير راضٍ{' '}
+                    <span className="tabular-nums text-rose-400/90">{satStats.uns}</span>
                   </p>
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center lg:max-w-xl">
                   <label className="relative min-w-0 flex-1">
                     <span className="sr-only">بحث</span>
                     <Search
-                      className="pointer-events-none absolute right-0 top-1/2 z-[1] -translate-y-1/2 opacity-40"
+                      className="pointer-events-none absolute right-0 top-1/2 z-[1] -translate-y-1/2 text-slate-500"
                       size={18}
-                      style={{ color: PRO.textMuted }}
                       aria-hidden
                     />
                     <input
@@ -1143,12 +1102,7 @@ export default function QuickVerification() {
                       value={quickSearch}
                       onChange={e => setQuickSearch(e.target.value)}
                       placeholder="بحث باسم المتجر أو الكود…"
-                      className="w-full border-0 border-b-2 border-transparent bg-transparent py-2.5 pr-8 pl-1 text-sm outline-none transition-colors placeholder:opacity-60 focus:border-[#1D4ED8]"
-                      style={{
-                        color: PRO.text,
-                        borderBottomColor: PRO.border,
-                        fontFamily: "'Tajawal', sans-serif",
-                      }}
+                      className="w-full rounded-xl border border-white/10 bg-black/25 py-2.5 pr-9 pl-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
                       autoComplete="off"
                     />
                   </label>
@@ -1156,8 +1110,7 @@ export default function QuickVerification() {
                     type="button"
                     onClick={() => void loadAll()}
                     disabled={loading}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                    style={{ background: PRO.accent }}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:bg-violet-500 disabled:opacity-50"
                   >
                     <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2} />
                     تحديث
@@ -1165,7 +1118,7 @@ export default function QuickVerification() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-6" role="tablist" aria-label="تصفية الرضا">
+              <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="تصفية الرضا">
                 {[
                   { id: 'all', label: 'الكل' },
                   { id: 'down', label: 'غير راضٍ' },
@@ -1177,276 +1130,286 @@ export default function QuickVerification() {
                     role="tab"
                     aria-selected={satTab === t.id}
                     onClick={() => setSatTab(t.id)}
-                    className="border-b-2 border-transparent pb-1 text-sm font-semibold transition-colors"
-                    style={{
-                      color: satTab === t.id ? PRO.accent : PRO.textMuted,
-                      borderBottomColor: satTab === t.id ? PRO.accent : 'transparent',
-                    }}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                      satTab === t.id
+                        ? 'bg-violet-600/90 text-white shadow-md shadow-violet-500/20'
+                        : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                    }`}
                   >
                     {t.label}
                   </button>
                 ))}
               </div>
 
-              <div className="flex flex-col gap-4 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-6">
-                <div className="flex flex-wrap gap-6" role="tablist" aria-label="نوع الاستبيان">
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="نوع الاستبيان">
                   <button
                     type="button"
                     onClick={() => setMainTab('onboarding')}
-                    className="text-sm font-semibold transition-colors"
-                    style={{ color: mainTab === 'onboarding' ? PRO.accent : PRO.textMuted }}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                      mainTab === 'onboarding'
+                        ? 'text-[#FBBF24]'
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
                   >
                     متاجر جدد
                   </button>
                   <button
                     type="button"
                     onClick={() => setMainTab('active_csat')}
-                    className="text-sm font-semibold transition-colors"
-                    style={{ color: mainTab === 'active_csat' ? PRO.accent : PRO.textMuted }}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                      mainTab === 'active_csat'
+                        ? 'text-[#FBBF24]'
+                        : 'text-slate-500 hover:text-slate-300'
+                    }`}
                   >
                     تجار نشطون
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-6" role="tablist" aria-label="التدقيق">
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label="التدقيق">
                   <button
                     type="button"
                     onClick={() => setAuditViewTab('active')}
-                    className="text-sm font-semibold transition-colors"
-                    style={{ color: auditViewTab === 'active' ? PRO.accent : PRO.textMuted }}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                      auditViewTab === 'active' ? 'text-violet-300' : 'text-slate-500 hover:text-slate-300'
+                    }`}
                   >
                     قيد التدقيق
                   </button>
                   <button
                     type="button"
                     onClick={() => setAuditViewTab('resolved')}
-                    className="text-sm font-semibold transition-colors"
-                    style={{ color: auditViewTab === 'resolved' ? PRO.accent : PRO.textMuted }}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                      auditViewTab === 'resolved' ? 'text-violet-300' : 'text-slate-500 hover:text-slate-300'
+                    }`}
                   >
                     سجل الحلول
                   </button>
                 </div>
               </div>
             </div>
+          </motion.div>
 
-            {err ? (
-              <p className="border-b px-6 py-3 text-sm sm:px-8" style={{ borderColor: PRO.border, background: '#FFFBEB', color: '#92400E' }}>
-                {err}
-              </p>
-            ) : null}
-
-            {/* ملخص الموظفين — جدول بسيط */}
-            <div className="border-b bg-white px-6 py-8 sm:px-8" style={{ borderColor: PRO.border }}>
-              <h2 className="mb-6 text-base font-bold" style={{ color: PRO.text }}>
-                ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
-              </h2>
-              {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-12 text-sm" style={{ color: PRO.textMuted }}>
-                  <Loader2 size={20} className="animate-spin" />
-                  جارٍ التحميل…
-                </div>
-              ) : !currentStaff?.length ? (
-                <p className="py-8 text-center text-sm" style={{ color: PRO.textMuted }}>
-                  لا توجد بيانات موظفين اليوم في هذا القسم.
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-right text-sm" style={{ borderColor: PRO.border }}>
-                    <thead>
-                      <tr>
-                        <th
-                          className="border px-4 py-3 font-semibold"
-                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
-                        >
-                          الموظف
-                        </th>
-                        <th
-                          className="border px-4 py-3 font-semibold"
-                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
-                        >
-                          الدور / اليوم
-                        </th>
-                        <th
-                          className="border px-4 py-3 font-semibold"
-                          style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}
-                        >
-                          الرضا
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentStaff.map(row => {
-                        const arrow = row.satisfaction_arrow
-                        const up = arrow === 'up'
-                        const mid = arrow === 'mid'
-                        return (
-                          <tr
-                            key={row.username || row.fullname}
-                            className="transition-colors hover:bg-white"
-                            style={{ borderColor: PRO.border }}
-                          >
-                            <td className="border px-4 py-3 font-medium" style={{ borderColor: PRO.border, color: PRO.text }}>
-                              {row.fullname || row.username}
-                            </td>
-                            <td className="border px-4 py-3 text-xs" style={{ borderColor: PRO.border, color: PRO.textMuted }}>
-                              {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
-                            </td>
-                            <td className="border px-4 py-3" style={{ borderColor: PRO.border }}>
-                              <button
-                                type="button"
-                                className="inline-flex items-center"
-                                onClick={() => {
-                                  const u = row.username
-                                  const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
-                                  const first = u
-                                    ? pool.find(dr => dr.staff_username === u)
-                                    : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
-                                  if (first) setModalRow(first)
-                                }}
-                              >
-                                {up ? (
-                                  <span className="text-xl leading-none" style={{ color: PRO.green }} aria-hidden>
-                                    ●
-                                  </span>
-                                ) : mid ? (
-                                  <span className="text-xl leading-none text-slate-400" aria-hidden>
-                                    ●
-                                  </span>
-                                ) : (
-                                  <span className="text-xl leading-none" style={{ color: PRO.red }} aria-hidden>
-                                    ●
-                                  </span>
-                                )}
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* جدول المتاجر */}
-            <div className="bg-white px-6 py-8 sm:px-8">
-              <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
-                <h2 className="text-base font-bold" style={{ color: PRO.text }}>
-                  {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل'}
-                </h2>
-                <span className="text-xs font-medium tabular-nums" style={{ color: PRO.textMuted }}>
-                  {stagingDisplayRows.length} سجل
+          {/* 4 بطاقات علوية — نفس أسلوب لوحة التحكم */}
+          <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <QuickAuditStatCard
+              title="إجمالي المتاجر"
+              value={totalStoresCount.toLocaleString('ar-SA')}
+              sub="من سياق المتاجر"
+              gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
+              glow="#7c3aed55"
+              icon={Package}
+            />
+            <QuickAuditStatCard
+              title="راضٍ / غير راضٍ"
+              value={
+                <span className="flex flex-wrap items-baseline gap-2 tabular-nums">
+                  <span className="text-emerald-300">{satStats.sat}</span>
+                  <span className="text-white/40">/</span>
+                  <span className="text-rose-300">{satStats.uns}</span>
                 </span>
-              </div>
-              {loading && currentDetails.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm" style={{ color: PRO.textMuted }}>
-                  <Loader2 size={22} className="animate-spin" />
-                  جارٍ تحميل التفاصيل…
-                </div>
-              ) : stagingDisplayRows.length === 0 ? (
-                <p className="py-12 text-center text-sm" style={{ color: PRO.textMuted }}>
-                  {auditViewTab === 'active'
-                    ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
-                    : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-right text-sm" style={{ borderColor: PRO.border }}>
-                    <thead>
-                      <tr>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          المتجر
-                        </th>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          الكود
-                        </th>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          الشحنات
-                        </th>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          الرضا
-                        </th>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          ملاحظة
-                        </th>
-                        <th className="border px-3 py-2.5 font-semibold sm:px-4" style={{ borderColor: PRO.border, color: PRO.textMuted, background: PRO.surface }}>
-                          &nbsp;
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stagingDisplayRows.map(row => {
-                        const shipN = resolveShipmentCount(allStores, row.store_id)
-                        const resolvedDown = row.arrow === 'down' && !!row.resolved
-                        const isHighRisk =
-                          auditViewTab === 'active' &&
-                          row.arrow === 'down' &&
-                          !row.resolved &&
-                          shipN != null &&
-                          shipN > HIGH_SHIPMENT_THRESHOLD
-                        return (
-                          <tr
-                            key={row.id}
-                            className="transition-colors hover:bg-white"
-                            style={{
-                              background: isHighRisk ? 'rgba(254, 242, 242, 0.5)' : resolvedDown ? 'rgba(240, 253, 244, 0.35)' : undefined,
-                            }}
-                          >
-                            <td className="border px-3 py-3 align-middle sm:px-4" style={{ borderColor: PRO.border }}>
-                              <span className="font-semibold" style={{ color: PRO.text }}>
-                                {row.store_name}
-                              </span>
-                              {isHighRisk ? (
-                                <span className="mr-2 text-xs font-medium" style={{ color: PRO.red }}>
-                                  {' '}
-                                  (أولوية)
-                                </span>
-                              ) : null}
-                              {auditViewTab === 'resolved' ? (
-                                <div className="mt-1 text-xs" style={{ color: PRO.textMuted }}>
-                                  مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
-                                </div>
-                              ) : null}
-                            </td>
-                            <td
-                              className="border px-3 py-3 align-middle tabular-nums text-xs sm:px-4"
-                              style={{ borderColor: PRO.border, color: PRO.textMuted }}
-                            >
-                              #{row.store_id}
-                            </td>
-                            <td
-                              className="border px-3 py-3 align-middle tabular-nums sm:px-4"
-                              style={{ borderColor: PRO.border, color: PRO.text }}
-                            >
-                              {shipN != null ? shipN.toLocaleString('ar-EG') : '—'}
-                            </td>
-                            <td className="border px-3 py-3 align-middle sm:px-4" style={{ borderColor: PRO.border }}>
-                              <MinimalSatisfactionDot arrow={row.arrow} resolvedDown={resolvedDown} />
-                            </td>
-                            <td
-                              className="max-w-[14rem] border px-3 py-3 align-middle text-xs sm:px-4"
-                              style={{ borderColor: PRO.border, color: PRO.textMuted }}
-                            >
-                              <span className="line-clamp-2">{textSnippet(row.suggestions, 48) || '—'}</span>
-                            </td>
-                            <td className="border px-3 py-3 align-middle whitespace-nowrap sm:px-4" style={{ borderColor: PRO.border }}>
-                              <button
-                                type="button"
-                                onClick={() => setModalRow(row)}
-                                className="text-sm font-semibold transition-opacity hover:opacity-80"
-                                style={{ color: PRO.accent }}
-                              >
-                                تفاصيل
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+              }
+              sub={`${satStats.total} استبيان في التبويب الحالي`}
+              gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
+              glow="#8b5cf655"
+              icon={BarChart3}
+            />
+            <QuickAuditStatCard
+              title="المشاكل المكتشفة"
+              value={execMetrics.totalProblems.toLocaleString('ar-SA')}
+              sub="🔽 غير راضٍ في القسم الحالي"
+              gradient="linear-gradient(135deg, #92400e, #d97706)"
+              glow="#d9770655"
+              icon={AlertCircle}
+            />
+            <QuickAuditStatCard
+              title="تم حلّها"
+              value={execMetrics.resolvedProblems.toLocaleString('ar-SA')}
+              sub={execMetrics.totalProblems ? `إنجاز ${execMetrics.pct}%` : '—'}
+              gradient="linear-gradient(135deg, #065f46, #059669)"
+              glow="#05966955"
+              icon={CheckCircle2}
+            />
           </div>
+
+          {err ? (
+            <p
+              className="mb-6 rounded-xl border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'rgba(251, 191, 36, 0.35)',
+                background: 'rgba(251, 191, 36, 0.08)',
+                color: STAGING_DASH.gold,
+              }}
+            >
+              {err}
+            </p>
+          ) : null}
+
+          {/* ملخص الموظفين — بطاقات */}
+          <section className="mb-10">
+            <h2 className="mb-4 text-base font-black text-slate-100">
+              ملخص الموظفين (اليوم) — {mainTab === 'onboarding' ? 'تهيئة' : 'CSAT نشط'}
+            </h2>
+            {loading && currentStaff.length === 0 && currentDetails.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] py-12 text-sm text-slate-500">
+                <Loader2 size={20} className="animate-spin text-violet-400" />
+                جارٍ التحميل…
+              </div>
+            ) : !currentStaff?.length ? (
+              <p className="rounded-2xl border border-dashed border-white/15 py-10 text-center text-sm text-slate-500">
+                لا توجد بيانات موظفين اليوم في هذا القسم.
+              </p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {currentStaff.map(row => {
+                  const arrow = row.satisfaction_arrow
+                  const up = arrow === 'up'
+                  const mid = arrow === 'mid'
+                  return (
+                    <li
+                      key={row.username || row.fullname}
+                      className="rounded-2xl border border-slate-600/50 bg-slate-800/40 px-4 py-3 shadow-lg backdrop-blur-sm transition hover:border-violet-500/30"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-slate-100">{row.fullname || row.username}</p>
+                          <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                            {row.role || '—'} · {row.answered_surveys_today ?? 0} استبيان
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0"
+                          onClick={() => {
+                            const u = row.username
+                            const pool = mainTab === 'onboarding' ? detailRows : activeDetailRows
+                            const first = u
+                              ? pool.find(dr => dr.staff_username === u)
+                              : pool.find(dr => (dr.staff_fullname || '') === (row.fullname || ''))
+                            if (first) setModalRow(first)
+                          }}
+                        >
+                          {up ? (
+                            <ArrowBigUp size={22} strokeWidth={2.5} className="text-emerald-400" aria-hidden />
+                          ) : mid ? (
+                            <ArrowLeftRight size={22} strokeWidth={2.5} style={{ color: STAGING_DASH.gold }} aria-hidden />
+                          ) : (
+                            <ArrowBigDown size={22} strokeWidth={2.5} className="text-rose-400" aria-hidden />
+                          )}
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* تغذية المتاجر — بطاقات داكنة */}
+          <section>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-base font-black text-slate-100">
+                {auditViewTab === 'active' ? 'قيد التدقيق — متابعة اليوم' : 'سجل الحلول — أرشيف المشاكل'}
+              </h2>
+              <span className="text-xs font-medium tabular-nums text-slate-500">{stagingDisplayRows.length} سجل</span>
+            </div>
+            {loading && currentDetails.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 py-16 text-sm text-slate-500">
+                <Loader2 size={22} className="animate-spin text-violet-400" />
+                جارٍ تحميل التفاصيل…
+              </div>
+            ) : stagingDisplayRows.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-white/15 py-12 text-center text-sm text-slate-500">
+                {auditViewTab === 'active'
+                  ? 'لا توجد سجلات مطابقة في قيد التدقيق.'
+                  : 'لا توجد مشاكل مُحلّاة في هذا القسم بعد.'}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {stagingDisplayRows.map(row => {
+                  const shipN = resolveShipmentCount(allStores, row.store_id)
+                  const resolvedDown = row.arrow === 'down' && !!row.resolved
+                  const isHighRisk =
+                    auditViewTab === 'active' &&
+                    row.arrow === 'down' &&
+                    !row.resolved &&
+                    shipN != null &&
+                    shipN > HIGH_SHIPMENT_THRESHOLD
+                  const showResolve =
+                    auditViewTab === 'active' && row.arrow === 'down' && !row.resolved
+                  return (
+                    <motion.div
+                      key={row.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-2xl border p-4 shadow-2xl md:p-5 ${
+                        isHighRisk
+                          ? 'border-[#FBBF24]/40 ring-1 ring-[#FBBF24]/35'
+                          : 'border-white/10'
+                      }`}
+                      style={{
+                        background: STAGING_DASH.cardLift,
+                        boxShadow: '0 10px 36px rgba(0,0,0,0.42)',
+                      }}
+                    >
+                      <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[auto_1fr_auto]">
+                        <div className="flex justify-center md:justify-start">
+                          <DarkAuditSatisfactionGlyph arrow={row.arrow} resolvedDown={resolvedDown} />
+                        </div>
+                        <div className="min-w-0 text-center md:text-right">
+                          <p className="text-lg font-black leading-tight" style={{ color: STAGING_DASH.silver }}>
+                            {row.store_name}
+                            {isHighRisk ? (
+                              <span className="mr-2 text-xs font-bold" style={{ color: STAGING_DASH.gold }}>
+                                {' '}
+                                (أولوية)
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="mt-1 text-sm tabular-nums text-slate-500">
+                            #{row.store_id}
+                            <span className="mx-2 text-slate-600">·</span>
+                            {shipN != null ? `${shipN.toLocaleString('ar-EG')} شحنة` : '— شحنة'}
+                          </p>
+                          {auditViewTab === 'resolved' ? (
+                            <p className="mt-2 text-xs text-slate-500">
+                              مدة المعالجة: {formatResolveDuration(row.created_at, row.resolved_at)}
+                            </p>
+                          ) : null}
+                          {(row.suggestions || '').trim() ? (
+                            <p className="mt-2 line-clamp-2 text-xs text-slate-500">
+                              {textSnippet(row.suggestions, 72)}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                          {showResolve ? (
+                            <button
+                              type="button"
+                              onClick={() => void resolveAudit(row.id)}
+                              disabled={resolvingId === row.id}
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-violet-600 to-purple-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition hover:from-violet-500 hover:to-purple-500 disabled:opacity-60"
+                            >
+                              {resolvingId === row.id ? <Loader2 size={18} className="animate-spin" /> : null}
+                              تم حل المشكلة ✅
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setModalRow(row)}
+                            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-violet-300 transition hover:bg-white/10"
+                          >
+                            تفاصيل
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         </div>
       ) : null}
 
