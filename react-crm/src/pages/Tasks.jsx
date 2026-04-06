@@ -370,7 +370,7 @@ function TaskCard({
 
       {/* أزرار الإجراء */}
       <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-        <CallButton onClick={() => onCall(task.store)} />
+        <CallButton onClick={() => onCall(task)} />
         {showNoAnswer && (
           <motion.button
             type="button"
