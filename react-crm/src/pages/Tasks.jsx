@@ -675,7 +675,7 @@ export default function Tasks() {
   /** مفاتيح مهام مُخفاة بعد «تم» — مُحمّلة من الخادم + نفس اليوم */
   const [dismissalKeys, setDismissalKeys] = useState(() => new Set())
   const [filter, setFilter]     = useState('all') // 'all' | 'high' | 'no_answer'
-  /** تبويبات مسؤول المتاجر (تجريبي): متابعة دورية | تم التواصل */
+  /** تبويبات مسؤول المتاجر الجديدة (تجريبي): متابعة دورية | تم التواصل | لم يتم الرد */
   const [moTab, setMoTab] = useState('periodic')
   const moSweepLoadedRef = useRef(null)
   const [dismissErr, setDismissErr] = useState('')
@@ -853,11 +853,10 @@ export default function Tasks() {
 
   const moPeriodicTasks = useMemo(() => {
     if (!isMoStaging) return mainTasks
-    return [
-      ...noAnswerTasks,
-      ...mainTasks.filter(t => !t.moContactedToday),
-    ]
-  }, [isMoStaging, mainTasks, noAnswerTasks])
+    return mainTasks.filter(
+      t => !t.moContactedToday && !taskIsNoAnswer(t, callLogs, assignments),
+    )
+  }, [isMoStaging, mainTasks, callLogs, assignments])
 
   const moContactedTasks = useMemo(() => {
     if (!isMoStaging) return []
@@ -867,12 +866,18 @@ export default function Tasks() {
   const displayed = useMemo(() => {
     if (isMoStaging) {
       if (moTab === 'contacted') return moContactedTasks
+      if (moTab === 'no_answer') return noAnswerTasks
       return moPeriodicTasks
     }
     if (filter === 'no_answer') return noAnswerTasks
     if (filter === 'high') return mainTasks.filter(t => t.priority === 'high')
     return mainTasks
   }, [isMoStaging, moTab, moPeriodicTasks, moContactedTasks, filter, mainTasks, noAnswerTasks])
+
+  const focusNoAnswerView = useCallback(() => {
+    setFilter('no_answer')
+    if (isMoStaging) setMoTab('no_answer')
+  }, [isMoStaging])
 
   async function dismissTaskOnly(id) {
     setDismissErr('')
@@ -964,7 +969,7 @@ export default function Tasks() {
         await reload()
         await loadInactiveWf()
         loadDismissals()
-        setFilter('no_answer')
+        focusNoAnswerView()
         return
       }
       if (task.type === 'new_call' && user?.role === 'incubation_manager') {
@@ -983,7 +988,7 @@ export default function Tasks() {
         }
         await reload()
         loadDismissals()
-        setFilter('no_answer')
+        focusNoAnswerView()
         return
       }
       if (
@@ -998,7 +1003,7 @@ export default function Tasks() {
         })
         await reload()
         loadDismissals()
-        setFilter('no_answer')
+        focusNoAnswerView()
       }
     } catch (e) {
       setDismissErr(e.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
@@ -1234,6 +1239,33 @@ export default function Tasks() {
                 {moContactedTasks.length}
               </span>
             </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('no_answer')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'no_answer'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'no_answer'
+                  ? {
+                      background: 'linear-gradient(135deg, #d97706, #b45309)',
+                      boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                    }
+                  : {}
+              }
+            >
+              لم يتم الرد
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'no_answer' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {noAnswerTasks.length}
+              </span>
+            </motion.button>
           </>
         ) : (
           [
@@ -1296,11 +1328,11 @@ export default function Tasks() {
               <p className="font-black text-slate-700 text-xl">أحسنت! لا توجد مهام معلقة</p>
               <p className="text-slate-400 text-sm mt-2">تم الانتهاء من جميع المهام اليوم 🎉</p>
             </>
-          ) : filter === 'no_answer' ? (
+          ) : (isMoStaging && moTab === 'no_answer') || filter === 'no_answer' ? (
             <>
               <CheckCircle size={56} className="text-amber-400 mx-auto mb-4" />
-              <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم ترد»</p>
-              <p className="text-slate-500 text-sm mt-2">عند الضغط على «عدم الرد» يُنقل المتجر إلى هذا التبويب</p>
+              <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم يتم الرد»</p>
+              <p className="text-slate-500 text-sm mt-2">عند الضغط على «عدم الرد» يُسجَّل عدم الرد ويظهر المتجر هنا</p>
             </>
           ) : filter === 'high' ? (
             <>
