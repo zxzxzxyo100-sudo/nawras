@@ -34,7 +34,7 @@ const MIN_INACTIVE_FEEDBACK_LEN = 10
 const SIMPLE_ONBOARDING_HEADINGS = [
   'إدخال الشحنات والباركود',
   'أداء التطبيق والتتبع',
-  'المهام (راجع / تسوية / تجميع)',
+  'المهام (راجع/تسوية/تجميع)',
 ]
 
 /** أزرار نتيجة المكالمة — الوضع الكامل فقط */
@@ -152,6 +152,8 @@ export default function CallModal({
   onClose,
   onSaved,
   taskCompletion = null,
+  /** فُتح من صفحة المهام اليومية — يفرض واجهة الاستبيان الثلاثي مع IS_SIMPLE_LOG_CALL_MODAL */
+  fromDailyTasks = false,
 }) {
   const { user } = useAuth()
   const { storeStates, surveyByStoreId, assignments, newMerchantOnboardingDoneIds } = useStores()
@@ -172,7 +174,7 @@ export default function CallModal({
     [callType, dbCategory],
   )
 
-  /** مسار مبسّط: استبيان 3 أسئلة فقط + حفظ / لم يرد (DEV أو VITE_APP_STAGING) */
+  /** مسار مبسّط: استبيان 3 أسئلة فقط + حفظ / لم يرد (DEV أو VITE_APP_STAGING=1) */
   const simpleOnboardingFlow = useMemo(
     () =>
       IS_SIMPLE_LOG_CALL_MODAL
@@ -505,7 +507,11 @@ export default function CallModal({
               <div>
                 <h3 className="font-black text-white text-base">تسجيل مكالمة</h3>
                 {simpleOnboardingFlow && (
-                  <p className="text-violet-200/95 text-[11px] mt-0.5">استبيان التهيئة — أجب عن الأسئلة ثم احفظ أو اختر «لم يرد»</p>
+                  <p className="text-violet-200/95 text-[11px] mt-0.5">
+                    {fromDailyTasks
+                      ? 'مهمة يومية — استبيان التهيئة (إلزامي): أجب عن الأسئلة ثم «حفظ المكالمة» أو «لم يرد»'
+                      : 'استبيان التهيئة — أجب عن الأسئلة ثم احفظ أو اختر «لم يرد»'}
+                  </p>
                 )}
                 <div className="text-purple-300 text-xs max-w-[240px] min-w-0 mt-0.5">
                   <StoreNameWithId store={store} nameClassName="text-purple-200" idClassName="font-mono text-purple-300/95" />
