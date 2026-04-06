@@ -110,6 +110,7 @@ function incubationSubLinkActive(kind, pathname) {
 
 /** مجموعة المتاجر — فوق مسار الاحتضان */
 function StoresNavGroup({ can, onClose }) {
+  const { user } = useAuth()
   const location = useLocation()
   const { pathname, search } = location
   const isStoresSection = pathname === '/new'
@@ -118,6 +119,9 @@ function StoresNavGroup({ can, onClose }) {
   useEffect(() => {
     if (isStoresSection) setOpen(true)
   }, [isStoresSection])
+
+  /** مسؤول المتاجر (احتضان): التجريب/التطوير — التركيز على المهام اليومية دون تكرار «المتاجر» */
+  if (IS_STAGING_OR_DEV && user?.role === 'incubation_manager') return null
 
   if (!can('new')) return null
 
