@@ -22,6 +22,40 @@ export function shouldCreateDeviationTicketForStore(store) {
   return d >= DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT
 }
 
+function parseTicketMetaJson(ticket) {
+  if (!ticket?.meta_json) return {}
+  try {
+    return typeof ticket.meta_json === 'string' ? JSON.parse(ticket.meta_json) : ticket.meta_json
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * أيام منذ آخر شحنة من تذكرة مفتوحة — meta أولاً، ثم سطر الجسم (للتذاكر القديمة).
+ */
+export function getDaysSinceShipFromDeviationTicket(ticket) {
+  const meta = parseTicketMetaJson(ticket)
+  const fromMeta = meta?.radar?.days_since_ship
+  if (fromMeta != null && fromMeta !== '' && Number.isFinite(Number(fromMeta))) {
+    return Math.max(0, Math.floor(Number(fromMeta)))
+  }
+  const body = ticket?.body || ''
+  const m = body.match(/أيام\s*منذ\s*آخر\s*شحنة:\s*(\d+)/)
+  if (m) {
+    const n = parseInt(m[1], 10)
+    return Number.isFinite(n) ? Math.max(0, n) : null
+  }
+  return null
+}
+
+/** قفل التنبيه / الشريط الأحمر — فقط عند تحقق عتبة الأيام */
+export function deviationTicketMeetsUrgentShipmentThreshold(ticket) {
+  const d = getDaysSinceShipFromDeviationTicket(ticket)
+  if (d == null) return false
+  return d >= DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT
+}
+
 export function buildWhatsAppUrl(phone) {
   if (phone == null || String(phone).trim() === '') return ''
   let digits = String(phone).replace(/\D/g, '')

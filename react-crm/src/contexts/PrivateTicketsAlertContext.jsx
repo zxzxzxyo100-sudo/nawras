@@ -9,6 +9,10 @@ import {
 } from 'react'
 import { useAuth } from './AuthContext'
 import { getExecutivePrivateTickets } from '../services/api'
+import {
+  deviationTicketMeetsUrgentShipmentThreshold,
+  getDaysSinceShipFromDeviationTicket,
+} from '../utils/deviationTicket'
 
 const PrivateTicketsAlertContext = createContext(null)
 
@@ -49,7 +53,15 @@ export function PrivateTicketsAlertProvider({ children }) {
       const deviations = open.filter(
         t => (t.ticket_type || 'general') === TICKET_TYPE_DEVIATION
       )
-      const devN = deviations.length
+      /** قفل واجهة التنبيه فقط لتذاكر تحقق ≥ عتبة أيام منذ آخر شحنة */
+      const urgentDeviations = deviations
+        .filter(deviationTicketMeetsUrgentShipmentThreshold)
+        .sort((a, b) => {
+          const da = getDaysSinceShipFromDeviationTicket(a) ?? 0
+          const db = getDaysSinceShipFromDeviationTicket(b) ?? 0
+          return db - da
+        })
+      const devN = urgentDeviations.length
 
       const prev = lastOpenRef.current
       if (prev !== null && n > prev) {
@@ -65,7 +77,7 @@ export function PrivateTicketsAlertProvider({ children }) {
 
       setOpenCount(n)
       setOpenMandatoryCount(m)
-      setOpenDeviationTickets(deviations)
+      setOpenDeviationTickets(urgentDeviations)
     } catch {
       /* ignore */
     }

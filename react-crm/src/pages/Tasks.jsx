@@ -327,8 +327,8 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username) {
-        /** «تم التواصل» = تسجيل مكالمة بـ «تم الرد» (answered) اليوم — وليس إخفاء الصف عند مشغول/بدون رد */
-        const moContactedToday = isContactedAnsweredToday(log)
+        /** «تم التواصل» = workflow_status=completed أو تسجيل مكالمة بـ «تم الرد» اليوم */
+        const moContactedToday = asgn?.workflow_status === 'completed' || isContactedAnsweredToday(log)
         const limboCallNotAnsweredToday =
           hideDailyTaskDueToCallToday(log) && !isContactedAnsweredToday(log)
         const assignedBeforeToday = assignmentLocalCalendarBeforeToday(asgn?.assigned_at)

@@ -28,7 +28,11 @@ function ensure_workflow_schema(PDO $pdo) {
     }
     ensure_active_pool_rotation_schema($pdo);
     try {
-        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
+        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer','completed') NOT NULL DEFAULT 'active'");
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec("ALTER TABLE store_assignments MODIFY workflow_status ENUM('active','no_answer','completed') NOT NULL DEFAULT 'active'");
     } catch (Throwable $e) {
     }
     try {
@@ -160,7 +164,7 @@ function pick_next_pool_store_for_user(PDO $pdo, $username) {
         SELECT ss.store_id, ss.store_name
         FROM store_states ss
         WHERE " . active_pipeline_where_sql() . "
-        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments)
+        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments WHERE workflow_status IN ('active','no_answer'))
         AND NOT EXISTS (
             SELECT 1 FROM surveys s
             WHERE s.store_id = ss.store_id
@@ -191,7 +195,7 @@ function pick_next_pool_store(PDO $pdo) {
         SELECT ss.store_id, ss.store_name
         FROM store_states ss
         WHERE " . active_pipeline_where_sql() . "
-        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments)
+        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments WHERE workflow_status IN ('active','no_answer'))
         AND NOT EXISTS (
             SELECT 1 FROM surveys s
             WHERE s.store_id = ss.store_id
@@ -246,7 +250,7 @@ function pick_next_inactive_pool_store(PDO $pdo) {
         $j = is_string($raw) ? json_decode($raw, true) : null;
         $stores = is_array($j) && isset($j['stores']) && is_array($j['stores']) ? $j['stores'] : [];
         if ($stores !== []) {
-            $stmt = $pdo->query("SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'");
+            $stmt = $pdo->query("SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')");
             $assigned = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $assigned[(string) ($row['store_id'] ?? '')] = true;
@@ -274,7 +278,7 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
         FROM store_states ss
         WHERE " . inactive_pipeline_where_sql() . "
         AND CAST(ss.store_id AS CHAR) NOT IN (
-            SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
+            SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')
         )
         ORDER BY ss.store_id ASC
         LIMIT 1
@@ -301,6 +305,8 @@ function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username
 function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
     ensure_inactive_daily_stats_schema($pdo);
+    $pdo->prepare("DELETE FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'completed' AND assignment_queue = 'inactive' AND DATE(workflow_updated_at) < CURDATE()")
+        ->execute([$username]);
     if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
         return 0;
     }
@@ -328,6 +334,8 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
 function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
+    $pdo->prepare("DELETE FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'completed' AND assignment_queue = 'active' AND DATE(workflow_updated_at) < CURDATE()")
+        ->execute([$username]);
     if (get_active_daily_success_count($pdo, $username) >= ACTIVE_DAILY_SUCCESS_TARGET) {
         return 0;
     }

@@ -152,12 +152,12 @@ elseif ($action === 'complete_inactive_success') {
     }
     ensure_inactive_daily_stats_schema($pdo);
     $sid = (string) $storeId;
-    $del = $pdo->prepare("
-        DELETE FROM store_assignments
-        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status = 'active'
+    $upd = $pdo->prepare("
+        UPDATE store_assignments SET workflow_status = 'completed'
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')
     ");
-    $del->execute([$sid, $username]);
-    if ($del->rowCount() === 0) {
+    $upd->execute([$sid, $username]);
+    if ($upd->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط لهذا المتجر في طابور الاستعادة.'], 400);
     }
     increment_inactive_daily_success($pdo, $username);
@@ -193,9 +193,9 @@ elseif ($action === 'release_after_survey') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
     $sid = (string) $storeId;
-    $del = $pdo->prepare("DELETE FROM store_assignments WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'");
-    $del->execute([$sid, $username]);
-    if ($del->rowCount() === 0) {
+    $upd = $pdo->prepare("UPDATE store_assignments SET workflow_status = 'completed' WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' AND workflow_status IN ('active','no_answer')");
+    $upd->execute([$sid, $username]);
+    if ($upd->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
     }
     ensure_active_daily_stats_schema($pdo);
