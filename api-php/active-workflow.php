@@ -66,18 +66,19 @@ if ($action === 'get_my_workflow') {
             '',
             'completed',
             'active',
-            cl.created_at,
-            cl.created_at
+            NOW(),
+            NOW()
         FROM call_logs cl
         LEFT JOIN store_states ss ON CAST(ss.store_id AS CHAR) = CAST(cl.store_id AS CHAR)
         WHERE cl.performed_by = ?
         AND cl.outcome = 'answered'
-        AND cl.created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+        AND cl.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
         AND CAST(cl.store_id AS CHAR) NOT IN (
             SELECT store_id FROM store_assignments WHERE assigned_to = ? AND assignment_queue = 'active'
         )
         ON DUPLICATE KEY UPDATE
             workflow_status = 'completed',
+            workflow_updated_at = NOW(),
             assigned_by = 'system_restore'
     ")->execute([$username, $username, $username]);
 

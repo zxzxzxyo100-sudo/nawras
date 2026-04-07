@@ -406,8 +406,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
    */
   if (userRole === 'active_manager' && username) {
     const now = new Date()
-    const thisYear = now.getFullYear()
-    const thisMonth = now.getMonth()
+    const cutoff = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
     const generatedIds = new Set(tasks.map(t => String(t.store.id)))
     allStores.forEach(store => {
       if (generatedIds.has(String(store.id))) return
@@ -417,7 +416,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
         if (String(entry?.performed_by ?? '').trim() !== username) return false
         if (String(entry?.outcome ?? '').trim() !== 'answered') return false
         const d = new Date(entry.date)
-        return d.getFullYear() === thisYear && d.getMonth() === thisMonth
+        return d >= cutoff
       })
       if (!hasAnsweredThisMonth) return
       tasks.push({
