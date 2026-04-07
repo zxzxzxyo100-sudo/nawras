@@ -53,23 +53,26 @@ if ($action === 'get_my_workflow') {
         ]);
     }
     fill_slots_for_user($pdo, $username, $username, null);
-    $st = $pdo->prepare("
+
+    $stActive = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
         FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status IN ('active', 'no_answer')
-        ORDER BY workflow_status ASC, assigned_at ASC
+        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
+        ORDER BY assigned_at ASC
+        LIMIT " . ACTIVE_QUEUE_TARGET . "
     ");
-    $st->execute([$username]);
-    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
-    $active = [];
-    $noAnswer = [];
-    foreach ($rows as $r) {
-        if (($r['workflow_status'] ?? 'active') === 'no_answer') {
-            $noAnswer[] = $r;
-        } else {
-            $active[] = $r;
-        }
-    }
+    $stActive->execute([$username]);
+    $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
+
+    $stNoAns = $pdo->prepare("
+        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
+        FROM store_assignments
+        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'no_answer'
+        ORDER BY assigned_at ASC
+    ");
+    $stNoAns->execute([$username]);
+    $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
+
     ensure_active_daily_stats_schema($pdo);
     $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
