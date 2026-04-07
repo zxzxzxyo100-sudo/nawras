@@ -1498,9 +1498,12 @@ export default function Tasks() {
               <>
                 <p className="text-cyan-100/95 text-sm mt-2">
                   قائمة «المتابعة الدورية»:{' '}
-                  {(activeWf.active_count ?? 0) + (activeWf.no_answer_count ?? 0)}
+                  {activeWf.active_count ?? 0}
                   {' / '}
                   {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً ويظهر في آخر القائمة.
+                </p>
+                <p className="text-sm mt-1 text-cyan-200/80">
+                  في تبويب «لم يرد»: {activeWf.no_answer_count ?? 0}
                 </p>
                 <p className="text-sm mt-1.5 flex flex-wrap items-center gap-2 text-cyan-200/95">
                   <span className="font-bold">تم التواصل اليوم:</span>
