@@ -25,6 +25,7 @@ import {
 import {
   NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV,
   needsNewMerchantOnboardingSurvey,
+  isNewMerchantOnboardingSurveyDone,
   buildOnboardingYesNoForApi,
 } from '../constants/newMerchantOnboardingSurvey'
 
@@ -186,18 +187,19 @@ export default function CallModal({
    * مسار مبسّط: استبيان 3 أسئلة + حفظ / لم يرد
    * — التجريبي/التطوير: IS_SIMPLE_LOG_CALL_MODAL
    * — مسؤول المتاجر من «المهام اليومية»: نفس الواجهة لكل المتاجر التي ما زالت تحتاج استبيان التهيئة (قديمة أو جديدة)
-   * — مسؤول الاحتضان: نوع المكالمة inc_call* (ليس general) كان يمنع المسار المبسّط → إصلاح
+   * — مسؤول الاحتضان + inc_call*: يظهر المسار المبسّط فقط إذا لم يُسجَّل استبيان تهيئة بعد (لا إعادة إجبارية)
    */
   const simpleOnboardingFlow = useMemo(() => {
     if (inactiveFeedbackNeeded) return false
 
-    /** مكالمات الاحتضان الدورية: الاستبيان إلزامي دائماً بغض النظر عن bucket أو حالة الإنجاز */
     const incCallMoDaily =
       fromDailyTasks
       && user?.role === 'incubation_manager'
       && ['inc_call1', 'inc_call2', 'inc_call3'].includes(callType)
 
-    if (incCallMoDaily && IS_SIMPLE_LOG_CALL_MODAL) return true
+    if (incCallMoDaily && IS_SIMPLE_LOG_CALL_MODAL) {
+      return !isNewMerchantOnboardingSurveyDone(store, newMerchantOnboardingDoneIds)
+    }
 
     if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
     if (callType !== 'general') return false
