@@ -57,3 +57,9 @@ if (!defined('CRON_QUEUE_FILL_SECRET')) {
     $cronFromEnv = getenv('NAWRAS_CRON_SECRET');
     define('CRON_QUEUE_FILL_SECRET', is_string($cronFromEnv) && $cronFromEnv !== '' ? $cronFromEnv : '');
 }
+
+// --- ترحيل المخطط (sync_db.php) — عرّف السر على السيرفر فقط؛ لا تُرفع القيمة للمستودع ---
+if (!defined('SYNC_DB_SECRET')) {
+    $syncEnv = getenv('NAWRAS_SYNC_DB_SECRET');
+    define('SYNC_DB_SECRET', is_string($syncEnv) && $syncEnv !== '' ? $syncEnv : '');
+}

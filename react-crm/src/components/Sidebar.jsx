@@ -24,6 +24,7 @@ function useDeviationNavLock() {
 }
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
+import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
@@ -462,11 +463,16 @@ export default function Sidebar({ isOpen, onClose }) {
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         lg:translate-x-0
+        overflow-hidden
       `}
-      style={{ background: 'linear-gradient(180deg, #0d0520 0%, #120828 50%, #0a0318 100%)' }}
     >
+      <NawrasHeroImageLayer opacity={0.1} footerCropPct={16} className="mix-blend-soft-light" />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0d0520]/94 via-[#120828]/92 to-[#0a0318]/96"
+        aria-hidden
+      />
       {/* ── Logo ─────────────────────────────── */}
-      <div className="px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
+      <div className="relative z-10 px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg"
@@ -474,9 +480,10 @@ export default function Sidebar({ isOpen, onClose }) {
           >
             <span className="text-white font-black text-sm">ن</span>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-white font-black text-sm leading-tight">النورس</p>
             <p className="text-purple-400 text-[10px] font-medium">CRM System</p>
+            <NawrasTaglineStack light compact className="mt-2 border-t border-white/10 pt-2" />
           </div>
         </div>
         <button
@@ -488,7 +495,7 @@ export default function Sidebar({ isOpen, onClose }) {
       </div>
 
       {/* ── Navigation ───────────────────────── */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
+      <nav className="relative z-10 flex-1 overflow-y-auto py-4 px-3">
         {navGroupsForUser(user?.role).map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
@@ -620,7 +627,7 @@ export default function Sidebar({ isOpen, onClose }) {
       </nav>
 
       {/* ── User ─────────────────────────────── */}
-      <div className="p-4 border-t border-white/5 space-y-2">
+      <div className="relative z-10 p-4 border-t border-white/5 space-y-2">
         {/* بيانات المستخدم */}
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
           <div
