@@ -203,41 +203,63 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
 
-    if (['call_1', 'call_2', 'call_3'].includes(incBucket) && ['incubation_manager', 'executive'].includes(userRole)) {
+    const execOrIncOfficer = ['incubation_manager', 'executive'].includes(userRole)
+    const needsNewOnboarding =
+      store.bucket === 'incubating'
+      && execOrIncOfficer
+      && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
+    const onbDesc = IS_STAGING_OR_DEV
+      ? 'اضغط «اتصل» ليظهر استبيان التهيئة (ثلاثة أسئلة) فوراً، ثم سجّل المكالمة من البطاقة — أو من لوحة المتاجر الجديدة'
+      : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة'
+
+    if (['call_1', 'call_2', 'call_3'].includes(incBucket) && execOrIncOfficer) {
       const incubationBadge =
         IS_STAGING_OR_DEV && incBucket === 'call_2'
           ? '⚠️ المكالمة الثانية للمتجر'
           : IS_STAGING_OR_DEV && incBucket === 'call_3'
             ? '🚨 المكالمة الثالثة والأخيرة'
             : null
-      tasks.push({
-        id: `${store.id}-inc-${incBucket}`, store,
+      const incLabel =
+        incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
+          : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
+            : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
+      const incDesc =
+        'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة'
+      const incTask = {
+        id: `${store.id}-inc-${incBucket}`,
+        store,
         priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
-        label:
-          incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
-            : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
-              : 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
-        desc: 'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة',
+        label: incLabel,
+        desc: incDesc,
         incubationBadge,
-      })
+      }
+      /** التنفيذي: صف واحد — كانت تُضاف مهمتان منفصلتان لنفس المتجر */
+      if (userRole === 'executive' && needsNewOnboarding) {
+        tasks.push({
+          ...incTask,
+          label: `${incLabel} · استبيان تهيئة متجر جديد`,
+          desc: `${incDesc} — ${onbDesc}`,
+          moMergedOnboarding: true,
+        })
+      } else {
+        tasks.push(incTask)
+      }
     }
 
-    if (
-      store.bucket === 'incubating'
-      && ['incubation_manager', 'executive'].includes(userRole)
-      && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
-    ) {
-      tasks.push({
-        id: `${store.id}-new-onboarding`,
-        store,
-        priority: 'normal',
-        type: 'new_merchant_onboarding',
-        label: 'استبيان تهيئة متجر جديد',
-        desc: IS_STAGING_OR_DEV
-          ? 'اضغط «اتصل» ليظهر استبيان التهيئة (ثلاثة أسئلة) فوراً، ثم سجّل المكالمة من البطاقة — أو من لوحة المتاجر الجديدة'
-          : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة',
-      })
+    if (needsNewOnboarding) {
+      const mergedIntoIncCall =
+        userRole === 'executive' && ['call_1', 'call_2', 'call_3'].includes(incBucket)
+      if (!mergedIntoIncCall) {
+        tasks.push({
+          id: `${store.id}-new-onboarding`,
+          store,
+          priority: 'normal',
+          type: 'new_merchant_onboarding',
+          label: 'استبيان تهيئة متجر جديد',
+          desc: onbDesc,
+        })
+      }
     }
 
     if (incBucket === 'never_started' && ['incubation_manager', 'executive'].includes(userRole)) {
@@ -938,9 +960,7 @@ export default function Tasks() {
       allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
       newMerchantOnboardingDoneIds,
     )
-    if (user?.role === 'incubation_manager' || user?.role === 'executive') {
-      t = dedupeIncubationDailyTasksByStore(t)
-    }
+    t = dedupeIncubationDailyTasksByStore(t)
     return t
   }, [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds])
 
