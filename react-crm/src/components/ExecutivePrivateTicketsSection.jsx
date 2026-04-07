@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Ticket, Loader2, CheckCircle2, AlertCircle, UserPlus } from 'lucide-react'
 import {
@@ -14,7 +15,11 @@ const fadeUp = {
   visible: { opacity: 1, y: 0 },
 }
 
+const TICKET_DEVIATION = 'deviation_alert'
+
 export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -59,6 +64,17 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
   useEffect(() => {
     void refreshPrivateTicketsAlert()
   }, [reloadKey, refreshPrivateTicketsAlert])
+
+  const scrollTarget = location.state?.scrollToDeviationTicketId
+  useEffect(() => {
+    if (scrollTarget == null) return
+    const id = scrollTarget
+    const t = setTimeout(() => {
+      document.querySelector(`[data-ticket-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: {} })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [scrollTarget, location.pathname, location.search, navigate])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -110,8 +126,10 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
         username: user.username,
         id,
       })
-      if (res?.success) await load()
-      else setErr(res?.error || 'تعذّر التحديث')
+      if (res?.success) {
+        await load()
+        await refreshPrivateTicketsAlert()
+      } else setErr(res?.error || 'تعذّر التحديث')
     } catch (e) {
       setErr(e?.response?.data?.error || e.message || 'خطأ')
     } finally {
@@ -149,8 +167,9 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
             <div>
               <h2 className="text-lg font-black text-white tracking-tight">تذاكر خاصة</h2>
               <p className="text-violet-200/75 text-xs mt-1 max-w-xl leading-relaxed">
-                مهام يعيّنها المدير التنفيذي لموظف محدد؛ يمكن جعلها <span className="text-amber-200 font-bold">إجبارية</span>.
-                تظهر هنا لكل موظف في لوحة التحكم بنفس أسلوب العرض.
+                مهام يعيّنها المدير التنفيذي لموظف محدد؛ يشمل نوع{' '}
+                <span className="text-red-200 font-bold">«تذاكر الانحراف»</span> عند التعيين من «نشط يشحن» (إجبارية).
+                يمكن جعل المهام الأخرى <span className="text-amber-200 font-bold">إجبارية</span>.
               </p>
             </div>
           </div>
@@ -254,11 +273,13 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
             {tickets.map(t => {
               const done = t.status === 'done'
               const mand = Number(t.is_mandatory) === 1
+              const isDeviation = (t.ticket_type || 'general') === TICKET_DEVIATION
               const canComplete =
                 !done && (isExecutive || t.assignee_username === user?.username)
               return (
                 <li
                   key={t.id}
+                  data-ticket-id={t.id}
                   className={`rounded-2xl border px-4 py-3.5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 ${
                     done
                       ? 'border-white/10 bg-white/[0.04]'
@@ -269,6 +290,11 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
                 >
                   <div className="min-w-0 flex-1 text-right">
                     <div className="flex flex-wrap items-center gap-2 justify-end mb-1">
+                      {isDeviation && (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-red-600/35 text-red-100 border border-red-400/40">
+                          تذاكر الانحراف
+                        </span>
+                      )}
                       {mand && (
                         <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md bg-amber-500/25 text-amber-100 border border-amber-400/30">
                           إجبارية

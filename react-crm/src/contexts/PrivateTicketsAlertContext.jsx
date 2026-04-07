@@ -12,21 +12,28 @@ import { getExecutivePrivateTickets } from '../services/api'
 
 const PrivateTicketsAlertContext = createContext(null)
 
-/** تنبيهات التذاكر الخاصة للموظفين (غير التنفيذي): شريط جانبي + وميض البطاقة */
+const TICKET_TYPE_DEVIATION = 'deviation_alert'
+
+/** تنبيهات التذاكر الخاصة؛ تذاكر الانحراف تفرض وضع «توقف عن كل شيء» */
 export function PrivateTicketsAlertProvider({ children }) {
   const { user } = useAuth()
   const [openCount, setOpenCount] = useState(0)
   const [openMandatoryCount, setOpenMandatoryCount] = useState(0)
   const [pulseTick, setPulseTick] = useState(0)
+  const [openDeviationTickets, setOpenDeviationTickets] = useState([])
+  const [deviationOverlayPulse, setDeviationOverlayPulse] = useState(0)
   const lastOpenRef = useRef(null)
+  const lastDeviationCountRef = useRef(null)
 
   const staffAlert = Boolean(user?.username && user?.role && user.role !== 'executive')
 
   const refresh = useCallback(async () => {
     if (!staffAlert || !user?.username) {
       lastOpenRef.current = null
+      lastDeviationCountRef.current = null
       setOpenCount(0)
       setOpenMandatoryCount(0)
+      setOpenDeviationTickets([])
       return
     }
     try {
@@ -39,13 +46,26 @@ export function PrivateTicketsAlertProvider({ children }) {
       const open = list.filter(t => t.status === 'open')
       const n = open.length
       const m = open.filter(t => Number(t.is_mandatory) === 1).length
+      const deviations = open.filter(
+        t => (t.ticket_type || 'general') === TICKET_TYPE_DEVIATION
+      )
+      const devN = deviations.length
+
       const prev = lastOpenRef.current
       if (prev !== null && n > prev) {
         setPulseTick(t => t + 1)
       }
       lastOpenRef.current = n
+
+      const prevDev = lastDeviationCountRef.current
+      if (prevDev !== null && devN > prevDev) {
+        setDeviationOverlayPulse(p => p + 1)
+      }
+      lastDeviationCountRef.current = devN
+
       setOpenCount(n)
       setOpenMandatoryCount(m)
+      setOpenDeviationTickets(deviations)
     } catch {
       /* ignore */
     }
@@ -53,14 +73,16 @@ export function PrivateTicketsAlertProvider({ children }) {
 
   useEffect(() => {
     lastOpenRef.current = null
+    lastDeviationCountRef.current = null
     void refresh()
   }, [user?.username, user?.role, refresh])
 
   useEffect(() => {
     if (!staffAlert) return
-    const id = setInterval(() => void refresh(), 28000)
+    const intervalMs = openDeviationTickets.length > 0 ? 5000 : 8000
+    const id = setInterval(() => void refresh(), intervalMs)
     return () => clearInterval(id)
-  }, [staffAlert, refresh])
+  }, [staffAlert, refresh, openDeviationTickets.length])
 
   useEffect(() => {
     if (!staffAlert) return
@@ -76,6 +98,9 @@ export function PrivateTicketsAlertProvider({ children }) {
     }
   }, [staffAlert, refresh])
 
+  const deviationLockdown = openDeviationTickets.length > 0
+  const primaryDeviationTicket = openDeviationTickets[0] ?? null
+
   const value = useMemo(
     () => ({
       shouldAlert: staffAlert && openCount > 0,
@@ -83,8 +108,22 @@ export function PrivateTicketsAlertProvider({ children }) {
       openMandatoryCount,
       pulseTick,
       refreshPrivateTicketsAlert: refresh,
+      deviationLockdown,
+      openDeviationTickets,
+      primaryDeviationTicket,
+      deviationOverlayPulse,
     }),
-    [staffAlert, openCount, openMandatoryCount, pulseTick, refresh]
+    [
+      staffAlert,
+      openCount,
+      openMandatoryCount,
+      pulseTick,
+      refresh,
+      deviationLockdown,
+      openDeviationTickets,
+      primaryDeviationTicket,
+      deviationOverlayPulse,
+    ]
   )
 
   return (
@@ -103,6 +142,10 @@ export function usePrivateTicketsAlert() {
       openMandatoryCount: 0,
       pulseTick: 0,
       refreshPrivateTicketsAlert: async () => {},
+      deviationLockdown: false,
+      openDeviationTickets: [],
+      primaryDeviationTicket: null,
+      deviationOverlayPulse: 0,
     }
   }
   return ctx

@@ -9,6 +9,7 @@ import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers, markSurveyNoAnswer } from '../services/api'
+import { createDeviationExecutiveTicket } from '../utils/createDeviationExecutiveTicket'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
@@ -94,6 +95,20 @@ export default function ActiveStores() {
       .catch(() => {})
   }, [isExecutive])
 
+  async function createDeviationTicketAfterAssign(store, assigneeUsername) {
+    if (!isExecutive || !user?.username || !assigneeUsername) return
+    try {
+      await createDeviationExecutiveTicket({
+        executiveUsername: user.username,
+        store,
+        assigneeUsername,
+        shipmentsRangeMeta,
+      })
+    } catch (e) {
+      console.error('deviation ticket', e)
+    }
+  }
+
   // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
     setSaving(store.id)
@@ -104,6 +119,7 @@ export default function ActiveStores() {
         assigned_to: username,
         assigned_by: user?.fullname || user?.username || '',
       })
+      await createDeviationTicketAfterAssign(store, username)
       await reload()
     } catch (e) { console.error(e) }
     finally { setSaving(null) }
@@ -122,7 +138,7 @@ export default function ActiveStores() {
             store_name:  storeMap[id]?.name || '',
             assigned_to: bulkUser,
             assigned_by: user?.fullname || user?.username || '',
-          })
+          }).then(() => createDeviationTicketAfterAssign(storeMap[id], bulkUser))
         )
       )
       await reload()
@@ -141,14 +157,15 @@ export default function ActiveStores() {
       const storeMap  = Object.fromEntries(active.map(s => [s.id, s]))
       const storeList = [...selectedIds]
       await Promise.all(
-        storeList.map((id, idx) =>
-          assignStore({
+        storeList.map((id, idx) => {
+          const assignee = targets[idx % targets.length]
+          return assignStore({
             store_id:    id,
             store_name:  storeMap[id]?.name || '',
-            assigned_to: targets[idx % targets.length],   // round-robin
+            assigned_to: assignee,
             assigned_by: user?.fullname || user?.username || '',
-          })
-        )
+          }).then(() => createDeviationTicketAfterAssign(storeMap[id], assignee))
+        })
       )
       await reload()
       const perUser = Math.ceil(storeList.length / targets.length)
