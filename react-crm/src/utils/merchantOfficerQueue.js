@@ -445,7 +445,7 @@ function mergeMoTaskGroup(group) {
 }
 
 /**
- * صف واحد لكل متجر عند تعدّد مهام الاحتضان/التهيئة (تجريبي فقط — يُستدعى من Tasks عند VITE_APP_STAGING).
+ * صف واحد لكل متجر عند تعدّد مهام الاحتضان/التهيئة (مسؤول المتاجر الجديدة + التنفيذي).
  */
 export function dedupeIncubationDailyTasksByStore(tasks) {
   if (!Array.isArray(tasks) || !tasks.length) return tasks
