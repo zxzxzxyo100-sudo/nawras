@@ -52,6 +52,7 @@ if ($action === 'get_my_workflow') {
             'no_answer_count' => count($noAnswer),
         ]);
     }
+    fill_slots_for_user($pdo, $username, $username, null);
     $st = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
         FROM store_assignments
@@ -69,10 +70,15 @@ if ($action === 'get_my_workflow') {
             $active[] = $r;
         }
     }
+    ensure_active_daily_stats_schema($pdo);
+    $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
         'success' => true,
         'queue' => 'active',
         'target' => ACTIVE_QUEUE_TARGET,
+        'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_successful_contacts' => $dailyActive,
+        'daily_target_reached' => $dailyActive >= ACTIVE_DAILY_SUCCESS_TARGET,
         'cooldown_days' => SURVEY_COOLDOWN_DAYS,
         'active_tasks' => $active,
         'no_answer_tasks' => $noAnswer,
@@ -122,6 +128,16 @@ elseif ($action === 'mark_no_answer') {
             $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد إلى قائمتك.';
         } elseif ($payload['daily_target_reached']) {
             $payload['notify_ar'] = 'تم تسجيل «لم يرد». لا يُضاف متجر جديد — تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.';
+        }
+    } elseif ($queue === 'active') {
+        ensure_active_daily_stats_schema($pdo);
+        $payload['daily_successful_contacts'] = get_active_daily_success_count($pdo, $username);
+        $payload['active_daily_target'] = ACTIVE_DAILY_SUCCESS_TARGET;
+        $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
+        if ($added > 0) {
+            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر نشط آخر إلى قائمتك.';
+        } elseif ($payload['daily_target_reached']) {
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد». لا يُضاف متجر جديد — تم بلوغ هدف 50 «تم التواصل» اليوم.';
         }
     }
     jsonResponse($payload);
@@ -182,8 +198,18 @@ elseif ($action === 'release_after_survey') {
     if ($del->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
     }
+    ensure_active_daily_stats_schema($pdo);
+    increment_active_daily_success($pdo, $username);
     $fill = fill_slots_for_user($pdo, $username, $username, null);
-    jsonResponse(['success' => true, 'filled' => $fill]);
+    $count = get_active_daily_success_count($pdo, $username);
+    jsonResponse([
+        'success' => true,
+        'filled' => $fill,
+        'daily_successful_contacts' => $count,
+        'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_target_reached' => $count >= ACTIVE_DAILY_SUCCESS_TARGET,
+        'goal_just_met' => $count === ACTIVE_DAILY_SUCCESS_TARGET,
+    ]);
 }
 
 // ========== POST: تعبئة كل مسؤولي المتاجر النشطة (المدير التنفيذي) ==========

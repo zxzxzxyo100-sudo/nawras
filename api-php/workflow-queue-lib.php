@@ -6,6 +6,10 @@
 if (!defined('ACTIVE_QUEUE_TARGET')) {
     define('ACTIVE_QUEUE_TARGET', 50);
 }
+/** هدف «تم التواصل» يومياً لمسؤول المتاجر النشطة — بعدها لا تُعبَّأ قوائم جديدة من المجمع */
+if (!defined('ACTIVE_DAILY_SUCCESS_TARGET')) {
+    define('ACTIVE_DAILY_SUCCESS_TARGET', 50);
+}
 if (!defined('INACTIVE_QUEUE_TARGET')) {
     define('INACTIVE_QUEUE_TARGET', 50);
 }
@@ -39,7 +43,41 @@ function ensure_workflow_schema(PDO $pdo) {
     } catch (Throwable $e) {
     }
     ensure_inactive_daily_stats_schema($pdo);
+    ensure_active_daily_stats_schema($pdo);
     $done = true;
+}
+
+function ensure_active_daily_stats_schema(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_manager_daily_stats (
+            username VARCHAR(191) NOT NULL,
+            work_date DATE NOT NULL,
+            successful_contacts INT UNSIGNED NOT NULL DEFAULT 0,
+            updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, work_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $done = true;
+}
+
+function get_active_daily_success_count(PDO $pdo, $username) {
+    ensure_active_daily_stats_schema($pdo);
+    $st = $pdo->prepare('SELECT COALESCE(successful_contacts, 0) FROM active_manager_daily_stats WHERE username = ? AND work_date = CURDATE()');
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
+function increment_active_daily_success(PDO $pdo, $username) {
+    ensure_active_daily_stats_schema($pdo);
+    $pdo->prepare("
+        INSERT INTO active_manager_daily_stats (username, work_date, successful_contacts)
+        VALUES (?, CURDATE(), 1)
+        ON DUPLICATE KEY UPDATE successful_contacts = successful_contacts + 1
+    ")->execute([$username]);
 }
 
 function ensure_inactive_daily_stats_schema(PDO $pdo) {
@@ -220,6 +258,10 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
 
 function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
+    ensure_active_daily_stats_schema($pdo);
+    if (get_active_daily_success_count($pdo, $username) >= ACTIVE_DAILY_SUCCESS_TARGET) {
+        return 0;
+    }
     $have = count_active_queue($pdo, $username);
     $need = ACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {

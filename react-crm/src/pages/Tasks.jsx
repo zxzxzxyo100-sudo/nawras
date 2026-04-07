@@ -731,8 +731,11 @@ export default function Tasks() {
   const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
   /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
   const [inactiveWf, setInactiveWf] = useState(null)
+  /** طابور مسؤول المتاجر النشطة (50) + عدّ «تم التواصل» يومياً */
+  const [activeWf, setActiveWf] = useState(null)
   /** لإطلاق الاحتفال فور استجابة goal_just_met */
   const [goalBurstNonce, setGoalBurstNonce] = useState(0)
+  const [activeGoalBurstNonce, setActiveGoalBurstNonce] = useState(0)
   /** تجديد دفعة «تحقيق البارد» عند حدود الساعة 9:00 صباحاً (توقيت الجهاز) */
   const [nowTick, setNowTick] = useState(() => Date.now())
   useEffect(() => {
@@ -747,6 +750,19 @@ export default function Tasks() {
       if (res?.success) setInactiveWf(res)
     } catch {
       setInactiveWf(null)
+    }
+  }, [user?.role, user?.username])
+
+  const loadActiveWf = useCallback(async () => {
+    if (user?.role !== 'active_manager' || !user?.username) {
+      setActiveWf(null)
+      return
+    }
+    try {
+      const res = await getMyWorkflow(user.username, { queue: 'active' })
+      if (res?.success) setActiveWf(res)
+    } catch {
+      setActiveWf(null)
     }
   }, [user?.role, user?.username])
 
@@ -769,6 +785,10 @@ export default function Tasks() {
   useEffect(() => {
     loadInactiveWf()
   }, [loadInactiveWf, lastLoaded])
+
+  useEffect(() => {
+    loadActiveWf()
+  }, [loadActiveWf, lastLoaded])
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
@@ -815,19 +835,26 @@ export default function Tasks() {
   }, [lastLoaded, user?.role, user?.username, allStores, callLogs, reload])
 
   const drawerTaskCompletion = useMemo(() => {
-    if (!IS_STAGING_OR_DEV || !selectedTask || !user?.username) return undefined
+    if (!selectedTask || !user?.username) return undefined
+    const releaseActiveWorkflow =
+      user.role === 'active_manager'
+      && (selectedTask.type === 'assigned_store' || selectedTask.type === 'new_merchant_onboarding')
+    const inactiveRecovery =
+      selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive'
+    if (!IS_STAGING_OR_DEV && !releaseActiveWorkflow && !inactiveRecovery) {
+      return undefined
+    }
     return {
       dailyTaskKey: selectedTask.id,
-      inactiveRecovery:
-        selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive',
-      /** إطلاق سير العمل بعد الاستبيان: متجر مُسنَد أو مهمة «استبيان تهيئة» لمسؤول المتاجر */
-      releaseActiveWorkflow:
-        user.role === 'active_manager'
-        && (selectedTask.type === 'assigned_store'
-          || selectedTask.type === 'new_merchant_onboarding'),
+      inactiveRecovery,
+      releaseActiveWorkflow,
       onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
+      onActiveGoalBurst: () => {
+        setActiveGoalBurstNonce(n => n + 1)
+        void loadActiveWf()
+      },
     }
-  }, [selectedTask, user?.username, user?.role])
+  }, [selectedTask, user?.username, user?.role, loadActiveWf])
 
   /**
    * فتح «تسجيل مكالمة» (استبيان 3 نعم/لا) مباشرة عند الحاجة لاستبيان التهيئة.
@@ -1094,8 +1121,24 @@ export default function Tasks() {
         return
       }
       if (
+        user?.role === 'active_manager'
+        && (task.type === 'assigned_store' || task.type === 'new_merchant_onboarding')
+      ) {
+        const mar = await markSurveyNoAnswer({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          username: user.username,
+          queue: 'active',
+        })
+        if (mar?.notify_ar) setToastMsg(mar.notify_ar)
+        await reload()
+        await loadActiveWf()
+        loadDismissals()
+        focusNoAnswerView()
+        return
+      }
+      if (
         task.type === 'assigned_store'
-        || (task.type === 'new_merchant_onboarding' && user?.role === 'active_manager')
         || (task.type === 'new_merchant_onboarding' && user?.role === 'incubation_manager')
       ) {
         await markSurveyNoAnswer({
@@ -1158,6 +1201,16 @@ export default function Tasks() {
           target={inactiveWf?.inactive_daily_target ?? 50}
           dailyTargetReached={inactiveWf?.daily_target_reached}
           burstNonce={goalBurstNonce}
+        />
+      )}
+
+      {user?.role === 'active_manager' && user?.username && (
+        <InactiveGoalCelebration
+          username={`${user.username}_active_am`}
+          successfulCount={activeWf?.daily_successful_contacts ?? 0}
+          target={activeWf?.active_daily_target ?? 50}
+          dailyTargetReached={activeWf?.daily_target_reached}
+          burstNonce={activeGoalBurstNonce}
         />
       )}
 
@@ -1238,6 +1291,32 @@ export default function Tasks() {
                   />
                   {inactiveWf.daily_target_reached && (
                     <span className="text-emerald-200/90 font-medium">— تم بلوغ الهدف</span>
+                  )}
+                </p>
+              </>
+            )}
+            {user?.role === 'active_manager' && activeWf?.success && (
+              <>
+                <p className="text-cyan-100/95 text-sm mt-2">
+                  طابور «نشط يشحن»:{' '}
+                  {(activeWf.active_count ?? 0) + (activeWf.no_answer_count ?? 0)}
+                  {' / '}
+                  {activeWf.target ?? 50} متجراً — يُستبدل عند «لم يُرد» بمتجر نشط آخر من المجمع.
+                </p>
+                <p
+                  className={`text-sm mt-1.5 flex flex-wrap items-center gap-2 ${
+                    activeWf.daily_target_reached ? 'text-emerald-200' : 'text-cyan-200/95'
+                  }`}
+                >
+                  <span className="font-bold">تم التواصل اليوم:</span>
+                  <InactiveGoalCounterBadge
+                    successfulCount={activeWf.daily_successful_contacts ?? 0}
+                    target={activeWf.active_daily_target ?? 50}
+                    dailyTargetReached={activeWf.daily_target_reached}
+                    className={activeWf.daily_target_reached ? 'text-emerald-200' : ''}
+                  />
+                  {activeWf.daily_target_reached && (
+                    <span className="text-emerald-200/90 font-medium">— تم بلوغ 50</span>
                   )}
                 </p>
               </>
@@ -1607,6 +1686,7 @@ export default function Tasks() {
           extraOnSaved={() => {
             loadDismissals()
             void loadInactiveWf()
+            void loadActiveWf()
           }}
         />
       )}

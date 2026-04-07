@@ -24,6 +24,15 @@ import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
+/** مسؤول المتاجر النشطة: يُوجَّه لصفحة المهام بدل طوابير «نشط / مجمّد» وKanban */
+function GuardActiveManagerHiddenRoutes({ children }) {
+  const { user } = useAuth()
+  if (user?.role === 'active_manager') {
+    return <Navigate to="/tasks" replace />
+  }
+  return children
+}
+
 function PrivateRoute({ children, view, viewAny }) {
   const { user, loading, can } = useAuth()
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">جارٍ التحميل...</div>
@@ -50,16 +59,46 @@ function AppRoutes() {
           element={<PrivateRoute view="quick_verification"><QuickVerification /></PrivateRoute>}
         />
         <Route path="/new"          element={<PrivateRoute view="new"><NewStores /></PrivateRoute>} />
-        <Route path="/active"       element={<Navigate to="/active/pending" replace />} />
+        <Route
+          path="/active"
+          element={(
+            <PrivateRoute view="active">
+              <GuardActiveManagerHiddenRoutes>
+                <Navigate to="/active/pending" replace />
+              </GuardActiveManagerHiddenRoutes>
+            </PrivateRoute>
+          )}
+        />
         <Route path="/active/frozen" element={<Navigate to="/frozen" replace />} />
-        <Route path="/frozen"       element={<PrivateRoute view="active"><FrozenStores /></PrivateRoute>} />
+        <Route
+          path="/frozen"
+          element={(
+            <PrivateRoute view="active">
+              <GuardActiveManagerHiddenRoutes>
+                <FrozenStores />
+              </GuardActiveManagerHiddenRoutes>
+            </PrivateRoute>
+          )}
+        />
         <Route
           path="/active/workflow"
-          element={<PrivateRoute view="active"><ActiveWorkflow /></PrivateRoute>}
+          element={(
+            <PrivateRoute view="active">
+              <GuardActiveManagerHiddenRoutes>
+                <ActiveWorkflow />
+              </GuardActiveManagerHiddenRoutes>
+            </PrivateRoute>
+          )}
         />
         <Route
           path="/active/:activeSegment"
-          element={<PrivateRoute view="active"><ActiveStores /></PrivateRoute>}
+          element={(
+            <PrivateRoute view="active">
+              <GuardActiveManagerHiddenRoutes>
+                <ActiveStores />
+              </GuardActiveManagerHiddenRoutes>
+            </PrivateRoute>
+          )}
         />
         <Route path="/hot-inactive" element={<Navigate to="/hot-inactive/all" replace />} />
         <Route
@@ -101,7 +140,16 @@ function AppRoutes() {
           path="/analytics/logistics"
           element={<PrivateRoute view="dashboard"><LogisticsAnalytics /></PrivateRoute>}
         />
-        <Route path="/kanban"       element={<PrivateRoute view="dashboard"><Kanban /></PrivateRoute>} />
+        <Route
+          path="/kanban"
+          element={(
+            <PrivateRoute view="dashboard">
+              <GuardActiveManagerHiddenRoutes>
+                <Kanban />
+              </GuardActiveManagerHiddenRoutes>
+            </PrivateRoute>
+          )}
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -114,7 +114,7 @@ async function runTaskCompletionAfterAnswered({
   setError,
   setSaving,
 }) {
-  if (!IS_STAGING_OR_DEV || !taskCompletion || !user?.username) return true
+  if (!taskCompletion || !user?.username) return true
   const u = user.username
   const sid = store.id
   const sname = store.name
@@ -129,9 +129,15 @@ async function runTaskCompletionAfterAnswered({
         taskCompletion.onInactiveGoalBurst?.()
       }
     } else if (taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager') {
-      await releaseAfterSurvey({ store_id: sid, username: u })
+      const rel = await releaseAfterSurvey({ store_id: sid, username: u })
+      if (rel?.goal_just_met) {
+        taskCompletion.onActiveGoalBurst?.()
+      }
     }
-    if (taskCompletion.dailyTaskKey) {
+    if (
+      taskCompletion.dailyTaskKey
+      && (IS_STAGING_OR_DEV || user?.role === 'active_manager')
+    ) {
       await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
     }
   } catch (syncErr) {
@@ -320,6 +326,7 @@ export default function CallModal({
               store_id: store.id,
               store_name: store.name,
               username: user.username,
+              queue: 'active',
             })
           } catch { /* */ }
         }
@@ -441,6 +448,7 @@ export default function CallModal({
               store_id: store.id,
               store_name: store.name,
               username: user.username,
+              queue: 'active',
             })
           } catch { /* */ }
         }
@@ -463,11 +471,17 @@ export default function CallModal({
         } catch { /* */ }
       }
 
-      if (IS_STAGING_OR_DEV && taskCompletion && user?.username && outcome === 'answered') {
-        const ok = await runTaskCompletionAfterAnswered({
-          taskCompletion, user, store, setError, setSaving,
-        })
-        if (!ok) return
+      if (taskCompletion && user?.username && outcome === 'answered') {
+        const shouldSyncWorkflow =
+          IS_STAGING_OR_DEV
+          || (user?.role === 'active_manager' && taskCompletion.releaseActiveWorkflow)
+          || (user?.role === 'inactive_manager' && taskCompletion.inactiveRecovery)
+        if (shouldSyncWorkflow) {
+          const ok = await runTaskCompletionAfterAnswered({
+            taskCompletion, user, store, setError, setSaving,
+          })
+          if (!ok) return
+        }
       }
 
       onSaved?.()
