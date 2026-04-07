@@ -158,10 +158,10 @@ function ensure_active_queue_reset_schema(PDO $pdo) {
 }
 
 /**
- * إعادة تهيئة لمرة واحدة: كل التعيينات النشطة الحالية لهذا المستخدم تصبح كأنها مُعيّنة الآن.
- * هذا يمنع ظهورها مباشرةً في «تأخيرات المهمات» بعد تغيير القاعدة.
+ * إعادة تهيئة لمرة واحدة: كل التعيينات المفتوحة الحالية لهذا المستخدم تصبح كأنها مُعيّنة الآن.
+ * يشمل ذلك active و no_answer حتى يبدأ كل شيء "من جديد" ولا يظهر مباشرةً في التأخيرات.
  */
-function reset_active_assignments_as_fresh_once(PDO $pdo, $username, $resetKey = 'delays_from_tomorrow_v1') {
+function reset_active_assignments_as_fresh_once(PDO $pdo, $username, $resetKey = 'delays_from_tomorrow_v2') {
     ensure_active_queue_reset_schema($pdo);
     $u = trim((string) $username);
     if ($u === '') {
@@ -177,7 +177,7 @@ function reset_active_assignments_as_fresh_once(PDO $pdo, $username, $resetKey =
         SET assigned_at = NOW(), workflow_updated_at = NOW()
         WHERE assigned_to = ?
         AND assignment_queue = 'active'
-        AND workflow_status = 'active'
+        AND workflow_status IN ('active', 'no_answer')
     ")->execute([$u]);
     $pdo->prepare("
         INSERT INTO active_manager_queue_resets (username, reset_key)
