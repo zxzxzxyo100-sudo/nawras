@@ -782,25 +782,41 @@ export default function QuickVerification() {
     >
       <div className="sticky top-0 z-40 w-full shadow-[0_8px_32px_-12px_rgba(75,0,130,0.12)]">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
-        <div className="w-full border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
-          <div className="flex w-full flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-            <div className="flex flex-1 rounded-2xl bg-gradient-to-br from-violet-100/50 via-white to-fuchsia-50/40 p-[1.5px] shadow-inner">
-            <div className="flex w-full flex-1 rounded-[0.85rem] border border-white/80 bg-slate-50/90 p-1.5 shadow-inner">
+        <div className="relative w-full overflow-hidden border-b border-white/15">
+          <div
+            className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_100%_0%,rgba(167,139,250,0.2),transparent_55%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.08),transparent_50%)]"
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-[#2d0a52] to-[#4B0082]" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+              backgroundSize: '32px 32px',
+            }}
+          />
+          <div className="relative flex w-full flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
+            <div className="flex w-full flex-1 rounded-2xl border border-white/20 bg-black/25 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md">
               <button
                 type="button"
                 onClick={() => setTab('crisis')}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition md:text-sm ${
                   tab === 'crisis'
-                    ? 'bg-white text-violet-900 shadow-md ring-1 ring-slate-200/80'
-                    : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+                    ? 'bg-white text-[#4B0082] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.35)] ring-1 ring-white/40'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <AlertTriangle size={16} className={tab === 'crisis' ? 'text-rose-500' : 'text-slate-400'} strokeWidth={2.2} />
+                <AlertTriangle
+                  size={16}
+                  className={tab === 'crisis' ? 'text-rose-600' : 'text-rose-300/90'}
+                  strokeWidth={2.2}
+                />
                 مركز الأزمات
                 {crisisTotal > 0 ? (
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                      tab === 'crisis' ? 'bg-rose-100 text-rose-800' : 'bg-slate-200/80 text-slate-600'
+                      tab === 'crisis' ? 'bg-rose-100 text-rose-800' : 'bg-white/15 text-white'
                     }`}
                   >
                     {crisisTotal}
@@ -812,16 +828,20 @@ export default function QuickVerification() {
                 onClick={() => setTab('solved')}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition md:text-sm ${
                   tab === 'solved'
-                    ? 'bg-white text-violet-900 shadow-md ring-1 ring-slate-200/80'
-                    : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+                    ? 'bg-white text-[#4B0082] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.35)] ring-1 ring-white/40'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <CheckCircle2 size={16} className={tab === 'solved' ? 'text-emerald-600' : 'text-slate-400'} strokeWidth={2.2} />
+                <CheckCircle2
+                  size={16}
+                  className={tab === 'solved' ? 'text-emerald-600' : 'text-emerald-300/90'}
+                  strokeWidth={2.2}
+                />
                 تم الحل
                 {solvedTotal > 0 ? (
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                      tab === 'solved' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200/80 text-slate-600'
+                      tab === 'solved' ? 'bg-emerald-100 text-emerald-900' : 'bg-white/15 text-white'
                     }`}
                   >
                     {solvedTotal}
@@ -829,19 +849,18 @@ export default function QuickVerification() {
                 ) : null}
               </button>
             </div>
-            </div>
             <button
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-violet-200/80 bg-gradient-to-b from-white to-violet-50/50 px-5 py-2.5 text-xs font-bold text-violet-900 shadow-md ring-2 ring-violet-100/40 transition hover:ring-violet-200/60 disabled:opacity-50 md:text-sm"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-5 py-2.5 text-xs font-bold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/18 disabled:opacity-50 md:text-sm"
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin text-violet-600' : 'text-violet-600'} strokeWidth={2.2} />
+              <RefreshCw size={16} className={loading ? 'animate-spin text-white' : 'text-white/90'} strokeWidth={2.2} />
               تحديث البيانات
             </button>
           </div>
         </div>
-        <div className="w-full border-b border-slate-200/50 bg-gradient-to-b from-white via-violet-50/20 to-[#ebe7f5] py-5 md:py-6">
+        <div className="w-full border-b border-violet-200/40 bg-gradient-to-b from-[#3d1a6e]/25 via-violet-100/35 to-[#ebe7f5] py-5 md:py-6">
           <QvStatStrip
             total={statStrip.total}
             openCrisis={statStrip.openCrisis}
