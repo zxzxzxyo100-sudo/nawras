@@ -215,7 +215,8 @@ function count_active_queue(PDO $pdo, $username) {
 }
 
 /**
- * عدد المتاجر النشطة التي لم يُتصل بها اليوم بنجاح — يُستخدم لحساب الخانات المطلوب تعبئتها.
+ * عدد المتاجر النشطة المعيّنة اليوم التي لم يُتصل بها اليوم بنجاح.
+ * هذا هو فقط ما يدخل في سعة «المتابعة الدورية» اليومية (50).
  */
 function count_pending_active_queue(PDO $pdo, $username) {
     $st = $pdo->prepare("
@@ -223,6 +224,7 @@ function count_pending_active_queue(PDO $pdo, $username) {
         WHERE sa.assigned_to = ?
         AND sa.workflow_status = 'active'
         AND sa.assignment_queue = 'active'
+        AND DATE(sa.assigned_at) = CURDATE()
         AND NOT EXISTS (
             SELECT 1 FROM call_logs cl
             WHERE cl.store_id = sa.store_id
@@ -241,7 +243,8 @@ function count_inactive_queue(PDO $pdo, $username) {
 }
 
 /**
- * تقليم: نبقي أحدث 50 تعيين نشط لم يُتصل به اليوم + كل المتصل بهم اليوم، ونحذف الأقدم.
+ * تقليم: نبقي أحدث 50 تعيين نشط من تعيينات اليوم لم يُتصل به اليوم + كل المتصل بهم اليوم،
+ * ونحذف الزائد من تعيينات اليوم فقط. التعيينات الأقدم تبقى لتبويب «تأخيرات المهمات».
  */
 function trim_active_queue_excess(PDO $pdo, $username) {
     $pending = count_pending_active_queue($pdo, $username);
@@ -250,6 +253,7 @@ function trim_active_queue_excess(PDO $pdo, $username) {
     $st = $pdo->prepare("
         SELECT sa.store_id FROM store_assignments sa
         WHERE sa.assigned_to = ? AND sa.workflow_status = 'active' AND sa.assignment_queue = 'active'
+        AND DATE(sa.assigned_at) = CURDATE()
         AND NOT EXISTS (
             SELECT 1 FROM call_logs cl
             WHERE cl.store_id = sa.store_id
