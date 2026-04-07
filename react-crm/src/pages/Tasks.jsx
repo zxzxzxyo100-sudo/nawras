@@ -400,6 +400,40 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     }
   })
 
+  /**
+   * مسؤول المتاجر النشطة: أي متجر سجّل له «تم الرد» هذا الشهر من هذا المستخدم
+   * يظهر في «تم التواصل» حتى لو لم يعد التعيين موجوداً في قاعدة البيانات.
+   */
+  if (userRole === 'active_manager' && username) {
+    const now = new Date()
+    const thisYear = now.getFullYear()
+    const thisMonth = now.getMonth()
+    const generatedIds = new Set(tasks.map(t => String(t.store.id)))
+    allStores.forEach(store => {
+      if (generatedIds.has(String(store.id))) return
+      const log = callLogs[store.id] || {}
+      const hasAnsweredThisMonth = Object.values(log).some(entry => {
+        if (!entry?.date) return false
+        if (String(entry?.performed_by ?? '').trim() !== username) return false
+        if (String(entry?.outcome ?? '').trim() !== 'answered') return false
+        const d = new Date(entry.date)
+        return d.getFullYear() === thisYear && d.getMonth() === thisMonth
+      })
+      if (!hasAnsweredThisMonth) return
+      tasks.push({
+        id: `${store.id}-contacted-month`,
+        store,
+        moContactedToday: true,
+        amTaskInDelays: false,
+        assignedAtTs: 0,
+        priority: 'normal',
+        type: 'assigned_store',
+        label: 'متجر مُسنَد إليك',
+        desc: '',
+      })
+    })
+  }
+
   return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
 }
 
