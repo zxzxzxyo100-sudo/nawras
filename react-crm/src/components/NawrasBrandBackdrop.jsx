@@ -38,7 +38,7 @@ export function NawrasTaglineStack({ light = false, compact = false, className =
           compact ? 'text-[10px] sm:text-[11px]' : 'text-xs sm:text-sm'
         }`}
       >
-        فريق مبيعات شركة النورس الأسطوري
+        فريق مبيعات شركة النورس
       </p>
       <p className={`mt-0.5 font-bold ${hashCls} ${compact ? 'text-[9px]' : 'text-[10px] sm:text-[11px]'}`}>
         #فريق_النورس
