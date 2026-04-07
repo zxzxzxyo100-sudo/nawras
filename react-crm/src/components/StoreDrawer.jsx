@@ -14,10 +14,13 @@ import {
 const CATEGORY_LABELS = {
   incubating: { label: 'تحت الاحتضان', bg: 'bg-purple-100', text: 'text-purple-700' },
   active:     { label: 'نشط',         bg: 'bg-green-100',  text: 'text-green-700'  },
+  active_shipping: { label: 'نشط يشحن', bg: 'bg-emerald-100', text: 'text-emerald-800' },
   active_pending_calls: { label: 'نشط قيد المكالمة', bg: 'bg-emerald-50', text: 'text-emerald-800' },
   completed:  { label: 'منجز',       bg: 'bg-violet-100', text: 'text-violet-800' },
   unreachable: { label: 'لم يتم الوصول', bg: 'bg-amber-100', text: 'text-amber-900' },
   inactive:   { label: 'غير نشط',     bg: 'bg-red-100',    text: 'text-red-700'    },
+  hot_inactive: { label: 'غير نشط ساخن', bg: 'bg-orange-100', text: 'text-orange-900' },
+  cold_inactive: { label: 'غير نشط بارد', bg: 'bg-slate-200', text: 'text-slate-800' },
   frozen:     { label: 'مجمد',        bg: 'bg-slate-100',  text: 'text-slate-600'  },
   restoring:  { label: 'قيد الاستعادة', bg: 'bg-cyan-100', text: 'text-cyan-700'  },
   restored:   { label: 'تمت الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
@@ -56,13 +59,29 @@ export default function StoreDrawer({
 
   const storeLog = callLogs[store.id] || {}
   const dbState  = storeStates[store.id]
+  /** فئة السجل في DB — تُستخدم للإجراءات (تجميد، old_status) */
   const dbCategory = dbState?.category || store.category || 'incubating'
+  /**
+   * خانة المتجر من all-stores.php: ≤14 يوماً منذ آخر شحن → نشط يشحن؛ حتى 60 يوم → ساخن؛ بعدها بارد.
+   * إن بقي السجل «نشط» في DB بعد تخريج قديم، نعرض خانة القائمة حتى لا يظهر «نشط» والجدول «غير نشط بارد».
+   */
+  const merchantListBucket = store.bucket || store._cat || ''
+  const uiCategory = (() => {
+    if (['restoring', 'frozen', 'recovered'].includes(dbCategory)) return dbCategory
+    if (merchantListBucket === 'hot_inactive' || merchantListBucket === 'cold_inactive') {
+      return merchantListBucket
+    }
+    if (merchantListBucket === 'active_shipping') return 'active_shipping'
+    if (merchantListBucket === 'incubating') return 'incubating'
+    return dbCategory
+  })()
   const displayCategory =
     dbCategory === 'restoring' && dbState && isRecoveryCompletedByShipment(store, dbState)
       ? 'restored'
-      : dbCategory
+      : uiCategory
   const catInfo =
     CATEGORY_LABELS[displayCategory]
+    || CATEGORY_LABELS[uiCategory]
     || CATEGORY_LABELS[dbCategory]
     || CATEGORY_LABELS.incubating
 
