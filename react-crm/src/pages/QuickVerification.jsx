@@ -179,7 +179,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   )
 }
 
-/** شريط مؤشرات سريعة تحت التبويب */
+/** شريط مؤشرات سريعة — بطاقات KPI بمظهر لوحة تحكم احترافية */
 function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
   const items = [
     {
@@ -187,32 +187,40 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
       sub: 'إجمالي ما ورد للتحقيق',
       value: loading ? '—' : total.toLocaleString('ar-SA'),
       icon: ClipboardList,
-      bar: 'bg-violet-600',
-      iconBg: 'bg-violet-100 text-violet-700',
+      edge: 'from-violet-600 via-violet-500 to-fuchsia-500',
+      iconBg:
+        'bg-gradient-to-br from-violet-500/[0.12] to-violet-700/[0.08] text-violet-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-violet-500/20',
+      glow: 'group-hover:shadow-violet-500/10',
     },
     {
       label: 'قيد المتابعة',
       sub: 'حالات تحتاج قراراً',
       value: loading ? '—' : openCrisis.toLocaleString('ar-SA'),
       icon: AlertTriangle,
-      bar: 'bg-rose-500',
-      iconBg: 'bg-rose-100 text-rose-700',
+      edge: 'from-rose-600 via-rose-500 to-orange-400',
+      iconBg:
+        'bg-gradient-to-br from-rose-500/[0.14] to-rose-700/[0.08] text-rose-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-rose-500/25',
+      glow: 'group-hover:shadow-rose-500/10',
     },
     {
       label: 'تمت الأرشفة',
       sub: 'حُلّت أو أُغلقت',
       value: loading ? '—' : resolved.toLocaleString('ar-SA'),
       icon: CheckCircle2,
-      bar: 'bg-emerald-500',
-      iconBg: 'bg-emerald-100 text-emerald-700',
+      edge: 'from-emerald-600 via-emerald-500 to-teal-400',
+      iconBg:
+        'bg-gradient-to-br from-emerald-500/[0.14] to-emerald-700/[0.08] text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-emerald-500/25',
+      glow: 'group-hover:shadow-emerald-500/10',
     },
     {
       label: 'مؤشر الرضا',
       sub: 'لمحة تراكمية',
       value: loading ? '—' : `${Math.min(100, Math.max(0, Number(globalSat) || 0))}%`,
       icon: Shield,
-      bar: 'bg-sky-500',
-      iconBg: 'bg-sky-100 text-sky-700',
+      edge: 'from-sky-600 via-sky-500 to-indigo-400',
+      iconBg:
+        'bg-gradient-to-br from-sky-500/[0.14] to-indigo-600/[0.08] text-sky-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-sky-500/25',
+      glow: 'group-hover:shadow-sky-500/10',
     },
   ]
   return (
@@ -220,20 +228,39 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
       {items.map(it => (
         <div
           key={it.label}
-          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-200/30 via-white/45 to-fuchsia-100/35 p-[1px] shadow-[0_8px_32px_-12px_rgba(75,0,130,0.18)] backdrop-blur-md transition hover:shadow-[0_16px_48px_-12px_rgba(75,0,130,0.22)]"
+          className={`group relative min-h-[7.5rem] overflow-hidden rounded-[1.125rem] bg-gradient-to-br from-white/50 via-white/40 to-slate-100/35 p-[1px] shadow-[0_4px_6px_-1px_rgba(15,23,42,0.04),0_12px_28px_-8px_rgba(75,0,130,0.12)] ring-1 ring-slate-200/50 backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-12px_rgba(75,0,130,0.18)] hover:ring-slate-300/60 ${it.glow}`}
         >
-          <div className="relative overflow-hidden rounded-[0.9rem] border border-white/75 bg-white/72 backdrop-blur-xl p-4 shadow-inner">
-          <div className={`absolute right-0 top-0 h-1 w-full ${it.bar} opacity-90`} aria-hidden />
-          <div className="flex items-start justify-between gap-3 pt-1">
-            <div className="min-w-0 text-right">
-              <p className="text-[11px] font-bold text-slate-500">{it.label}</p>
-              <p className="mt-2 text-2xl font-black tabular-nums tracking-tight text-slate-900">{it.value}</p>
-              <p className="mt-1 text-[10px] font-medium text-slate-400">{it.sub}</p>
+          {/* شريط لوني على الحافة (بداية السطر في RTL = يمين البطاقة) */}
+          <div
+            className={`pointer-events-none absolute inset-y-3 right-0 z-[1] w-[3px] rounded-full bg-gradient-to-b ${it.edge} opacity-95 shadow-[2px_0_12px_-2px_rgba(0,0,0,0.15)]`}
+            aria-hidden
+          />
+          <div className="relative flex h-full min-h-[7.25rem] flex-col overflow-hidden rounded-[1.05rem] border border-white/90 bg-gradient-to-b from-white/95 via-white/88 to-slate-50/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
+            {/* خط علوي مركزي نحيف */}
+            <div
+              className={`pointer-events-none absolute inset-x-8 top-0 h-[2px] rounded-full bg-gradient-to-l ${it.edge} opacity-80 blur-[0.5px]`}
+              aria-hidden
+            />
+            <div className="flex flex-1 flex-col justify-between p-4 pt-5 sm:p-[1.125rem]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 pr-1 text-right">
+                  <p className="text-[10px] font-bold tracking-wide text-slate-500">{it.label}</p>
+                  <p
+                    className={`mt-1.5 font-black tabular-nums tracking-tight ${loading ? 'text-2xl text-slate-300' : 'text-[1.65rem] leading-none text-slate-900 sm:text-[1.75rem]'}`}
+                  >
+                    {it.value}
+                  </p>
+                </div>
+                <span
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition duration-300 group-hover:scale-[1.03] sm:h-12 sm:w-12 ${it.iconBg}`}
+                >
+                  <it.icon className="h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5" strokeWidth={2.2} />
+                </span>
+              </div>
+              <p className="mt-3 border-t border-slate-100/90 pt-2.5 text-[10px] font-medium leading-relaxed text-slate-500 sm:text-[11px]">
+                {it.sub}
+              </p>
             </div>
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-2 ring-white/80 ${it.iconBg}`}>
-              <it.icon className="h-5 w-5" strokeWidth={2.2} />
-            </span>
-          </div>
           </div>
         </div>
       ))}
