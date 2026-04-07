@@ -475,6 +475,8 @@ export default function StoreDrawer({
           onSaved={() => {
             reload()
             extraOnSaved?.()
+            /** إغلاق الدرج تلقائياً بعد حفظ المكالمة من المهام اليومية حتى يرى المستخدم القائمة المحدَّثة */
+            if (fromDailyTasks) setTimeout(onClose, 700)
           }}
           taskCompletion={taskCompletion}
           fromDailyTasks={fromDailyTasks}

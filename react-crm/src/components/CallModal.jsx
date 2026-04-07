@@ -190,8 +190,8 @@ export default function CallModal({
    */
   const simpleOnboardingFlow = useMemo(() => {
     if (inactiveFeedbackNeeded) return false
-    if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
 
+    /** مكالمات الاحتضان الدورية: الاستبيان إلزامي دائماً بغض النظر عن bucket أو حالة الإنجاز */
     const incCallMoDaily =
       fromDailyTasks
       && user?.role === 'incubation_manager'
@@ -199,6 +199,7 @@ export default function CallModal({
 
     if (incCallMoDaily && IS_SIMPLE_LOG_CALL_MODAL) return true
 
+    if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
     if (callType !== 'general') return false
     if (IS_SIMPLE_LOG_CALL_MODAL) return true
     if (fromDailyTasks && user?.role === 'active_manager') return true
