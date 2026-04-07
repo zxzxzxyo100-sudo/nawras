@@ -8,8 +8,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $userRole = $input['user_role'] ?? '';
-if ($userRole !== 'incubation_manager') {
-    echo json_encode(['success' => false, 'error' => 'غير مصرح — مسؤول المتاجر الجديدة فقط.'], JSON_UNESCAPED_UNICODE);
+$allowedMoAutomation = ['incubation_manager', 'executive'];
+if (!in_array($userRole, $allowedMoAutomation, true)) {
+    echo json_encode(['success' => false, 'error' => 'غير مصرح — مسؤول المتاجر الجديدة أو التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
