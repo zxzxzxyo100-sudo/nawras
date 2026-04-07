@@ -472,11 +472,11 @@ export default function StoreDrawer({
           store={store}
           callType={callType}
           onClose={() => setShowCallModal(false)}
-          onSaved={() => {
-            reload()
+          onSaved={async () => {
+            await reload()
             extraOnSaved?.()
-            /** إغلاق الدرج تلقائياً بعد حفظ المكالمة من المهام اليومية حتى يرى المستخدم القائمة المحدَّثة */
-            if (fromDailyTasks) setTimeout(onClose, 700)
+            /** انتظار reload أولاً ثم إغلاق الدرج — وإلا تبقى callLogs قديمة ولا يتحدّث تبويب «تم التواصل» */
+            if (fromDailyTasks) setTimeout(onClose, 400)
           }}
           taskCompletion={taskCompletion}
           fromDailyTasks={fromDailyTasks}

@@ -895,7 +895,24 @@ export default function Tasks() {
       && (selectedTask.type === 'assigned_store' || selectedTask.type === 'new_merchant_onboarding')
     const inactiveRecovery =
       selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive'
-    if (!IS_STAGING_OR_DEV && !releaseActiveWorkflow && !inactiveRecovery) {
+    /** مهام مسؤول الاحتضان/التنفيذ من «المهام اليومية» — يجب تمرير dailyTaskKey في الفعلي أيضاً (لا يقتصر على التجريبي) */
+    const incubationDailyMoTask =
+      user.role === 'incubation_manager'
+      && (
+        selectedTask.type === 'new_call'
+        || selectedTask.type === 'new_merchant_onboarding'
+        || (selectedTask.type === 'recovery_call' && selectedTask.workflowQueue !== 'inactive')
+      )
+    const executiveDailyMoTask =
+      user.role === 'executive'
+      && (selectedTask.type === 'new_call' || selectedTask.type === 'new_merchant_onboarding')
+    if (
+      !IS_STAGING_OR_DEV
+      && !releaseActiveWorkflow
+      && !inactiveRecovery
+      && !incubationDailyMoTask
+      && !executiveDailyMoTask
+    ) {
       return undefined
     }
     return {
