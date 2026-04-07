@@ -16,6 +16,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
+import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
@@ -418,6 +419,12 @@ export default function Dashboard() {
           />
         )}
       </motion.div>
+
+      {/* ══ تذاكر خاصة — مهام من التنفيذي لكل موظف ═══════════════════ */}
+      <ExecutivePrivateTicketsSection
+        user={user}
+        reloadKey={lastLoaded ? lastLoaded.getTime() : 0}
+      />
 
       {/* ══ بورصة رضا الموظفين — التجريبي يخفي هذا القسم (انظر IS_STAGING_OR_DEV) ══ */}
       {user?.role === 'executive' && !IS_STAGING_OR_DEV && (

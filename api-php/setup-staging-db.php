@@ -140,6 +140,20 @@ try {
 } catch (Throwable $e) {
 }
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS executive_private_tickets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    body TEXT NOT NULL,
+    assignee_username VARCHAR(100) NOT NULL,
+    created_by_username VARCHAR(100) NOT NULL,
+    is_mandatory TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('open','done') NOT NULL DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
+    INDEX idx_assignee_status (assignee_username, status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 // مستخدم admin افتراضي للـ staging
 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = 'admin'");
 $stmt->execute();
@@ -153,5 +167,5 @@ jsonResponse([
     'env'     => 'staging',
     'db'      => DB_NAME,
     'message' => '✅ تم إنشاء جميع الجداول في قاعدة البيانات التجريبية بنجاح',
-    'tables'  => ['users', 'store_states', 'audit_logs', 'call_logs', 'recovery_calls', 'surveys', 'store_assignments'],
+    'tables'  => ['users', 'store_states', 'audit_logs', 'call_logs', 'recovery_calls', 'surveys', 'store_assignments', 'executive_private_tickets'],
 ]);

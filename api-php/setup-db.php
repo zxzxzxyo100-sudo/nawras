@@ -129,6 +129,20 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS daily_task_dismissals (
     INDEX idx_user_day (username, dismissed_on)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS executive_private_tickets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(500) NOT NULL,
+    body TEXT NOT NULL,
+    assignee_username VARCHAR(100) NOT NULL,
+    created_by_username VARCHAR(100) NOT NULL,
+    is_mandatory TINYINT(1) NOT NULL DEFAULT 1,
+    status ENUM('open','done') NOT NULL DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
+    INDEX idx_assignee_status (assignee_username, status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 // Insert default admin user
 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = 'admin'");
 $stmt->execute();
