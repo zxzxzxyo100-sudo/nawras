@@ -34,6 +34,7 @@ import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboar
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
 import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV } from '../config/envFlags'
+import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 
 const MIN_TASK_NOTE_LENGTH = 10
 
@@ -1315,24 +1316,26 @@ export default function Tasks() {
         className="relative rounded-3xl overflow-hidden text-white p-5 lg:p-7"
         style={{ background: 'linear-gradient(135deg, #1e0a3c 0%, #2d1466 55%, #1a0a4e 100%)' }}
       >
+        <NawrasHeroImageLayer opacity={0.14} footerCropPct={16} className="z-0 mix-blend-soft-light" />
         {/* Blobs */}
-        <div className="absolute top-0 left-1/3 w-60 h-60 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 right-0 w-48 h-48 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 left-1/3 z-[1] w-60 h-60 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 right-0 z-[1] w-48 h-48 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
 
         {/* نورس كبير خلفية */}
-        <div className="absolute bottom-2 left-4 pointer-events-none">
+        <div className="absolute bottom-2 left-4 z-[1] pointer-events-none">
           <SeagullMark size={110} opacity={0.06} />
         </div>
         {/* نورس صغير مقلوب */}
-        <div className="absolute top-3 right-8 pointer-events-none" style={{ transform: 'scaleX(-1)' }}>
+        <div className="absolute top-3 right-8 z-[1] pointer-events-none" style={{ transform: 'scaleX(-1)' }}>
           <SeagullMark size={65} opacity={0.04} />
         </div>
 
-        <div className="relative flex items-center justify-between gap-4 flex-wrap">
+        <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-xl lg:text-2xl font-black leading-tight">
               المهام اليومية
             </h1>
+            <NawrasTaglineStack light compact className="mt-1.5 max-w-[min(100%,20rem)]" />
             <p className="text-white/50 text-sm mt-0.5">
               مرحباً{' '}
               <span className="text-violet-300 font-semibold">{user?.fullname || user?.username}</span>

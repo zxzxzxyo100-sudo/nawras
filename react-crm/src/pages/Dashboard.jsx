@@ -27,6 +27,7 @@ import {
   ACTIVE_MANAGER_COLD_VERIFY_LIMIT,
 } from '../utils/coldVerificationDaily'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
+import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 // ─── رمز النورس كزخرفة خلفية ─────────────────────────────────────
@@ -337,27 +338,40 @@ export default function Dashboard() {
         initial="hidden"
         animate="visible"
         transition={{ duration: 0.45 }}
-        className="flex items-center justify-between"
+        className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm backdrop-blur-sm"
       >
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-            لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-purple-500">التحكم</span>
-          </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            مرحباً <span className="text-violet-600 font-semibold">{user?.fullname}</span>
-            {lastLoaded && <span className="mr-2 text-slate-300">• {lastLoaded.toLocaleTimeString('ar-SA')}</span>}
-          </p>
+        <NawrasHeroImageLayer opacity={0.11} footerCropPct={15} />
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-l from-slate-50/95 via-white/85 to-violet-50/25"
+          aria-hidden
+        />
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+              لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-purple-500">التحكم</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              مرحباً <span className="text-violet-600 font-semibold">{user?.fullname}</span>
+              {lastLoaded && <span className="mr-2 text-slate-300">• {lastLoaded.toLocaleTimeString('ar-SA')}</span>}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <NawrasTaglineStack className="hidden max-w-[220px] sm:block md:max-w-[260px]" />
+            <motion.button
+              onClick={handleDashboardRefresh}
+              disabled={loading || (user?.role === 'executive' && missionsLoading)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.96 }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading || missionsLoading ? 'animate-spin' : ''} />
+              تحديث
+            </motion.button>
+          </div>
         </div>
-        <motion.button
-          onClick={handleDashboardRefresh}
-          disabled={loading || (user?.role === 'executive' && missionsLoading)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.96 }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading || missionsLoading ? 'animate-spin' : ''} />
-          تحديث
-        </motion.button>
+        <div className="relative z-10 border-t border-slate-100/90 px-4 pb-3 sm:hidden">
+          <NawrasTaglineStack compact className="pt-2" />
+        </div>
       </motion.div>
 
       {/* ══ Hero Stats ══════════════════════════════════════════════ */}

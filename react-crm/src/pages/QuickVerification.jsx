@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
+import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 
 function rowMatchesQuery(row, q) {
   if (!q.trim()) return true
@@ -62,47 +63,48 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
       className="relative isolate w-full overflow-hidden rounded-b-[1.35rem] border border-white/15 border-t-0 shadow-[0_8px_0_0_rgba(167,139,250,0.12),0_28px_80px_-28px_rgba(15,23,42,0.75),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-violet-300/25 ring-offset-0 backdrop-blur-2xl sm:rounded-b-[1.75rem]"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
+      <NawrasHeroImageLayer opacity={0.13} footerCropPct={16} className="z-0 mix-blend-soft-light rounded-b-[inherit]" />
       {/* إطار متدرج خفيف — يبرز حواف الكتلة */}
       <div
-        className="pointer-events-none absolute inset-0 rounded-b-[inherit] bg-gradient-to-b from-white/[0.08] via-transparent to-transparent opacity-90"
+        className="pointer-events-none absolute inset-0 z-[1] rounded-b-[inherit] bg-gradient-to-b from-white/[0.08] via-transparent to-transparent opacity-90"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-[1px] rounded-b-[calc(1.35rem-2px)] border border-white/[0.07] border-t-0 sm:rounded-b-[calc(1.75rem-2px)]"
+        className="pointer-events-none absolute inset-[1px] z-[1] rounded-b-[calc(1.35rem-2px)] border border-white/[0.07] border-t-0 sm:rounded-b-[calc(1.75rem-2px)]"
         aria-hidden
       />
       {/* لمعان سفلي — خط فاصل أنيق يندمج مع الشريط التالي */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-violet-500/0 via-fuchsia-300/35 to-violet-500/0 blur-[2px]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[3px] bg-gradient-to-r from-violet-500/0 via-fuchsia-300/35 to-violet-500/0 blur-[2px]"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-x-[12%] bottom-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+        className="pointer-events-none absolute inset-x-[12%] bottom-0 z-[1] h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
         aria-hidden
       />
       {/* لمسات جانبية رأسية */}
       <div
-        className="pointer-events-none absolute inset-y-6 right-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
+        className="pointer-events-none absolute inset-y-6 right-0 z-[1] w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-y-6 left-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
+        className="pointer-events-none absolute inset-y-6 left-0 z-[1] w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
         aria-hidden
       />
       <div
-        className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
+        className="absolute inset-0 z-[1] bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
         aria-hidden
       />
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/88 via-[#2d0a52]/88 to-[#4B0082]/88" />
+      <div className="absolute inset-0 z-[1] bg-gradient-to-br from-slate-950/88 via-[#2d0a52]/88 to-[#4B0082]/88" />
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 z-[1] opacity-[0.07]"
         style={{
           backgroundImage:
             'linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)',
           backgroundSize: '48px 48px',
         }}
       />
-      <div className="relative flex w-full min-w-0 flex-col gap-8 px-5 py-8 sm:px-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:px-10 lg:py-8 xl:px-12 2xl:px-16">
+      <div className="relative z-10 flex w-full min-w-0 flex-col gap-8 px-5 py-8 sm:px-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:px-10 lg:py-8 xl:px-12 2xl:px-16">
         <div className="min-w-0 flex-1 text-right">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-violet-200/90 backdrop-blur-sm">
             <Sparkles size={12} className="text-amber-200/90" strokeWidth={2.2} />
@@ -117,6 +119,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/70 md:text-[0.95rem]">
             لوحة مراجعة تنفيذية لاستبيانات اليوم: أزمات الرضا، طلبات التجميد، ومتابعة الحلول — بلمحة سريعة ووضوح بصري.
           </p>
+          <NawrasTaglineStack light className="mt-3 max-w-xl" />
           <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
             <div className="inline-flex items-center gap-2.5 rounded-2xl border border-white/20 bg-white/[0.07] px-4 py-2.5 shadow-inner backdrop-blur-md">
               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-200">

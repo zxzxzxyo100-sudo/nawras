@@ -4,6 +4,7 @@ import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
 import FloatingCallBar from './FloatingCallBar'
 import DeviationAlertOverlay from './DeviationAlertOverlay'
+import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth } from '../contexts/AuthContext'
 import { PrivateTicketsAlertProvider, usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 
@@ -44,10 +45,23 @@ function LayoutInner() {
         <header
           className={
             isQuickVerification
-              ? 'lg:hidden sticky top-0 z-20 flex items-center justify-between border-b border-violet-200/35 bg-white/75 px-4 py-3 shadow-[0_8px_30px_-12px_rgba(75,0,130,0.12)] backdrop-blur-xl'
-              : 'lg:hidden sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm'
+              ? 'lg:hidden sticky top-0 z-20 relative overflow-hidden flex items-center justify-between border-b border-violet-200/35 px-4 py-3 shadow-[0_8px_30px_-12px_rgba(75,0,130,0.12)] backdrop-blur-xl'
+              : 'lg:hidden sticky top-0 z-20 relative overflow-hidden flex items-center justify-between border-b border-slate-200 px-4 py-3 shadow-sm'
           }
         >
+          <NawrasHeroImageLayer
+            opacity={isQuickVerification ? 0.14 : 0.12}
+            footerCropPct={15}
+            className={isQuickVerification ? 'mix-blend-soft-light' : ''}
+          />
+          <div
+            className={
+              isQuickVerification
+                ? 'pointer-events-none absolute inset-0 bg-gradient-to-l from-violet-950/80 via-violet-900/55 to-violet-950/75'
+                : 'pointer-events-none absolute inset-0 bg-gradient-to-l from-white/92 via-white/78 to-white/88'
+            }
+            aria-hidden
+          />
           <button
             onClick={() => setSidebarOpen(true)}
             className={
@@ -58,14 +72,26 @@ function LayoutInner() {
           >
             <Menu size={20} />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="relative z-10 flex min-w-0 flex-1 items-center justify-center gap-2 px-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
               <Package size={14} className="text-white" />
             </div>
-            <span className="font-bold text-slate-800 text-base">نظام النورس</span>
+            <div className="min-w-0 text-center">
+              <span
+                className={`block font-bold text-base truncate ${
+                  isQuickVerification ? 'text-white' : 'text-slate-800'
+                }`}
+              >
+                نظام النورس
+              </span>
+              <NawrasTaglineStack
+                light={isQuickVerification}
+                compact
+                className="mt-0.5 max-w-[14rem] mx-auto"
+              />
+            </div>
           </div>
-          {/* spacer to center the logo */}
-          <div className="w-10" />
+          <div className="relative z-10 w-10 shrink-0" />
         </header>
 
         {/* شريط البيئة التجريبية */}
@@ -73,15 +99,45 @@ function LayoutInner() {
           <div
             className={
               isQuickVerification
-                ? 'sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-violet-500/35 bg-violet-950/55 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl'
-                : 'sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-violet-700/40 bg-violet-900/80 py-1 text-center backdrop-blur-md'
+                ? 'sticky top-0 z-30 relative overflow-hidden flex items-center justify-center gap-2 border-b border-violet-500/35 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl'
+                : 'sticky top-0 z-30 relative overflow-hidden flex items-center justify-center gap-2 border-b border-violet-700/40 py-1 text-center backdrop-blur-md'
             }
           >
-            <FlaskConical size={11} className="text-violet-300" />
-            <p className="text-violet-200 text-[10px] font-semibold">
+            <NawrasHeroImageLayer opacity={0.06} footerCropPct={18} className="mix-blend-overlay" />
+            <div
+              className={
+                isQuickVerification
+                  ? 'pointer-events-none absolute inset-0 bg-violet-950/72'
+                  : 'pointer-events-none absolute inset-0 bg-violet-900/78'
+              }
+              aria-hidden
+            />
+            <FlaskConical size={11} className="relative z-10 text-violet-300" />
+            <p className="relative z-10 text-violet-200 text-[10px] font-semibold">
               بيئة تجريبية — قاعدة بيانات مستقلة
             </p>
-            <FlaskConical size={11} className="text-violet-300" />
+            <FlaskConical size={11} className="relative z-10 text-violet-300" />
+          </div>
+        )}
+
+        {/* شريط علوي للشاشات الكبيرة — كل الصفحات ما عدا التحقيق السريع (له هيدر خاص) */}
+        {!isQuickVerification && (
+          <div className="relative z-10 hidden lg:flex items-center justify-between gap-4 overflow-hidden border-b border-slate-200/90 bg-white/95 px-6 py-2.5 shadow-sm backdrop-blur-md">
+            <NawrasHeroImageLayer opacity={0.11} footerCropPct={15} />
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-l from-slate-50/95 via-white/88 to-indigo-50/40"
+              aria-hidden
+            />
+            <div className="relative z-10 flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-md shadow-violet-500/25">
+                <Package size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-800">نظام النورس — CRM</p>
+                <p className="text-[11px] text-slate-500">لوحة التحكم والمهام</p>
+              </div>
+            </div>
+            <NawrasTaglineStack className="relative z-10 max-w-[min(100%,280px)] shrink-0" />
           </div>
         )}
 
