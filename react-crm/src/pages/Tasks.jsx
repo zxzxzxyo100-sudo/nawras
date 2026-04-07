@@ -1509,9 +1509,9 @@ export default function Tasks() {
               <>
                 <p className="text-cyan-100/95 text-sm mt-2">
                   قائمة «المتابعة الدورية»:{' '}
-                  {activeWf.active_count ?? 0}
+                  {Math.min(activeWf.active_count ?? 0, activeWf.target ?? 50)}
                   {' / '}
-                  {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً ويظهر في آخر القائمة.
+                  {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً.
                 </p>
                 <p className="text-sm mt-1 text-cyan-200/80">
                   في تبويب «لم يرد»: {activeWf.no_answer_count ?? 0}
