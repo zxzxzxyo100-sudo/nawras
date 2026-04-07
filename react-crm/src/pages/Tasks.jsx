@@ -764,8 +764,10 @@ export default function Tasks() {
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
   /** إشعار بعد «لم يرد» أو بلوغ الهدف */
   const [toastMsg, setToastMsg] = useState('')
-  /** فتح استبيان تهيئة المتجر الجديد من «تم» */
+  /** فتح استبيان تهيئة المتجر الجديد من «تم» أو من «اتصل» */
   const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
+  /** بعد حفظ الاستبيان: فتح نافذة ملاحظة المكالمة (احتضان) أو إخفاء مهمة التنفيذي */
+  const pendingOnboardingFlowRef = useRef(null)
   /** طابور موظف الاستعادة (50 متجر غير نشط) من active-workflow.php */
   const [inactiveWf, setInactiveWf] = useState(null)
   /** طابور مسؤول المتاجر النشطة (50) + عدّ «تم التواصل» يومياً */
@@ -1109,6 +1111,7 @@ export default function Tasks() {
       return
     }
     if (task.type === 'new_merchant_onboarding') {
+      pendingOnboardingFlowRef.current = null
       if (onboardingDoneForStore(newMerchantOnboardingDoneIds, task.store.id)) {
         dismissTaskOnly(task.id)
         return
@@ -1123,11 +1126,39 @@ export default function Tasks() {
         return
       }
     }
+
+    const storeNeedsOnboardingSurvey =
+      needsNewMerchantOnboardingSurvey(task.store, newMerchantOnboardingDoneIds)
+      && !onboardingDoneForStore(newMerchantOnboardingDoneIds, task.store.id)
+
+    /** مكالمة احتضان: استبيان التهيئة إلزامي قبل نافذة «تم» (ملاحظة المكالمة) */
+    if (
+      user?.role === 'incubation_manager'
+      && task.type === 'new_call'
+      && storeNeedsOnboardingSurvey
+    ) {
+      pendingOnboardingFlowRef.current = { after: 'inc_done', task }
+      setPendingOnboardingTask(task)
+      return
+    }
+
     if (user?.role === 'incubation_manager') {
       setDoneModalErr('')
       setPendingDoneTask(task)
       return
     }
+
+    /** تنفيذي: نفس الاستبيان قبل إخفاء مهمة المكالمة */
+    if (
+      user?.role === 'executive'
+      && task.type === 'new_call'
+      && storeNeedsOnboardingSurvey
+    ) {
+      pendingOnboardingFlowRef.current = { after: 'exec_dismiss', task }
+      setPendingOnboardingTask(task)
+      return
+    }
+
     dismissTaskOnly(task.id)
   }
 
@@ -1832,14 +1863,26 @@ export default function Tasks() {
       {pendingOnboardingTask && (
         <NewMerchantOnboardingModal
           store={pendingOnboardingTask.store}
-          dailyTaskKey={pendingOnboardingTask.id}
-          onClose={() => setPendingOnboardingTask(null)}
+          dailyTaskKey={pendingOnboardingFlowRef.current ? undefined : pendingOnboardingTask.id}
+          skipMarkDailyDone={!!pendingOnboardingFlowRef.current}
+          onClose={() => {
+            pendingOnboardingFlowRef.current = null
+            setPendingOnboardingTask(null)
+          }}
           onSaved={async () => {
+            const flow = pendingOnboardingFlowRef.current
             const t = pendingOnboardingTask
+            pendingOnboardingFlowRef.current = null
             setPendingOnboardingTask(null)
             await reload()
             loadDismissals()
-            if (t && IS_STAGING_OR_DEV) {
+            if (flow?.after === 'inc_done' && flow.task && user?.role === 'incubation_manager') {
+              setDoneModalErr('')
+              setPendingDoneTask(flow.task)
+            } else if (flow?.after === 'exec_dismiss' && flow.task && user?.role === 'executive') {
+              await dismissTaskOnly(flow.task.id)
+            }
+            if (t && IS_STAGING_OR_DEV && !flow) {
               setSelectedTask(t)
             }
           }}
