@@ -1035,7 +1035,7 @@ export default function Tasks() {
     return t
   }, [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds])
 
-  const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
+  const pendingTasks = tasks.filter(t => t.moContactedToday || !dismissalKeys.has(t.id))
 
   const { mainTasks, noAnswerTasks, highCountMain } = useMemo(() => {
     const main = []
