@@ -21,7 +21,7 @@ import {
 } from '../utils/merchantOfficerQueue'
 import {
   getBizDateKeyAt9am,
-  pickDailyColdInactiveStores,
+  getDailyColdBatchStores,
   buildColdVerificationTasks,
 } from '../utils/coldVerificationDaily'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
@@ -910,7 +910,7 @@ export default function Tasks() {
 
   const coldVerificationTasksAll = useMemo(() => {
     if (!isMoStaging) return []
-    const picked = pickDailyColdInactiveStores(
+    const picked = getDailyColdBatchStores(
       allStores,
       storeStates,
       bizDateKeyCold,
@@ -1246,7 +1246,7 @@ export default function Tasks() {
               <p className="text-sky-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-sky-300/35 bg-gradient-to-l from-sky-400/15 to-cyan-300/10 backdrop-blur-sm">
                 <Snowflake className="inline-block ml-1.5 align-text-bottom opacity-90" size={14} aria-hidden />
                 {' '}
-                تحقيق البارد: حتى 30 متجراً يومياً من «غير النشط البارد» — تتجدد الدفعة تلقائياً الساعة 9:00 صباحاً (توقيت جهازك). يوم الدفعة الحالي:{' '}
+                تحقيق البارد: حتى 30 متجراً تُختار مرة واحدة لكل يوم عمل (يبدأ 9:00 صباحاً — توقيت جهازك). لا يُستبدل من خرج بالتجميد أو الاتصال في نفس اليوم؛ دفعة جديدة فقط بعد 9:00 ص يوم العمل التالي. يوم الدفعة:{' '}
                 <span className="font-mono font-bold tabular-nums">{bizDateKeyCold}</span>
                 {' — '}إجمالي المتاجر الباردة في النظام:{' '}
                 {coldInactivePoolCount.toLocaleString('ar-SA')}
@@ -1464,7 +1464,7 @@ export default function Tasks() {
               <>
                 <Snowflake size={56} className="text-cyan-300 mx-auto mb-4" />
                 <p className="font-black text-slate-700 text-xl">لا توجد متاجر «غير نشط بارد» في النظام</p>
-                <p className="text-slate-500 text-sm mt-2">عند الإتاحة ستُعرض هنا دفعة يومية حتى 30 متجراً</p>
+                <p className="text-slate-500 text-sm mt-2">عند وجود متاجر بارد ستُعرض دفعة يومية حتى 30؛ تُحدَّد الدفعة الجديدة بعد 9:00 ص يوم العمل التالي</p>
               </>
             ) : pendingColdVerifyTasks.length === 0 && coldVerificationTasksAll.length > 0 ? (
               <>

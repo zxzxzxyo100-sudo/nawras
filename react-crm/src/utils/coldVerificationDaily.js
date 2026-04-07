@@ -1,6 +1,9 @@
 /**
- * دفعة «تحقيق البارد»: 30 متجراً غير نشط بارد يومياً، تتجدد الساعة 9:00 صباحاً (توقيت الجهاز).
- * الترتيب حتمي حسب (يوم العمل + اسم المستخدم) ليتطابق لكل موظف.
+ * دفعة «تحقيق البارد»: حتى 30 متجراً **لليوم الواحد** (يوم العمل يبدأ 9:00 صباحاً).
+ *
+ * - عند أول بناء للدفعة في ذلك اليوم تُختار حتى 30 معرفاً (ترتيب حتمي) وتُحفَظ محلياً.
+ * - عند تجميد أو اتصال يخرج المتجر من البارد **لا يُستبدل** بآخر في نفس اليوم.
+ * - دفعة جديدة فقط مع **يوم عمل جديد** بعد الساعة 9:00 صباحاً (مفتاح التخزين = يوم الدفعة).
  */
 
 function hashStringToUint32(str) {
@@ -12,7 +15,7 @@ function hashStringToUint32(str) {
   return h >>> 0
 }
 
-/** يوم «الدفعة»: قبل 9:00 صباحاً يُعتبر اليوم السابق. */
+/** يوم «الدفعة»: قبل 9:00 صباحاً يُعتبر اليوم السابق (توقيت الجهاز). */
 export function getBizDateKeyAt9am(now = new Date()) {
   const d = new Date(now.getTime())
   if (d.getHours() < 9) {
@@ -24,27 +27,88 @@ export function getBizDateKeyAt9am(now = new Date()) {
   return `${y}-${m}-${day}`
 }
 
-/**
- * يختار حتى `limit` متجراً من «غير النشط البارد» ليوم العمل الحالي.
- *
- * **مهم:** الترتيب اليومي يُشتق من `(يوم العمل + المستخدم + معرف المتجر)` وليس من
- * خلط القائمة الحالية فقط. بذلك عند تجميد متجر أو اتصال يخرج من البارد، يبقى
- * ترتيب بقية المتاجر ثابتاً ويُستبدل الفراغ تلقائياً بالمتجر التالي في الترتيب
- * (دون أن ينهار العدد من 30 إلى 29 طالما يوجد في النظام 30+ متجر بارد).
- */
-export function pickDailyColdInactiveStores(allStores, storeStates, bizDateKey, username, limit = 30) {
-  const cold = (allStores || []).filter(s => {
+const STORAGE_KEY_PREFIX = 'nawras_cold_daily_ids_v2'
+
+function storageKey(bizDateKey, username) {
+  return `${STORAGE_KEY_PREFIX}|${bizDateKey}|${String(username || 'anon')}`
+}
+
+function listColdInactiveStores(allStores, storeStates) {
+  return (allStores || []).filter(s => {
     const cat = storeStates?.[s.id]?.category || s.category || ''
     return cat === 'cold_inactive'
   })
+}
+
+/** ترتيب حتمي ثم أول `limit` معرفات — يُستدعى مرة عند إنشاء دفعة اليوم فقط. */
+function computeInitialBatchIds(allStores, storeStates, bizDateKey, username, limit) {
+  const cold = listColdInactiveStores(allStores, storeStates)
   const u = String(username || 'anon')
   const seed = `nawras_cold_v1|${bizDateKey}|${u}`
   const withRank = cold.map(s => ({
-    store: s,
+    id: Number(s.id),
     rank: hashStringToUint32(`${seed}|id:${s.id}`),
   }))
-  withRank.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : Number(a.store.id) - Number(b.store.id)))
-  return withRank.slice(0, Math.min(limit, withRank.length)).map(x => x.store)
+  withRank.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : a.id - b.id))
+  return withRank.slice(0, Math.min(limit, withRank.length)).map(x => x.id)
+}
+
+/**
+ * يعيد متاجر «البارد» المندرجة في **دفعة اليوم المخزّنة** فقط، والتي لا تزال باردة.
+ * لا إدخال بديل في نفس اليوم بعد استنفاد أو إخراج متاجر من الدفعة.
+ */
+export function getDailyColdBatchStores(allStores, storeStates, bizDateKey, username, limit = 30) {
+  const key = storageKey(bizDateKey, username)
+  let ids = null
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed) && parsed.length) {
+          ids = parsed.map(x => Number(x))
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const coldNow = listColdInactiveStores(allStores, storeStates)
+
+  if (!ids || ids.length === 0) {
+    if (coldNow.length === 0) return []
+    ids = computeInitialBatchIds(allStores, storeStates, bizDateKey, username, limit)
+    if (typeof window !== 'undefined' && ids.length > 0) {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(ids))
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  const byId = {}
+  ;(allStores || []).forEach(s => {
+    const n = Number(s.id)
+    byId[n] = s
+  })
+
+  const out = []
+  for (const rawId of ids) {
+    const id = Number(rawId)
+    const s = byId[id]
+    if (!s) continue
+    const cat = storeStates?.[s.id]?.category || s.category || ''
+    if (cat === 'cold_inactive') out.push(s)
+  }
+  return out
+}
+
+/** اسم قديم — نفس سلوك `getDailyColdBatchStores`. */
+export function pickDailyColdInactiveStores(allStores, storeStates, bizDateKey, username, limit = 30) {
+  return getDailyColdBatchStores(allStores, storeStates, bizDateKey, username, limit)
 }
 
 export function buildColdVerificationTasks(pickedStores, bizDateKey) {
@@ -54,7 +118,7 @@ export function buildColdVerificationTasks(pickedStores, bizDateKey) {
     priority: 'normal',
     type: 'cold_verification',
     label: 'تحقيق بارد',
-    desc: `متجر غير نشط بارد — دفعة يومية تتجدد 9:00 ص (${bizDateKey})`,
+    desc: `متجر غير نشط بارد — دفعة يومية ثابتة؛ تُحدَّد دفعة جديدة 9:00 ص (${bizDateKey})`,
     coldVerifyBatchDate: bizDateKey,
   }))
 }
