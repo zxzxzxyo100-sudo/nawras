@@ -112,15 +112,31 @@ function latestCallEntry(log) {
   return entries[0]
 }
 
-function hideDailyTaskDueToCallToday(log, todayIso) {
+/**
+ * هل تاريخ سجل المكالمة (من الخادم، غالباً UTC) يقع في نفس اليوم التقويمي المحلي للمستخدم.
+ * يصلح عدم ظهور «تم التواصل» عندما لا يطابق بادئة YYYY-MM-DD المحلية بسبب انزياح التوقيت.
+ */
+export function isCallLogDateLocalToday(dateStr, ref = new Date()) {
+  if (!dateStr) return false
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return false
+  return (
+    d.getFullYear() === ref.getFullYear()
+    && d.getMonth() === ref.getMonth()
+    && d.getDate() === ref.getDate()
+  )
+}
+
+export function hideDailyTaskDueToCallToday(log) {
   const top = latestCallEntry(log)
-  if (!top?.date || !String(top.date).startsWith(todayIso)) return false
+  if (!top?.date || !isCallLogDateLocalToday(top.date)) return false
   return String(top.outcome ?? '').trim() !== 'no_answer'
 }
 
-export function isContactedAnsweredToday(log, todayIso) {
+export function isContactedAnsweredToday(log) {
+  const ref = new Date()
   return Object.values(log || {}).some(c => {
-    if (!c?.date || !String(c.date).startsWith(todayIso)) return false
+    if (!c?.date || !isCallLogDateLocalToday(c.date, ref)) return false
     const o = String(c.outcome ?? '').trim()
     return o === 'answered' || o === ''
   })
@@ -244,7 +260,6 @@ export function generateIncubationOfficerStagingTasks(
   newMerchantOnboardingDoneIds,
   isStagingOrDev,
 ) {
-  const today = localDateYmd(new Date())
   const tasks = []
 
   allStores.forEach(store => {
@@ -253,7 +268,7 @@ export function generateIncubationOfficerStagingTasks(
     const incBucket = store._inc
     const topCall = latestCallEntry(log)
     const lastCallDate = topCall?.date
-    const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
+    const callTodayHidesTask = hideDailyTaskDueToCallToday(log)
     const daysSinceLast = lastCallDate
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
@@ -275,7 +290,7 @@ export function generateIncubationOfficerStagingTasks(
       store.bucket === 'incubating'
       && !onboardingDoneForStore(newMerchantOnboardingDoneIds, store.id)
     ) {
-      const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
+      const answeredToday = isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
       const base = {
         id: `${store.id}-new-onboarding`,
         store,
@@ -309,7 +324,7 @@ export function generateIncubationOfficerStagingTasks(
             ? '🚨 المكالمة الثالثة والأخيرة'
             : retro.badge
 
-      const answeredToday = isContactedAnsweredToday(log, today) && hideDailyTaskDueToCallToday(log, today)
+      const answeredToday = isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
       const overdueInfo = isOverdueForStage(store, storeStates, days)
       const due = isDueForPeriodicStage(store, storeStates, days)
       const needWork = due || overdueInfo.overdue
