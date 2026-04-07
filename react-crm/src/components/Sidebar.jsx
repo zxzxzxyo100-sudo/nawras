@@ -412,6 +412,17 @@ const NAV_GROUPS = [
   },
 ]
 
+/** مسؤول المتاجر النشطة: لوحة جانبية مبسّطة — لوحة التحكم + المهام اليومية فقط */
+function navGroupsForUser(role) {
+  if (role === 'active_manager') {
+    return [
+      { label: 'الرئيسية', keys: ['/'] },
+      { label: 'الإدارة', keys: ['/tasks'] },
+    ]
+  }
+  return NAV_GROUPS
+}
+
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
   const { shouldAlert: privateTicketNavAlert } = usePrivateTicketsAlert()
@@ -456,7 +467,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Navigation ───────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {NAV_GROUPS.map(group => {
+        {navGroupsForUser(user?.role).map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
               if (key === '__stores_group__') {
