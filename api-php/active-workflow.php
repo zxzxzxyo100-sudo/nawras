@@ -54,7 +54,7 @@ if ($action === 'get_my_workflow') {
     }
     reset_active_assignments_as_fresh_once($pdo, $username);
 
-    // تحويل أي تعيين نشط إلى «مكتمل» إذا سُجّل له «تم الرد» خلال آخر 60 يومًا
+    // تحويل أي تعيين نشط إلى «مكتمل» إذا اتّصل به هذا المستخدم بنجاح خلال آخر 60 يومًا
     $pdo->prepare("
         UPDATE store_assignments sa
         INNER JOIN call_logs cl ON CAST(sa.store_id AS CHAR) = CAST(cl.store_id AS CHAR)
@@ -64,9 +64,10 @@ if ($action === 'get_my_workflow') {
         WHERE sa.assigned_to = ?
         AND sa.assignment_queue = 'active'
         AND sa.workflow_status = 'active'
+        AND cl.performed_by = ?
         AND cl.outcome = 'answered'
         AND cl.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-    ")->execute([$username]);
+    ")->execute([$username, $username]);
 
     // إعادة إسناد المتاجر التي حُذف تعيينها لكن سُجّل لها «تم الرد» خلال آخر 60 يومًا
     $pdo->prepare("
