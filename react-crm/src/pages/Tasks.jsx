@@ -207,6 +207,17 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   }
   const skipExecMoDuplicates = userRole === 'executive'
 
+  /** سعة 50: أقدم 50 تعيين نشط فقط — الباقي يُتجاهل في المتابعة الدورية */
+  const amActiveIds = (() => {
+    if (userRole !== 'active_manager' || !assignments) return null
+    const active = Object.entries(assignments)
+      .filter(([, a]) => a?.assigned_to === username && a?.workflow_status === 'active' && a?.assignment_queue === 'active')
+      .sort((a, b) => new Date(a[1].assigned_at || 0) - new Date(b[1].assigned_at || 0))
+      .slice(0, 50)
+      .map(([sid]) => sid)
+    return new Set(active)
+  })()
+
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
@@ -324,9 +335,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (userRole === 'active_manager' && username && assignments) {
+    if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
-      if (asgn?.assigned_to === username) {
+      if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
         /** «تم التواصل» = workflow_status=completed أو تسجيل مكالمة بـ «تم الرد» اليوم */
         const moContactedToday = asgn?.workflow_status === 'completed' || isContactedAnsweredToday(log)
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
