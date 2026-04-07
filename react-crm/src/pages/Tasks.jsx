@@ -207,13 +207,11 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   }
   const skipExecMoDuplicates = userRole === 'executive'
 
-  /** سعة 50: أقدم 50 تعيين نشط فقط — الباقي يُتجاهل في المتابعة الدورية */
+  /** كل التعيينات النشطة — سقف الـ 50 يُطبَّق فقط على تبويب «متابعة دورية» */
   const amActiveIds = (() => {
     if (userRole !== 'active_manager' || !assignments) return null
     const active = Object.entries(assignments)
       .filter(([, a]) => a?.assigned_to === username && a?.workflow_status === 'active' && a?.assignment_queue === 'active')
-      .sort((a, b) => new Date(a[1].assigned_at || 0) - new Date(b[1].assigned_at || 0))
-      .slice(0, 50)
       .map(([sid]) => sid)
     return new Set(active)
   })()
@@ -1122,7 +1120,7 @@ export default function Tasks() {
       const tb = Number(b.assignedAtTs || 0)
       if (ta !== tb) return ta - tb
       return String(a.id).localeCompare(String(b.id))
-    })
+    }).slice(0, 50)
   }, [isTaskTabUser, mainTasks, callLogs, assignments, user?.role])
 
   const moAmDelayTasks = useMemo(
