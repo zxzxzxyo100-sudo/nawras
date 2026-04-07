@@ -33,11 +33,21 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col lg:mr-60">
-        {/* Mobile top header */}
-        <header className="lg:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        {/* Mobile top header — زجاجي على التحقق السريع ليتماشى مع الهيدر البنفسجي */}
+        <header
+          className={
+            isQuickVerification
+              ? 'lg:hidden sticky top-0 z-20 flex items-center justify-between border-b border-violet-200/35 bg-white/75 px-4 py-3 shadow-[0_8px_30px_-12px_rgba(75,0,130,0.12)] backdrop-blur-xl'
+              : 'lg:hidden sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-sm'
+          }
+        >
           <button
             onClick={() => setSidebarOpen(true)}
-            className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+            className={
+              isQuickVerification
+                ? 'flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100/80 text-violet-800 transition-colors hover:bg-violet-100'
+                : 'flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200'
+            }
           >
             <Menu size={20} />
           </button>
@@ -53,7 +63,13 @@ export default function Layout() {
 
         {/* شريط البيئة التجريبية */}
         {IS_STAGING && (
-          <div className="sticky top-0 z-30 flex items-center justify-center gap-2 py-1 text-center bg-violet-900/80 backdrop-blur-sm border-b border-violet-700/40">
+          <div
+            className={
+              isQuickVerification
+                ? 'sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-violet-500/35 bg-violet-950/55 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl'
+                : 'sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-violet-700/40 bg-violet-900/80 py-1 text-center backdrop-blur-md'
+            }
+          >
             <FlaskConical size={11} className="text-violet-300" />
             <p className="text-violet-200 text-[10px] font-semibold">
               بيئة تجريبية — قاعدة بيانات مستقلة

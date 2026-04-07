@@ -59,7 +59,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
     <header
-      className="relative w-full overflow-hidden rounded-b-[1.35rem] border border-white/15 border-t-0 shadow-[0_8px_0_0_rgba(167,139,250,0.12),0_28px_80px_-28px_rgba(15,23,42,0.75),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-violet-300/25 ring-offset-0 sm:rounded-b-[1.75rem]"
+      className="relative isolate w-full overflow-hidden rounded-b-[1.35rem] border border-white/15 border-t-0 shadow-[0_8px_0_0_rgba(167,139,250,0.12),0_28px_80px_-28px_rgba(15,23,42,0.75),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-violet-300/25 ring-offset-0 backdrop-blur-2xl sm:rounded-b-[1.75rem]"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
       {/* إطار متدرج خفيف — يبرز حواف الكتلة */}
@@ -93,7 +93,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
         className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
         aria-hidden
       />
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#2d0a52] to-[#4B0082]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950/88 via-[#2d0a52]/88 to-[#4B0082]/88" />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
@@ -220,9 +220,9 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
       {items.map(it => (
         <div
           key={it.label}
-          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-200/35 via-white/60 to-fuchsia-100/40 p-[1px] shadow-[0_8px_32px_-12px_rgba(75,0,130,0.18)] transition hover:shadow-[0_16px_48px_-12px_rgba(75,0,130,0.22)]"
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-200/30 via-white/45 to-fuchsia-100/35 p-[1px] shadow-[0_8px_32px_-12px_rgba(75,0,130,0.18)] backdrop-blur-md transition hover:shadow-[0_16px_48px_-12px_rgba(75,0,130,0.22)]"
         >
-          <div className="relative overflow-hidden rounded-[0.9rem] border border-white/90 bg-white p-4 shadow-inner">
+          <div className="relative overflow-hidden rounded-[0.9rem] border border-white/75 bg-white/72 backdrop-blur-xl p-4 shadow-inner">
           <div className={`absolute right-0 top-0 h-1 w-full ${it.bar} opacity-90`} aria-hidden />
           <div className="flex items-start justify-between gap-3 pt-1">
             <div className="min-w-0 text-right">
@@ -421,7 +421,7 @@ function DetailDrawer({
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
             className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l-[5px] border-l-violet-600 bg-white shadow-[-28px_0_90px_-24px_rgba(75,0,130,0.28)] ring-1 ring-violet-200/30"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-l from-violet-50/90 via-white to-white px-5 py-5">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100/80 bg-gradient-to-l from-violet-50/75 via-white/92 to-white/95 px-5 py-5 backdrop-blur-xl">
               <div className="min-w-0 text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600/90">سجل التحقيق</p>
                 <p id="qv-drawer-title" className="mt-1 truncate text-xl font-black text-slate-900">
@@ -809,12 +809,24 @@ export default function QuickVerification() {
     >
       <div className="sticky top-0 z-40 w-full shadow-[0_8px_32px_-12px_rgba(75,0,130,0.12)]">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
-        <div className="relative w-full overflow-hidden border-b border-white/15">
+        <div className="relative isolate w-full overflow-hidden border-x border-white/10 border-b border-white/15 shadow-[0_10px_36px_-20px_rgba(15,23,42,0.65)] ring-1 ring-violet-300/20 backdrop-blur-2xl">
           <div
-            className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_100%_0%,rgba(167,139,250,0.2),transparent_55%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.08),transparent_50%)]"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
             aria-hidden
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-[#2d0a52] to-[#4B0082]" />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(ellipse_100%_80%_at_100%_0%,rgba(167,139,250,0.22),transparent_55%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.1),transparent_50%)]"
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/80 via-[#2d0a52]/85 to-[#4B0082]/82" />
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-x-px top-px bottom-0 border-x border-b border-white/[0.08] border-t-0"
+            aria-hidden
+          />
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.07]"
             style={{
@@ -823,8 +835,18 @@ export default function QuickVerification() {
               backgroundSize: '32px 32px',
             }}
           />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-violet-500/0 via-fuchsia-300/28 to-violet-500/0 blur-[2px]"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-x-[14%] bottom-0 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent"
+            aria-hidden
+          />
+          <div className="pointer-events-none absolute inset-y-5 right-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent opacity-70 sm:inset-y-6" aria-hidden />
+          <div className="pointer-events-none absolute inset-y-5 left-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent opacity-70 sm:inset-y-6" aria-hidden />
           <div className="relative flex w-full flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-            <div className="flex w-full flex-1 rounded-2xl border border-white/20 bg-black/25 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md">
+            <div className="flex w-full flex-1 rounded-2xl border border-white/25 bg-black/20 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl ring-1 ring-white/10">
               <button
                 type="button"
                 onClick={() => setTab('crisis')}
@@ -880,14 +902,22 @@ export default function QuickVerification() {
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-5 py-2.5 text-xs font-bold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/18 disabled:opacity-50 md:text-sm"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/12 px-5 py-2.5 text-xs font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:bg-white/22 disabled:opacity-50 md:text-sm"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin text-white' : 'text-white/90'} strokeWidth={2.2} />
               تحديث البيانات
             </button>
           </div>
         </div>
-        <div className="w-full border-b border-violet-200/40 bg-gradient-to-b from-[#3d1a6e]/25 via-violet-100/35 to-[#ebe7f5] py-5 md:py-6">
+        <div className="relative isolate w-full overflow-hidden border-b border-violet-200/35 bg-gradient-to-b from-white/40 via-violet-100/30 to-[#ebe7f5]/95 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-xl md:py-6">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/50 to-transparent"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent"
+            aria-hidden
+          />
           <QvStatStrip
             total={statStrip.total}
             openCrisis={statStrip.openCrisis}
@@ -899,8 +929,8 @@ export default function QuickVerification() {
       </div>
 
       <div className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16 md:py-10">
-        <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/35 via-white/60 to-fuchsia-200/30 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)]">
-          <div className="relative rounded-[1.25rem] border border-white/90 bg-white/95 shadow-inner">
+        <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/28 via-white/45 to-fuchsia-200/25 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)] ring-1 ring-violet-200/30 backdrop-blur-sm">
+          <div className="relative rounded-[1.25rem] border border-white/85 bg-white/78 backdrop-blur-xl shadow-inner">
           <Search className="pointer-events-none absolute right-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-violet-500/70" strokeWidth={2} />
           <input
             type="search"
