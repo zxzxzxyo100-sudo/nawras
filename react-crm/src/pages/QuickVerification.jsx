@@ -58,15 +58,42 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
   const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
-    <header className="relative w-full overflow-hidden border-b border-white/20 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-violet-400/20">
+    <header
+      className="relative w-full overflow-hidden rounded-b-[1.35rem] border border-white/15 border-t-0 shadow-[0_8px_0_0_rgba(167,139,250,0.12),0_28px_80px_-28px_rgba(15,23,42,0.75),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-violet-300/25 ring-offset-0 sm:rounded-b-[1.75rem]"
+      style={{ fontFamily: "'Cairo', sans-serif" }}
+    >
+      {/* إطار متدرج خفيف — يبرز حواف الكتلة */}
+      <div
+        className="pointer-events-none absolute inset-0 rounded-b-[inherit] bg-gradient-to-b from-white/[0.08] via-transparent to-transparent opacity-90"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-[1px] rounded-b-[calc(1.35rem-2px)] border border-white/[0.07] border-t-0 sm:rounded-b-[calc(1.75rem-2px)]"
+        aria-hidden
+      />
+      {/* لمعان سفلي — خط فاصل أنيق يندمج مع الشريط التالي */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-violet-500/0 via-fuchsia-300/35 to-violet-500/0 blur-[2px]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-x-[12%] bottom-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+        aria-hidden
+      />
+      {/* لمسات جانبية رأسية */}
+      <div
+        className="pointer-events-none absolute inset-y-6 right-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-y-6 left-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent opacity-80 sm:inset-y-8"
+        aria-hidden
+      />
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
         aria-hidden
       />
-      <div
-        className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#2d0a52] to-[#4B0082]"
-        style={{ fontFamily: "'Cairo', sans-serif" }}
-      />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-[#2d0a52] to-[#4B0082]" />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
