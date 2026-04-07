@@ -135,11 +135,15 @@ async function runTaskCompletionAfterAnswered({
         taskCompletion.onActiveGoalBurst?.()
       }
     }
-    if (
-      taskCompletion.dailyTaskKey
-      && (IS_STAGING_OR_DEV || user?.role === 'active_manager')
-    ) {
-      await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
+    if (taskCompletion.dailyTaskKey) {
+      const canMarkDailyDismissal =
+        IS_STAGING_OR_DEV
+        || user?.role === 'active_manager'
+        || user?.role === 'incubation_manager'
+        || user?.role === 'executive'
+      if (canMarkDailyDismissal) {
+        await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
+      }
     }
   } catch (syncErr) {
     const msg = syncErr?.response?.data?.error || syncErr?.message || 'تعذّر مزامنة إتمام المهمة.'
@@ -489,6 +493,8 @@ export default function CallModal({
           IS_STAGING_OR_DEV
           || (user?.role === 'active_manager' && taskCompletion.releaseActiveWorkflow)
           || (user?.role === 'inactive_manager' && taskCompletion.inactiveRecovery)
+          || (Boolean(taskCompletion.dailyTaskKey)
+            && ['incubation_manager', 'executive'].includes(user?.role))
         if (shouldSyncWorkflow) {
           const ok = await runTaskCompletionAfterAnswered({
             taskCompletion, user, store, setError, setSaving,
