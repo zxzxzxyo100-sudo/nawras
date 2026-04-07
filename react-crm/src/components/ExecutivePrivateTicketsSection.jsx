@@ -15,8 +15,6 @@ const fadeUp = {
   visible: { opacity: 1, y: 0 },
 }
 
-const TICKET_DEVIATION = 'deviation_alert'
-
 export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -273,7 +271,6 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
             {tickets.map(t => {
               const done = t.status === 'done'
               const mand = Number(t.is_mandatory) === 1
-              const isDeviation = (t.ticket_type || 'general') === TICKET_DEVIATION
               const canComplete =
                 !done && (isExecutive || t.assignee_username === user?.username)
               return (
@@ -290,11 +287,6 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
                 >
                   <div className="min-w-0 flex-1 text-right">
                     <div className="flex flex-wrap items-center gap-2 justify-end mb-1">
-                      {isDeviation && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-red-600/35 text-red-100 border border-red-400/40">
-                          تذاكر الانحراف
-                        </span>
-                      )}
                       {mand && (
                         <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md bg-amber-500/25 text-amber-100 border border-amber-400/30">
                           إجبارية

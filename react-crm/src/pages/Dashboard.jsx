@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction, getQuickVerificationBourse, getDailyTaskDismissals } from '../services/api'
 import {
@@ -115,7 +114,6 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick,
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, storeStates, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
-  const { refreshPrivateTicketsAlert, deviationLockdown } = usePrivateTicketsAlert()
   const navigate = useNavigate()
 
   const [staffMissions, setStaffMissions] = useState(null)
@@ -193,7 +191,6 @@ export default function Dashboard() {
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
-    void refreshPrivateTicketsAlert()
     if (user?.username) {
       getDailyTaskDismissals(user.username)
         .then(r => {
@@ -583,7 +580,6 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
             glow="#7c3aed55"
             onClick={() => navigate('/new')}
-            dimmed={deviationLockdown}
           />
         )}
         {can('active') && (
@@ -607,7 +603,6 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #065f46, #059669)"
             glow="#05966955"
             onClick={() => navigate('/active/pending')}
-            dimmed={deviationLockdown}
           />
         )}
         {can('hot_inactive') && (
@@ -619,7 +614,6 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #92400e, #d97706)"
             glow="#d9770655"
             onClick={() => navigate('/hot-inactive/all')}
-            dimmed={deviationLockdown}
           />
         )}
         {can('cold_inactive') && (
@@ -631,7 +625,6 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
             glow="#8b5cf655"
             onClick={() => navigate('/cold-inactive')}
-            dimmed={deviationLockdown}
           />
         )}
         {can('tasks') && (can('active') || can('new')) && (
