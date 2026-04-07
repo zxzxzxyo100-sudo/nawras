@@ -75,6 +75,8 @@ export default function NewMerchantOnboardingModal({
   onSaved,
   /** إن وُجدت، تُخفى مهمة اليوم ذات المفتاح بعد حفظ الاستبيان بنجاح */
   dailyTaskKey,
+  /** عند true: يُحفظ الاستبيان فقط دون إخفاء مهمة يومية (يُستخدم قبل إتمام مكالمة الاحتضان) */
+  skipMarkDailyDone = false,
 }) {
   const { user } = useAuth()
   const useDevSurvey = IS_STAGING_OR_DEV
@@ -145,7 +147,7 @@ export default function NewMerchantOnboardingModal({
     setSaving(true)
     try {
       await saveSurvey(payload)
-      if (dailyTaskKey && user?.username) {
+      if (!skipMarkDailyDone && dailyTaskKey && user?.username) {
         await markDailyTaskDone({ username: user.username, task_key: dailyTaskKey })
       }
       onSaved?.()
