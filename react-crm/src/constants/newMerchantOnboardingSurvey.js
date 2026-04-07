@@ -87,3 +87,23 @@ export function needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDon
   }
   return !newMerchantOnboardingDoneIds[sid] && !newMerchantOnboardingDoneIds[String(sid)]
 }
+
+/** هل وُجد سجل استبيان تهيئة لهذا المتجر (لا يُعاد طلب الاستبيان في مكالمات الاحتضان الدورية) */
+export function isNewMerchantOnboardingSurveyDone(store, newMerchantOnboardingDoneIds) {
+  if (!store || store.id == null) return false
+  if (!newMerchantOnboardingDoneIds) return false
+  const sid = store.id
+  const n = Number(sid)
+  if (newMerchantOnboardingDoneIds instanceof Set) {
+    return (
+      newMerchantOnboardingDoneIds.has(sid)
+      || newMerchantOnboardingDoneIds.has(String(sid))
+      || (Number.isFinite(n) && newMerchantOnboardingDoneIds.has(n))
+    )
+  }
+  return Boolean(
+    newMerchantOnboardingDoneIds[sid]
+    || newMerchantOnboardingDoneIds[String(sid)]
+    || (Number.isFinite(n) && newMerchantOnboardingDoneIds[n]),
+  )
+}
