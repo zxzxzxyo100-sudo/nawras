@@ -121,8 +121,8 @@ elseif ($action === 'mark_no_answer') {
     ")->execute([$storeId, $input['store_name'] ?? '', $queue === 'inactive' ? 'استعادة — عدم رد' : 'استبيان — عدم الرد', $detail, $username, $roleLabel]);
 
     $added = $queue === 'inactive'
-        ? fill_inactive_slots_for_user($pdo, $username, $username, 1)
-        : replace_one_active_queue_slot($pdo, $username, $username);
+        ? fill_inactive_slots_for_user($pdo, $username, $username, null)
+        : fill_slots_for_user($pdo, $username, $username, null);
     $payload = ['success' => true, 'replacement_added' => $added, 'queue' => $queue];
     if ($queue === 'inactive') {
         $payload['daily_successful_contacts'] = get_inactive_daily_success_count($pdo, $username);
@@ -199,7 +199,7 @@ elseif ($action === 'release_after_survey') {
     }
     ensure_active_daily_stats_schema($pdo);
     increment_active_daily_success($pdo, $username);
-    $fill = replace_one_active_queue_slot($pdo, $username, $username);
+    $fill = fill_slots_for_user($pdo, $username, $username, null);
     $count = get_active_daily_success_count($pdo, $username);
     jsonResponse([
         'success' => true,
