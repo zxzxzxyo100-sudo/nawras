@@ -241,16 +241,22 @@ function count_inactive_queue(PDO $pdo, $username) {
 }
 
 /**
- * تقليم الفائض: إذا تجاوز عدد المتاجر النشطة السقف (50)، نحذف الأحدث إسنادًا ونبقي أقدم 50.
+ * تقليم: نبقي أقدم 50 تعيين نشط لم يُتصل به اليوم + كل المتصل بهم اليوم، ونحذف الباقي.
  */
 function trim_active_queue_excess(PDO $pdo, $username) {
-    $have = count_active_queue($pdo, $username);
-    $excess = $have - ACTIVE_QUEUE_TARGET;
+    $pending = count_pending_active_queue($pdo, $username);
+    $excess = $pending - ACTIVE_QUEUE_TARGET;
     if ($excess <= 0) return 0;
     $st = $pdo->prepare("
-        SELECT store_id FROM store_assignments
-        WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'active'
-        ORDER BY assigned_at DESC
+        SELECT sa.store_id FROM store_assignments sa
+        WHERE sa.assigned_to = ? AND sa.workflow_status = 'active' AND sa.assignment_queue = 'active'
+        AND NOT EXISTS (
+            SELECT 1 FROM call_logs cl
+            WHERE cl.store_id = sa.store_id
+            AND DATE(cl.created_at) = CURDATE()
+            AND cl.outcome = 'answered'
+        )
+        ORDER BY sa.assigned_at DESC
         LIMIT " . (int) $excess . "
     ");
     $st->execute([$username]);
@@ -391,6 +397,7 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
+    trim_active_queue_excess($pdo, $username);
     $pending = count_pending_active_queue($pdo, $username);
     $need = ACTIVE_QUEUE_TARGET - $pending;
     if ($need <= 0) {
