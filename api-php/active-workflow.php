@@ -53,6 +53,34 @@ if ($action === 'get_my_workflow') {
         ]);
     }
     reset_active_assignments_as_fresh_once($pdo, $username);
+
+    // إعادة إسناد المتاجر المتصل بها هذا الشهر والتي حُذف تعيينها
+    $pdo->prepare("
+        INSERT INTO store_assignments
+            (store_id, store_name, assigned_to, assigned_by, notes, workflow_status, assignment_queue, assigned_at, workflow_updated_at)
+        SELECT DISTINCT
+            cl.store_id,
+            COALESCE(ss.store_name, ''),
+            ?,
+            'system_restore',
+            '',
+            'completed',
+            'active',
+            cl.created_at,
+            cl.created_at
+        FROM call_logs cl
+        LEFT JOIN store_states ss ON CAST(ss.store_id AS CHAR) = CAST(cl.store_id AS CHAR)
+        WHERE cl.performed_by = ?
+        AND cl.outcome = 'answered'
+        AND cl.created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+        AND CAST(cl.store_id AS CHAR) NOT IN (
+            SELECT store_id FROM store_assignments WHERE assigned_to = ? AND assignment_queue = 'active'
+        )
+        ON DUPLICATE KEY UPDATE
+            workflow_status = 'completed',
+            assigned_by = 'system_restore'
+    ")->execute([$username, $username, $username]);
+
     fill_slots_for_user($pdo, $username, $username, null);
 
     $stActive = $pdo->prepare("
