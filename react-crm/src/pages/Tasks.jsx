@@ -374,7 +374,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           t.amTaskInDelays =
             !taskIsNoAnswer(t, callLogs, assignments)
             && !moContactedToday
-            && (limboCallNotAnsweredToday || assignedBeforeToday)
+            && assignedBeforeToday
           tasks.push(t)
         } else {
           const descBase = shipDesc
@@ -393,7 +393,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           t.amTaskInDelays =
             !taskIsNoAnswer(t, callLogs, assignments)
             && !moContactedToday
-            && (limboCallNotAnsweredToday || assignedBeforeToday)
+            && assignedBeforeToday
           tasks.push(t)
         }
       }
