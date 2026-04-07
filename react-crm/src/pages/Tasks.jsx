@@ -183,6 +183,20 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   }
 
   const tasks = []
+  /** التنفيذي: نفس طابور مسؤول الاحتضان (دورة 14 يوماً) + مهام إضافية (استعادة ساخن/بارد، متابعة نشط) */
+  if (userRole === 'executive') {
+    tasks.push(
+      ...generateIncubationOfficerStagingTasks(
+        allStores,
+        callLogs,
+        storeStates,
+        newMerchantOnboardingDoneIds,
+        IS_STAGING_OR_DEV,
+      ),
+    )
+  }
+  const skipExecMoDuplicates = userRole === 'executive'
+
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
@@ -203,7 +217,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       ? 'اضغط «اتصل» ليظهر استبيان التهيئة (ثلاثة أسئلة) فوراً، ثم سجّل المكالمة من البطاقة — أو من لوحة المتاجر الجديدة'
       : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة'
 
-    if (['call_1', 'call_2', 'call_3'].includes(incBucket) && execOrIncOfficer) {
+    if (!skipExecMoDuplicates && ['call_1', 'call_2', 'call_3'].includes(incBucket) && execOrIncOfficer) {
       const incubationBadge =
         IS_STAGING_OR_DEV && incBucket === 'call_2'
           ? '⚠️ المكالمة الثانية للمتجر'
@@ -238,7 +252,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (needsNewOnboarding) {
+    if (!skipExecMoDuplicates && needsNewOnboarding) {
       const mergedIntoIncCall =
         userRole === 'executive' && ['call_1', 'call_2', 'call_3'].includes(incBucket)
       if (!mergedIntoIncCall) {
@@ -253,7 +267,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (incBucket === 'never_started' && ['incubation_manager', 'executive'].includes(userRole)) {
+    if (!skipExecMoDuplicates && incBucket === 'never_started' && ['incubation_manager', 'executive'].includes(userRole)) {
       if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-never`, store,
@@ -264,7 +278,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (incBucket === 'restoring' && ['incubation_manager', 'executive'].includes(userRole)) {
+    if (!skipExecMoDuplicates && incBucket === 'restoring' && ['incubation_manager', 'executive'].includes(userRole)) {
       if (!callTodayHidesTask) {
         tasks.push({
           id: `${store.id}-restoring`, store,
@@ -443,8 +457,8 @@ function MerchantOfficerTaskRow({
     typeof onNoAnswerWorkflow === 'function'
     && ((task.type === 'assigned_store' && userRole === 'active_manager')
       || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
-      || (task.type === 'new_call' && userRole === 'incubation_manager')
-      || (task.type === 'new_merchant_onboarding' && userRole === 'incubation_manager')
+      || (task.type === 'new_call' && ['incubation_manager', 'executive'].includes(userRole))
+      || (task.type === 'new_merchant_onboarding' && ['incubation_manager', 'executive'].includes(userRole))
       || task.type === 'recovery_call')
   return (
     <motion.div
@@ -592,7 +606,7 @@ function TaskCard({
     && (
       (task.type === 'assigned_store' && userRole === 'active_manager')
       || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
-      || (task.type === 'cold_verification' && userRole === 'incubation_manager')
+      || (task.type === 'cold_verification' && ['incubation_manager', 'executive'].includes(userRole))
       || (task.type === 'am_cold_verification' && userRole === 'active_manager')
       || task.type === 'recovery_call'
     )
@@ -846,7 +860,7 @@ export default function Tasks() {
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
-    if (user?.role !== 'incubation_manager' || !user?.username || !lastLoaded) return
+    if (!['incubation_manager', 'executive'].includes(user?.role) || !user?.username || !lastLoaded) return
     if (moSweepLoadedRef.current === lastLoaded) return
     moSweepLoadedRef.current = lastLoaded
     let cancelled = false
@@ -869,7 +883,7 @@ export default function Tasks() {
         const answered = countAnsweredCalls(log)
         try {
           const r = await postMerchantOfficerAutomation({
-            user_role: 'incubation_manager',
+            user_role: user.role,
             username: user.username,
             store_id: store.id,
             store_name: store.name || '',
@@ -896,22 +910,18 @@ export default function Tasks() {
     const inactiveRecovery =
       selectedTask.type === 'recovery_call' && selectedTask.workflowQueue === 'inactive'
     /** مهام مسؤول الاحتضان/التنفيذ من «المهام اليومية» — يجب تمرير dailyTaskKey في الفعلي أيضاً (لا يقتصر على التجريبي) */
-    const incubationDailyMoTask =
-      user.role === 'incubation_manager'
+    const moStyleDailyTask =
+      ['incubation_manager', 'executive'].includes(user.role)
       && (
         selectedTask.type === 'new_call'
         || selectedTask.type === 'new_merchant_onboarding'
         || (selectedTask.type === 'recovery_call' && selectedTask.workflowQueue !== 'inactive')
       )
-    const executiveDailyMoTask =
-      user.role === 'executive'
-      && (selectedTask.type === 'new_call' || selectedTask.type === 'new_merchant_onboarding')
     if (
       !IS_STAGING_OR_DEV
       && !releaseActiveWorkflow
       && !inactiveRecovery
-      && !incubationDailyMoTask
-      && !executiveDailyMoTask
+      && !moStyleDailyTask
     ) {
       return undefined
     }
@@ -1001,11 +1011,14 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
-  /** مسؤول المتاجر الجديدة + مسؤول المتاجر النشطة — تبويبات المهام */
+  /** مسؤول المتاجر الجديدة + مسؤول المتاجر النشطة + التنفيذي — تبويبات المهام (دورة 14 / تم التواصل / لم يتم الرد) */
   const isTaskTabUser =
-    user?.role === 'incubation_manager' || user?.role === 'active_manager'
-  /** دفعة «تحقيق بارد» لمسؤول المتاجر الجديدة — من غير نشط بارد (حتى 30) */
-  const showColdInactiveTab = user?.role === 'incubation_manager'
+    user?.role === 'incubation_manager'
+    || user?.role === 'active_manager'
+    || user?.role === 'executive'
+  /** دفعة «تحقيق بارد» لمسؤول المتاجر الجديدة والتنفيذي — من غير نشط بارد (حتى 30) */
+  const showColdInactiveTab =
+    user?.role === 'incubation_manager' || user?.role === 'executive'
   /** دفعة «تحقيق بارد» لمسؤول المتاجر النشطة — من غير نشط بارد (20 ثابتة، تخزين منفصل) */
   const showAmColdTab = user?.role === 'active_manager'
 
@@ -1150,9 +1163,9 @@ export default function Tasks() {
       needsNewMerchantOnboardingSurvey(task.store, newMerchantOnboardingDoneIds)
       && !onboardingDoneForStore(newMerchantOnboardingDoneIds, task.store.id)
 
-    /** مكالمة احتضان: استبيان التهيئة إلزامي قبل نافذة «تم» (ملاحظة المكالمة) */
+    /** مكالمة احتضان / تنفيذي: استبيان التهيئة إلزامي قبل نافذة «تم» (ملاحظة المكالمة) */
     if (
-      user?.role === 'incubation_manager'
+      ['incubation_manager', 'executive'].includes(user?.role)
       && task.type === 'new_call'
       && storeNeedsOnboardingSurvey
     ) {
@@ -1161,20 +1174,9 @@ export default function Tasks() {
       return
     }
 
-    if (user?.role === 'incubation_manager') {
+    if (['incubation_manager', 'executive'].includes(user?.role)) {
       setDoneModalErr('')
       setPendingDoneTask(task)
-      return
-    }
-
-    /** تنفيذي: نفس الاستبيان قبل إخفاء مهمة المكالمة */
-    if (
-      user?.role === 'executive'
-      && task.type === 'new_call'
-      && storeNeedsOnboardingSurvey
-    ) {
-      pendingOnboardingFlowRef.current = { after: 'exec_dismiss', task }
-      setPendingOnboardingTask(task)
       return
     }
 
@@ -1215,7 +1217,7 @@ export default function Tasks() {
         focusNoAnswerView()
         return
       }
-      if (task.type === 'new_call' && user?.role === 'incubation_manager') {
+      if (task.type === 'new_call' && ['incubation_manager', 'executive'].includes(user?.role)) {
         const res = await logCall({
           store_id: task.store.id,
           store_name: task.store.name,
@@ -1235,7 +1237,7 @@ export default function Tasks() {
         return
       }
       /** مسؤول الاحتضان: استبيان التهيئة ليس ضمن طابور store_assignments — لا نستدعي mark_no_answer */
-      if (task.type === 'new_merchant_onboarding' && user?.role === 'incubation_manager') {
+      if (task.type === 'new_merchant_onboarding' && ['incubation_manager', 'executive'].includes(user?.role)) {
         const res = await logCall({
           store_id: task.store.id,
           store_name: task.store.name,
@@ -1500,9 +1502,9 @@ export default function Tasks() {
                 {coldInactivePoolCount.toLocaleString('ar-SA')}
               </p>
             )}
-            {user?.role === 'incubation_manager' && moTab !== 'cold_verify' && moTab !== 'am_cold_verify' && (
+            {['incubation_manager', 'executive'].includes(user?.role) && moTab !== 'cold_verify' && moTab !== 'am_cold_verify' && (
               <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
-                وضع مسؤول المتاجر الجديدة (تجريبي): في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+                في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
               </p>
             )}
             {user?.role === 'active_manager' && moTab !== 'am_cold_verify' && moTab !== 'cold_verify' && (
@@ -1902,11 +1904,9 @@ export default function Tasks() {
             setPendingOnboardingTask(null)
             await reload()
             loadDismissals()
-            if (flow?.after === 'inc_done' && flow.task && user?.role === 'incubation_manager') {
+            if (flow?.after === 'inc_done' && flow.task && ['incubation_manager', 'executive'].includes(user?.role)) {
               setDoneModalErr('')
               setPendingDoneTask(flow.task)
-            } else if (flow?.after === 'exec_dismiss' && flow.task && user?.role === 'executive') {
-              await dismissTaskOnly(flow.task.id)
             }
             if (t && IS_STAGING_OR_DEV && !flow) {
               setSelectedTask(t)
