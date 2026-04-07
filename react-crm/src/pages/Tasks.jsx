@@ -1506,25 +1506,12 @@ export default function Tasks() {
               </>
             )}
             {user?.role === 'active_manager' && activeWf?.success && (
-              <>
-                <p className="text-cyan-100/95 text-sm mt-2">
-                  قائمة «المتابعة الدورية»:{' '}
-                  {Math.min(activeWf.active_count ?? 0, activeWf.target ?? 50)}
-                  {' / '}
-                  {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً.
-                </p>
-                <p className="text-sm mt-1 text-cyan-200/80">
-                  في تبويب «لم يرد»: {activeWf.no_answer_count ?? 0}
-                </p>
-                <p className="text-sm mt-1.5 flex flex-wrap items-center gap-2 text-cyan-200/95">
-                  <span className="font-bold">تم التواصل اليوم:</span>
-                  <InactiveGoalCounterBadge
-                    successfulCount={activeWf.daily_successful_contacts ?? 0}
-                    target={activeWf.active_daily_target ?? 50}
-                    dailyTargetReached={false}
-                  />
-                </p>
-              </>
+              <p className="text-cyan-100/95 text-sm mt-2">
+                قائمة «المتابعة الدورية»:{' '}
+                {activeWf.active_count ?? 0}
+                {' / '}
+                {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً ويظهر في آخر القائمة.
+              </p>
             )}
             {showColdInactiveTab && moTab === 'cold_verify' && (
               <p className="text-sky-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-sky-300/35 bg-gradient-to-l from-sky-400/15 to-cyan-300/10 backdrop-blur-sm">

@@ -371,7 +371,6 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
-    trim_active_queue_excess($pdo, $username);
     $have = count_active_queue($pdo, $username);
     $need = ACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {
