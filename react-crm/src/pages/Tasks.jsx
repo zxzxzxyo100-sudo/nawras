@@ -917,11 +917,13 @@ export default function Tasks() {
    */
   const drawerAutoOpenCallModal = useMemo(() => {
     if (!selectedTask) return false
-    const needs = needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
-    if (!needs) return false
     const allowAuto =
       IS_SIMPLE_LOG_CALL_MODAL || user?.role === 'active_manager'
     if (!allowAuto) return false
+    /** مكالمات الاحتضان من المهام اليومية: افتح نافذة التسجيل مباشرة (كانت تبقى مغلقة فيعتقد المستخدم أن «اتصل» لا يعمل) */
+    if (selectedTask.type === 'new_call' && user?.role === 'incubation_manager') return true
+    const needs = needsNewMerchantOnboardingSurvey(selectedTask.store, newMerchantOnboardingDoneIds)
+    if (!needs) return false
     if (user?.role === 'active_manager' && selectedTask.type === 'new_merchant_onboarding') return true
     if (
       selectedTask.type === 'new_merchant_onboarding'

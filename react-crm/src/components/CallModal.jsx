@@ -186,10 +186,20 @@ export default function CallModal({
    * مسار مبسّط: استبيان 3 أسئلة + حفظ / لم يرد
    * — التجريبي/التطوير: IS_SIMPLE_LOG_CALL_MODAL
    * — مسؤول المتاجر من «المهام اليومية»: نفس الواجهة لكل المتاجر التي ما زالت تحتاج استبيان التهيئة (قديمة أو جديدة)
+   * — مسؤول الاحتضان: نوع المكالمة inc_call* (ليس general) كان يمنع المسار المبسّط → إصلاح
    */
   const simpleOnboardingFlow = useMemo(() => {
-    if (callType !== 'general' || inactiveFeedbackNeeded) return false
+    if (inactiveFeedbackNeeded) return false
     if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
+
+    const incCallMoDaily =
+      fromDailyTasks
+      && user?.role === 'incubation_manager'
+      && ['inc_call1', 'inc_call2', 'inc_call3'].includes(callType)
+
+    if (incCallMoDaily && IS_SIMPLE_LOG_CALL_MODAL) return true
+
+    if (callType !== 'general') return false
     if (IS_SIMPLE_LOG_CALL_MODAL) return true
     if (fromDailyTasks && user?.role === 'active_manager') return true
     return false
