@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock, BarChart3, BadgeCheck, Package,
+  ChevronDown, Circle, Layers, Lock, BarChart3, BadgeCheck, Package, AlertTriangle,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
@@ -12,7 +12,8 @@ import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 function useDeviationNavLock() {
   const { deviationLockdown } = usePrivateTicketsAlert()
   const locked = useCallback(
-    to => deviationLockdown && to !== '/' && to !== '/tasks',
+    to =>
+      deviationLockdown && to !== '/' && to !== '/tasks' && to !== '/deviation-tickets',
     [deviationLockdown],
   )
   const suffix = useCallback(
@@ -26,6 +27,7 @@ import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
+  { to: '/deviation-tickets', label: 'تذاكر الانحراف', icon: AlertTriangle, view: 'deviation_tickets' },
   { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
@@ -421,7 +423,7 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', '/quick-verification', '/kanban'] },
+  { label: 'الرئيسية',  keys: ['/', '/deviation-tickets', '/quick-verification', '/kanban'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
@@ -435,7 +437,7 @@ const NAV_GROUPS = [
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
-      { label: 'الرئيسية', keys: ['/'] },
+      { label: 'الرئيسية', keys: ['/', '/deviation-tickets'] },
       { label: 'الإدارة', keys: ['/tasks'] },
     ]
   }
