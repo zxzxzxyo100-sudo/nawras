@@ -209,6 +209,20 @@ export const getDailyTaskDismissals = (username, date) =>
 export const markDailyTaskDone = (data) =>
   http.post('/daily-tasks.php?action=mark_done', data).then(r => r.data)
 
+/** تذاكر خاصة — مهام من المدير التنفيذي لموظف محدد */
+export const getExecutivePrivateTickets = params =>
+  http
+    .get('/executive-private-tickets.php', {
+      params: { action: 'list', username: params.username, user_role: params.user_role },
+    })
+    .then(r => r.data)
+
+export const createExecutivePrivateTicket = data =>
+  http.post('/executive-private-tickets.php?action=create', data).then(r => r.data)
+
+export const completeExecutivePrivateTicket = data =>
+  http.post('/executive-private-tickets.php?action=complete', data).then(r => r.data)
+
 // ─── Incubation ──────────────────────────────────────────────────────────────
 export const getIncubationData = () =>
   http.get('/store-actions.php?action=get_incubation_data').then(r => r.data)
