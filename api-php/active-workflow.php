@@ -23,7 +23,7 @@ if ($action === 'get_my_workflow') {
         $st = $pdo->prepare("
             SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
             FROM store_assignments
-            WHERE assigned_to = ? AND assignment_queue = 'inactive'
+            WHERE assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status IN ('active', 'no_answer')
             ORDER BY workflow_status ASC, assigned_at ASC
         ");
         $st->execute([$username]);
@@ -56,7 +56,7 @@ if ($action === 'get_my_workflow') {
     $st = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
         FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active'
+        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status IN ('active', 'no_answer')
         ORDER BY workflow_status ASC, assigned_at ASC
     ");
     $st->execute([$username]);
@@ -87,7 +87,7 @@ if ($action === 'get_my_workflow') {
     ]);
 }
 
-// ========== POST: عدم الرد — نقل للمتابعة + استبدال من المجمع ==========
+// ========== POST: عدم الرد — نقل للحالة + إحلال فوري من المجمع ==========
 elseif ($action === 'mark_no_answer') {
     $storeId = (int) ($input['store_id'] ?? 0);
     $username = trim((string) ($input['username'] ?? ''));
@@ -118,16 +118,14 @@ elseif ($action === 'mark_no_answer') {
     ")->execute([$storeId, $input['store_name'] ?? '', $queue === 'inactive' ? 'استعادة — عدم رد' : 'استبيان — عدم الرد', $detail, $username, $roleLabel]);
 
     $added = $queue === 'inactive'
-        ? fill_inactive_slots_for_user($pdo, $username, $username, null)
-        : fill_slots_for_user($pdo, $username, $username, null);
+        ? fill_inactive_slots_for_user($pdo, $username, $username, 1)
+        : replace_one_active_queue_slot($pdo, $username, $username);
     $payload = ['success' => true, 'replacement_added' => $added, 'queue' => $queue];
     if ($queue === 'inactive') {
         $payload['daily_successful_contacts'] = get_inactive_daily_success_count($pdo, $username);
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= INACTIVE_DAILY_SUCCESS_TARGET;
         if ($added > 0) {
             $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد إلى قائمتك.';
-        } elseif ($payload['daily_target_reached']) {
-            $payload['notify_ar'] = 'تم تسجيل «لم يرد». لا يُضاف متجر جديد — تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.';
         }
     } elseif ($queue === 'active') {
         ensure_active_daily_stats_schema($pdo);
@@ -136,8 +134,6 @@ elseif ($action === 'mark_no_answer') {
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
         if ($added > 0) {
             $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر نشط آخر إلى قائمتك.';
-        } elseif ($payload['daily_target_reached']) {
-            $payload['notify_ar'] = 'تم تسجيل «لم يرد». لا يُضاف متجر جديد — تم بلوغ هدف 50 «تم التواصل» اليوم.';
         }
     }
     jsonResponse($payload);
@@ -161,7 +157,7 @@ elseif ($action === 'complete_inactive_success') {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط لهذا المتجر في طابور الاستعادة.'], 400);
     }
     increment_inactive_daily_success($pdo, $username);
-    $filled = fill_inactive_slots_for_user($pdo, $username, $username, null);
+    $filled = fill_inactive_slots_for_user($pdo, $username, $username, 1);
     $count = get_inactive_daily_success_count($pdo, $username);
     $reached = $count >= INACTIVE_DAILY_SUCCESS_TARGET;
     $pdo->prepare("
@@ -185,7 +181,7 @@ elseif ($action === 'complete_inactive_success') {
     ]);
 }
 
-// ========== POST: بعد إكمال الاستبيان — إزالة من الطابور + تعبئة ==========
+// ========== POST: بعد إكمال الاستبيان — إتمام المتجر + إحلال فوري ==========
 elseif ($action === 'release_after_survey') {
     $storeId = (int) ($input['store_id'] ?? 0);
     $username = trim((string) ($input['username'] ?? ''));
@@ -200,7 +196,7 @@ elseif ($action === 'release_after_survey') {
     }
     ensure_active_daily_stats_schema($pdo);
     increment_active_daily_success($pdo, $username);
-    $fill = fill_slots_for_user($pdo, $username, $username, null);
+    $fill = replace_one_active_queue_slot($pdo, $username, $username);
     $count = get_active_daily_success_count($pdo, $username);
     jsonResponse([
         'success' => true,

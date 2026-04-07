@@ -329,6 +329,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       if (asgn?.assigned_to === username) {
         /** «تم التواصل» = workflow_status=completed أو تسجيل مكالمة بـ «تم الرد» اليوم */
         const moContactedToday = asgn?.workflow_status === 'completed' || isContactedAnsweredToday(log)
+        const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
           hideDailyTaskDueToCallToday(log) && !isContactedAnsweredToday(log)
         const assignedBeforeToday = assignmentLocalCalendarBeforeToday(asgn?.assigned_at)
@@ -336,6 +337,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           store,
           moContactedToday,
           amTaskInDelays: false,
+          assignedAtTs,
         }
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
@@ -817,9 +819,8 @@ export default function Tasks() {
   const [inactiveWf, setInactiveWf] = useState(null)
   /** طابور مسؤول المتاجر النشطة (50) + عدّ «تم التواصل» يومياً */
   const [activeWf, setActiveWf] = useState(null)
-  /** لإطلاق الاحتفال فور استجابة goal_just_met */
+  /** لإطلاق الاحتفال فور استجابة API الخاصة بطابور الاستعادة */
   const [goalBurstNonce, setGoalBurstNonce] = useState(0)
-  const [activeGoalBurstNonce, setActiveGoalBurstNonce] = useState(0)
   /** تجديد دفعة «تحقيق البارد» عند حدود الساعة 9:00 صباحاً (توقيت الجهاز) */
   const [nowTick, setNowTick] = useState(() => Date.now())
   useEffect(() => {
@@ -961,10 +962,7 @@ export default function Tasks() {
       inactiveRecovery,
       releaseActiveWorkflow,
       onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
-      onActiveGoalBurst: () => {
-        setActiveGoalBurstNonce(n => n + 1)
-        void loadActiveWf()
-      },
+      onActiveGoalBurst: () => { void loadActiveWf() },
     }
   }, [selectedTask, user?.username, user?.role, loadActiveWf])
 
@@ -1101,13 +1099,20 @@ export default function Tasks() {
 
   const moPeriodicTasks = useMemo(() => {
     if (!isTaskTabUser) return mainTasks
-    return mainTasks.filter(
+    const filtered = mainTasks.filter(
       t =>
         !t.moContactedToday
         && !taskIsNoAnswer(t, callLogs, assignments)
         && !t.amTaskInDelays,
     )
-  }, [isTaskTabUser, mainTasks, callLogs, assignments])
+    if (user?.role !== 'active_manager') return filtered
+    return [...filtered].sort((a, b) => {
+      const ta = Number(a.assignedAtTs || 0)
+      const tb = Number(b.assignedAtTs || 0)
+      if (ta !== tb) return ta - tb
+      return String(a.id).localeCompare(String(b.id))
+    })
+  }, [isTaskTabUser, mainTasks, callLogs, assignments, user?.role])
 
   const moAmDelayTasks = useMemo(
     () => mainTasks.filter(t => Boolean(t.amTaskInDelays)),
@@ -1406,16 +1411,6 @@ export default function Tasks() {
         />
       )}
 
-      {user?.role === 'active_manager' && user?.username && (
-        <InactiveGoalCelebration
-          username={`${user.username}_active_am`}
-          successfulCount={activeWf?.daily_successful_contacts ?? 0}
-          target={activeWf?.active_daily_target ?? 50}
-          dailyTargetReached={activeWf?.daily_target_reached}
-          burstNonce={activeGoalBurstNonce}
-        />
-      )}
-
       <AnimatePresence>
         {toastMsg && (
           <motion.div
@@ -1502,26 +1497,18 @@ export default function Tasks() {
             {user?.role === 'active_manager' && activeWf?.success && (
               <>
                 <p className="text-cyan-100/95 text-sm mt-2">
-                  طابور «نشط يشحن»:{' '}
+                  قائمة «المتابعة الدورية»:{' '}
                   {(activeWf.active_count ?? 0) + (activeWf.no_answer_count ?? 0)}
                   {' / '}
-                  {activeWf.target ?? 50} متجراً — يُستبدل عند «لم يُرد» بمتجر نشط آخر من المجمع.
+                  {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً ويظهر في آخر القائمة.
                 </p>
-                <p
-                  className={`text-sm mt-1.5 flex flex-wrap items-center gap-2 ${
-                    activeWf.daily_target_reached ? 'text-emerald-200' : 'text-cyan-200/95'
-                  }`}
-                >
+                <p className="text-sm mt-1.5 flex flex-wrap items-center gap-2 text-cyan-200/95">
                   <span className="font-bold">تم التواصل اليوم:</span>
                   <InactiveGoalCounterBadge
                     successfulCount={activeWf.daily_successful_contacts ?? 0}
                     target={activeWf.active_daily_target ?? 50}
-                    dailyTargetReached={activeWf.daily_target_reached}
-                    className={activeWf.daily_target_reached ? 'text-emerald-200' : ''}
+                    dailyTargetReached={false}
                   />
-                  {activeWf.daily_target_reached && (
-                    <span className="text-emerald-200/90 font-medium">— تم بلوغ 50</span>
-                  )}
                 </p>
               </>
             )}

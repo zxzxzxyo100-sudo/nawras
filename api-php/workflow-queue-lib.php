@@ -6,7 +6,7 @@
 if (!defined('ACTIVE_QUEUE_TARGET')) {
     define('ACTIVE_QUEUE_TARGET', 50);
 }
-/** هدف «تم التواصل» يومياً لمسؤول المتاجر النشطة — بعدها لا تُعبَّأ قوائم جديدة من المجمع */
+/** عدّاد يومي تقريري فقط لمسؤول المتاجر النشطة — لا يوقف الإحلال أو التعبئة */
 if (!defined('ACTIVE_DAILY_SUCCESS_TARGET')) {
     define('ACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
@@ -220,6 +220,21 @@ function count_inactive_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+function cleanup_completed_assignments(PDO $pdo, $username, $queue) {
+    $u = trim((string) $username);
+    $q = $queue === 'inactive' ? 'inactive' : 'active';
+    if ($u === '') {
+        return;
+    }
+    $pdo->prepare("
+        DELETE FROM store_assignments
+        WHERE assigned_to = ?
+        AND workflow_status = 'completed'
+        AND assignment_queue = ?
+        AND DATE(workflow_updated_at) < CURDATE()
+    ")->execute([$u, $q]);
+}
+
 function assign_store_to_user(PDO $pdo, $storeId, $storeName, $username, $assignedBy) {
     $sid = (string) $storeId;
     $pdo->prepare("
@@ -305,8 +320,7 @@ function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username
 function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
     ensure_inactive_daily_stats_schema($pdo);
-    $pdo->prepare("DELETE FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'completed' AND assignment_queue = 'inactive' AND DATE(workflow_updated_at) < CURDATE()")
-        ->execute([$username]);
+    cleanup_completed_assignments($pdo, $username, 'inactive');
     if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
         return 0;
     }
@@ -334,11 +348,7 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
 function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
-    $pdo->prepare("DELETE FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'completed' AND assignment_queue = 'active' AND DATE(workflow_updated_at) < CURDATE()")
-        ->execute([$username]);
-    if (get_active_daily_success_count($pdo, $username) >= ACTIVE_DAILY_SUCCESS_TARGET) {
-        return 0;
-    }
+    cleanup_completed_assignments($pdo, $username, 'active');
     $have = count_active_queue($pdo, $username);
     $need = ACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {
@@ -359,6 +369,21 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
         $need--;
     }
     return $added;
+}
+
+/**
+ * مزامنة سعة طابور المتابعة الدورية لمسؤول المتاجر النشطة.
+ * تُستدعى مباشرة بعد أي تغيير حالة يحرّر خانة من أصل 50.
+ */
+function sync_active_queue_capacity(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
+    return fill_slots_for_user($pdo, $username, $assignedBy, $maxToAdd);
+}
+
+/**
+ * إحلال فوري: عند خروج متجر من الحسبة النشطة نضيف بديلاً واحداً في آخر القائمة.
+ */
+function replace_one_active_queue_slot(PDO $pdo, $username, $assignedBy) {
+    return sync_active_queue_capacity($pdo, $username, $assignedBy, 1);
 }
 
 /**
