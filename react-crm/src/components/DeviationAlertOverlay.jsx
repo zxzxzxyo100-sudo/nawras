@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, MessageCircle, PhoneCall, ChevronDown } from 'lucide-react'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
+import { DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT } from '../utils/deviationTicket'
 
 function parseMeta(ticket) {
   if (!ticket?.meta_json) return {}
@@ -47,6 +48,11 @@ export default function DeviationAlertOverlay() {
   const [cooldown, setCooldown] = useState(6)
 
   const meta = useMemo(() => parseMeta(primaryDeviationTicket), [primaryDeviationTicket])
+  const daysSinceShip = meta?.radar?.days_since_ship
+  const daysSinceShipLabel =
+    daysSinceShip != null && Number.isFinite(Number(daysSinceShip))
+      ? String(Math.max(0, Math.floor(Number(daysSinceShip))))
+      : '—'
   const ticketId = primaryDeviationTicket?.id
 
   useEffect(() => {
@@ -110,7 +116,11 @@ export default function DeviationAlertOverlay() {
         <div className="flex min-w-0 flex-1 items-start gap-2">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden />
           <p className="text-sm font-black leading-snug">
-            ⚠️ تنبيه انحراف عاجل: لديك متجر تراجعت شحناته! يرجى التوقف عن المهام الحالية ومعالجة{' '}
+            ⚠️ تنبيه انحراف عاجل — أيام منذ آخر شحنة:{' '}
+            <span className="tabular-nums text-amber-200">{daysSinceShipLabel}</span>
+            {' — التنبيه عند ≥ '}
+            <span className="tabular-nums text-amber-200">{DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT}</span>
+            {' أيام. التوقف عن المهام الحالية ومعالجة '}
             <span className="underline decoration-amber-300/90">تذاكر الانحراف</span> فوراً.
           </p>
         </div>
