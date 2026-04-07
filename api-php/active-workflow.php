@@ -58,6 +58,7 @@ if ($action === 'get_my_workflow') {
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
         FROM store_assignments
         WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
+        AND DATE(assigned_at) = CURDATE()
         ORDER BY assigned_at ASC
         LIMIT " . ACTIVE_QUEUE_TARGET . "
     ");
