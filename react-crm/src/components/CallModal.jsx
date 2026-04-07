@@ -136,11 +136,13 @@ async function runTaskCompletionAfterAnswered({
       }
     }
     if (taskCompletion.dailyTaskKey) {
+      const skipDismissal = taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager'
       const canMarkDailyDismissal =
-        IS_STAGING_OR_DEV
-        || user?.role === 'active_manager'
-        || user?.role === 'incubation_manager'
-        || user?.role === 'executive'
+        !skipDismissal
+        && (IS_STAGING_OR_DEV
+          || user?.role === 'active_manager'
+          || user?.role === 'incubation_manager'
+          || user?.role === 'executive')
       if (canMarkDailyDismissal) {
         await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
       }
