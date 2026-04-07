@@ -26,6 +26,7 @@ function ensure_workflow_schema(PDO $pdo) {
     if ($done) {
         return;
     }
+    ensure_active_pool_rotation_schema($pdo);
     try {
         $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
     } catch (Throwable $e) {
@@ -117,6 +118,74 @@ function active_pipeline_where_sql() {
     return "ss.category IN ('active','active_shipping','active_pending_calls')";
 }
 
+/** سجل متاجر اختيرت من المجمع لمسؤول النشط — لعدم تكرار نفس المتجر في أمس والأمس السابق */
+function ensure_active_pool_rotation_schema(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_manager_pool_rotation (
+            username VARCHAR(191) NOT NULL,
+            store_id VARCHAR(64) NOT NULL,
+            slot_date DATE NOT NULL,
+            created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, store_id, slot_date),
+            INDEX idx_user_recent (username, slot_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $done = true;
+}
+
+function log_active_manager_pool_pick(PDO $pdo, $username, $storeId) {
+    ensure_active_pool_rotation_schema($pdo);
+    $u = trim((string) $username);
+    if ($u === '') {
+        return;
+    }
+    $sid = (string) $storeId;
+    $pdo->prepare("
+        INSERT IGNORE INTO active_manager_pool_rotation (username, store_id, slot_date)
+        VALUES (?, ?, CURDATE())
+    ")->execute([$u, $sid]);
+}
+
+/**
+ * متجر نشط من المجمع — يستبعد ما عُيّن لنفس المستخدم في أمس أو أمس السابق (تدوير يومي ~50).
+ */
+function pick_next_pool_store_for_user(PDO $pdo, $username) {
+    ensure_active_pool_rotation_schema($pdo);
+    $u = trim((string) $username);
+    $sql = "
+        SELECT ss.store_id, ss.store_name
+        FROM store_states ss
+        WHERE " . active_pipeline_where_sql() . "
+        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments)
+        AND NOT EXISTS (
+            SELECT 1 FROM surveys s
+            WHERE s.store_id = ss.store_id
+            AND s.created_at >= DATE_SUB(NOW(), INTERVAL " . SURVEY_COOLDOWN_DAYS . " DAY)
+        )
+    ";
+    if ($u !== '') {
+        $sql .= "
+        AND CAST(ss.store_id AS CHAR) NOT IN (
+            SELECT store_id FROM active_manager_pool_rotation
+            WHERE username = ?
+            AND slot_date IN (DATE_SUB(CURDATE(), INTERVAL 1 DAY), DATE_SUB(CURDATE(), INTERVAL 2 DAY))
+        )";
+    }
+    $sql .= ' ORDER BY ss.store_id ASC LIMIT 1';
+    $st = $pdo->prepare($sql);
+    if ($u !== '') {
+        $st->execute([$u]);
+    } else {
+        $st->execute();
+    }
+    return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** @deprecated استخدم pick_next_pool_store_for_user مع اسم المستخدم */
 function pick_next_pool_store(PDO $pdo) {
     $sql = "
         SELECT ss.store_id, ss.store_name
@@ -272,11 +341,12 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     }
     $added = 0;
     while ($need > 0) {
-        $row = pick_next_pool_store($pdo);
+        $row = pick_next_pool_store_for_user($pdo, $username);
         if (!$row) {
             break;
         }
         assign_store_to_user($pdo, $row['store_id'], $row['store_name'] ?? '', $username, $assignedBy);
+        log_active_manager_pool_pick($pdo, $username, $row['store_id']);
         $added++;
         $need--;
     }

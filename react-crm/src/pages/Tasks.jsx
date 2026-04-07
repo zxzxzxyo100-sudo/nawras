@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake,
+  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake, Clock,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
@@ -83,6 +83,16 @@ function taskIsNoAnswer(task, callLogs, assignments) {
     if (a?.assignment_queue === 'inactive' && a?.workflow_status === 'no_answer') return true
   }
   return false
+}
+
+/** تاريخ التعيين قبل اليوم التقويمي المحلي (متابعة متأخرة من يوم سابق) */
+function assignmentLocalCalendarBeforeToday(assignedAtStr, ref = new Date()) {
+  if (!assignedAtStr) return false
+  const a = new Date(assignedAtStr)
+  if (Number.isNaN(a.getTime())) return false
+  const r0 = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate()).getTime()
+  const a0 = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime()
+  return a0 < r0
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -317,12 +327,16 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username) {
-        const moContactedToday =
-          isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
-        /** بعد «تم الرد» اليوم: أظهر الصف في «تم التواصل» بدل إخفائه بالكامل */
-        if (!moContactedToday && callTodayHidesTask) {
-          /* آخر مكالمة اليوم ليست «تم الرد» (مثلاً مشغول) — لا صف في المتابعة ولا في تم التواصل */
-        } else {
+        /** «تم التواصل» = تسجيل مكالمة بـ «تم الرد» (answered) اليوم — وليس إخفاء الصف عند مشغول/بدون رد */
+        const moContactedToday = isContactedAnsweredToday(log)
+        const limboCallNotAnsweredToday =
+          hideDailyTaskDueToCallToday(log) && !isContactedAnsweredToday(log)
+        const assignedBeforeToday = assignmentLocalCalendarBeforeToday(asgn?.assigned_at)
+        const draft = {
+          store,
+          moContactedToday,
+          amTaskInDelays: false,
+        }
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
           : 999
@@ -335,10 +349,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           : null
         /** مسؤول المتاجر: مهمة استبيان التهيئة منفصلة (نفس مسار المكالمة المبسّط) — لا تُكرَّر مع «متجر مُسنَد» */
         if (needsOnboarding) {
-          tasks.push({
+          const t = {
             id: `${store.id}-new-onboarding-am`,
-            store,
-            /** عالية: تظهر في «الكل» و«عالية الأولوية»؛ عند «لم يُرد» تنتقل لقائمة no_answer عبر taskIsNoAnswer */
+            ...draft,
             priority: 'high',
             type: 'new_merchant_onboarding',
             label: stagingAm?.label ?? 'استبيان تهيئة — متجر مُسنَد إليك',
@@ -346,23 +359,31 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             desc: stagingAm
               ? `${shipDesc} — ${stagingAm.descHint} — اضغط «اتصل»`
               : `${shipDesc} — أكمل استبيان التهيئة من «اتصل» ثم سجّل المكالمة`,
-            moContactedToday,
-          })
+          }
+          t.amTaskInDelays =
+            !taskIsNoAnswer(t, callLogs, assignments)
+            && !moContactedToday
+            && (limboCallNotAnsweredToday || assignedBeforeToday)
+          tasks.push(t)
         } else {
           const descBase = shipDesc
           const desc = stagingAm?.descHint
             ? `${descBase} — ${stagingAm.descHint} — اضغط «تسجيل مكالمة»`
             : descBase
-          tasks.push({
-            id: `${store.id}-assigned`, store,
+          const t = {
+            id: `${store.id}-assigned`,
+            ...draft,
             priority: daysSinceShip >= 10 ? 'high' : 'normal',
             type: 'assigned_store',
             label: stagingAm?.label ?? 'متجر مُسنَد إليك',
             incubationBadge: stagingAm?.incubationBadge ?? undefined,
             desc,
-            moContactedToday,
-          })
-        }
+          }
+          t.amTaskInDelays =
+            !taskIsNoAnswer(t, callLogs, assignments)
+            && !moContactedToday
+            && (limboCallNotAnsweredToday || assignedBeforeToday)
+          tasks.push(t)
         }
       }
     }
@@ -483,6 +504,11 @@ function MerchantOfficerTaskRow({
           {task.incubationBadge ? (
             <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-900">
               {task.incubationBadge}
+            </span>
+          ) : null}
+          {task.amTaskInDelays ? (
+            <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-900">
+              تأخّر — يحتاج «تم الرد»
             </span>
           ) : null}
           {task.moOverdue ? (
@@ -648,6 +674,11 @@ function TaskCard({
           {task.incubationBadge && (
             <span className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-amber-100 text-amber-900 border border-amber-200/80 flex-shrink-0 max-w-[14rem] leading-snug">
               {task.incubationBadge}
+            </span>
+          )}
+          {task.amTaskInDelays && (
+            <span className="text-[10px] px-2 py-0.5 rounded-lg font-black bg-rose-100 text-rose-900 border border-rose-200/80 flex-shrink-0">
+              تأخّر — يحتاج «تم الرد»
             </span>
           )}
           {task.priority === 'high' && (
@@ -1021,6 +1052,8 @@ export default function Tasks() {
     user?.role === 'incubation_manager' || user?.role === 'executive'
   /** دفعة «تحقيق بارد» لمسؤول المتاجر النشطة — من غير نشط بارد (20 ثابتة، تخزين منفصل) */
   const showAmColdTab = user?.role === 'active_manager'
+  /** مسؤول النشط: مهام من يوم سابق أو مكالمة اليوم دون «تم الرد» */
+  const showAmDelaysTab = user?.role === 'active_manager'
 
   const bizDateKeyCold = useMemo(() => getBizDateKeyAt9am(new Date(nowTick)), [nowTick])
 
@@ -1069,9 +1102,17 @@ export default function Tasks() {
   const moPeriodicTasks = useMemo(() => {
     if (!isTaskTabUser) return mainTasks
     return mainTasks.filter(
-      t => !t.moContactedToday && !taskIsNoAnswer(t, callLogs, assignments),
+      t =>
+        !t.moContactedToday
+        && !taskIsNoAnswer(t, callLogs, assignments)
+        && !t.amTaskInDelays,
     )
   }, [isTaskTabUser, mainTasks, callLogs, assignments])
+
+  const moAmDelayTasks = useMemo(
+    () => mainTasks.filter(t => Boolean(t.amTaskInDelays)),
+    [mainTasks],
+  )
 
   const moContactedTasks = useMemo(() => {
     if (!isTaskTabUser) return []
@@ -1084,6 +1125,7 @@ export default function Tasks() {
       if (moTab === 'am_cold_verify') return pendingAmColdVerifyTasks
       if (moTab === 'contacted') return moContactedTasks
       if (moTab === 'no_answer') return noAnswerTasks
+      if (moTab === 'am_delays') return moAmDelayTasks
       return moPeriodicTasks
     }
     if (filter === 'no_answer') return noAnswerTasks
@@ -1093,6 +1135,7 @@ export default function Tasks() {
     isTaskTabUser,
     moTab,
     moPeriodicTasks,
+    moAmDelayTasks,
     moContactedTasks,
     pendingColdVerifyTasks,
     pendingAmColdVerifyTasks,
@@ -1507,9 +1550,17 @@ export default function Tasks() {
                 في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
               </p>
             )}
-            {user?.role === 'active_manager' && moTab !== 'am_cold_verify' && moTab !== 'cold_verify' && (
+            {user?.role === 'active_manager' && moTab === 'am_cold_verify' && (
               <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
                 راجع تبويب «تحقيق بارد» يومياً بعد 9:00 ص — {ACTIVE_MANAGER_COLD_VERIFY_LIMIT} متجراً من «غير نشط بارد» بانتظار التحقق (مع آخر شحنة).
+              </p>
+            )}
+            {user?.role === 'active_manager'
+              && moTab !== 'am_cold_verify'
+              && moTab !== 'cold_verify'
+              && (
+              <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
+                يُعبَّأ طابورك تلقائياً حتى 50 متجراً نشطاً؛ لا يُعاد اختيار نفس المتجر من المجمع في يومَي العمل السابقين (أمس والأمس السابق). «متابعة دورية» للمهام الحالية؛ «تأخيرات المهمات» لما بقي دون «تم الرد» من يوم سابق أو بعد مكالمة اليوم غير مكتملة — يبقى حتى يُسجَّل «تم الرد» فينتقل إلى «تم التواصل».
               </p>
             )}
             {pendingTasks.length > 0 && (
@@ -1579,6 +1630,36 @@ export default function Tasks() {
                 {moPeriodicTasks.length}
               </span>
             </motion.button>
+            {showAmDelaysTab && (
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('am_delays')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'am_delays'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'am_delays'
+                  ? {
+                      background: 'linear-gradient(135deg, #e11d48, #be123c)',
+                      boxShadow: '0 4px 14px rgba(225,29,72,0.3)',
+                    }
+                  : {}
+              }
+            >
+              <Clock size={16} className={moTab === 'am_delays' ? 'opacity-95' : 'text-slate-400'} aria-hidden />
+              تأخيرات المهمات
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'am_delays' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {moAmDelayTasks.length}
+              </span>
+            </motion.button>
+            )}
             <motion.button
               type="button"
               onClick={() => setMoTab('contacted')}
@@ -1784,6 +1865,14 @@ export default function Tasks() {
             ) : (
               <p className="font-bold text-slate-600">لا توجد مهام في هذا التبويب</p>
             )
+          ) : showAmDelaysTab && moTab === 'am_delays' ? (
+            <>
+              <Clock size={56} className="text-rose-300 mx-auto mb-4" aria-hidden />
+              <p className="font-black text-slate-700 text-xl">لا توجد مهام متأخرة</p>
+              <p className="text-slate-500 text-sm mt-2 max-w-md mx-auto leading-relaxed">
+                يُدرَج هنا ما عُيّن من يوم سابق ولم يُسجَّل له «تم الرد» بعد، أو ما سُجِّلت له مكالمة اليوم دون إتمام «تم الرد». بعد الإكمال يظهر في «تم التواصل».
+              </p>
+            </>
           ) : pendingTasks.length === 0 ? (
             <>
               <motion.div
