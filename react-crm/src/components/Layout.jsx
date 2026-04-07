@@ -3,10 +3,9 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
 import FloatingCallBar from './FloatingCallBar'
-import DeviationAlertOverlay from './DeviationAlertOverlay'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth } from '../contexts/AuthContext'
-import { PrivateTicketsAlertProvider, usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
+import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
 
 // يظهر الشريط فقط في بناء البيئة التجريبية
 const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
@@ -18,7 +17,6 @@ function LayoutInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
   const { pathname } = useLocation()
-  const { deviationLockdown } = usePrivateTicketsAlert()
   /** التحقيق السريع: عرض كامل ملتصق بحواف منطقة المحتوى (دون p-4 الافتراضية) */
   const isQuickVerification = pathname === '/quick-verification'
 
@@ -35,12 +33,7 @@ function LayoutInner() {
         />
       )}
 
-      {/* Main content — إطار نابض عند وجود تذكرة انحراف مفتوحة */}
-      <div
-        className={`flex-1 flex flex-col lg:mr-60 transition-shadow duration-300 ${
-          deviationLockdown ? 'animate-deviation-border' : ''
-        }`}
-      >
+      <div className="flex-1 flex flex-col lg:mr-60 transition-shadow duration-300">
         {/* Mobile top header — زجاجي على التحقق السريع ليتماشى مع الهيدر البنفسجي */}
         <header
           className={
@@ -140,8 +133,6 @@ function LayoutInner() {
             <NawrasTaglineStack className="relative z-10 max-w-[min(100%,280px)] shrink-0" />
           </div>
         )}
-
-        <DeviationAlertOverlay />
 
         <main
           className={`flex-1 overflow-auto ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}
