@@ -52,6 +52,7 @@ if ($action === 'get_my_workflow') {
             'no_answer_count' => count($noAnswer),
         ]);
     }
+    reset_active_assignments_as_fresh_once($pdo, $username);
     fill_slots_for_user($pdo, $username, $username, null);
 
     $stActive = $pdo->prepare("

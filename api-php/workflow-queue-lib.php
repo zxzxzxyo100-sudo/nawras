@@ -141,6 +141,51 @@ function ensure_active_pool_rotation_schema(PDO $pdo) {
     $done = true;
 }
 
+function ensure_active_queue_reset_schema(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_manager_queue_resets (
+            username VARCHAR(191) NOT NULL,
+            reset_key VARCHAR(64) NOT NULL,
+            created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, reset_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    $done = true;
+}
+
+/**
+ * إعادة تهيئة لمرة واحدة: كل التعيينات النشطة الحالية لهذا المستخدم تصبح كأنها مُعيّنة الآن.
+ * هذا يمنع ظهورها مباشرةً في «تأخيرات المهمات» بعد تغيير القاعدة.
+ */
+function reset_active_assignments_as_fresh_once(PDO $pdo, $username, $resetKey = 'delays_from_tomorrow_v1') {
+    ensure_active_queue_reset_schema($pdo);
+    $u = trim((string) $username);
+    if ($u === '') {
+        return false;
+    }
+    $check = $pdo->prepare('SELECT 1 FROM active_manager_queue_resets WHERE username = ? AND reset_key = ? LIMIT 1');
+    $check->execute([$u, $resetKey]);
+    if ($check->fetchColumn()) {
+        return false;
+    }
+    $pdo->prepare("
+        UPDATE store_assignments
+        SET assigned_at = NOW(), workflow_updated_at = NOW()
+        WHERE assigned_to = ?
+        AND assignment_queue = 'active'
+        AND workflow_status = 'active'
+    ")->execute([$u]);
+    $pdo->prepare("
+        INSERT INTO active_manager_queue_resets (username, reset_key)
+        VALUES (?, ?)
+    ")->execute([$u, $resetKey]);
+    return true;
+}
+
 function log_active_manager_pool_pick(PDO $pdo, $username, $storeId) {
     ensure_active_pool_rotation_schema($pdo);
     $u = trim((string) $username);
