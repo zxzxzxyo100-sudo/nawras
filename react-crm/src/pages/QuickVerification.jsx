@@ -58,7 +58,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
   const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
-    <header className="relative mx-3 mt-3 overflow-hidden rounded-b-[1.75rem] border border-white/25 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-violet-300/25 sm:mx-6 sm:rounded-b-[2rem]">
+    <header className="relative w-full overflow-hidden border-b border-white/20 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-violet-400/20">
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
         aria-hidden
@@ -75,7 +75,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
           backgroundSize: '48px 48px',
         }}
       />
-      <div className="relative flex w-full min-w-0 flex-col gap-8 px-4 py-8 sm:px-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:px-10 lg:py-7 xl:px-14">
+      <div className="relative flex w-full min-w-0 flex-col gap-8 px-5 py-8 sm:px-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-10 lg:px-10 lg:py-8 xl:px-12 2xl:px-16">
         <div className="min-w-0 flex-1 text-right">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-violet-200/90 backdrop-blur-sm">
             <Sparkles size={12} className="text-amber-200/90" strokeWidth={2.2} />
@@ -189,7 +189,7 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
     },
   ]
   return (
-    <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 px-4 md:grid-cols-4 md:gap-4 md:px-8">
+    <div className="grid w-full grid-cols-2 gap-3 px-5 sm:px-8 md:grid-cols-4 md:gap-4 lg:px-10 xl:px-12 2xl:px-16">
       {items.map(it => (
         <div
           key={it.label}
@@ -777,13 +777,13 @@ export default function QuickVerification() {
 
   return (
     <div
-      className="min-h-screen bg-[#ebe7f5] pb-24 [background-image:radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(139,92,246,0.12),transparent),radial-gradient(ellipse_60%_40%_at_100%_50%,rgba(244,114,182,0.06),transparent)]"
+      className="flex min-h-full w-full min-w-0 flex-col bg-[#ebe7f5] pb-16 [background-image:radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(139,92,246,0.12),transparent),radial-gradient(ellipse_60%_40%_at_100%_50%,rgba(244,114,182,0.06),transparent)]"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
-      <div className="sticky top-0 z-40">
+      <div className="sticky top-0 z-40 w-full shadow-[0_8px_32px_-12px_rgba(75,0,130,0.12)]">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
-        <div className="mx-3 border-b border-slate-200/70 bg-white/95 shadow-[0_4px_24px_-8px_rgba(75,0,130,0.08)] backdrop-blur-xl sm:mx-6 sm:rounded-b-2xl sm:border-x sm:border-t-0 sm:ring-1 sm:ring-violet-100/60">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+        <div className="w-full border-b border-slate-200/70 bg-white/95 backdrop-blur-xl">
+          <div className="flex w-full flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
             <div className="flex flex-1 rounded-2xl bg-gradient-to-br from-violet-100/50 via-white to-fuchsia-50/40 p-[1.5px] shadow-inner">
             <div className="flex w-full flex-1 rounded-[0.85rem] border border-white/80 bg-slate-50/90 p-1.5 shadow-inner">
               <button
@@ -841,7 +841,7 @@ export default function QuickVerification() {
             </button>
           </div>
         </div>
-        <div className="mx-3 border-b border-slate-200/50 bg-gradient-to-b from-white via-violet-50/20 to-[#ebe7f5] py-5 md:mx-6 md:py-6">
+        <div className="w-full border-b border-slate-200/50 bg-gradient-to-b from-white via-violet-50/20 to-[#ebe7f5] py-5 md:py-6">
           <QvStatStrip
             total={statStrip.total}
             openCrisis={statStrip.openCrisis}
@@ -852,7 +852,7 @@ export default function QuickVerification() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-10">
+      <div className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16 md:py-10">
         <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/35 via-white/60 to-fuchsia-200/30 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)]">
           <div className="relative rounded-[1.25rem] border border-white/90 bg-white/95 shadow-inner">
           <Search className="pointer-events-none absolute right-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-violet-500/70" strokeWidth={2} />

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
 import FloatingCallBar from './FloatingCallBar'
@@ -14,6 +14,9 @@ const FLOATING_CALL_ROLES = ['inactive_manager', 'active_manager', 'incubation_o
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
+  const { pathname } = useLocation()
+  /** التحقيق السريع: عرض كامل ملتصق بحواف منطقة المحتوى (دون p-4 الافتراضية) */
+  const isQuickVerification = pathname === '/quick-verification'
 
   return (
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
@@ -59,7 +62,9 @@ export default function Layout() {
           </div>
         )}
 
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main
+          className={`flex-1 overflow-auto ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}
+        >
           <Outlet />
         </main>
       </div>
