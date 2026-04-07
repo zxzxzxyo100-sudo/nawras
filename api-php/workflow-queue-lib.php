@@ -241,7 +241,7 @@ function count_inactive_queue(PDO $pdo, $username) {
 }
 
 /**
- * تقليم: نبقي أقدم 50 تعيين نشط لم يُتصل به اليوم + كل المتصل بهم اليوم، ونحذف الباقي.
+ * تقليم: نبقي أحدث 50 تعيين نشط لم يُتصل به اليوم + كل المتصل بهم اليوم، ونحذف الأقدم.
  */
 function trim_active_queue_excess(PDO $pdo, $username) {
     $pending = count_pending_active_queue($pdo, $username);
@@ -256,7 +256,7 @@ function trim_active_queue_excess(PDO $pdo, $username) {
             AND DATE(cl.created_at) = CURDATE()
             AND cl.outcome = 'answered'
         )
-        ORDER BY sa.assigned_at DESC
+        ORDER BY sa.assigned_at ASC
         LIMIT " . (int) $excess . "
     ");
     $st->execute([$username]);
