@@ -1217,6 +1217,26 @@ export default function Tasks() {
         focusNoAnswerView()
         return
       }
+      /** مسؤول الاحتضان: استبيان التهيئة ليس ضمن طابور store_assignments — لا نستدعي mark_no_answer */
+      if (task.type === 'new_merchant_onboarding' && user?.role === 'incubation_manager') {
+        const res = await logCall({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          call_type: 'general',
+          outcome: 'no_answer',
+          note: '',
+          performed_by: user?.fullname || user?.username || '',
+          performed_role: user?.role,
+          registration_date: task.store.registered_at || null,
+        })
+        if (!DISABLE_POINTS_AND_PERFORMANCE) {
+          onCallSaved(res?.points_awarded ?? 0)
+        }
+        await reload()
+        loadDismissals()
+        focusNoAnswerView()
+        return
+      }
       if (task.type === 'cold_verification') {
         const res = await logCall({
           store_id: task.store.id,
@@ -1269,19 +1289,6 @@ export default function Tasks() {
         loadDismissals()
         focusNoAnswerView()
         return
-      }
-      if (
-        task.type === 'assigned_store'
-        || (task.type === 'new_merchant_onboarding' && user?.role === 'incubation_manager')
-      ) {
-        await markSurveyNoAnswer({
-          store_id: task.store.id,
-          store_name: task.store.name,
-          username: user.username,
-        })
-        await reload()
-        loadDismissals()
-        focusNoAnswerView()
       }
     } catch (e) {
       setDismissErr(e.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
