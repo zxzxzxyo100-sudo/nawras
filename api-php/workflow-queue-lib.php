@@ -328,7 +328,7 @@ function cleanup_completed_assignments(PDO $pdo, $username, $queue) {
         WHERE assigned_to = ?
         AND workflow_status = 'completed'
         AND assignment_queue = ?
-        AND workflow_updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+        AND workflow_updated_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')
     ")->execute([$u, $q]);
 }
 
