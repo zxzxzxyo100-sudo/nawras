@@ -16,7 +16,16 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse, getDailyTaskDismissals } from '../services/api'
+import {
+  getBizDateKeyAt9am,
+  getDailyActiveShippingVerifyStores,
+  buildActiveShippingVerificationTasks,
+  getDailyColdBatchStores,
+  buildColdVerificationTasks,
+  ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT,
+  COLD_INACTIVE_DAILY_LIMIT,
+} from '../utils/coldVerificationDaily'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
@@ -101,7 +110,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
 // ─── الداشبورد ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
+  const { counts, stores, allStores, callLogs, storeStates, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
   const { refreshPrivateTicketsAlert } = usePrivateTicketsAlert()
   const navigate = useNavigate()
@@ -110,6 +119,23 @@ export default function Dashboard() {
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
+  const [dashDismissals, setDashDismissals] = useState(() => new Set())
+  const [dashNowTick, setDashNowTick] = useState(() => Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setDashNowTick(Date.now()), 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const u = user?.username
+    if (!u) return
+    getDailyTaskDismissals(u)
+      .then(r => {
+        if (r?.success && Array.isArray(r.keys)) setDashDismissals(new Set(r.keys))
+      })
+      .catch(() => {})
+  }, [user?.username, lastLoaded])
 
   const loadFreezeQvPending = useCallback(async () => {
     if (user?.role !== 'executive') {
@@ -165,6 +191,13 @@ export default function Dashboard() {
     reload()
     void loadFreezeQvPending()
     void refreshPrivateTicketsAlert()
+    if (user?.username) {
+      getDailyTaskDismissals(user.username)
+        .then(r => {
+          if (r?.success && Array.isArray(r.keys)) setDashDismissals(new Set(r.keys))
+        })
+        .catch(() => {})
+    }
     if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
@@ -237,6 +270,48 @@ export default function Dashboard() {
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
   const showIncubationHero = can('new') || can('incubation')
+
+  const dashBizDateKey = useMemo(() => getBizDateKeyAt9am(new Date(dashNowTick)), [dashNowTick])
+  const activeShipVerifyAlert = useMemo(() => {
+    if (user?.role !== 'active_manager' && user?.role !== 'incubation_manager') return null
+    if (!user?.username) return null
+    const picked = getDailyActiveShippingVerifyStores(
+      allStores,
+      storeStates,
+      dashBizDateKey,
+      user.username,
+      ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT,
+    )
+    const tasks = buildActiveShippingVerificationTasks(picked, dashBizDateKey)
+    const pending = tasks.filter(t => !dashDismissals.has(t.id)).length
+    const pool = allStores.filter(s => {
+      const cat = storeStates[s.id]?.category || s.category || ''
+      const bucket = s.bucket || ''
+      if (bucket === 'active_shipping') return true
+      return ['active_shipping', 'active', 'active_pending_calls'].includes(cat)
+    }).length
+    const hour = new Date(dashNowTick).getHours()
+    return { pending, pool, beforeNine: hour < 9 }
+  }, [user?.role, user?.username, allStores, storeStates, dashBizDateKey, dashDismissals, dashNowTick])
+
+  const coldVerifyAlert = useMemo(() => {
+    if (user?.role !== 'incubation_manager' || !user?.username) return null
+    const picked = getDailyColdBatchStores(
+      allStores,
+      storeStates,
+      dashBizDateKey,
+      user.username,
+      COLD_INACTIVE_DAILY_LIMIT,
+    )
+    const tasks = buildColdVerificationTasks(picked, dashBizDateKey)
+    const pending = tasks.filter(t => !dashDismissals.has(t.id)).length
+    const pool = allStores.filter(s => {
+      const cat = storeStates[s.id]?.category || s.category || ''
+      return cat === 'cold_inactive'
+    }).length
+    const hour = new Date(dashNowTick).getHours()
+    return { pending, pool, beforeNine: hour < 9 }
+  }, [user?.role, user?.username, allStores, storeStates, dashBizDateKey, dashDismissals, dashNowTick])
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -333,6 +408,91 @@ export default function Dashboard() {
           ))}
         </div>
       </motion.div>
+
+      {(user?.role === 'active_manager' || user?.role === 'incubation_manager') && activeShipVerifyAlert ? (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="rounded-2xl border border-emerald-300/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50/80 p-4 shadow-sm shadow-emerald-900/5 lg:p-5"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 ring-1 ring-emerald-500/25">
+                <Store size={22} strokeWidth={2.2} aria-hidden />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-black uppercase tracking-wider text-emerald-800/90">تحقيق يومي — نشط يشحن</p>
+                <p className="text-sm font-bold text-slate-900">دفعة حتى {ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT} متجراً — يوم العمل يبدأ 9:00 ص (توقيت جهازك)</p>
+                {activeShipVerifyAlert.beforeNine ? (
+                  <p className="text-sm text-amber-800 font-medium leading-relaxed">
+                    قبل 9:00 ص: الدفعة الرسمية لليوم تبدأ بعد التاسعة صباحاً. افتح «المهام اليومية» بعدها لإكمال التحقيق.
+                  </p>
+                ) : activeShipVerifyAlert.pending > 0 ? (
+                  <p className="text-sm text-emerald-950 font-semibold leading-relaxed">
+                    لديك{' '}
+                    <span className="tabular-nums font-black">{activeShipVerifyAlert.pending.toLocaleString('ar-SA')}</span>
+                    {' '}
+                    متجراً بانتظار التحقق في دفعة «نشط يشحن» اليوم.
+                  </p>
+                ) : activeShipVerifyAlert.pool > 0 ? (
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    لا يتبقى متاجر في دفعة اليوم — أو اكتمل التحقق. يمكنك المراجعة من المهام اليومية.
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-500">لا توجد متاجر مؤهّلة في خانة «نشط يشحن» حالياً.</p>
+                )}
+              </div>
+            </div>
+            <Link
+              to="/tasks"
+              state={{ openTasksTab: 'active_shipping_verify' }}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-md shadow-emerald-600/25 transition hover:bg-emerald-700"
+            >
+              فتح تبويب التحقيق
+              <ArrowUpRight size={16} />
+            </Link>
+          </div>
+          {user?.role === 'incubation_manager' && coldVerifyAlert ? (
+            <div className="mt-4 border-t border-cyan-200/80 pt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-800 ring-1 ring-cyan-400/30">
+                  <Snowflake size={20} aria-hidden />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-xs font-black uppercase tracking-wider text-cyan-900/90">تحقيق بارد — غير نشط</p>
+                  <p className="text-sm font-bold text-slate-900">حتى {COLD_INACTIVE_DAILY_LIMIT} متجراً يومياً — نفس موعد 9:00 ص</p>
+                  {coldVerifyAlert.beforeNine ? (
+                    <p className="text-sm text-amber-800 font-medium leading-relaxed">
+                      قبل 9:00 ص: انتظر بداية يوم العمل للدفعة الباردة.
+                    </p>
+                  ) : coldVerifyAlert.pending > 0 ? (
+                    <p className="text-sm text-cyan-950 font-semibold leading-relaxed">
+                      لديك{' '}
+                      <span className="tabular-nums font-black">{coldVerifyAlert.pending.toLocaleString('ar-SA')}</span>
+                      {' '}
+                      متجراً بانتظار التحقق في دفعة «غير نشط بارد».
+                    </p>
+                  ) : coldVerifyAlert.pool > 0 ? (
+                    <p className="text-sm text-slate-600">لا يتبقى متاجر في دفعة البارد اليوم.</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">لا توجد متاجر «باردة» في النظام.</p>
+                  )}
+                </div>
+              </div>
+              <Link
+                to="/tasks"
+                state={{ openTasksTab: 'cold_verify' }}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-cyan-600 bg-white px-4 py-2.5 text-sm font-black text-cyan-900 shadow-sm transition hover:bg-cyan-50"
+              >
+                تبويب البارد
+                <ArrowUpRight size={16} />
+              </Link>
+            </div>
+          ) : null}
+        </motion.div>
+      ) : null}
 
       {user?.role === 'executive' && can('quick_verification') ? (
         <motion.div

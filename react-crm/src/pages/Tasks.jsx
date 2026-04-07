@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake,
+  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake, Truck,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
@@ -23,6 +24,10 @@ import {
   getBizDateKeyAt9am,
   getDailyColdBatchStores,
   buildColdVerificationTasks,
+  getDailyActiveShippingVerifyStores,
+  buildActiveShippingVerificationTasks,
+  COLD_INACTIVE_DAILY_LIMIT,
+  ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT,
 } from '../utils/coldVerificationDaily'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
@@ -534,6 +539,12 @@ const TYPE_STYLES = {
     badge: 'bg-cyan-100 text-cyan-900 border border-cyan-200/80',
     bg: 'linear-gradient(135deg, rgba(224,242,254,0.85) 0%, rgba(240,249,255,0.95) 50%, rgba(248,250,252,0.9) 100%)',
   },
+  active_shipping_verification: {
+    borderColor: '#6ee7b7',
+    accent: '#059669',
+    badge: 'bg-emerald-100 text-emerald-900 border border-emerald-200/80',
+    bg: 'linear-gradient(135deg, rgba(209,250,229,0.9) 0%, rgba(236,253,245,0.95) 55%, rgba(248,250,252,0.92) 100%)',
+  },
 }
 
 function TaskCard({
@@ -558,6 +569,8 @@ function TaskCard({
       (task.type === 'assigned_store' && userRole === 'active_manager')
       || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
       || (task.type === 'cold_verification' && userRole === 'incubation_manager')
+      || (task.type === 'active_shipping_verification'
+        && (userRole === 'incubation_manager' || userRole === 'active_manager'))
       || task.type === 'recovery_call'
     )
   return (
@@ -706,6 +719,7 @@ function IncManagerDoneModal({ task, onClose, onConfirm, saving, error }) {
 }
 
 export default function Tasks() {
+  const location = useLocation()
   const {
     allStores, callLogs, storeStates, assignments, loading, reload, lastLoaded, surveyByStoreId,
     newMerchantOnboardingDoneIds,
@@ -781,6 +795,21 @@ export default function Tasks() {
   useEffect(() => {
     loadDismissals()
   }, [loadDismissals, lastLoaded])
+
+  /** فتح تبويب محدد من لوحة التحكم (تحقيق نشط / بارد) */
+  useEffect(() => {
+    const t = location.state?.openTasksTab
+    if (t === 'active_shipping_verify' || t === 'cold_verify') {
+      setMoTab(t)
+    }
+  }, [location.state])
+
+  /** مسؤول المتاجر النشطة لا يرى تبويب «بارد» — إعادة توجيه إن وُجدت حالة قديمة */
+  useEffect(() => {
+    if (user?.role === 'active_manager' && moTab === 'cold_verify') {
+      setMoTab('active_shipping_verify')
+    }
+  }, [user?.role, moTab])
 
   useEffect(() => {
     loadInactiveWf()
@@ -923,7 +952,11 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
-  const isMoStaging = user?.role === 'incubation_manager'
+  /** مسؤول المتاجر الجديدة + مسؤول المتاجر النشطة — تبويبات المهام (يشمل تحقيق نشط يشحن) */
+  const isTaskTabUser =
+    user?.role === 'incubation_manager' || user?.role === 'active_manager'
+  /** تبويب «تحقيق بارد» (غير نشط بارد) — لمسؤول المتاجر الجديدة فقط */
+  const showColdInactiveTab = user?.role === 'incubation_manager'
 
   const bizDateKeyCold = useMemo(() => getBizDateKeyAt9am(new Date(nowTick)), [nowTick])
 
@@ -935,38 +968,66 @@ export default function Tasks() {
     [allStores, storeStates],
   )
 
+  const activeShippingPoolCount = useMemo(
+    () => allStores.filter(s => {
+      const cat = storeStates[s.id]?.category || s.category || ''
+      const bucket = s.bucket || ''
+      if (bucket === 'active_shipping') return true
+      return ['active_shipping', 'active', 'active_pending_calls'].includes(cat)
+    }).length,
+    [allStores, storeStates],
+  )
+
   const coldVerificationTasksAll = useMemo(() => {
-    if (!isMoStaging) return []
+    if (!showColdInactiveTab) return []
     const picked = getDailyColdBatchStores(
       allStores,
       storeStates,
       bizDateKeyCold,
       user?.username,
-      30,
+      COLD_INACTIVE_DAILY_LIMIT,
     )
     return buildColdVerificationTasks(picked, bizDateKeyCold)
-  }, [isMoStaging, allStores, storeStates, bizDateKeyCold, user?.username])
+  }, [showColdInactiveTab, allStores, storeStates, bizDateKeyCold, user?.username])
 
   const pendingColdVerifyTasks = useMemo(
     () => coldVerificationTasksAll.filter(t => !dismissalKeys.has(t.id)),
     [coldVerificationTasksAll, dismissalKeys],
   )
 
+  const activeShippingVerificationTasksAll = useMemo(() => {
+    if (!isTaskTabUser) return []
+    const picked = getDailyActiveShippingVerifyStores(
+      allStores,
+      storeStates,
+      bizDateKeyCold,
+      user?.username,
+      ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT,
+    )
+    return buildActiveShippingVerificationTasks(picked, bizDateKeyCold)
+  }, [isTaskTabUser, allStores, storeStates, bizDateKeyCold, user?.username])
+
+  const pendingActiveShipVerifyTasks = useMemo(
+    () => activeShippingVerificationTasksAll.filter(t => !dismissalKeys.has(t.id)),
+    [activeShippingVerificationTasksAll, dismissalKeys],
+  )
+
   const moPeriodicTasks = useMemo(() => {
-    if (!isMoStaging) return mainTasks
+    if (!isTaskTabUser) return mainTasks
     return mainTasks.filter(
       t => !t.moContactedToday && !taskIsNoAnswer(t, callLogs, assignments),
     )
-  }, [isMoStaging, mainTasks, callLogs, assignments])
+  }, [isTaskTabUser, mainTasks, callLogs, assignments])
 
   const moContactedTasks = useMemo(() => {
-    if (!isMoStaging) return []
+    if (!isTaskTabUser) return []
     return mainTasks.filter(t => t.moContactedToday)
-  }, [isMoStaging, mainTasks])
+  }, [isTaskTabUser, mainTasks])
 
   const displayed = useMemo(() => {
-    if (isMoStaging) {
+    if (isTaskTabUser) {
       if (moTab === 'cold_verify') return pendingColdVerifyTasks
+      if (moTab === 'active_shipping_verify') return pendingActiveShipVerifyTasks
       if (moTab === 'contacted') return moContactedTasks
       if (moTab === 'no_answer') return noAnswerTasks
       return moPeriodicTasks
@@ -975,11 +1036,12 @@ export default function Tasks() {
     if (filter === 'high') return mainTasks.filter(t => t.priority === 'high')
     return mainTasks
   }, [
-    isMoStaging,
+    isTaskTabUser,
     moTab,
     moPeriodicTasks,
     moContactedTasks,
     pendingColdVerifyTasks,
+    pendingActiveShipVerifyTasks,
     filter,
     mainTasks,
     noAnswerTasks,
@@ -987,8 +1049,8 @@ export default function Tasks() {
 
   const focusNoAnswerView = useCallback(() => {
     setFilter('no_answer')
-    if (isMoStaging) setMoTab('no_answer')
-  }, [isMoStaging])
+    if (isTaskTabUser) setMoTab('no_answer')
+  }, [isTaskTabUser])
 
   async function dismissTaskOnly(id) {
     setDismissErr('')
@@ -1103,6 +1165,24 @@ export default function Tasks() {
         return
       }
       if (task.type === 'cold_verification') {
+        const res = await logCall({
+          store_id: task.store.id,
+          store_name: task.store.name,
+          call_type: 'general',
+          outcome: 'no_answer',
+          note: '',
+          performed_by: user?.fullname || user?.username || '',
+          performed_role: user?.role,
+          registration_date: task.store.registered_at || null,
+        })
+        if (!DISABLE_POINTS_AND_PERFORMANCE) {
+          onCallSaved(res?.points_awarded ?? 0)
+        }
+        await reload()
+        loadDismissals()
+        return
+      }
+      if (task.type === 'active_shipping_verification') {
         const res = await logCall({
           store_id: task.store.id,
           store_name: task.store.name,
@@ -1321,19 +1401,34 @@ export default function Tasks() {
                 </p>
               </>
             )}
-            {isMoStaging && moTab === 'cold_verify' && (
+            {showColdInactiveTab && moTab === 'cold_verify' && (
               <p className="text-sky-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-sky-300/35 bg-gradient-to-l from-sky-400/15 to-cyan-300/10 backdrop-blur-sm">
                 <Snowflake className="inline-block ml-1.5 align-text-bottom opacity-90" size={14} aria-hidden />
                 {' '}
-                تحقيق البارد: حتى 30 متجراً تُختار مرة واحدة لكل يوم عمل (يبدأ 9:00 صباحاً — توقيت جهازك). لا يُستبدل من خرج بالتجميد أو الاتصال في نفس اليوم؛ دفعة جديدة فقط بعد 9:00 ص يوم العمل التالي. يوم الدفعة:{' '}
+                تحقيق البارد (غير نشط): حتى {COLD_INACTIVE_DAILY_LIMIT} متجراً لكل يوم عمل (يبدأ 9:00 صباحاً — توقيت جهازك). لا يُستبدل من خرج بالتجميد أو الاتصال في نفس اليوم؛ دفعة جديدة بعد 9:00 ص يوم العمل التالي. يوم الدفعة:{' '}
                 <span className="font-mono font-bold tabular-nums">{bizDateKeyCold}</span>
-                {' — '}إجمالي المتاجر الباردة في النظام:{' '}
+                {' — '}إجمالي «غير نشط بارد» في النظام:{' '}
                 {coldInactivePoolCount.toLocaleString('ar-SA')}
               </p>
             )}
-            {isMoStaging && moTab !== 'cold_verify' && (
+            {isTaskTabUser && moTab === 'active_shipping_verify' && (
+              <p className="text-emerald-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-emerald-400/35 bg-gradient-to-l from-emerald-500/20 to-teal-400/10 backdrop-blur-sm">
+                <Truck className="inline-block ml-1.5 align-text-bottom opacity-90" size={14} aria-hidden />
+                {' '}
+                تحقيق المتاجر النشطة «يشحن»: حتى {ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT} متجراً يومياً (يوم العمل يبدأ 9:00 ص — توقيت جهازك). لا استبدال داخل اليوم؛ دفعة جديدة بعد 9:00 ص التالي. يوم الدفعة:{' '}
+                <span className="font-mono font-bold tabular-nums">{bizDateKeyCold}</span>
+                {' — '}إجمالي «نشط يشحن» في النظام:{' '}
+                {activeShippingPoolCount.toLocaleString('ar-SA')}
+              </p>
+            )}
+            {user?.role === 'incubation_manager' && moTab !== 'cold_verify' && moTab !== 'active_shipping_verify' && (
               <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
                 وضع مسؤول المتاجر الجديدة (تجريبي): في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+              </p>
+            )}
+            {user?.role === 'active_manager' && moTab !== 'active_shipping_verify' && moTab !== 'cold_verify' && (
+              <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
+                راجع تبويب «تحقيق نشط يشحن» يومياً بعد 9:00 ص — دفعة ثابتة حتى {ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT} متجراً للتحقق من سلامة التشغيل.
               </p>
             )}
             {pendingTasks.length > 0 && (
@@ -1374,7 +1469,7 @@ export default function Tasks() {
         transition={{ duration: 0.4, delay: 0.18 }}
         className="flex flex-wrap gap-2"
       >
-        {isMoStaging ? (
+        {isTaskTabUser ? (
           <>
             <motion.button
               type="button"
@@ -1459,6 +1554,37 @@ export default function Tasks() {
             </motion.button>
             <motion.button
               type="button"
+              onClick={() => setMoTab('active_shipping_verify')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                moTab === 'active_shipping_verify'
+                  ? 'text-emerald-950 shadow-lg border-emerald-300/90'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'active_shipping_verify'
+                  ? {
+                      background: 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #f0fdf4 100%)',
+                      boxShadow: '0 4px 18px rgba(16,185,129,0.28)',
+                    }
+                  : {}
+              }
+            >
+              <Truck size={16} className={moTab === 'active_shipping_verify' ? 'text-emerald-700' : 'text-slate-400'} aria-hidden />
+              تحقيق نشط يشحن
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'active_shipping_verify'
+                    ? 'bg-emerald-600/15 text-emerald-950'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {pendingActiveShipVerifyTasks.length}
+              </span>
+            </motion.button>
+            {showColdInactiveTab && (
+            <motion.button
+              type="button"
               onClick={() => setMoTab('cold_verify')}
               whileTap={{ scale: 0.97 }}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
@@ -1476,7 +1602,7 @@ export default function Tasks() {
               }
             >
               <Snowflake size={16} className={moTab === 'cold_verify' ? 'text-cyan-600' : 'text-slate-400'} aria-hidden />
-              تحقيق البارد
+              تحقيق بارد
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   moTab === 'cold_verify'
@@ -1487,6 +1613,7 @@ export default function Tasks() {
                 {pendingColdVerifyTasks.length}
               </span>
             </motion.button>
+            )}
           </>
         ) : (
           [
@@ -1538,18 +1665,38 @@ export default function Tasks() {
           transition={{ duration: 0.4 }}
           className="bg-white rounded-3xl p-12 text-center shadow-sm border border-slate-100"
         >
-          {isMoStaging && moTab === 'cold_verify' ? (
+          {showColdInactiveTab && moTab === 'cold_verify' ? (
             coldInactivePoolCount === 0 ? (
               <>
                 <Snowflake size={56} className="text-cyan-300 mx-auto mb-4" />
                 <p className="font-black text-slate-700 text-xl">لا توجد متاجر «غير نشط بارد» في النظام</p>
-                <p className="text-slate-500 text-sm mt-2">عند وجود متاجر بارد ستُعرض دفعة يومية حتى 30؛ تُحدَّد الدفعة الجديدة بعد 9:00 ص يوم العمل التالي</p>
+                <p className="text-slate-500 text-sm mt-2">
+                  عند وجود متاجر بارد ستُعرض دفعة يومية حتى {COLD_INACTIVE_DAILY_LIMIT}؛ تُحدَّد الدفعة الجديدة بعد 9:00 ص يوم العمل التالي
+                </p>
               </>
             ) : pendingColdVerifyTasks.length === 0 && coldVerificationTasksAll.length > 0 ? (
               <>
                 <CheckCircle size={56} className="text-cyan-400 mx-auto mb-4" />
                 <p className="font-black text-slate-700 text-xl">لا يتبقى متاجر في دفعة تحقيق البارد</p>
                 <p className="text-slate-500 text-sm mt-2">الدفعة التالية تُحدَّد الساعة 9:00 صباحاً (توقيت جهازك)</p>
+              </>
+            ) : (
+              <p className="font-bold text-slate-600">لا توجد مهام في هذا التبويب</p>
+            )
+          ) : isTaskTabUser && moTab === 'active_shipping_verify' ? (
+            activeShippingPoolCount === 0 ? (
+              <>
+                <Truck size={56} className="text-emerald-300 mx-auto mb-4" />
+                <p className="font-black text-slate-700 text-xl">لا توجد متاجر «نشط يشحن» في النظام</p>
+                <p className="text-slate-500 text-sm mt-2">
+                  عند وجود متاجر نشطة ستُعرض دفعة يومية حتى {ACTIVE_SHIPPING_VERIFY_DAILY_LIMIT}؛ يوم العمل يبدأ 9:00 ص
+                </p>
+              </>
+            ) : pendingActiveShipVerifyTasks.length === 0 && activeShippingVerificationTasksAll.length > 0 ? (
+              <>
+                <CheckCircle size={56} className="text-emerald-400 mx-auto mb-4" />
+                <p className="font-black text-slate-700 text-xl">لا يتبقى متاجر في دفعة تحقيق «نشط يشحن»</p>
+                <p className="text-slate-500 text-sm mt-2">الدفعة التالية تُحدَّد بعد 9:00 ص يوم العمل التالي</p>
               </>
             ) : (
               <p className="font-bold text-slate-600">لا توجد مهام في هذا التبويب</p>
@@ -1565,7 +1712,7 @@ export default function Tasks() {
               <p className="font-black text-slate-700 text-xl">أحسنت! لا توجد مهام معلقة</p>
               <p className="text-slate-400 text-sm mt-2">تم الانتهاء من جميع المهام اليوم 🎉</p>
             </>
-          ) : (isMoStaging && moTab === 'no_answer') || filter === 'no_answer' ? (
+          ) : (isTaskTabUser && moTab === 'no_answer') || filter === 'no_answer' ? (
             <>
               <CheckCircle size={56} className="text-amber-400 mx-auto mb-4" />
               <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم يتم الرد»</p>
@@ -1605,7 +1752,7 @@ export default function Tasks() {
                 task.type === 'assigned_store'
                 && needsActiveSatisfactionSurvey(task.store.id, cat, surveyByStoreId)
               const useMoRow =
-                isMoStaging
+                isTaskTabUser
                 && (task.moDays != null
                   || task.moCycleDay != null
                   || task.type === 'new_merchant_onboarding'
