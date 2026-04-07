@@ -220,6 +220,28 @@ function count_inactive_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+/**
+ * تقليم الفائض: إذا تجاوز عدد المتاجر النشطة السقف (50)، نحذف الأحدث إسنادًا ونبقي أقدم 50.
+ */
+function trim_active_queue_excess(PDO $pdo, $username) {
+    $have = count_active_queue($pdo, $username);
+    $excess = $have - ACTIVE_QUEUE_TARGET;
+    if ($excess <= 0) return 0;
+    $st = $pdo->prepare("
+        SELECT store_id FROM store_assignments
+        WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'active'
+        ORDER BY assigned_at DESC
+        LIMIT " . (int) $excess . "
+    ");
+    $st->execute([$username]);
+    $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($ids)) return 0;
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $pdo->prepare("DELETE FROM store_assignments WHERE store_id IN ($ph) AND assigned_to = ? AND assignment_queue = 'active'")
+        ->execute(array_merge($ids, [$username]));
+    return count($ids);
+}
+
 function cleanup_completed_assignments(PDO $pdo, $username, $queue) {
     $u = trim((string) $username);
     $q = $queue === 'inactive' ? 'inactive' : 'active';
@@ -349,6 +371,7 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
+    trim_active_queue_excess($pdo, $username);
     $have = count_active_queue($pdo, $username);
     $need = ACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {
