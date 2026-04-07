@@ -1039,8 +1039,13 @@ export default function Tasks() {
     const main = []
     const noAns = []
     for (const t of pendingTasks) {
-      if (taskIsNoAnswer(t, callLogs, assignments)) noAns.push(t)
-      else main.push(t)
+      if (t.moContactedToday) {
+        main.push(t)
+      } else if (taskIsNoAnswer(t, callLogs, assignments)) {
+        noAns.push(t)
+      } else {
+        main.push(t)
+      }
     }
     return {
       mainTasks: main,
