@@ -334,29 +334,52 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {user?.role === 'executive' && can('quick_verification') && freezeQvPending != null && freezeQvPending > 0 ? (
+      {user?.role === 'executive' && can('quick_verification') ? (
         <motion.div
           variants={fadeUp}
           initial="hidden"
           animate="visible"
-          transition={{ duration: 0.4, delay: 0.08 }}
+          transition={{ duration: 0.45, delay: 0.06 }}
         >
           <Link
             to="/quick-verification"
-            className="flex w-full items-center justify-between gap-4 rounded-2xl border border-violet-300/60 bg-gradient-to-l from-violet-600/95 to-[#4B0082] px-5 py-4 text-right text-white shadow-lg shadow-violet-500/20 transition hover:brightness-105"
+            className="relative flex w-full flex-col gap-4 overflow-hidden rounded-3xl border-2 border-cyan-300/45 bg-gradient-to-br from-slate-950 via-indigo-950 to-fuchsia-950 p-5 text-right text-white shadow-[0_24px_60px_-20px_rgba(99,102,241,0.55),0_0_0_1px_rgba(255,255,255,0.06)_inset] transition hover:brightness-[1.07] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6 lg:p-7"
           >
-            <div className="flex min-w-0 flex-1 items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                <BadgeCheck size={22} className="text-white" strokeWidth={2.2} />
+            <div
+              className="pointer-events-none absolute -left-20 top-0 h-48 w-48 rounded-full bg-cyan-400/25 blur-3xl"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-fuchsia-500/20 blur-3xl"
+              aria-hidden
+            />
+            <div className="relative flex min-w-0 flex-1 items-start gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 shadow-[0_8px_32px_-8px_rgba(34,211,238,0.45)] ring-2 ring-cyan-300/30">
+                <BadgeCheck size={28} className="text-cyan-100" strokeWidth={2.2} />
               </span>
-              <div className="min-w-0">
-                <p className="text-sm font-black">التحقيق السريع — بانتظار المراجعة التنفيذية</p>
-                <p className="mt-1 text-xs font-medium text-white/85">
-                  {freezeQvPending.toLocaleString('ar-SA')} حالة اليوم: تجميدات و/أو طلبات «يحتاج تجميد» من الفرق.
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200/90">لوحة تنفيذية</p>
+                <p className="text-lg font-black leading-tight tracking-tight sm:text-xl">التحقيق السريع</p>
+                <p className="text-sm font-medium leading-relaxed text-white/80">
+                  مراجعة استبيانات اليوم، أزمات الرضا، تنبيهات التجميد، وطلبات «يحتاج تجميد» — اضغط للدخول إلى البورصة الكاملة.
                 </p>
+                {freezeQvPending != null && freezeQvPending > 0 ? (
+                  <p className="pt-1 text-xs font-bold text-amber-200">
+                    <span className="mr-1 inline-flex items-center rounded-full border border-amber-400/50 bg-amber-500/20 px-2.5 py-1">
+                      {freezeQvPending.toLocaleString('ar-SA')} بانتظار مراجعتك الآن
+                    </span>
+                  </p>
+                ) : (
+                  <p className="pt-0.5 text-xs text-white/50">لا توجد حالات عاجلة معلّقة في الطابور حسب آخر تحديث.</p>
+                )}
               </div>
             </div>
-            <ArrowUpRight className="shrink-0 text-white/90" size={20} />
+            <div className="relative flex shrink-0 items-center gap-2 self-end sm:self-center">
+              <span className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-black text-white/95 backdrop-blur-sm">
+                فتح اللوحة
+              </span>
+              <ArrowUpRight className="text-cyan-200" size={22} strokeWidth={2.2} />
+            </div>
           </Link>
         </motion.div>
       ) : null}

@@ -179,48 +179,48 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   )
 }
 
-/** شريط مؤشرات سريعة — بطاقات KPI بمظهر لوحة تحكم احترافية */
+/** شريط مؤشرات سريعة — بطاقات KPI بألوان ممتدة على كامل المربع */
 function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
   const items = [
     {
-      label: 'سجلات اليوم',
+      label: 'تسجيلات اليوم',
       sub: 'إجمالي ما ورد للتحقيق',
       value: loading ? '—' : total.toLocaleString('ar-SA'),
       icon: ClipboardList,
-      edge: 'from-violet-600 via-violet-500 to-fuchsia-500',
-      iconBg:
-        'bg-gradient-to-br from-violet-500/[0.12] to-violet-700/[0.08] text-violet-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-violet-500/20',
-      glow: 'group-hover:shadow-violet-500/10',
+      fullBg:
+        'bg-gradient-to-br from-fuchsia-600 via-violet-700 to-indigo-950 shadow-[0_18px_44px_-14px_rgba(91,33,182,0.65)] ring-2 ring-fuchsia-300/35',
+      sheen:
+        'bg-[radial-gradient(ellipse_100%_80%_at_100%_0%,rgba(255,255,255,0.22),transparent_55%)]',
     },
     {
       label: 'قيد المتابعة',
       sub: 'حالات تحتاج قراراً',
       value: loading ? '—' : openCrisis.toLocaleString('ar-SA'),
       icon: AlertTriangle,
-      edge: 'from-rose-600 via-rose-500 to-orange-400',
-      iconBg:
-        'bg-gradient-to-br from-rose-500/[0.14] to-rose-700/[0.08] text-rose-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-rose-500/25',
-      glow: 'group-hover:shadow-rose-500/10',
+      fullBg:
+        'bg-gradient-to-br from-rose-600 via-orange-600 to-red-950 shadow-[0_18px_44px_-14px_rgba(225,29,72,0.55)] ring-2 ring-rose-300/40',
+      sheen:
+        'bg-[radial-gradient(ellipse_90%_70%_at_0%_0%,rgba(255,255,255,0.2),transparent_50%)]',
     },
     {
       label: 'تمت الأرشفة',
       sub: 'حُلّت أو أُغلقت',
       value: loading ? '—' : resolved.toLocaleString('ar-SA'),
       icon: CheckCircle2,
-      edge: 'from-emerald-600 via-emerald-500 to-teal-400',
-      iconBg:
-        'bg-gradient-to-br from-emerald-500/[0.14] to-emerald-700/[0.08] text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-emerald-500/25',
-      glow: 'group-hover:shadow-emerald-500/10',
+      fullBg:
+        'bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-950 shadow-[0_18px_44px_-14px_rgba(5,150,105,0.55)] ring-2 ring-emerald-300/35',
+      sheen:
+        'bg-[radial-gradient(ellipse_100%_80%_at_80%_100%,rgba(255,255,255,0.18),transparent_55%)]',
     },
     {
       label: 'مؤشر الرضا',
       sub: 'لمحة تراكمية',
       value: loading ? '—' : `${Math.min(100, Math.max(0, Number(globalSat) || 0))}%`,
       icon: Shield,
-      edge: 'from-sky-600 via-sky-500 to-indigo-400',
-      iconBg:
-        'bg-gradient-to-br from-sky-500/[0.14] to-indigo-600/[0.08] text-sky-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] ring-1 ring-sky-500/25',
-      glow: 'group-hover:shadow-sky-500/10',
+      fullBg:
+        'bg-gradient-to-br from-sky-500 via-cyan-500 to-blue-950 shadow-[0_18px_44px_-14px_rgba(14,165,233,0.55)] ring-2 ring-cyan-200/40',
+      sheen:
+        'bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(255,255,255,0.25),transparent_50%)]',
     },
   ]
   return (
@@ -228,39 +228,27 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
       {items.map(it => (
         <div
           key={it.label}
-          className={`group relative min-h-[7.5rem] overflow-hidden rounded-[1.125rem] bg-gradient-to-br from-white/50 via-white/40 to-slate-100/35 p-[1px] shadow-[0_4px_6px_-1px_rgba(15,23,42,0.04),0_12px_28px_-8px_rgba(75,0,130,0.12)] ring-1 ring-slate-200/50 backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-12px_rgba(75,0,130,0.18)] hover:ring-slate-300/60 ${it.glow}`}
+          className={`group relative min-h-[7.75rem] overflow-hidden rounded-[1.125rem] transition duration-300 hover:-translate-y-1 hover:brightness-[1.05] ${it.fullBg}`}
         >
-          {/* شريط لوني على الحافة (بداية السطر في RTL = يمين البطاقة) */}
-          <div
-            className={`pointer-events-none absolute inset-y-3 right-0 z-[1] w-[3px] rounded-full bg-gradient-to-b ${it.edge} opacity-95 shadow-[2px_0_12px_-2px_rgba(0,0,0,0.15)]`}
-            aria-hidden
-          />
-          <div className="relative flex h-full min-h-[7.25rem] flex-col overflow-hidden rounded-[1.05rem] border border-white/90 bg-gradient-to-b from-white/95 via-white/88 to-slate-50/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
-            {/* خط علوي مركزي نحيف */}
-            <div
-              className={`pointer-events-none absolute inset-x-8 top-0 h-[2px] rounded-full bg-gradient-to-l ${it.edge} opacity-80 blur-[0.5px]`}
-              aria-hidden
-            />
-            <div className="flex flex-1 flex-col justify-between p-4 pt-5 sm:p-[1.125rem]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 pr-1 text-right">
-                  <p className="text-[10px] font-bold tracking-wide text-slate-500">{it.label}</p>
-                  <p
-                    className={`mt-1.5 font-black tabular-nums tracking-tight ${loading ? 'text-2xl text-slate-300' : 'text-[1.65rem] leading-none text-slate-900 sm:text-[1.75rem]'}`}
-                  >
-                    {it.value}
-                  </p>
-                </div>
-                <span
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition duration-300 group-hover:scale-[1.03] sm:h-12 sm:w-12 ${it.iconBg}`}
+          <div className={`pointer-events-none absolute inset-0 ${it.sheen}`} aria-hidden />
+          <div className="pointer-events-none absolute inset-0 opacity-30 mix-blend-overlay bg-[linear-gradient(135deg,rgba(255,255,255,0.15)_0%,transparent_45%,rgba(0,0,0,0.12)_100%)]" aria-hidden />
+          <div className="relative flex h-full min-h-[7.5rem] flex-col justify-between p-4 pt-5 sm:p-[1.125rem]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 pr-1 text-right">
+                <p className="text-[10px] font-black tracking-wide text-white/85 drop-shadow-sm">{it.label}</p>
+                <p
+                  className={`mt-1.5 font-black tabular-nums tracking-tight drop-shadow-md ${loading ? 'text-2xl text-white/35' : 'text-[1.65rem] leading-none text-white sm:text-[1.75rem]'}`}
                 >
-                  <it.icon className="h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5" strokeWidth={2.2} />
-                </span>
+                  {it.value}
+                </p>
               </div>
-              <p className="mt-3 border-t border-slate-100/90 pt-2.5 text-[10px] font-medium leading-relaxed text-slate-500 sm:text-[11px]">
-                {it.sub}
-              </p>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white shadow-inner ring-1 ring-white/30 transition duration-300 group-hover:scale-[1.06] sm:h-12 sm:w-12">
+                <it.icon className="h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5" strokeWidth={2.2} />
+              </span>
             </div>
+            <p className="mt-3 border-t border-white/25 pt-2.5 text-[10px] font-semibold leading-relaxed text-white/80 sm:text-[11px]">
+              {it.sub}
+            </p>
           </div>
         </div>
       ))}
