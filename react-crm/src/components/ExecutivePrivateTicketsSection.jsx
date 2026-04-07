@@ -7,6 +7,7 @@ import {
   completeExecutivePrivateTicket,
   listUsers,
 } from '../services/api'
+import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -26,6 +27,7 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
   const [mandatory, setMandatory] = useState(true)
 
   const isExecutive = user?.role === 'executive'
+  const { shouldAlert: ticketCardAlert, refreshPrivateTicketsAlert } = usePrivateTicketsAlert()
 
   const load = useCallback(async () => {
     if (!user?.username) return
@@ -53,6 +55,10 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
   useEffect(() => {
     void load()
   }, [load, reloadKey])
+
+  useEffect(() => {
+    void refreshPrivateTicketsAlert()
+  }, [reloadKey, refreshPrivateTicketsAlert])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -116,13 +122,19 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
   const openCount = tickets.filter(t => t.status === 'open').length
   const openMandatory = tickets.filter(t => t.status === 'open' && Number(t.is_mandatory) === 1).length
 
+  const staffFrostPulse = !isExecutive && ticketCardAlert
+
   return (
     <motion.section
       variants={fadeUp}
       initial="hidden"
       animate="visible"
       transition={{ duration: 0.45, delay: 0.12 }}
-      className="relative rounded-3xl overflow-hidden border border-violet-400/25 shadow-[0_20px_50px_-20px_rgba(76,29,149,0.35)]"
+      className={`relative rounded-3xl overflow-hidden shadow-[0_20px_50px_-20px_rgba(76,29,149,0.35)] ${
+        staffFrostPulse
+          ? 'animate-private-ticket-frost border-2 border-cyan-100/35'
+          : 'border border-violet-400/25'
+      }`}
       style={{ background: 'linear-gradient(145deg, #1a0d35 0%, #251043 45%, #12082a 100%)' }}
     >
       <div className="absolute top-0 right-0 w-72 h-72 bg-fuchsia-600/15 rounded-full blur-3xl pointer-events-none" />

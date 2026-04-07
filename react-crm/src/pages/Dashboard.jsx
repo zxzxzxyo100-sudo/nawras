@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
+import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
@@ -102,6 +103,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
+  const { refreshPrivateTicketsAlert } = usePrivateTicketsAlert()
   const navigate = useNavigate()
 
   const [staffMissions, setStaffMissions] = useState(null)
@@ -162,6 +164,7 @@ export default function Dashboard() {
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
+    void refreshPrivateTicketsAlert()
     if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
