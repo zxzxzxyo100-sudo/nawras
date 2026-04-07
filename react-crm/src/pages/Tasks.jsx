@@ -336,7 +336,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
-        /** «تم التواصل» = workflow_status=completed أو تسجيل مكالمة بـ «تم الرد» اليوم */
+        /** «تم التواصل» = workflow_status=completed (خلال 7 أيام) أو تسجيل مكالمة بـ «تم الرد» اليوم */
         const moContactedToday = asgn?.workflow_status === 'completed' || isContactedAnsweredToday(log)
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
