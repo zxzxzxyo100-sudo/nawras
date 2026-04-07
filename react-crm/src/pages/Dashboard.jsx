@@ -69,14 +69,16 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 // ─── كرت المتجر الملوّن مع Framer Motion ─────────────────────────
-function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick }) {
+function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick, dimmed }) {
   return (
     <motion.button
       variants={fadeUp}
       onClick={onClick}
       whileHover={{ y: -5, boxShadow: `0 14px 40px ${glow}` }}
       whileTap={{ scale: 0.97 }}
-      className="group relative rounded-2xl p-5 text-right overflow-hidden w-full"
+      className={`group relative rounded-2xl p-5 text-right overflow-hidden w-full ${
+        dimmed ? 'opacity-[0.38] pointer-events-none' : ''
+      }`}
       style={{ background: gradient, boxShadow: `0 4px 24px ${glow}` }}
     >
       {/* shimmer overlay */}
@@ -112,7 +114,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick 
 export default function Dashboard() {
   const { counts, stores, allStores, callLogs, storeStates, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
-  const { refreshPrivateTicketsAlert } = usePrivateTicketsAlert()
+  const { refreshPrivateTicketsAlert, deviationLockdown } = usePrivateTicketsAlert()
   const navigate = useNavigate()
 
   const [staffMissions, setStaffMissions] = useState(null)
@@ -567,6 +569,7 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #5b21b6, #7c3aed)"
             glow="#7c3aed55"
             onClick={() => navigate('/new')}
+            dimmed={deviationLockdown}
           />
         )}
         {can('active') && (
@@ -590,6 +593,7 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #065f46, #059669)"
             glow="#05966955"
             onClick={() => navigate('/active/pending')}
+            dimmed={deviationLockdown}
           />
         )}
         {can('hot_inactive') && (
@@ -601,6 +605,7 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #92400e, #d97706)"
             glow="#d9770655"
             onClick={() => navigate('/hot-inactive/all')}
+            dimmed={deviationLockdown}
           />
         )}
         {can('cold_inactive') && (
@@ -612,6 +617,7 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
             glow="#8b5cf655"
             onClick={() => navigate('/cold-inactive')}
+            dimmed={deviationLockdown}
           />
         )}
         {can('tasks') && (can('active') || can('new')) && (

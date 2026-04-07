@@ -31,7 +31,36 @@ function ensure_executive_private_tickets_table(PDO $pdo): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
+/** أعمدة تذاكر الانحراف (deviation_alert) والبيانات الوصفية */
+function ensure_executive_private_tickets_extra_columns(PDO $pdo): void
+{
+    $tryAlter = static function (PDO $pdo, string $sql): void {
+        try {
+            $pdo->exec($sql);
+        } catch (Throwable $e) {
+            /* عمود أو فهرس موجود مسبقاً */
+        }
+    };
+    $tryAlter(
+        $pdo,
+        "ALTER TABLE executive_private_tickets ADD COLUMN ticket_type VARCHAR(40) NOT NULL DEFAULT 'general' AFTER body"
+    );
+    $tryAlter(
+        $pdo,
+        'ALTER TABLE executive_private_tickets ADD COLUMN store_id INT NULL DEFAULT NULL AFTER ticket_type'
+    );
+    $tryAlter(
+        $pdo,
+        'ALTER TABLE executive_private_tickets ADD COLUMN meta_json TEXT NULL DEFAULT NULL AFTER store_id'
+    );
+    $tryAlter(
+        $pdo,
+        'CREATE INDEX idx_assignee_type_open ON executive_private_tickets (assignee_username, status, ticket_type)'
+    );
+}
+
 ensure_executive_private_tickets_table($pdo);
+ensure_executive_private_tickets_extra_columns($pdo);
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
@@ -81,6 +110,31 @@ if ($action === 'create') {
     $body = trim((string) ($input['body'] ?? ''));
     $assignee = trim((string) ($input['assignee_username'] ?? ''));
     $mandatory = isset($input['is_mandatory']) ? (int) (bool) $input['is_mandatory'] : 1;
+    $ticketType = trim((string) ($input['ticket_type'] ?? 'general'));
+    if ($ticketType === '') {
+        $ticketType = 'general';
+    }
+    $allowedTypes = ['general', 'deviation_alert'];
+    if (!in_array($ticketType, $allowedTypes, true)) {
+        jsonResponse(['success' => false, 'error' => 'نوع التذكرة غير صالح.'], 400);
+    }
+    $storeId = isset($input['store_id']) ? (int) $input['store_id'] : null;
+    if ($storeId !== null && $storeId <= 0) {
+        $storeId = null;
+    }
+    $metaJson = $input['meta_json'] ?? null;
+    if ($metaJson !== null && !is_string($metaJson)) {
+        $metaJson = json_encode($metaJson, JSON_UNESCAPED_UNICODE);
+    }
+    if ($metaJson !== null) {
+        $metaJson = trim((string) $metaJson);
+        if ($metaJson === '') {
+            $metaJson = null;
+        }
+    }
+    if ($ticketType === 'deviation_alert') {
+        $mandatory = 1;
+    }
     if ($title === '' || $body === '' || $assignee === '') {
         jsonResponse(['success' => false, 'error' => 'العنوان والنص والموظف المكلّف مطلوبة.'], 400);
     }
@@ -90,10 +144,10 @@ if ($action === 'create') {
         jsonResponse(['success' => false, 'error' => 'اسم المستخدم غير موجود.'], 400);
     }
     $ins = $pdo->prepare(
-        'INSERT INTO executive_private_tickets (title, body, assignee_username, created_by_username, is_mandatory, status)
-         VALUES (?, ?, ?, ?, ?, \'open\')'
+        'INSERT INTO executive_private_tickets (title, body, ticket_type, store_id, meta_json, assignee_username, created_by_username, is_mandatory, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, \'open\')'
     );
-    $ins->execute([$title, $body, $assignee, $username, $mandatory]);
+    $ins->execute([$title, $body, $ticketType, $storeId, $metaJson, $assignee, $username, $mandatory]);
     jsonResponse(['success' => true, 'id' => (int) $pdo->lastInsertId()]);
 }
 

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
@@ -7,6 +7,20 @@ import {
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
+
+/** أثناء تذاكر الانحراف المفتوحة: السماح باللوحة والمهام اليومية فقط */
+function useDeviationNavLock() {
+  const { deviationLockdown } = usePrivateTicketsAlert()
+  const locked = useCallback(
+    to => deviationLockdown && to !== '/' && to !== '/tasks',
+    [deviationLockdown],
+  )
+  const suffix = useCallback(
+    to => (locked(to) ? ' opacity-[0.38] pointer-events-none' : ''),
+    [locked],
+  )
+  return { deviationLockdown, navLocked: locked, navLockSuffix: suffix }
+}
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
@@ -111,6 +125,7 @@ function incubationSubLinkActive(kind, pathname) {
 /** مجموعة المتاجر — فوق مسار الاحتضان */
 function StoresNavGroup({ can, onClose }) {
   const { user } = useAuth()
+  const { navLockSuffix } = useDeviationNavLock()
   const location = useLocation()
   const { pathname, search } = location
   const isStoresSection = pathname === '/new'
@@ -158,7 +173,7 @@ function StoresNavGroup({ can, onClose }) {
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
                     active ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
-                  }`
+                  }${navLockSuffix(sub.to)}`
                 }
               >
                 <Circle size={6} className={active ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
@@ -174,6 +189,7 @@ function StoresNavGroup({ can, onClose }) {
 
 /** نشط يشحن — أسفل مسار الاحتضان */
 function ActiveNavGroup({ can, onClose }) {
+  const { navLockSuffix } = useDeviationNavLock()
   const location = useLocation()
   const pathname = location.pathname
   const isActiveSection = pathname.startsWith('/active')
@@ -218,7 +234,7 @@ function ActiveNavGroup({ can, onClose }) {
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
                     subActive ? 'text-cyan-300 bg-white/10' : 'text-cyan-200/40 hover:text-cyan-200/85 hover:bg-white/5'
-                  }`
+                  }${navLockSuffix(sub.to)}`
                 }
               >
                 <Circle size={6} className={subActive ? 'text-cyan-400 fill-cyan-400' : 'text-white/20'} />
@@ -234,6 +250,7 @@ function ActiveNavGroup({ can, onClose }) {
 
 /** مسار الاحتضان — أسفل المتاجر */
 function IncubationNavGroup({ can, onClose }) {
+  const { navLockSuffix } = useDeviationNavLock()
   const location = useLocation()
   const pathname = location.pathname
   const isIncubationSection = pathname.startsWith('/incubation')
@@ -279,7 +296,7 @@ function IncubationNavGroup({ can, onClose }) {
                 className={
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
                     active ? 'text-cyan-300 bg-white/10' : 'text-cyan-200/40 hover:text-cyan-200/85 hover:bg-white/5'
-                  }`
+                  }${navLockSuffix(sub.to)}`
                 }
               >
                 <Circle size={6} className={active ? 'text-cyan-400 fill-cyan-400' : 'text-white/20'} />
@@ -295,6 +312,7 @@ function IncubationNavGroup({ can, onClose }) {
 
 /** رابط مستقل — ليس ضمن «نشط يشحن» ولا «غير نشطة» */
 function FrozenNavLink({ can, onClose }) {
+  const { navLockSuffix } = useDeviationNavLock()
   const location = useLocation()
   if (!can('active')) return null
   const isFrozen = location.pathname === '/frozen'
@@ -305,7 +323,7 @@ function FrozenNavLink({ can, onClose }) {
       className={
         `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
           isFrozen ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-        }`
+        }${navLockSuffix('/frozen')}`
       }
       style={isFrozen ? {
         background: 'linear-gradient(135deg, rgba(71,85,105,0.45), rgba(51,65,85,0.2))',
@@ -335,6 +353,7 @@ const STORE_NAV_ORDER = [
 ]
 
 function InactiveNavGroup({ can, onClose }) {
+  const { navLockSuffix } = useDeviationNavLock()
   const location = useLocation()
   const isInactiveSection =
     location.pathname.startsWith('/hot-inactive') || location.pathname.startsWith('/cold-inactive')
@@ -379,7 +398,7 @@ function InactiveNavGroup({ can, onClose }) {
               className={({ isActive }) =>
                 `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
                   isActive ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
-                }`
+                }${navLockSuffix(sub.to)}`
               }
             >
               {({ isActive }) => (
@@ -426,6 +445,7 @@ function navGroupsForUser(role) {
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
   const { shouldAlert: privateTicketNavAlert } = usePrivateTicketsAlert()
+  const { navLockSuffix } = useDeviationNavLock()
   const navigate = useNavigate()
   function handleLogout() { logout(); navigate('/login') }
   function handleNav()    { if (onClose) onClose() }
@@ -498,7 +518,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       isActive
                         ? 'text-white'
                         : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                    }`
+                    }${navLockSuffix(item.to)}`
                   }
                   style={({ isActive }) => isActive
                     ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
@@ -556,11 +576,11 @@ export default function Sidebar({ isOpen, onClose }) {
                       const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group'
                       if (frostDash) {
                         if (isActive) {
-                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35`
+                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35${navLockSuffix(item.to)}`
                         }
-                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]`
+                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]${navLockSuffix(item.to)}`
                       }
-                      return `${base} ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`
+                      return `${base} ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}${navLockSuffix(item.to)}`
                     }}
                     style={({ isActive }) => {
                       if (frostDash) return {}

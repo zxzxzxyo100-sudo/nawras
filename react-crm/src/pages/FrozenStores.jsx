@@ -5,6 +5,7 @@ import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
+import { createDeviationExecutiveTicket } from '../utils/createDeviationExecutiveTicket'
 
 export default function FrozenStores() {
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
@@ -38,6 +39,18 @@ export default function FrozenStores() {
         assigned_to: username,
         assigned_by: user?.fullname || user?.username || '',
       })
+      if (isExecutive && user?.username) {
+        try {
+          await createDeviationExecutiveTicket({
+            executiveUsername: user.username,
+            store,
+            assigneeUsername: username,
+            shipmentsRangeMeta,
+          })
+        } catch (e) {
+          console.error('deviation ticket', e)
+        }
+      }
       await reload()
     } catch (e) { console.error(e) }
     finally { setSaving(null) }
