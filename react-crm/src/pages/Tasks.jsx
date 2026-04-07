@@ -413,6 +413,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       const log = callLogs[store.id] || {}
       const hasAnsweredThisMonth = Object.values(log).some(entry => {
         if (!entry?.date) return false
+        if (String(entry?.performed_by ?? '').trim() !== username) return false
         if (String(entry?.outcome ?? '').trim() !== 'answered') return false
         const d = new Date(entry.date)
         return d >= cutoff
