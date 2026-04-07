@@ -19,6 +19,7 @@ import {
   generateIncubationOfficerStagingTasks,
   daysInSystem,
   countAnsweredCalls,
+  dedupeIncubationDailyTasksByStore,
 } from '../utils/merchantOfficerQueue'
 import {
   getBizDateKeyAt9am,
@@ -33,7 +34,7 @@ import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
-import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV } from '../config/envFlags'
+import { IS_SIMPLE_LOG_CALL_MODAL, IS_STAGING_OR_DEV, IS_VITE_APP_STAGING } from '../config/envFlags'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 
 const MIN_TASK_NOTE_LENGTH = 10
@@ -902,6 +903,10 @@ export default function Tasks() {
       selectedTask.type === 'new_merchant_onboarding'
       && ['incubation_manager', 'executive'].includes(user?.role)
     ) return true
+    if (
+      selectedTask.moMergedOnboarding
+      && ['incubation_manager', 'executive'].includes(user?.role)
+    ) return true
     return false
   }, [user?.role, selectedTask, newMerchantOnboardingDoneIds])
 
@@ -928,13 +933,19 @@ export default function Tasks() {
     return () => clearTimeout(t)
   }, [toastMsg])
 
-  const tasks = useMemo(
-    () => generateTasks(
+  const tasks = useMemo(() => {
+    let t = generateTasks(
       allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
       newMerchantOnboardingDoneIds,
-    ),
-    [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds]
-  )
+    )
+    if (
+      IS_VITE_APP_STAGING
+      && (user?.role === 'incubation_manager' || user?.role === 'executive')
+    ) {
+      t = dedupeIncubationDailyTasksByStore(t)
+    }
+    return t
+  }, [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds])
 
   const pendingTasks = tasks.filter(t => !dismissalKeys.has(t.id))
 

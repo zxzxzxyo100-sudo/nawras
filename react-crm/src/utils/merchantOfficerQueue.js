@@ -415,3 +415,61 @@ export function generateIncubationOfficerStagingTasks(
 
   return tasks.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
 }
+
+const MO_DEDUPE_TYPES = new Set(['new_call', 'new_merchant_onboarding'])
+
+function mergeMoTaskGroup(group) {
+  if (group.length === 1) return group[0]
+  const onboarding = group.find(t => t.type === 'new_merchant_onboarding')
+  const calls = group.filter(t => t.type === 'new_call')
+  const call = calls.length
+    ? [...calls].sort((a, b) => (b.priority === 'high' ? 1 : 0) - (a.priority === 'high' ? 1 : 0))[0]
+    : null
+  if (onboarding && call) {
+    const priority = call.priority === 'high' || onboarding.priority === 'high' ? 'high' : 'normal'
+    return {
+      ...call,
+      id: call.id,
+      type: 'new_call',
+      priority,
+      label: `${call.label} · ${onboarding.label}`,
+      desc: [call.desc, onboarding.desc].filter(Boolean).join(' — '),
+      moContactedToday: Boolean(call.moContactedToday || onboarding.moContactedToday),
+      moOverdue: Boolean(call.moOverdue || onboarding.moOverdue),
+      moOverdueHint: call.moOverdueHint || onboarding.moOverdueHint || '',
+      incubationBadge: call.incubationBadge ?? onboarding.incubationBadge,
+      moMergedOnboarding: true,
+    }
+  }
+  return [...group].sort((a, b) => (b.priority === 'high' ? 1 : 0) - (a.priority === 'high' ? 1 : 0))[0]
+}
+
+/**
+ * صف واحد لكل متجر عند تعدّد مهام الاحتضان/التهيئة (تجريبي فقط — يُستدعى من Tasks عند VITE_APP_STAGING).
+ */
+export function dedupeIncubationDailyTasksByStore(tasks) {
+  if (!Array.isArray(tasks) || !tasks.length) return tasks
+  const byStore = new Map()
+  for (const t of tasks) {
+    const sid = t.store?.id
+    if (sid == null || !MO_DEDUPE_TYPES.has(t.type)) continue
+    const k = String(sid)
+    if (!byStore.has(k)) byStore.set(k, [])
+    byStore.get(k).push(t)
+  }
+  const out = []
+  const emitted = new Set()
+  for (const t of tasks) {
+    const sid = t.store?.id
+    if (sid == null || !MO_DEDUPE_TYPES.has(t.type)) {
+      out.push(t)
+      continue
+    }
+    const k = String(sid)
+    if (emitted.has(k)) continue
+    emitted.add(k)
+    const g = byStore.get(k) || [t]
+    out.push(mergeMoTaskGroup(g))
+  }
+  return out.sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
+}
