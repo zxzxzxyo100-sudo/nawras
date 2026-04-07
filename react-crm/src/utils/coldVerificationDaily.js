@@ -12,15 +12,6 @@ function hashStringToUint32(str) {
   return h >>> 0
 }
 
-function mulberry32(a) {
-  return function mul() {
-    let t = (a += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
 /** يوم «الدفعة»: قبل 9:00 صباحاً يُعتبر اليوم السابق. */
 export function getBizDateKeyAt9am(now = new Date()) {
   const d = new Date(now.getTime())
@@ -33,26 +24,27 @@ export function getBizDateKeyAt9am(now = new Date()) {
   return `${y}-${m}-${day}`
 }
 
-function shuffleDeterministic(items, seedStr) {
-  const seed = hashStringToUint32(seedStr)
-  const rand = mulberry32(seed)
-  const arr = items.slice()
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-  return arr
-}
-
+/**
+ * يختار حتى `limit` متجراً من «غير النشط البارد» ليوم العمل الحالي.
+ *
+ * **مهم:** الترتيب اليومي يُشتق من `(يوم العمل + المستخدم + معرف المتجر)` وليس من
+ * خلط القائمة الحالية فقط. بذلك عند تجميد متجر أو اتصال يخرج من البارد، يبقى
+ * ترتيب بقية المتاجر ثابتاً ويُستبدل الفراغ تلقائياً بالمتجر التالي في الترتيب
+ * (دون أن ينهار العدد من 30 إلى 29 طالما يوجد في النظام 30+ متجر بارد).
+ */
 export function pickDailyColdInactiveStores(allStores, storeStates, bizDateKey, username, limit = 30) {
   const cold = (allStores || []).filter(s => {
     const cat = storeStates?.[s.id]?.category || s.category || ''
     return cat === 'cold_inactive'
   })
-  cold.sort((a, b) => Number(a.id) - Number(b.id))
   const u = String(username || 'anon')
-  const shuffled = shuffleDeterministic(cold, `nawras_cold_v1|${bizDateKey}|${u}`)
-  return shuffled.slice(0, Math.min(limit, shuffled.length))
+  const seed = `nawras_cold_v1|${bizDateKey}|${u}`
+  const withRank = cold.map(s => ({
+    store: s,
+    rank: hashStringToUint32(`${seed}|id:${s.id}`),
+  }))
+  withRank.sort((a, b) => (a.rank !== b.rank ? a.rank - b.rank : Number(a.store.id) - Number(b.store.id)))
+  return withRank.slice(0, Math.min(limit, withRank.length)).map(x => x.store)
 }
 
 export function buildColdVerificationTasks(pickedStores, bizDateKey) {
