@@ -968,67 +968,128 @@ export default function QuickVerification() {
           />
           <div className="pointer-events-none absolute inset-y-5 right-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent opacity-70 sm:inset-y-6" aria-hidden />
           <div className="pointer-events-none absolute inset-y-5 left-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent opacity-70 sm:inset-y-6" aria-hidden />
-          <div className="relative flex w-full flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
-            <div className="flex w-full flex-1 rounded-2xl border border-white/25 bg-black/20 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl ring-1 ring-white/10">
-              <button
-                type="button"
-                onClick={() => setTab('crisis')}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition md:text-sm ${
+          <div className="relative flex w-full flex-col gap-3 px-5 py-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-4 sm:px-8 lg:px-10 xl:px-12 2xl:px-16">
+            {/* شريط تبويب احترافي — مسار داكن + قرص أبيض متحرك */}
+            <div className="relative flex min-h-[3.5rem] w-full flex-1 overflow-hidden rounded-[14px] border border-white/20 bg-gradient-to-b from-black/35 via-black/40 to-black/55 p-[5px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-8px_20px_rgba(0,0,0,0.35)] backdrop-blur-xl ring-1 ring-white/[0.07]">
+              <motion.div
+                layout
+                transition={{ type: 'spring', stiffness: 460, damping: 38 }}
+                className="pointer-events-none absolute z-0 w-[calc(50%-5px)] rounded-[10px] bg-white shadow-[0_8px_32px_-10px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,1)] ring-1 ring-black/[0.06]"
+                style={
                   tab === 'crisis'
-                    ? 'bg-white text-[#4B0082] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.35)] ring-1 ring-white/40'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
+                    ? { top: '5px', right: '5px', bottom: '5px', left: 'auto' }
+                    : { top: '5px', left: '5px', bottom: '5px', right: 'auto' }
+                }
+              />
+              <div
+                className="relative z-10 flex min-h-[3.25rem] w-full flex-1 items-stretch"
+                role="tablist"
+                aria-label="تبديل عرض التحقيق"
               >
-                <AlertTriangle
-                  size={16}
-                  className={tab === 'crisis' ? 'text-rose-600' : 'text-rose-300/90'}
-                  strokeWidth={2.2}
-                />
-                مركز الأزمات
-                {crisisTotal > 0 ? (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                      tab === 'crisis' ? 'bg-rose-100 text-rose-800' : 'bg-white/15 text-white'
-                    }`}
-                  >
-                    {crisisTotal}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'crisis'}
+                  id="qv-tab-crisis"
+                  onClick={() => setTab('crisis')}
+                  className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-3 py-2 transition-colors duration-200 sm:flex-row sm:gap-2.5 sm:px-4 md:gap-3 ${
+                    tab === 'crisis'
+                      ? 'text-slate-900'
+                      : 'text-white/72 hover:text-white'
+                  }`}
+                >
+                  <span className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:justify-start sm:gap-2.5">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${
+                        tab === 'crisis'
+                          ? 'bg-rose-500/12 text-rose-600 ring-1 ring-rose-500/20'
+                          : 'bg-white/5 text-rose-200/95 ring-1 ring-white/10'
+                      }`}
+                    >
+                      <AlertTriangle size={17} strokeWidth={2.2} className="sm:h-[18px] sm:w-[18px]" />
+                    </span>
+                    <span className="min-w-0 text-center sm:text-right">
+                      <span className="block text-[0.8125rem] font-extrabold leading-tight tracking-tight md:text-[0.9375rem]">
+                        مركز الأزمات
+                      </span>
+                      <span
+                        className={`mt-0.5 hidden text-[10px] font-semibold uppercase tracking-[0.14em] sm:block ${
+                          tab === 'crisis' ? 'text-slate-500' : 'text-white/45'
+                        }`}
+                      >
+                        قيد المراجعة
+                      </span>
+                    </span>
                   </span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('solved')}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition md:text-sm ${
-                  tab === 'solved'
-                    ? 'bg-white text-[#4B0082] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.35)] ring-1 ring-white/40'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <CheckCircle2
-                  size={16}
-                  className={tab === 'solved' ? 'text-emerald-600' : 'text-emerald-300/90'}
-                  strokeWidth={2.2}
-                />
-                تم الحل
-                {solvedTotal > 0 ? (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                      tab === 'solved' ? 'bg-emerald-100 text-emerald-900' : 'bg-white/15 text-white'
-                    }`}
-                  >
-                    {solvedTotal}
+                  {crisisTotal > 0 ? (
+                    <span
+                      className={`mt-1 inline-flex min-w-[1.65rem] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums ring-1 sm:mt-0 sm:ms-auto sm:min-w-[1.85rem] ${
+                        tab === 'crisis'
+                          ? 'bg-rose-500/15 text-rose-800 ring-rose-500/25'
+                          : 'bg-black/30 text-white/95 ring-white/15'
+                      }`}
+                    >
+                      {crisisTotal}
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === 'solved'}
+                  id="qv-tab-solved"
+                  onClick={() => setTab('solved')}
+                  className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] px-3 py-2 transition-colors duration-200 sm:flex-row sm:gap-2.5 sm:px-4 md:gap-3 ${
+                    tab === 'solved'
+                      ? 'text-slate-900'
+                      : 'text-white/72 hover:text-white'
+                  }`}
+                >
+                  <span className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:justify-start sm:gap-2.5">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${
+                        tab === 'solved'
+                          ? 'bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25'
+                          : 'bg-white/5 text-emerald-200/95 ring-1 ring-white/10'
+                      }`}
+                    >
+                      <CheckCircle2 size={17} strokeWidth={2.2} className="sm:h-[18px] sm:w-[18px]" />
+                    </span>
+                    <span className="min-w-0 text-center sm:text-right">
+                      <span className="block text-[0.8125rem] font-extrabold leading-tight tracking-tight md:text-[0.9375rem]">
+                        تم الحل
+                      </span>
+                      <span
+                        className={`mt-0.5 hidden text-[10px] font-semibold uppercase tracking-[0.14em] sm:block ${
+                          tab === 'solved' ? 'text-slate-500' : 'text-white/45'
+                        }`}
+                      >
+                        أرشيف الحلول
+                      </span>
+                    </span>
                   </span>
-                ) : null}
-              </button>
+                  {solvedTotal > 0 ? (
+                    <span
+                      className={`mt-1 inline-flex min-w-[1.65rem] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums ring-1 sm:mt-0 sm:ms-auto sm:min-w-[1.85rem] ${
+                        tab === 'solved'
+                          ? 'bg-emerald-500/15 text-emerald-900 ring-emerald-500/30'
+                          : 'bg-black/30 text-white/95 ring-white/15'
+                      }`}
+                    >
+                      {solvedTotal}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
             </div>
             <button
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/12 px-5 py-2.5 text-xs font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:bg-white/22 disabled:opacity-50 md:text-sm"
+              className="inline-flex h-[3.5rem] shrink-0 items-center justify-center gap-2 rounded-[14px] border border-white/25 bg-gradient-to-b from-white/14 to-white/[0.07] px-4 text-xs font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-xl transition hover:from-white/20 hover:to-white/12 disabled:opacity-50 sm:min-w-[9.5rem] md:px-5 md:text-sm"
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin text-white' : 'text-white/90'} strokeWidth={2.2} />
-              تحديث البيانات
+              <RefreshCw size={17} className={loading ? 'animate-spin' : ''} strokeWidth={2.2} />
+              <span className="whitespace-nowrap">تحديث البيانات</span>
             </button>
           </div>
         </div>
