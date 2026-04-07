@@ -214,6 +214,26 @@ function count_active_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+/**
+ * عدد المتاجر النشطة التي لم يُتصل بها اليوم بنجاح — يُستخدم لحساب الخانات المطلوب تعبئتها.
+ */
+function count_pending_active_queue(PDO $pdo, $username) {
+    $st = $pdo->prepare("
+        SELECT COUNT(*) FROM store_assignments sa
+        WHERE sa.assigned_to = ?
+        AND sa.workflow_status = 'active'
+        AND sa.assignment_queue = 'active'
+        AND NOT EXISTS (
+            SELECT 1 FROM call_logs cl
+            WHERE cl.store_id = sa.store_id
+            AND DATE(cl.created_at) = CURDATE()
+            AND cl.outcome = 'answered'
+        )
+    ");
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
 function count_inactive_queue(PDO $pdo, $username) {
     $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'inactive'");
     $st->execute([$username]);
@@ -371,8 +391,8 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     ensure_workflow_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
-    $have = count_active_queue($pdo, $username);
-    $need = ACTIVE_QUEUE_TARGET - $have;
+    $pending = count_pending_active_queue($pdo, $username);
+    $need = ACTIVE_QUEUE_TARGET - $pending;
     if ($need <= 0) {
         return 0;
     }
