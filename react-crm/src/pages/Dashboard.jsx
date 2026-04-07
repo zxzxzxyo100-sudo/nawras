@@ -193,13 +193,26 @@ export default function Dashboard() {
     return days
   }, [callLogs, allStores])
 
-  // ── أداء الموظفين ───────────────────────────────────────────────
+  // ── مخطط الأداء: «أداء الموظفين» فقط لمن يملك صلاحية إدارة المستخدمين (executive في ROLES).
+  //    باقي الحسابات ترى «أداء الموظف» (مكالماتها فقط). نعتمد can('users') لا مقارنة نصية خام
+  //    حتى لا يختلف السلوك بسبب فرق في قيمة role من الخادم أو جلسة قديمة.
+  const showExecutiveStaffLeaderboard = can('users')
   const employeeData = useMemo(() => {
     const map = {}
+    const fn = (user?.fullname || '').trim()
+    const un = (user?.username || '').trim()
     Object.values(callLogs).forEach(log => {
       Object.values(log || {}).forEach(e => {
-        if (e?.performed_by) {
-          map[e.performed_by] = (map[e.performed_by] || 0) + 1
+        if (!e?.performed_by) return
+        const raw = e.performed_by
+        if (showExecutiveStaffLeaderboard) {
+          map[raw] = (map[raw] || 0) + 1
+        } else {
+          const pb = String(raw).trim()
+          if (pb === fn || pb === un) {
+            const display = fn || un || pb
+            map[display] = (map[display] || 0) + 1
+          }
         }
       })
     })
@@ -207,9 +220,10 @@ export default function Dashboard() {
       .map(([name, calls]) => ({ name, مكالمات: calls }))
       .sort((a, b) => b.مكالمات - a.مكالمات)
       .slice(0, 6)
-  }, [callLogs])
+  }, [callLogs, showExecutiveStaffLeaderboard, user?.fullname, user?.username])
 
   const topEmployee = employeeData[0]?.name
+  const showTopPerformerBadge = showExecutiveStaffLeaderboard && topEmployee && employeeData.length > 1
 
   // ── إحصائيات سريعة ─────────────────────────────────────────────
   const totalShipments  = allStores.reduce((s, x) => s + (parseInt(x.total_shipments) || 0), 0)
@@ -562,7 +576,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Bar Chart — أداء الموظفين */}
+        {/* Bar Chart — أداء الموظفين (executive فقط) / أداء الموظف (نشطة، استعادة، جديد، …) */}
         <div
           className="lg:col-span-2 rounded-2xl p-5 lg:p-6"
           style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
@@ -571,11 +585,13 @@ export default function Dashboard() {
             <div>
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                أداء الموظفين
+                {showExecutiveStaffLeaderboard ? 'أداء الموظفين' : 'أداء الموظف'}
               </h2>
-              <p className="text-white/40 text-xs mt-0.5">إجمالي المكالمات</p>
+              <p className="text-white/40 text-xs mt-0.5">
+                {showExecutiveStaffLeaderboard ? 'إجمالي المكالمات' : 'مكالماتك المسجّلة'}
+              </p>
             </div>
-            {topEmployee && (
+            {showTopPerformerBadge && (
               <div className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-full">
                 <Award size={11} />
                 المتصدر
