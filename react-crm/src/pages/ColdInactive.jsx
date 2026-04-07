@@ -186,7 +186,9 @@ export default function ColdInactive() {
         emptyMsg="لا توجد متاجر في هذه الفئة"
       />
 
-      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />
+      )}
     </div>
   )
 }

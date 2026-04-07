@@ -35,16 +35,12 @@ if (!in_array($userRole, $allowedRoles, true)) {
 
 $freezeAlertId = (int) ($input['freeze_alert_id'] ?? 0);
 $surveyId = (int) ($input['survey_id'] ?? 0);
+$needsFreezeId = (int) ($input['needs_freeze_id'] ?? 0);
 
-if ($freezeAlertId <= 0 && $surveyId <= 0) {
+$idCount = ($freezeAlertId > 0 ? 1 : 0) + ($surveyId > 0 ? 1 : 0) + ($needsFreezeId > 0 ? 1 : 0);
+if ($idCount !== 1) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'معرّف الاستبيان أو تنبيه التجميد مطلوب.'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-if ($freezeAlertId > 0 && $surveyId > 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'أرسل نوعاً واحداً فقط (استبيان أو تجميد).'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'أرسل نوعاً واحداً فقط (استبيان، تنبيه تجميد، أو طلب يحتاج تجميد).'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -107,6 +103,70 @@ if ($freezeAlertId > 0) {
         echo json_encode([
             'success' => true,
             'freeze_alert_id' => $freezeAlertId,
+            'resolved' => true,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'تعذّر حفظ الأرشفة.'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+// ── أرشفة طلب «يحتاج تجميد» (التنفيذي فقط) ───────────────────────
+if ($needsFreezeId > 0) {
+    if ($userRole !== 'executive') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'أرشفة طلبات «يحتاج تجميد» للمدير التنفيذي فقط.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS qv_needs_freeze_requests (
+            id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            store_id INT NOT NULL,
+            store_name VARCHAR(512) NULL,
+            reason TEXT NOT NULL,
+            source VARCHAR(32) NOT NULL,
+            requested_by_username VARCHAR(100) NULL,
+            requested_by_fullname VARCHAR(255) NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_created (created_at),
+            INDEX idx_store (store_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_needs_freeze_resolutions (
+            needs_freeze_id INT NOT NULL PRIMARY KEY,
+            resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            resolved_by VARCHAR(100) NULL DEFAULT NULL,
+            executive_notes TEXT NULL DEFAULT NULL,
+            INDEX idx_resolved_at (resolved_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $pdo->exec('ALTER TABLE quick_verification_needs_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+        } catch (Throwable $e) {
+        }
+        $st = $pdo->prepare('SELECT id FROM qv_needs_freeze_requests WHERE id = ? AND DATE(created_at) = CURDATE() LIMIT 1');
+        $st->execute([$needsFreezeId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'الطلب غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $ins = $pdo->prepare('
+            INSERT INTO quick_verification_needs_freeze_resolutions (needs_freeze_id, resolved_at, resolved_by, executive_notes)
+            VALUES (?, NOW(), ?, ?)
+            ON DUPLICATE KEY UPDATE
+                resolved_at = VALUES(resolved_at),
+                resolved_by = VALUES(resolved_by),
+                executive_notes = VALUES(executive_notes)
+        ');
+        $ins->execute([
+            $needsFreezeId,
+            $resolvedBy !== '' ? $resolvedBy : null,
+            $executiveNotes !== '' ? $executiveNotes : null,
+        ]);
+        echo json_encode([
+            'success' => true,
+            'needs_freeze_id' => $needsFreezeId,
             'resolved' => true,
         ], JSON_UNESCAPED_UNICODE);
     } catch (Throwable $e) {

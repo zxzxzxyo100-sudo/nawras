@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone } from 'lucide-react'
-import { setStoreStatus, getAuditLog } from '../services/api'
+import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle } from 'lucide-react'
+import { setStoreStatus, getAuditLog, postQuickVerificationSubmitNeedsFreeze } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
@@ -38,6 +38,8 @@ export default function StoreDrawer({
   autoOpenCallModal = false,
   /** نافذة التسجيل فُتحت من صفحة المهام اليومية — تمرير إلى CallModal لواجهة الاستبيان المفرَضة */
   fromDailyTasks = false,
+  /** إظهار إرسال «يحتاج تجميد» إلى التحقق السريع: incubation = متاجر جديدة، inactive = غير نشطة */
+  qvNeedsFreezeSource = null,
 }) {
   const { user } = useAuth()
   const { callLogs, storeStates, reload } = useStores()
@@ -45,6 +47,7 @@ export default function StoreDrawer({
   /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
   const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
   const [freezeReason, setFreezeReason]     = useState('')
+  const [needsFreezeQvReason, setNeedsFreezeQvReason] = useState('')
   const [reason, setReason]                 = useState('')
   const [actionError, setActionError]       = useState('')
   const [saving, setSaving]                 = useState(false)
@@ -73,8 +76,45 @@ export default function StoreDrawer({
   function closeManualPanel() {
     setManualPanel(null)
     setFreezeReason('')
+    setNeedsFreezeQvReason('')
     setReason('')
     setActionError('')
+  }
+
+  const canSubmitNeedsFreezeQv =
+    qvNeedsFreezeSource === 'incubation' &&
+    user?.role === 'incubation_manager' &&
+    dbCategory !== 'frozen'
+  const canSubmitNeedsFreezeQvInactive =
+    qvNeedsFreezeSource === 'inactive' &&
+    user?.role === 'inactive_manager' &&
+    dbCategory !== 'frozen'
+  const showNeedsFreezeQvButton = canSubmitNeedsFreezeQv || canSubmitNeedsFreezeQvInactive
+  const needsFreezeSourceParam = canSubmitNeedsFreezeQvInactive ? 'inactive' : 'incubation'
+
+  async function submitNeedsFreezeQv() {
+    setActionError('')
+    if (!needsFreezeQvReason.trim()) {
+      setActionError('اذكر سبب طلب التجميد للتحقق السريع.')
+      return
+    }
+    setSaving(true)
+    try {
+      await postQuickVerificationSubmitNeedsFreeze({
+        store_id: store.id,
+        store_name: store.name || '',
+        reason: needsFreezeQvReason.trim(),
+        source: needsFreezeSourceParam,
+        user_role: user?.role,
+        username: user?.username,
+        fullname: user?.fullname || '',
+      })
+      reload()
+      closeManualPanel()
+    } catch (e) {
+      setActionError(e.response?.data?.error || 'تعذّر إرسال الطلب.')
+    }
+    setSaving(false)
   }
 
   useEffect(() => {
@@ -238,11 +278,39 @@ export default function StoreDrawer({
                 بدء الاستعادة
               </button>
             )}
+            {showNeedsFreezeQvButton ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setActionError('')
+                  setManualPanel('needs_freeze_qv')
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500/95 hover:bg-amber-500 text-white text-sm font-medium rounded-xl transition-colors border border-white/10"
+              >
+                <AlertTriangle size={14} />
+                يحتاج تجميد (التحقق السريع)
+              </button>
+            ) : null}
           </div>
         </div>
 
         {manualPanel && (
           <div className="p-4 bg-amber-50 border-b border-amber-200">
+            {manualPanel === 'needs_freeze_qv' && (
+              <>
+                <p className="text-sm font-medium text-amber-900 mb-1">إرسال إلى التحقق السريع</p>
+                <p className="text-[11px] text-amber-800 mb-2">
+                  يُسجَّل الطلب في خانة «تحتاج التجميد» لدى المدير التنفيذي — دون تجميد المتجر من هنا.
+                </p>
+                <textarea
+                  placeholder="سبب طلب التجميد (مطلوب)"
+                  value={needsFreezeQvReason}
+                  onChange={e => setNeedsFreezeQvReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+              </>
+            )}
             {manualPanel === 'freeze' && (
               <>
                 <p className="text-sm font-medium text-amber-900 mb-1">تجميد المتجر</p>
@@ -296,11 +364,13 @@ export default function StoreDrawer({
               <button
                 type="button"
                 onClick={
-                  manualPanel === 'freeze'
-                    ? submitFreeze
-                    : manualPanel === 'unfreeze'
-                      ? submitUnfreeze
-                      : submitRestore
+                  manualPanel === 'needs_freeze_qv'
+                    ? submitNeedsFreezeQv
+                    : manualPanel === 'freeze'
+                      ? submitFreeze
+                      : manualPanel === 'unfreeze'
+                        ? submitUnfreeze
+                        : submitRestore
                 }
                 disabled={saving}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-sm font-medium rounded-xl transition-colors"

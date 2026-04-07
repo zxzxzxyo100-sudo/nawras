@@ -120,7 +120,8 @@ export default function Dashboard() {
       })
       if (d?.success) {
         const fr = Array.isArray(d.freeze_rows) ? d.freeze_rows : []
-        setFreezeQvPending(fr.filter(r => !r.resolved).length)
+        const nf = Array.isArray(d.needs_freeze_rows) ? d.needs_freeze_rows : []
+        setFreezeQvPending(fr.filter(r => !r.resolved).length + nf.filter(r => !r.resolved).length)
       } else {
         setFreezeQvPending(0)
       }
@@ -331,9 +332,9 @@ export default function Dashboard() {
                 <BadgeCheck size={22} className="text-white" strokeWidth={2.2} />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-black">التحقيق السريع — تجميدات بانتظار المراجعة</p>
+                <p className="text-sm font-black">التحقيق السريع — بانتظار المراجعة التنفيذية</p>
                 <p className="mt-1 text-xs font-medium text-white/85">
-                  {freezeQvPending.toLocaleString('ar-SA')} متجر مُجمَّد اليوم مرفق سبب التجميد للمتابعة التنفيذية.
+                  {freezeQvPending.toLocaleString('ar-SA')} حالة اليوم: تجميدات و/أو طلبات «يحتاج تجميد» من الفرق.
                 </p>
               </div>
             </div>
