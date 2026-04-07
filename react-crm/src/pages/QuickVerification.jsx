@@ -272,19 +272,54 @@ function SectionShell({ title, subtitle, count, children, empty }) {
   )
 }
 
-function MerchantLogo({ name, storeId }) {
+const LOGO_SIZES = {
+  md: {
+    box: 'h-14 w-14 rounded-2xl',
+    letter: 'text-xl',
+    ico: 'h-7 w-7 rounded-lg',
+    store: 13,
+  },
+  sm: {
+    box: 'h-11 w-11 rounded-xl',
+    letter: 'text-lg',
+    ico: 'h-6 w-6 rounded-md',
+    store: 11,
+  },
+  xs: {
+    box: 'h-9 w-9 rounded-lg',
+    letter: 'text-base',
+    ico: 'h-5 w-5 rounded-md',
+    store: 10,
+  },
+}
+
+function MerchantLogo({ name, storeId, size = 'md' }) {
   const ch = (name || String(storeId) || '?').trim().slice(0, 1)
+  const s = LOGO_SIZES[size] || LOGO_SIZES.md
   return (
-    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-violet-200/80 bg-gradient-to-br from-white via-violet-50/30 to-violet-100/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-      <span className="text-xl font-black text-violet-900">{ch}</span>
-      <span className="absolute -bottom-1 -left-1 flex h-7 w-7 items-center justify-center rounded-lg border border-white bg-white shadow-md ring-1 ring-slate-200/80">
-        <Store size={13} className="text-violet-700" strokeWidth={2.2} />
+    <div
+      className={`relative flex shrink-0 items-center justify-center border border-violet-200/80 bg-gradient-to-br from-white via-violet-50/30 to-violet-100/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${s.box}`}
+    >
+      <span className={`font-black text-violet-900 ${s.letter}`}>{ch}</span>
+      <span
+        className={`absolute -bottom-0.5 -left-0.5 flex items-center justify-center border border-white bg-white shadow-md ring-1 ring-slate-200/80 ${s.ico}`}
+      >
+        <Store size={s.store} className="text-violet-700" strokeWidth={2.2} />
       </span>
     </div>
   )
 }
 
-function CrisisCard({ row, onOpen, layoutId }) {
+/** كلما زاد عدد الحالات في القسم صغر مربع البطاقة لاستيعاب المزيد في الشاشة */
+function crisisDensity(sectionCount) {
+  const n = Math.max(0, Number(sectionCount) || 0)
+  if (n >= 18) return 'ultra'
+  if (n >= 10) return 'dense'
+  if (n >= 5) return 'compact'
+  return 'comfortable'
+}
+
+function CrisisCard({ row, onOpen, layoutId, sectionCount = 0 }) {
   const kindLabel =
     row.survey_kind === 'freeze_alert'
       ? 'تجميد'
@@ -301,6 +336,80 @@ function CrisisCard({ row, onOpen, layoutId }) {
         ? 'تحتاج تجميد'
         : 'غير راضٍ'
 
+  const tier = crisisDensity(sectionCount)
+  const tierClass =
+    tier === 'ultra'
+      ? {
+          minH: 'min-h-[112px]',
+          outerRound: 'rounded-2xl',
+          innerRound: 'rounded-[1.05rem]',
+          topBar: 'left-2 right-2 top-2 h-0.5',
+          head: 'mt-1 px-2.5 pb-2 pt-0.5 gap-1.5',
+          name: 'text-[11px]',
+          badge: 'px-1.5 py-0.5 text-[8px]',
+          body: 'p-2',
+          rowGap: 'mb-1.5 gap-1',
+          meta: 'text-[10px]',
+          footer: 'pt-1.5',
+          footL: 'text-[9px]',
+          footR: 'text-[9px]',
+          logo: 'xs',
+          showPriority: false,
+        }
+      : tier === 'dense'
+        ? {
+            minH: 'min-h-[142px]',
+            outerRound: 'rounded-2xl',
+            innerRound: 'rounded-[1.2rem]',
+            topBar: 'left-2.5 right-2.5 top-2.5 h-0.5',
+            head: 'mt-1.5 px-3 pb-2.5 pt-0.5 gap-2',
+            name: 'text-[12px]',
+            badge: 'px-2 py-0.5 text-[9px]',
+            body: 'p-2.5',
+            rowGap: 'mb-2 gap-1.5',
+            meta: 'text-[11px]',
+            footer: 'pt-2',
+            footL: 'text-[9px]',
+            footR: 'text-[10px]',
+            logo: 'xs',
+            showPriority: true,
+          }
+        : tier === 'compact'
+          ? {
+              minH: 'min-h-[168px]',
+              outerRound: 'rounded-3xl',
+              innerRound: 'rounded-[1.3rem]',
+              topBar: 'left-3 right-3 top-3 h-0.5',
+              head: 'mt-2 px-3.5 pb-3 pt-1 gap-2',
+              name: 'text-[12.5px]',
+              badge: 'px-2 py-0.5 text-[9px]',
+              body: 'p-3',
+              rowGap: 'mb-2.5 gap-2',
+              meta: 'text-[11.5px]',
+              footer: 'pt-2.5',
+              footL: 'text-[10px]',
+              footR: 'text-[10.5px]',
+              logo: 'sm',
+              showPriority: true,
+            }
+          : {
+              minH: 'min-h-[200px]',
+              outerRound: 'rounded-3xl',
+              innerRound: 'rounded-[1.35rem]',
+              topBar: 'left-3 right-3 top-3 h-1',
+              head: 'mt-2 px-4 pb-3.5 pt-1 gap-2',
+              name: 'text-[13px]',
+              badge: 'px-2.5 py-1 text-[10px]',
+              body: 'p-4',
+              rowGap: 'mb-3 gap-2',
+              meta: 'text-[12px]',
+              footer: 'pt-3',
+              footL: 'text-[10px]',
+              footR: 'text-[11px]',
+              logo: 'md',
+              showPriority: true,
+            }
+
   return (
     <motion.button
       type="button"
@@ -311,37 +420,45 @@ function CrisisCard({ row, onOpen, layoutId }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-      className="group relative flex min-h-[200px] w-full flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-violet-300/45 via-fuchsia-200/25 to-indigo-200/35 p-[1.5px] text-right shadow-[0_4px_6px_-1px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(75,0,130,0.2)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-20px_rgba(75,0,130,0.32)]"
+      className={`group relative flex w-full flex-col overflow-hidden bg-gradient-to-br from-violet-300/45 via-fuchsia-200/25 to-indigo-200/35 p-[1.5px] text-right shadow-[0_4px_6px_-1px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(75,0,130,0.2)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-20px_rgba(75,0,130,0.32)] ${tierClass.minH} ${tierClass.outerRound}`}
     >
-      <div className="relative flex min-h-[200px] w-full flex-col overflow-hidden rounded-[1.35rem] border border-white/70 bg-white shadow-inner">
       <div
-        className="absolute left-3 right-3 top-3 z-10 h-1 rounded-full bg-gradient-to-l from-fuchsia-500 via-[#4B0082] to-indigo-600 opacity-95"
+        className={`relative flex w-full flex-col overflow-hidden border border-white/70 bg-white shadow-inner ${tierClass.minH} ${tierClass.innerRound}`}
+      >
+      <div
+        className={`absolute z-10 rounded-full bg-gradient-to-l from-fuchsia-500 via-[#4B0082] to-indigo-600 opacity-95 ${tierClass.topBar}`}
         aria-hidden
       />
       <div
-        className="relative mt-2 flex w-full shrink-0 items-center justify-between gap-2 border-b border-slate-100/90 bg-gradient-to-l from-violet-50/40 via-white to-slate-50/30 px-4 pb-3.5 pt-1"
+        className={`relative flex w-full shrink-0 items-center justify-between border-b border-slate-100/90 bg-gradient-to-l from-violet-50/40 via-white to-slate-50/30 ${tierClass.head}`}
       >
-        <span className="min-w-0 flex-1 truncate text-right text-[13px] font-black leading-snug text-slate-900">
+        <span className={`min-w-0 flex-1 truncate text-right font-black leading-snug text-slate-900 ${tierClass.name}`}>
           {displayName}
         </span>
-        <span className="shrink-0 rounded-lg border border-violet-200/80 bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-900">
+        <span className={`shrink-0 rounded-lg border border-violet-200/80 bg-violet-50 font-black text-violet-900 ${tierClass.badge}`}>
           {headerBadge}
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col p-4">
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <MerchantLogo name={row.store_name} storeId={row.store_id} />
-          <span className="inline-flex items-center gap-1 rounded-full border border-rose-100 bg-gradient-to-l from-rose-50 to-orange-50/80 px-2.5 py-1 text-[9px] font-black text-rose-800 shadow-sm">
-            <Flame size={11} className="text-rose-500" />
-            أولوية
-          </span>
+      <div className={`flex min-h-0 flex-1 flex-col ${tierClass.body}`}>
+        <div className={`flex items-start justify-between ${tierClass.rowGap}`}>
+          <MerchantLogo name={row.store_name} storeId={row.store_id} size={tierClass.logo} />
+          {tierClass.showPriority ? (
+            <span className="inline-flex items-center gap-0.5 rounded-full border border-rose-100 bg-gradient-to-l from-rose-50 to-orange-50/80 px-2 py-0.5 text-[8px] font-black text-rose-800 shadow-sm sm:text-[9px]">
+              <Flame size={tier === 'comfortable' ? 11 : 10} className="text-rose-500" />
+              أولوية
+            </span>
+          ) : (
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600" title="أولوية">
+              <Flame size={12} className="text-rose-500" strokeWidth={2.2} />
+            </span>
+          )}
         </div>
-        <p className="text-[12px] font-semibold tabular-nums text-slate-500">
+        <p className={`font-semibold tabular-nums text-slate-500 ${tierClass.meta}`}>
           #{row.store_id} · {kindLabel}
         </p>
-        <div className="mt-auto flex items-center justify-between border-t border-slate-100/80 bg-slate-50/30 pt-3">
-          <span className="text-[10px] font-bold text-slate-400">استبيان اليوم</span>
-          <span className="text-[11px] font-bold text-violet-700 opacity-0 transition group-hover:opacity-100">
+        <div className={`mt-auto flex items-center justify-between border-t border-slate-100/80 bg-slate-50/30 ${tierClass.footer}`}>
+          <span className={`font-bold text-slate-400 ${tierClass.footL}`}>استبيان اليوم</span>
+          <span className={`font-bold text-violet-700 opacity-0 transition group-hover:opacity-100 ${tierClass.footR}`}>
             عرض التفاصيل
           </span>
         </div>
@@ -351,28 +468,34 @@ function CrisisCard({ row, onOpen, layoutId }) {
   )
 }
 
-function SolvedRow({ row, onOpen }) {
+function SolvedRow({ row, onOpen, listSize = 0 }) {
+  const denseList = listSize >= 14
+  const tightList = listSize >= 24
   return (
     <button
       type="button"
       onClick={() => onOpen(row)}
-      className="group flex w-full items-center gap-4 border-b border-slate-100/90 bg-white px-5 py-4 text-right transition hover:bg-slate-50/90"
+      className={`group flex w-full items-center border-b border-slate-100/90 bg-white text-right transition hover:bg-slate-50/90 ${tightList ? 'gap-2.5 px-3 py-2' : denseList ? 'gap-3 px-4 py-2.5' : 'gap-4 px-5 py-4'}`}
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white text-base font-black text-emerald-900 shadow-sm">
+      <div
+        className={`flex shrink-0 items-center justify-center rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white font-black text-emerald-900 shadow-sm ${denseList ? 'h-10 w-10 text-sm' : 'h-12 w-12 text-base'}`}
+      >
         {(row.store_name || '?').trim().slice(0, 1)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-bold text-slate-900">{row.store_name}</p>
-        <p className="mt-0.5 text-xs font-medium text-slate-400">#{row.store_id}</p>
+        <p className={`truncate font-bold text-slate-900 ${denseList ? 'text-[13px]' : 'text-[15px]'}`}>{row.store_name}</p>
+        <p className={`font-medium text-slate-400 ${denseList ? 'mt-0 text-[11px]' : 'mt-0.5 text-xs'}`}>#{row.store_id}</p>
         {row.executive_notes ? (
-          <p className="mt-1.5 line-clamp-1 text-right text-xs font-medium text-violet-800/90">
+          <p
+            className={`line-clamp-1 text-right font-medium text-violet-800/90 ${denseList ? 'mt-1 text-[11px]' : 'mt-1.5 text-xs'}`}
+          >
             {row.executive_notes}
           </p>
         ) : null}
       </div>
       <CheckCircle2
         className="shrink-0 text-emerald-500 opacity-70 transition group-hover:opacity-100"
-        size={22}
+        size={tightList ? 18 : denseList ? 20 : 22}
         strokeWidth={2.2}
       />
     </button>
@@ -975,10 +1098,18 @@ export default function QuickVerification() {
                 count={crisisOnb.length}
                 empty={crisisOnb.length === 0}
               >
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisOnb.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisOnb.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                >
                   <AnimatePresence mode="popLayout">
                     {crisisOnb.map(row => (
-                      <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                      <CrisisCard
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-c-${row.id}`}
+                        onOpen={setDrawerRow}
+                        sectionCount={crisisOnb.length}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -990,10 +1121,18 @@ export default function QuickVerification() {
                 count={crisisActive.length}
                 empty={crisisActive.length === 0}
               >
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisActive.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisActive.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                >
                   <AnimatePresence mode="popLayout">
                     {crisisActive.map(row => (
-                      <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                      <CrisisCard
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-c-${row.id}`}
+                        onOpen={setDrawerRow}
+                        sectionCount={crisisActive.length}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -1005,10 +1144,18 @@ export default function QuickVerification() {
                 count={crisisNeedsFreeze.length}
                 empty={crisisNeedsFreeze.length === 0}
               >
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisNeedsFreeze.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisNeedsFreeze.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                >
                   <AnimatePresence mode="popLayout">
                     {crisisNeedsFreeze.map(row => (
-                      <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                      <CrisisCard
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-c-${row.id}`}
+                        onOpen={setDrawerRow}
+                        sectionCount={crisisNeedsFreeze.length}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -1021,10 +1168,18 @@ export default function QuickVerification() {
                   count={crisisFreeze.length}
                   empty={crisisFreeze.length === 0}
                 >
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div
+                    className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisFreeze.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisFreeze.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                  >
                     <AnimatePresence mode="popLayout">
                       {crisisFreeze.map(row => (
-                        <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                        <CrisisCard
+                          key={row.id}
+                          row={row}
+                          layoutId={`qv-c-${row.id}`}
+                          onOpen={setDrawerRow}
+                          sectionCount={crisisFreeze.length}
+                        />
                       ))}
                     </AnimatePresence>
                   </div>
@@ -1048,18 +1203,18 @@ export default function QuickVerification() {
             ) : (
               <>
                 {solvedOnb.map(row => (
-                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                 ))}
                 {solvedActive.map(row => (
-                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                 ))}
                 {isExec
                   ? solvedFreeze.map(row => (
-                      <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                      <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                     ))
                   : null}
                 {solvedNeedsFreeze.map(row => (
-                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                 ))}
               </>
             )}
