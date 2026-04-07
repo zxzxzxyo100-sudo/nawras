@@ -4,6 +4,7 @@ import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
 import FloatingCallBar from './FloatingCallBar'
 import { useAuth } from '../contexts/AuthContext'
+import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
 
 // يظهر الشريط فقط في بناء البيئة التجريبية
 const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
@@ -19,6 +20,7 @@ export default function Layout() {
   const isQuickVerification = pathname === '/quick-verification'
 
   return (
+    <PrivateTicketsAlertProvider>
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -88,5 +90,6 @@ export default function Layout() {
       {/* زر الاتصال العائم — للموظفين فقط */}
       {FLOATING_CALL_ROLES.includes(user?.role) && <FloatingCallBar />}
     </div>
+    </PrivateTicketsAlertProvider>
   )
 }

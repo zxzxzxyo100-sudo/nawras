@@ -6,6 +6,7 @@ import {
   ChevronDown, Circle, Layers, Lock, BarChart3, BadgeCheck, Package,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
+import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 
@@ -413,6 +414,7 @@ const NAV_GROUPS = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
+  const { shouldAlert: privateTicketNavAlert } = usePrivateTicketsAlert()
   const navigate = useNavigate()
   function handleLogout() { logout(); navigate('/login') }
   function handleNav()    { if (onClose) onClose() }
@@ -531,41 +533,53 @@ export default function Sidebar({ isOpen, onClose }) {
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {items.map(item => (
+                {items.map(item => {
+                  const frostDash = item.to === '/' && privateTicketNavAlert
+                  return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.to === '/'}
                     onClick={handleNav}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
-                        isActive
-                          ? 'text-white'
-                          : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                      }`
-                    }
-                    style={({ isActive }) => isActive
-                      ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
-                      : {}
-                    }
+                    className={({ isActive }) => {
+                      const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group'
+                      if (frostDash) {
+                        if (isActive) {
+                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35`
+                        }
+                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]`
+                      }
+                      return `${base} ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`
+                    }}
+                    style={({ isActive }) => {
+                      if (frostDash) return {}
+                      return isActive
+                        ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                        : {}
+                    }}
                   >
                     {({ isActive }) => (
                       <>
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
-                          isActive
-                            ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
-                            : 'bg-white/5 group-hover:bg-white/10'
+                          frostDash
+                            ? isActive
+                              ? 'bg-cyan-400/25 shadow-[0_0_14px_rgba(200,255,255,0.35)] border border-white/20'
+                              : 'bg-white/15 border border-white/15'
+                            : isActive
+                              ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                              : 'bg-white/5 group-hover:bg-white/10'
                         }`}>
-                          <item.icon size={14} className={isActive ? 'text-white' : 'text-white/50'} />
+                          <item.icon size={14} className={frostDash ? 'text-cyan-100' : (isActive ? 'text-white' : 'text-white/50')} />
                         </div>
                         <span className="truncate">{item.label}</span>
                         {isActive && (
-                          <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-violet-400'}`} />
                         )}
                       </>
                     )}
                   </NavLink>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )
