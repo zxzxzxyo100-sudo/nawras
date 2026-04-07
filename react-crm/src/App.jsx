@@ -23,6 +23,7 @@ import Kanban from './pages/Kanban'
 import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
+import DeviationTickets from './pages/DeviationTickets'
 
 /** مسؤول المتاجر النشطة: يُوجَّه لصفحة المهام بدل طوابير «نشط / مجمّد» وKanban */
 function GuardActiveManagerHiddenRoutes({ children }) {
@@ -54,6 +55,14 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<Dashboard />} />
+        <Route
+          path="/deviation-tickets"
+          element={(
+            <PrivateRoute view="deviation_tickets">
+              <DeviationTickets />
+            </PrivateRoute>
+          )}
+        />
         <Route
           path="/quick-verification"
           element={<PrivateRoute view="quick_verification"><QuickVerification /></PrivateRoute>}
