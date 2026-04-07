@@ -164,6 +164,17 @@ tryExec($pdo, "
 ", 'CREATE active_manager_daily_stats', $steps);
 
 tryExec($pdo, "
+    CREATE TABLE IF NOT EXISTS active_manager_pool_rotation (
+        username VARCHAR(191) NOT NULL,
+        store_id VARCHAR(64) NOT NULL,
+        slot_date DATE NOT NULL,
+        created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (username, store_id, slot_date),
+        INDEX idx_user_recent (username, slot_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+", 'CREATE active_manager_pool_rotation', $steps);
+
+tryExec($pdo, "
     CREATE TABLE IF NOT EXISTS inactive_manager_daily_stats (
         username VARCHAR(191) NOT NULL,
         work_date DATE NOT NULL,
