@@ -20,6 +20,8 @@ import {
   daysInSystem,
   countAnsweredCalls,
   dedupeIncubationDailyTasksByStore,
+  hideDailyTaskDueToCallToday,
+  isContactedAnsweredToday,
 } from '../utils/merchantOfficerQueue'
 import {
   getBizDateKeyAt9am,
@@ -65,15 +67,6 @@ function latestCallEntry(log) {
   if (!entries.length) return null
   entries.sort((a, b) => new Date(b.date) - new Date(a.date))
   return entries[0]
-}
-
-/**
- * إذا آخر مكالمة اليوم كانت «عدم رد» لا نُخفي المهمة — يبقى المتجر معلّقاً في المهام اليومية.
- */
-function hideDailyTaskDueToCallToday(log, todayIso) {
-  const top = latestCallEntry(log)
-  if (!top?.date || !String(top.date).startsWith(todayIso)) return false
-  return String(top.outcome ?? '').trim() !== 'no_answer'
 }
 
 /** مهمة ضمن تبويب «متاجر لم ترد»: آخر مكالمة عدم رد، أو تعيين سير عمل no_answer */
@@ -148,8 +141,6 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
 }
 
 function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
-  const today = new Date().toISOString().split('T')[0]
-
   /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
   if (userRole === 'inactive_manager') {
     const tasks = []
@@ -162,7 +153,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       if (!store) continue
       const log = callLogs[store.id] || {}
       const lastCallDate = latestCallEntry(log)?.date
-      const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
+      const callTodayHidesTask = hideDailyTaskDueToCallToday(log)
       const daysSinceLast = lastCallDate
         ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
         : 999
@@ -198,7 +189,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     const incBucket    = store._inc
     const topCall      = latestCallEntry(log)
     const lastCallDate = topCall?.date
-    const callTodayHidesTask = hideDailyTaskDueToCallToday(log, today)
+    const callTodayHidesTask = hideDailyTaskDueToCallToday(log)
     const daysSinceLast = lastCallDate
       ? Math.floor((new Date() - new Date(lastCallDate)) / 86400000)
       : 999
@@ -311,7 +302,13 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
 
     if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
-      if (asgn?.assigned_to === username && !callTodayHidesTask) {
+      if (asgn?.assigned_to === username) {
+        const moContactedToday =
+          isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
+        /** بعد «تم الرد» اليوم: أظهر الصف في «تم التواصل» بدل إخفائه بالكامل */
+        if (!moContactedToday && callTodayHidesTask) {
+          /* آخر مكالمة اليوم ليست «تم الرد» (مثلاً مشغول) — لا صف في المتابعة ولا في تم التواصل */
+        } else {
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
           : 999
@@ -335,6 +332,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             desc: stagingAm
               ? `${shipDesc} — ${stagingAm.descHint} — اضغط «اتصل»`
               : `${shipDesc} — أكمل استبيان التهيئة من «اتصل» ثم سجّل المكالمة`,
+            moContactedToday,
           })
         } else {
           const descBase = shipDesc
@@ -348,7 +346,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
             label: stagingAm?.label ?? 'متجر مُسنَد إليك',
             incubationBadge: stagingAm?.incubationBadge ?? undefined,
             desc,
+            moContactedToday,
           })
+        }
         }
       }
     }
