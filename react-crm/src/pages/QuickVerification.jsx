@@ -58,7 +58,7 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
   const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
   return (
-    <header className="relative w-full overflow-hidden border-b border-white/10 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65)]">
+    <header className="relative mx-3 mt-3 overflow-hidden rounded-b-[1.75rem] border border-white/25 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-violet-300/25 sm:mx-6 sm:rounded-b-[2rem]">
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_100%_-20%,rgba(167,139,250,0.35),transparent_50%),radial-gradient(ellipse_80%_60%_at_0%_100%,rgba(59,130,246,0.12),transparent_45%)]"
         aria-hidden
@@ -113,8 +113,8 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
         </div>
 
         <div className="flex w-full shrink-0 justify-center lg:w-auto lg:max-w-sm lg:justify-end">
-          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-white/12 to-white/[0.04] p-1 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-            <div className="rounded-[1.35rem] bg-slate-950/40 px-6 py-5 sm:px-7 sm:py-6">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-gradient-to-br from-violet-200/40 via-white/25 to-fuchsia-300/30 p-[1.5px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="rounded-[1.4rem] border border-white/10 bg-slate-950/50 px-6 py-5 sm:px-7 sm:py-6">
               <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
                 <div className="text-right">
                   <p className="text-xs font-black text-white/95">الرضا العالمي</p>
@@ -193,8 +193,9 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
       {items.map(it => (
         <div
           key={it.label}
-          className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_4px_24px_-12px_rgba(15,23,42,0.08)] transition hover:shadow-[0_12px_40px_-16px_rgba(75,0,130,0.12)]"
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-200/35 via-white/60 to-fuchsia-100/40 p-[1px] shadow-[0_8px_32px_-12px_rgba(75,0,130,0.18)] transition hover:shadow-[0_16px_48px_-12px_rgba(75,0,130,0.22)]"
         >
+          <div className="relative overflow-hidden rounded-[0.9rem] border border-white/90 bg-white p-4 shadow-inner">
           <div className={`absolute right-0 top-0 h-1 w-full ${it.bar} opacity-90`} aria-hidden />
           <div className="flex items-start justify-between gap-3 pt-1">
             <div className="min-w-0 text-right">
@@ -202,9 +203,10 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
               <p className="mt-2 text-2xl font-black tabular-nums tracking-tight text-slate-900">{it.value}</p>
               <p className="mt-1 text-[10px] font-medium text-slate-400">{it.sub}</p>
             </div>
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${it.iconBg}`}>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-2 ring-white/80 ${it.iconBg}`}>
               <it.icon className="h-5 w-5" strokeWidth={2.2} />
             </span>
+          </div>
           </div>
         </div>
       ))}
@@ -215,11 +217,15 @@ function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
 function SectionShell({ title, subtitle, count, children, empty }) {
   return (
     <section className="relative">
-      <div className="mb-6 flex flex-col gap-2 border-b border-slate-200/90 pb-5">
+      <div className="relative mb-7 pb-6">
+        <div
+          className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-gradient-to-l from-transparent via-violet-400/45 to-transparent"
+          aria-hidden
+        />
         <div className="min-w-0 text-right">
           <div className="flex flex-wrap items-center justify-end gap-3">
             <h2 className="text-lg font-black tracking-tight text-slate-900 md:text-xl">{title}</h2>
-            <span className="inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-black tabular-nums text-slate-800 shadow-sm">
+            <span className="inline-flex h-9 min-w-[2.25rem] items-center justify-center rounded-xl bg-gradient-to-br from-violet-100/90 to-white px-3 text-sm font-black tabular-nums text-violet-950 shadow-sm ring-2 ring-violet-200/60 ring-offset-2 ring-offset-[#ebe7f5]">
               {count}
             </span>
           </div>
@@ -229,7 +235,7 @@ function SectionShell({ title, subtitle, count, children, empty }) {
         </div>
       </div>
       {empty ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-5 py-12 text-center">
+        <div className="rounded-2xl border-2 border-dashed border-violet-200/60 bg-gradient-to-b from-slate-50/80 to-violet-50/20 px-5 py-12 text-center shadow-inner">
           <p className="text-sm font-medium text-slate-400">لا توجد حالات في هذا القسم.</p>
         </div>
       ) : (
@@ -278,14 +284,15 @@ function CrisisCard({ row, onOpen, layoutId }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-      className="group relative flex min-h-[200px] w-full flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white text-right shadow-[0_4px_6px_-1px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(75,0,130,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/80 hover:shadow-[0_24px_50px_-20px_rgba(75,0,130,0.28)]"
+      className="group relative flex min-h-[200px] w-full flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-violet-300/45 via-fuchsia-200/25 to-indigo-200/35 p-[1.5px] text-right shadow-[0_4px_6px_-1px_rgba(15,23,42,0.06),0_20px_40px_-24px_rgba(75,0,130,0.2)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-20px_rgba(75,0,130,0.32)]"
     >
+      <div className="relative flex min-h-[200px] w-full flex-col overflow-hidden rounded-[1.35rem] border border-white/70 bg-white shadow-inner">
       <div
-        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-fuchsia-500 via-[#4B0082] to-indigo-600 opacity-90"
+        className="absolute left-3 right-3 top-3 z-10 h-1 rounded-full bg-gradient-to-l from-fuchsia-500 via-[#4B0082] to-indigo-600 opacity-95"
         aria-hidden
       />
       <div
-        className="flex w-full shrink-0 items-center justify-between gap-2 border-b border-slate-100/90 bg-gradient-to-l from-slate-50 to-white px-4 py-3"
+        className="relative mt-2 flex w-full shrink-0 items-center justify-between gap-2 border-b border-slate-100/90 bg-gradient-to-l from-violet-50/40 via-white to-slate-50/30 px-4 pb-3.5 pt-1"
       >
         <span className="min-w-0 flex-1 truncate text-right text-[13px] font-black leading-snug text-slate-900">
           {displayName}
@@ -305,12 +312,13 @@ function CrisisCard({ row, onOpen, layoutId }) {
         <p className="text-[12px] font-semibold tabular-nums text-slate-500">
           #{row.store_id} · {kindLabel}
         </p>
-        <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
+        <div className="mt-auto flex items-center justify-between border-t border-slate-100/80 bg-slate-50/30 pt-3">
           <span className="text-[10px] font-bold text-slate-400">استبيان اليوم</span>
           <span className="text-[11px] font-bold text-violet-700 opacity-0 transition group-hover:opacity-100">
             عرض التفاصيل
           </span>
         </div>
+      </div>
       </div>
     </motion.button>
   )
@@ -384,7 +392,7 @@ function DetailDrawer({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
-            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-violet-200/60 bg-white shadow-[-24px_0_80px_-20px_rgba(15,23,42,0.25)]"
+            className="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l-[5px] border-l-violet-600 bg-white shadow-[-28px_0_90px_-24px_rgba(75,0,130,0.28)] ring-1 ring-violet-200/30"
           >
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-l from-violet-50/90 via-white to-white px-5 py-5">
               <div className="min-w-0 text-right">
@@ -769,14 +777,15 @@ export default function QuickVerification() {
 
   return (
     <div
-      className="min-h-screen bg-[#f4f2fa] pb-24"
+      className="min-h-screen bg-[#ebe7f5] pb-24 [background-image:radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(139,92,246,0.12),transparent),radial-gradient(ellipse_60%_40%_at_100%_50%,rgba(244,114,182,0.06),transparent)]"
       style={{ fontFamily: "'Cairo', sans-serif" }}
     >
       <div className="sticky top-0 z-40">
         <QuickAuditTopNav growth={kpis.growth} resolution={kpis.resolution} globalSat={kpis.global} loading={loading} />
-        <div className="border-b border-slate-200/80 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-xl">
+        <div className="mx-3 border-b border-slate-200/70 bg-white/95 shadow-[0_4px_24px_-8px_rgba(75,0,130,0.08)] backdrop-blur-xl sm:mx-6 sm:rounded-b-2xl sm:border-x sm:border-t-0 sm:ring-1 sm:ring-violet-100/60">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
-            <div className="flex flex-1 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-1.5 shadow-inner">
+            <div className="flex flex-1 rounded-2xl bg-gradient-to-br from-violet-100/50 via-white to-fuchsia-50/40 p-[1.5px] shadow-inner">
+            <div className="flex w-full flex-1 rounded-[0.85rem] border border-white/80 bg-slate-50/90 p-1.5 shadow-inner">
               <button
                 type="button"
                 onClick={() => setTab('crisis')}
@@ -820,18 +829,19 @@ export default function QuickVerification() {
                 ) : null}
               </button>
             </div>
+            </div>
             <button
               type="button"
               onClick={() => void load()}
               disabled={loading}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-white px-5 py-2.5 text-xs font-bold text-violet-900 shadow-sm transition hover:bg-violet-50 disabled:opacity-50 md:text-sm"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-violet-200/80 bg-gradient-to-b from-white to-violet-50/50 px-5 py-2.5 text-xs font-bold text-violet-900 shadow-md ring-2 ring-violet-100/40 transition hover:ring-violet-200/60 disabled:opacity-50 md:text-sm"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin text-violet-600' : 'text-violet-600'} strokeWidth={2.2} />
               تحديث البيانات
             </button>
           </div>
         </div>
-        <div className="border-b border-slate-200/60 bg-gradient-to-b from-white to-[#f4f2fa] py-5 md:py-6">
+        <div className="mx-3 border-b border-slate-200/50 bg-gradient-to-b from-white via-violet-50/20 to-[#ebe7f5] py-5 md:mx-6 md:py-6">
           <QvStatStrip
             total={statStrip.total}
             openCrisis={statStrip.openCrisis}
@@ -843,15 +853,17 @@ export default function QuickVerification() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-10">
-        <div className="relative mb-10">
-          <Search className="pointer-events-none absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-violet-400/80" strokeWidth={2} />
+        <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/35 via-white/60 to-fuchsia-200/30 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)]">
+          <div className="relative rounded-[1.25rem] border border-white/90 bg-white/95 shadow-inner">
+          <Search className="pointer-events-none absolute right-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-violet-500/70" strokeWidth={2} />
           <input
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="بحث بالاسم، رقم المتجر، الموظف، أو السبب…"
-            className="w-full rounded-2xl border border-slate-200/90 bg-white py-4 pr-14 pl-5 text-sm font-medium text-slate-800 shadow-[0_8px_30px_-12px_rgba(75,0,130,0.12)] outline-none ring-0 placeholder:text-slate-400 focus:border-violet-400 focus:shadow-[0_12px_40px_-12px_rgba(75,0,130,0.18)] focus:ring-4 focus:ring-violet-500/10"
+            className="w-full rounded-[1.25rem] border-0 bg-transparent py-4 pr-14 pl-5 text-sm font-medium text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:ring-2 focus:ring-violet-400/25"
           />
+          </div>
         </div>
 
         {err ? (
@@ -870,7 +882,7 @@ export default function QuickVerification() {
           </div>
         ) : tab === 'crisis' ? (
           crisisTotal === 0 ? (
-            <div className="overflow-hidden rounded-3xl border border-emerald-200/60 bg-gradient-to-b from-emerald-50/80 via-white to-white px-8 py-16 text-center shadow-[0_20px_60px_-30px_rgba(16,185,129,0.25)]">
+            <div className="overflow-hidden rounded-3xl border-2 border-emerald-200/50 bg-gradient-to-b from-emerald-50/90 via-white to-white px-8 py-16 text-center shadow-[0_20px_60px_-30px_rgba(16,185,129,0.2)] ring-4 ring-emerald-100/30">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-inner">
                 <CheckCircle2 size={32} strokeWidth={2.2} />
               </div>
@@ -945,8 +957,9 @@ export default function QuickVerification() {
             </div>
           )
         ) : (
-          <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_24px_60px_-28px_rgba(15,23,42,0.18)]">
-            <div className="border-b border-slate-100 bg-gradient-to-l from-emerald-50/90 to-white px-6 py-5">
+          <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-200/35 via-violet-100/25 to-slate-200/40 p-[2px] shadow-[0_24px_60px_-28px_rgba(15,23,42,0.2)]">
+            <div className="overflow-hidden rounded-[1.4rem] border border-white/90 bg-white shadow-inner">
+            <div className="border-b border-emerald-100/80 bg-gradient-to-l from-emerald-50/95 via-white to-violet-50/30 px-6 py-5">
               <p className="text-base font-black text-emerald-950">أرشيف الحلول</p>
               <p className="mt-1 text-xs font-medium text-slate-500">
                 حالات أُغلقت من «مركز الأزمات» مع إمكانية الاطلاع على ملاحظات المدير.
@@ -974,6 +987,7 @@ export default function QuickVerification() {
                 ))}
               </>
             )}
+            </div>
           </div>
         )}
       </div>
