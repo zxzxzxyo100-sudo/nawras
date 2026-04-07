@@ -2,11 +2,24 @@
  * تذاكر الانحراف — نص الجسم (إحصائيات الرادار + سكربت الاستعادة) وبناء رابط واتساب.
  */
 
+/** عتبة «تنبيه انحراف عاجل» في الواجهة (أيام منذ آخر شحنة) — للعرض والتوثيق */
+export const DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT = 5
+
 export function daysSinceLastShipment(store) {
   if (!store?.last_shipment_date || store.last_shipment_date === 'لا يوجد') return null
   const d = new Date(store.last_shipment_date)
   if (Number.isNaN(d.getTime())) return null
   return Math.floor((Date.now() - d.getTime()) / 86400000)
+}
+
+/**
+ * تذكرة انحراف عند التعيين: فقط إن وُجد تاريخ شحنة ومرّت ≥ عتبة الأيام، أو إن لم يُعرف التاريخ (لا يوجد).
+ * يمنع تذاكر «عاجل» لمتاجر شحنت مؤخراً (مثلاً يوم واحد) مع انخفاض رادار فقط.
+ */
+export function shouldCreateDeviationTicketForStore(store) {
+  const d = daysSinceLastShipment(store)
+  if (d == null) return true
+  return d >= DEVIATION_URGENT_DAYS_SINCE_LAST_SHIPMENT
 }
 
 export function buildWhatsAppUrl(phone) {
