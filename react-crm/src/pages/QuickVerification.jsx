@@ -27,11 +27,12 @@ function rowMatchesQuery(row, q) {
   const name = (row.store_name || '').toLowerCase()
   const staff = (row.staff_username || row.staff_fullname || '').toLowerCase()
   const fr = String(row.freeze_reason || '').toLowerCase()
-  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s)
+  const src = String(row.source_label || '').toLowerCase()
+  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s) || src.includes(s)
 }
 
 function isSatisfied(row) {
-  if (row.survey_kind === 'freeze_alert') return false
+  if (row.survey_kind === 'freeze_alert' || row.survey_kind === 'needs_freeze_request') return false
   return row.arrow === 'up'
 }
 
@@ -41,7 +42,7 @@ function isCrisis(row) {
 }
 
 function satisfactionPercent(row) {
-  if (row.survey_kind === 'freeze_alert') return 0
+  if (row.survey_kind === 'freeze_alert' || row.survey_kind === 'needs_freeze_request') return 0
   if (row.survey_kind === 'new_merchant_onboarding') {
     const ans = row.answers || []
     const yes = ans.filter(a => a.yes).length
@@ -137,12 +138,18 @@ function CrisisCard({ row, onOpen, layoutId }) {
   const kindLabel =
     row.survey_kind === 'freeze_alert'
       ? 'تجميد'
-      : row.survey_kind === 'new_merchant_onboarding'
-        ? 'تهيئة'
-        : 'CSAT نشط'
+      : row.survey_kind === 'needs_freeze_request'
+        ? 'يحتاج تجميد'
+        : row.survey_kind === 'new_merchant_onboarding'
+          ? 'تهيئة'
+          : 'CSAT نشط'
   const displayName = row.store_name || `متجر #${row.store_id}`
   const headerBadge =
-    row.survey_kind === 'freeze_alert' ? 'تجميد — تحقيق' : 'غير راضٍ'
+    row.survey_kind === 'freeze_alert'
+      ? 'تجميد — تحقيق'
+      : row.survey_kind === 'needs_freeze_request'
+        ? 'تحتاج تجميد'
+        : 'غير راضٍ'
 
   return (
     <motion.button
@@ -220,6 +227,8 @@ function DetailDrawer({
 }) {
   if (!row) return null
   const freezeAlert = row.survey_kind === 'freeze_alert'
+  const needsFreezeReq = row.survey_kind === 'needs_freeze_request'
+  const freezeLike = freezeAlert || needsFreezeReq
   const onboarding = row.survey_kind === 'new_merchant_onboarding'
 
   return (
@@ -267,15 +276,23 @@ function DetailDrawer({
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-5">
-              {freezeAlert ? (
+              {freezeLike ? (
                 <>
-                  <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">سبب التجميد</p>
+                  {needsFreezeReq ? (
+                    <p className="mb-2 text-xs font-bold text-violet-800">
+                      المصدر:{' '}
+                      <span className="text-slate-800">{row.source_label || '—'}</span>
+                    </p>
+                  ) : null}
+                  <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">
+                    {needsFreezeReq ? 'سبب طلب التجميد' : 'سبب التجميد'}
+                  </p>
                   <div className="rounded-xl border border-sky-200/90 bg-sky-50/60 p-4 shadow-inner">
                     <p className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-900">
                       {(row.freeze_reason || row.suggestions || '').trim() || '—'}
                     </p>
                     <p className="mt-3 text-[11px] text-slate-600">
-                      نُفّذ التجميد بواسطة:{' '}
+                      {needsFreezeReq ? 'طُلب من:' : 'نُفّذ التجميد بواسطة:'}{' '}
                       <span className="font-bold text-slate-800">
                         {(row.staff_fullname || row.frozen_by || row.staff_username || '—').trim()}
                       </span>
@@ -286,7 +303,7 @@ function DetailDrawer({
                   </div>
                 </>
               ) : null}
-              {!freezeAlert ? (
+              {!freezeLike ? (
                 <>
               <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">نتائج الاستبيان</p>
               {onboarding ? (
@@ -324,7 +341,7 @@ function DetailDrawer({
                 </>
               ) : null}
 
-              {canResolve && !row.resolved && !freezeAlert ? (
+              {canResolve && !row.resolved && !freezeLike ? (
                 <div className="mt-6 rounded-xl border border-rose-100/90 bg-rose-50/35 p-4 shadow-inner">
                   <p className="mb-1 text-[11px] font-black text-rose-900">إنذار احتضان (اختياري)</p>
                   <p className="mb-3 text-[11px] leading-relaxed text-slate-600">
@@ -416,6 +433,7 @@ export default function QuickVerification() {
   const [onboardingRows, setOnboardingRows] = useState([])
   const [activeRows, setActiveRows] = useState([])
   const [freezeRows, setFreezeRows] = useState([])
+  const [needsFreezeRows, setNeedsFreezeRows] = useState([])
   const [query, setQuery] = useState('')
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
@@ -435,17 +453,20 @@ export default function QuickVerification() {
         setOnboardingRows(Array.isArray(d.rows) ? d.rows : [])
         setActiveRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setFreezeRows(Array.isArray(d.freeze_rows) ? d.freeze_rows : [])
+        setNeedsFreezeRows(Array.isArray(d.needs_freeze_rows) ? d.needs_freeze_rows : [])
       } else {
         setErr(d?.error || 'تعذّر التحميل')
         setOnboardingRows([])
         setActiveRows([])
         setFreezeRows([])
+        setNeedsFreezeRows([])
       }
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
       setOnboardingRows([])
       setActiveRows([])
       setFreezeRows([])
+      setNeedsFreezeRows([])
     } finally {
       setLoading(false)
     }
@@ -456,7 +477,7 @@ export default function QuickVerification() {
   }, [load])
 
   const kpis = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows, ...freezeRows]
+    const all = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows]
     if (!all.length) return { growth: 0, resolution: 100, global: 100 }
     const positive = all.filter(isSatisfied).length
     const growth = Math.round((positive / all.length) * 100)
@@ -466,7 +487,7 @@ export default function QuickVerification() {
     const gSum = all.reduce((acc, r) => acc + satisfactionPercent(r), 0)
     const global = Math.round(gSum / all.length)
     return { growth, resolution, global }
-  }, [onboardingRows, activeRows, freezeRows])
+  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows])
 
   const crisisOnb = useMemo(
     () =>
@@ -486,6 +507,13 @@ export default function QuickVerification() {
       ),
     [freezeRows, query],
   )
+  const crisisNeedsFreeze = useMemo(
+    () =>
+      needsFreezeRows.filter(
+        r => !r.resolved && isCrisis(r) && rowMatchesQuery(r, query),
+      ),
+    [needsFreezeRows, query],
+  )
 
   const solvedOnb = useMemo(
     () => onboardingRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
@@ -498,6 +526,10 @@ export default function QuickVerification() {
   const solvedFreeze = useMemo(
     () => freezeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [freezeRows, query],
+  )
+  const solvedNeedsFreeze = useMemo(
+    () => needsFreezeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
+    [needsFreezeRows, query],
   )
 
   const toggleQvMissedInc = useCallback(key => {
@@ -522,19 +554,25 @@ export default function QuickVerification() {
   const resolve = useCallback(
     async row => {
       const isFreeze = row?.survey_kind === 'freeze_alert'
-      const busyKey = isFreeze ? `f-${row.freeze_alert_id}` : row.id
+      const isNeedsFreeze = row?.survey_kind === 'needs_freeze_request'
+      const busyKey = isFreeze
+        ? `f-${row.freeze_alert_id}`
+        : isNeedsFreeze
+          ? `nf-${row.needs_freeze_id}`
+          : row.id
       setResolvingId(busyKey)
       setErr('')
       try {
         const qvTags = []
-        if (!isFreeze) {
+        if (!isFreeze && !isNeedsFreeze) {
           if (qvMissedInc.c1) qvTags.push(QV_MISSED_INC_TAG.call1)
           if (qvMissedInc.c2) qvTags.push(QV_MISSED_INC_TAG.call2)
           if (qvMissedInc.c3) qvTags.push(QV_MISSED_INC_TAG.call3)
         }
         const res = await postQuickVerificationResolveAudit({
-          survey_id: isFreeze ? 0 : row.id,
+          survey_id: isFreeze || isNeedsFreeze ? 0 : row.id,
           freeze_alert_id: isFreeze ? row.freeze_alert_id : 0,
+          needs_freeze_id: isNeedsFreeze ? row.needs_freeze_id : 0,
           user_role: user?.role || 'executive',
           resolved_by: user?.username || '',
           executive_notes: executiveNotes.trim(),
@@ -560,7 +598,7 @@ export default function QuickVerification() {
   const isExec = user?.role === 'executive'
   const canResolveRow = row => {
     if (row.resolved) return false
-    if (row.survey_kind === 'freeze_alert') return isExec
+    if (row.survey_kind === 'freeze_alert' || row.survey_kind === 'needs_freeze_request') return isExec
     if (isExec) return true
     const u = (user?.username || '').trim()
     const staff = (row.staff_username || '').trim()
@@ -572,12 +610,15 @@ export default function QuickVerification() {
     const stillOnb = onboardingRows.some(r => r.id === drawerRow.id)
     const stillAct = activeRows.some(r => r.id === drawerRow.id)
     const stillFr = freezeRows.some(r => r.id === drawerRow.id)
-    if (!stillOnb && !stillAct && !stillFr) setDrawerRow(null)
+    const stillNf = needsFreezeRows.some(r => r.id === drawerRow.id)
+    if (!stillOnb && !stillAct && !stillFr && !stillNf) setDrawerRow(null)
     else {
-      const fresh = [...onboardingRows, ...activeRows, ...freezeRows].find(r => r.id === drawerRow.id)
+      const fresh = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows].find(
+        r => r.id === drawerRow.id,
+      )
       if (fresh && fresh.resolved !== drawerRow.resolved) setDrawerRow(fresh)
     }
-  }, [onboardingRows, activeRows, freezeRows, drawerRow])
+  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows, drawerRow])
 
   if (!can('quick_verification')) {
     return <Navigate to="/" replace />
@@ -586,8 +627,10 @@ export default function QuickVerification() {
   const drawerOpen = !!drawerRow
   const drawerCanResolve = drawerRow ? canResolveRow(drawerRow) : false
 
-  const crisisTotal = crisisOnb.length + crisisActive.length + crisisFreeze.length
-  const solvedTotal = solvedOnb.length + solvedActive.length + solvedFreeze.length
+  const crisisTotal =
+    crisisOnb.length + crisisActive.length + crisisFreeze.length + crisisNeedsFreeze.length
+  const solvedTotal =
+    solvedOnb.length + solvedActive.length + solvedFreeze.length + solvedNeedsFreeze.length
 
   return (
     <div
@@ -674,7 +717,7 @@ export default function QuickVerification() {
           </p>
         ) : null}
 
-        {loading && !onboardingRows.length && !activeRows.length && !freezeRows.length ? (
+        {loading && !onboardingRows.length && !activeRows.length && !freezeRows.length && !needsFreezeRows.length ? (
           <div className="flex justify-center py-24">
             <Loader2 className="h-10 w-10 animate-spin text-[#4B0082]" />
           </div>
@@ -717,6 +760,27 @@ export default function QuickVerification() {
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <AnimatePresence mode="popLayout">
                       {crisisActive.map(row => (
+                        <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <div className="mb-5 flex items-center justify-between">
+                  <h2 className="text-sm font-black uppercase tracking-wide text-[#4B0082]">تحتاج التجميد</h2>
+                  <span className="text-xs font-bold text-slate-400">{crisisNeedsFreeze.length}</span>
+                </div>
+                <p className="mb-4 text-xs leading-relaxed text-slate-500">
+                  طلبات من مسؤول المتاجر الجديدة أو مسؤول غير النشطة — للمراجعة التنفيذية (دون تجميد آلي).
+                </p>
+                {crisisNeedsFreeze.length === 0 ? (
+                  <p className="text-sm text-slate-400">لا توجد حالات في هذا القسم.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <AnimatePresence mode="popLayout">
+                      {crisisNeedsFreeze.map(row => (
                         <CrisisCard key={row.id} row={row} layoutId={`qv-c-${row.id}`} onOpen={setDrawerRow} />
                       ))}
                     </AnimatePresence>
@@ -768,6 +832,9 @@ export default function QuickVerification() {
                       <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
                     ))
                   : null}
+                {solvedNeedsFreeze.map(row => (
+                  <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} />
+                ))}
               </>
             )}
           </div>
@@ -781,8 +848,12 @@ export default function QuickVerification() {
         onResolve={resolve}
         resolveBusy={
           drawerRow
-            ? resolvingId
-              === (drawerRow.survey_kind === 'freeze_alert' ? `f-${drawerRow.freeze_alert_id}` : drawerRow.id)
+            ? resolvingId ===
+              (drawerRow.survey_kind === 'freeze_alert'
+                ? `f-${drawerRow.freeze_alert_id}`
+                : drawerRow.survey_kind === 'needs_freeze_request'
+                  ? `nf-${drawerRow.needs_freeze_id}`
+                  : drawerRow.id)
             : false
         }
         canResolve={drawerCanResolve}

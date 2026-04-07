@@ -410,7 +410,9 @@ export default function HotInactive() {
         }
       />
 
-      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />
+      )}
     </div>
   )
 }

@@ -408,6 +408,84 @@ if ($userRole === 'executive') {
     }
 }
 
+/** طلبات «يحتاج تجميد» من مسؤول المتاجر الجديدة / غير النشطة — تظهر في التحقق السريع */
+$needsFreezeRows = [];
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS qv_needs_freeze_requests (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        store_id INT NOT NULL,
+        store_name VARCHAR(512) NULL,
+        reason TEXT NOT NULL,
+        source VARCHAR(32) NOT NULL,
+        requested_by_username VARCHAR(100) NULL,
+        requested_by_fullname VARCHAR(255) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_created (created_at),
+        INDEX idx_store (store_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_needs_freeze_resolutions (
+        needs_freeze_id INT NOT NULL PRIMARY KEY,
+        resolved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        resolved_by VARCHAR(100) NULL DEFAULT NULL,
+        executive_notes TEXT NULL DEFAULT NULL,
+        INDEX idx_resolved_at (resolved_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try {
+        $pdo->exec('ALTER TABLE quick_verification_needs_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
+    } catch (Throwable $e) {
+    }
+    $stN = $pdo->query("
+        SELECT r.id, r.store_id, r.store_name, r.reason, r.source,
+          r.requested_by_username, r.requested_by_fullname, r.created_at,
+          res.resolved_at AS qv_resolved_at, res.resolved_by AS qv_resolved_by, res.executive_notes AS qv_executive_notes
+        FROM qv_needs_freeze_requests r
+        LEFT JOIN quick_verification_needs_freeze_resolutions res ON res.needs_freeze_id = r.id
+        WHERE DATE(r.created_at) = CURDATE()
+        ORDER BY r.created_at DESC
+    ");
+    if ($stN) {
+        while ($nr = $stN->fetch(PDO::FETCH_ASSOC)) {
+            $qvAt = $nr['qv_resolved_at'] ?? null;
+            $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
+            $nid = (int) ($nr['id'] ?? 0);
+            $src = trim((string) ($nr['source'] ?? ''));
+            $srcLabel = $src === 'inactive' ? 'غير نشطة' : 'متاجر جديدة';
+            $uname = trim((string) ($nr['requested_by_username'] ?? ''));
+            $needsFreezeRows[] = [
+                'id' => 'nf_' . $nid,
+                'needs_freeze_id' => $nid,
+                'survey_kind' => 'needs_freeze_request',
+                'store_id' => (int) ($nr['store_id'] ?? 0),
+                'store_name' => $nr['store_name'] !== '' && $nr['store_name'] !== null
+                    ? (string) $nr['store_name']
+                    : ('#' . (int) ($nr['store_id'] ?? 0)),
+                'store_category' => '',
+                'source' => $src,
+                'source_label' => $srcLabel,
+                'staff_username' => $uname,
+                'staff_fullname' => trim((string) ($nr['requested_by_fullname'] ?? '')),
+                'freeze_reason' => trim((string) ($nr['reason'] ?? '')),
+                'arrow' => 'down',
+                'suggestions' => trim((string) ($nr['reason'] ?? '')),
+                'created_at' => $nr['created_at'],
+                'resolved' => $resolved,
+                'resolved_at' => $resolved ? $nr['qv_resolved_at'] : null,
+                'resolved_by' => $resolved ? trim((string) ($nr['qv_resolved_by'] ?? '')) : null,
+                'executive_notes' => $resolved ? trim((string) ($nr['qv_executive_notes'] ?? '')) : null,
+            ];
+        }
+    }
+} catch (Throwable $e) {
+    $needsFreezeRows = [];
+}
+
+if ($userRole !== 'executive') {
+    $needsFreezeRows = array_values(array_filter($needsFreezeRows, function ($r) use ($requestUsername) {
+        $u = isset($r['staff_username']) ? trim((string) $r['staff_username']) : '';
+        return $u !== '' && $u === $requestUsername;
+    }));
+}
+
 echo json_encode([
     'success' => true,
     'rows' => $rows,
@@ -415,4 +493,5 @@ echo json_encode([
     'active_csat_rows' => $activeCsatRows,
     'active_csat_staff_summary' => $active_csat_staff_summary,
     'freeze_rows' => $freezeRows,
+    'needs_freeze_rows' => $needsFreezeRows,
 ], JSON_UNESCAPED_UNICODE);

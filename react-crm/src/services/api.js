@@ -190,6 +190,10 @@ export const getQuickVerificationBourse = (params = {}) =>
 export const postQuickVerificationResolveAudit = data =>
   http.post('/quick-verification-resolve-audit.php', data).then(r => r.data)
 
+/** إرسال متجر إلى التحقق السريع — خانة «يحتاج تجميد» (مسؤول متاجر جديدة / غير نشطة) */
+export const postQuickVerificationSubmitNeedsFreeze = data =>
+  http.post('/quick-verification-submit-needs-freeze.php', data).then(r => r.data)
+
 /** هدف 50 اتصالاً — مسؤولو الاستعادة (للمدير التنفيذي) */
 export const getInactiveRecoveryDailyStatus = () =>
   http

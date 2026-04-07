@@ -153,7 +153,9 @@ export default function NewStores() {
         />
       )}
 
-      {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="incubation" />
+      )}
     </div>
   )
 }
