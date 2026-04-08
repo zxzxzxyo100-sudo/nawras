@@ -75,7 +75,10 @@ export default function ActiveStores() {
   /** منجز — يُعاد تلقائياً إلى قيد المكالمة بعد 30 يوماً من آخر مكالمة */
   const completed = useMemo(() => {
     const base = stores.completed_merchants || []
-    const fromInc = (stores.incubating || []).filter(s => storeStates[s.id]?.category === 'completed')
+    const fromInc = (stores.incubating || []).filter(s => {
+      const c = storeStates[s.id]?.category
+      return c === 'completed' || c === 'contacted'
+    })
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
   }, [stores.completed_merchants, stores.incubating, storeStates])

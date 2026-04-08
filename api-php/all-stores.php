@@ -507,7 +507,7 @@ try {
                 $id = (int) ($s['id'] ?? 0);
                 $row = $catById[$id] ?? null;
                 $cat = $row['category'] ?? '';
-                if ($cat === 'completed') {
+                if ($cat === 'completed' || $cat === 'contacted') {
                     if (!empty($row['last_call_date'])) {
                         $s['last_call_date'] = $row['last_call_date'];
                     }

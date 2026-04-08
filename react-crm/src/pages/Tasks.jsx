@@ -71,6 +71,10 @@ function latestCallEntry(log) {
 
 /** مهمة ضمن تبويب «متاجر لم ترد»: آخر مكالمة عدم رد، أو تعيين سير عمل no_answer */
 function taskIsNoAnswer(task, callLogs, assignments) {
+  if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
+    const a = assignments[String(task.store.id)] || assignments[task.store.id]
+    if (a?.workflow_status === 'completed') return false
+  }
   const log = callLogs[task.store.id] || {}
   const top = latestCallEntry(log)
   if (top && String(top.outcome ?? '').trim() === 'no_answer') return true

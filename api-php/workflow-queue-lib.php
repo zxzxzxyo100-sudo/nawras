@@ -524,3 +524,77 @@ function fill_all_inactive_managers_only(PDO $pdo, $assignedByLabel) {
         'inactive_managers_found'  => count($users),
     ];
 }
+
+/**
+ * بعد «تم التواصل» من الطابور أو إكمال الاستبيان: يضمن ظهور المتجر في «المتاجر المنجزة»
+ * (all-stores.php يفرز من active_shipping حسب store_states.category = completed).
+ * إن لم يوجد صف في store_states يُنشَأ صف منجز؛ وإن كان التصنيف نشطاً/احتضاناً يُحدَّث إلى منجز.
+ */
+function workflow_mark_active_store_contacted_completed(PDO $pdo, $storeId, $storeName, $username) {
+    $storeId = (int) $storeId;
+    if ($storeId <= 0) {
+        return;
+    }
+    $storeName = (string) $storeName;
+    $username = trim((string) $username);
+
+    $upd = $pdo->prepare("
+        UPDATE store_states
+        SET category = 'completed',
+            last_call_date = NOW(),
+            updated_by = ?
+        WHERE store_id = ?
+        AND category IN ('active_pending_calls','active','active_shipping','unreachable','incubating')
+    ");
+    $upd->execute([$username, $storeId]);
+    if ($upd->rowCount() > 0) {
+        return;
+    }
+
+    $chk = $pdo->prepare('SELECT category FROM store_states WHERE store_id = ? LIMIT 1');
+    $chk->execute([$storeId]);
+    $row = $chk->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        try {
+            $pdo->prepare("
+                INSERT INTO store_states (store_id, store_name, category, last_call_date, updated_by)
+                VALUES (?, ?, 'completed', NOW(), ?)
+            ")->execute([$storeId, $storeName, $username]);
+        } catch (Throwable $e) {
+            try {
+                $pdo->prepare("
+                    INSERT INTO store_states (store_id, store_name, category, updated_by)
+                    VALUES (?, ?, 'completed', ?)
+                ")->execute([$storeId, $storeName, $username]);
+            } catch (Throwable $e2) {
+            }
+        }
+        return;
+    }
+
+    $cat = (string) ($row['category'] ?? '');
+    if (in_array($cat, ['frozen', 'restoring'], true)) {
+        return;
+    }
+    if ($cat === 'completed' || $cat === 'contacted') {
+        try {
+            $pdo->prepare('UPDATE store_states SET last_call_date = NOW(), updated_by = ? WHERE store_id = ?')
+                ->execute([$username, $storeId]);
+        } catch (Throwable $e) {
+        }
+        return;
+    }
+
+    try {
+        $pdo->prepare("
+            UPDATE store_states
+            SET category = 'completed', last_call_date = NOW(), updated_by = ?
+            WHERE store_id = ?
+        ")->execute([$username, $storeId]);
+    } catch (Throwable $e) {
+        $pdo->prepare("
+            UPDATE store_states SET category = 'completed', updated_by = ?
+            WHERE store_id = ?
+        ")->execute([$username, $storeId]);
+    }
+}
