@@ -73,6 +73,7 @@ export default function IncubationNewCompleted() {
       const res = await getIncubationFollowupStores({
         user_role: user?.role ?? '',
         username: user?.username ?? '',
+        user_fullname: user?.fullname ?? '',
         q: qApplied.trim(),
         reg_from: regFrom.trim(),
         reg_to: regTo.trim(),
@@ -89,7 +90,7 @@ export default function IncubationNewCompleted() {
     } finally {
       setLoading(false)
     }
-  }, [user?.role, user?.username, qApplied, regFrom, regTo])
+  }, [user?.role, user?.username, user?.fullname, qApplied, regFrom, regTo])
 
   useEffect(() => {
     if (user?.username) {
