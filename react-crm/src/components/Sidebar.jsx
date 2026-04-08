@@ -6,6 +6,7 @@ import {
   ChevronDown, Circle, Layers, Lock, BarChart3, BadgeCheck, Package,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
+import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
@@ -425,6 +426,7 @@ function navGroupsForUser(role) {
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout, can } = useAuth()
+  const { shouldAlert: privateTicketNavAlert } = usePrivateTicketsAlert()
   const navigate = useNavigate()
   function handleLogout() { logout(); navigate('/login') }
   function handleNav()    { if (onClose) onClose() }
