@@ -46,6 +46,7 @@ const INCUBATION_SUB = [
   { to: '/incubation/call-1', label: 'المكالمة الأولى', kind: 'call1' },
   { to: '/incubation/call-2', label: 'المكالمة الثانية', kind: 'call2' },
   { to: '/incubation/call-3', label: 'المكالمة الثالثة', kind: 'call3' },
+  { to: '/incubation/new-completed', label: 'المتاجر الجديدة المنجزة', kind: 'new_completed' },
 ]
 
 /** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */
@@ -104,6 +105,8 @@ function incubationSubLinkActive(kind, pathname) {
       return pathname.startsWith('/incubation/call-2')
     case 'call3':
       return pathname.startsWith('/incubation/call-3')
+    case 'new_completed':
+      return pathname.startsWith('/incubation/new-completed')
     default:
       return false
   }

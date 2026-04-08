@@ -17,6 +17,7 @@ import HotInactive from './pages/HotInactive'
 import ColdInactive from './pages/ColdInactive'
 import IncubationPath from './pages/IncubationPath'
 import IncubationCallDelay from './pages/IncubationCallDelay'
+import IncubationNewCompleted from './pages/IncubationNewCompleted'
 import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 import Kanban from './pages/Kanban'
@@ -115,6 +116,10 @@ function AppRoutes() {
         <Route
           path="/incubation/call-delay"
           element={<PrivateRoute view="incubation"><IncubationCallDelay /></PrivateRoute>}
+        />
+        <Route
+          path="/incubation/new-completed"
+          element={<PrivateRoute view="incubation"><IncubationNewCompleted /></PrivateRoute>}
         />
         <Route
           path="/incubation/:tabKey"
