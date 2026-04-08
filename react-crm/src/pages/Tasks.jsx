@@ -377,7 +377,13 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
-    if (userRole === 'active_manager' && (dbCat === 'cold_inactive' || store.bucket === 'cold_inactive')) {
+    /** لا مهام متابعة دورية لمخرج من الاحتضان (حتى قبل اكتمال حذف التعيين من الخادم) */
+    const amSkipPeriodic =
+      ['cold_inactive', 'hot_inactive', 'completed', 'contacted', 'frozen', 'unreachable'].includes(dbCat)
+      || ['cold_inactive', 'hot_inactive', 'completed_merchants', 'frozen_merchants', 'unreachable_merchants'].includes(
+        store.bucket,
+      )
+    if (userRole === 'active_manager' && amSkipPeriodic) {
       return
     }
     const incBucket    = store._inc

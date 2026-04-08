@@ -892,6 +892,16 @@ foreach ($result['cold_inactive'] ?? [] as $s) {
     ], JSON_UNESCAPED_UNICODE)
 );
 
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    require_once __DIR__ . '/workflow-queue-lib.php';
+    purge_active_manager_assignments_for_exited_incubation($pdoDb, $result);
+} catch (Throwable $e) {
+}
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
