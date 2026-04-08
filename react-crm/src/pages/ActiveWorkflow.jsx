@@ -157,7 +157,23 @@ export default function ActiveWorkflow() {
 
   const target = wf?.target ?? 50
 
-  const activeRows = useMemo(() => dedupeWorkflowRows(wf?.active_tasks ?? []), [wf])
+  const activeRows = useMemo(() => {
+    const rows = dedupeWorkflowRows(wf?.active_tasks ?? [])
+    const delayedRank = (r) => {
+      const v = r?.is_delayed
+      if (v === true || v === 1 || v === '1') return 1
+      return 0
+    }
+    return [...rows].sort((a, b) => {
+      const da = delayedRank(a)
+      const db = delayedRank(b)
+      if (da !== db) return db - da
+      const ta = new Date(a.assigned_at || 0).getTime()
+      const tb = new Date(b.assigned_at || 0).getTime()
+      if (ta !== tb) return ta - tb
+      return String(a.store_id).localeCompare(String(b.store_id))
+    })
+  }, [wf])
   const noAnswerRows = useMemo(() => dedupeWorkflowRows(wf?.no_answer_tasks ?? []), [wf])
 
   return (
@@ -171,8 +187,8 @@ export default function ActiveWorkflow() {
             <div>
               <h1 className="text-lg font-black text-slate-900">المتابعة الدورية — طابور المتاجر النشطة</h1>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                يظهر حتى {target} متجراً في قائمة الاتصال اليوم؛ زر «تم التواصل» ينقل المتجر إلى المنجزة ويُحلّ مكانه فوراً من المجمع.
-                «لم يرد» يبقي المتابعة تحت تبويب عدم الرد (في آخر القائمة) ويُضاف متجر بديل للطابور. الاستبيان يبقى متاحاً عند الحاجة.
+                حتى {target} متجراً في الطابور؛ المتأخّرات تُثبَّت أعلى القائمة. «اتصل» يسجّل تم التواصل وينقل المتجر إلى تبويب «تم التواصل» ويُحلّ مكانه فوراً.
+                «لم يرد» يبقي المتابعة تحت «لم يتم الرد» مع إحلال من المجمع.
               </p>
             </div>
           </div>
@@ -243,11 +259,22 @@ export default function ActiveWorkflow() {
                     activeRows.map(row => (
                       <tr key={row.store_id} className="border-b border-slate-50 hover:bg-slate-50/50">
                         <td className="px-4 py-3">
-                          <StoreNameWithId
-                            store={findStoreInContext(stores, storeStates, row.store_id)}
-                            nameClassName="font-semibold text-slate-800"
-                            idClassName="font-mono text-xs text-slate-500"
-                          />
+                          <div className="flex flex-wrap items-center gap-2 justify-end">
+                            <StoreNameWithId
+                              store={findStoreInContext(stores, storeStates, row.store_id)}
+                              nameClassName="font-semibold text-slate-800"
+                              idClassName="font-mono text-xs text-slate-500"
+                            />
+                            {(() => {
+                              const v = row?.is_delayed
+                              const delayed = v === true || v === 1 || v === '1'
+                              return delayed ? (
+                                <span className="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-200/80 px-2 py-0.5 rounded-md shrink-0">
+                                  متأخر — يحتاج تم الرد
+                                </span>
+                              ) : null
+                            })()}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
@@ -259,7 +286,7 @@ export default function ActiveWorkflow() {
                               title="تسجيل تم التواصل وإحلال المتجر في الطابور"
                             >
                               <Phone size={14} />
-                              {contactedLoading === row.store_id ? 'جارٍ…' : 'تم التواصل'}
+                              {contactedLoading === row.store_id ? 'جارٍ…' : 'اتصل'}
                             </button>
                             {(() => {
                               const st = findStoreInContext(stores, storeStates, row.store_id)
@@ -282,7 +309,7 @@ export default function ActiveWorkflow() {
                               className="text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border-2 border-orange-400 bg-orange-50 text-orange-950 hover:bg-orange-100 disabled:opacity-50"
                             >
                               <PhoneOff size={14} />
-                              {noAnswerRowLoading === row.store_id ? 'جارٍ…' : 'لم يرد'}
+                              {noAnswerRowLoading === row.store_id ? 'جارٍ…' : 'عدم الرد'}
                             </button>
                             <button
                               type="button"
@@ -312,7 +339,7 @@ export default function ActiveWorkflow() {
             <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/80 flex items-center justify-between">
               <h2 className="text-sm font-black text-amber-950 flex items-center gap-2">
                 <AlertTriangle size={18} className="text-amber-600" />
-                متابعة — عدم الرد
+                لم يتم الرد
               </h2>
               <span className="text-xs font-bold text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-full">
                 {wf?.no_answer_count ?? 0}

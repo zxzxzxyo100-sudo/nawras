@@ -112,15 +112,32 @@ if ($action === 'get_my_workflow') {
 
     fill_slots_for_user($pdo, $username, $username, null);
 
+    // طابور المتابعة الدورية: حتى 50 تعيين نشط (يشمل متأخّرات أيام سابقة) — المتأخّر أولاً ثم الأقدم
     $stActive = $pdo->prepare("
-        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
-        FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
-        AND DATE(assigned_at) = CURDATE()
-        ORDER BY assigned_at ASC
-        LIMIT " . ACTIVE_QUEUE_TARGET . "
+        SELECT
+            sa.store_id,
+            sa.store_name,
+            sa.assigned_to,
+            sa.assigned_at,
+            sa.workflow_status,
+            sa.assignment_queue,
+            CASE
+                WHEN DATE(sa.assigned_at) < CURDATE() THEN 1
+                WHEN EXISTS (
+                    SELECT 1 FROM call_logs cl
+                    WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
+                    AND cl.performed_by = ?
+                    AND DATE(cl.created_at) = CURDATE()
+                    AND (cl.outcome IS NULL OR cl.outcome <> 'answered')
+                ) THEN 1
+                ELSE 0
+            END AS is_delayed
+        FROM store_assignments sa
+        WHERE sa.assigned_to = ? AND sa.assignment_queue = 'active' AND sa.workflow_status = 'active'
+        ORDER BY is_delayed DESC, sa.assigned_at ASC
+        LIMIT " . (int) ACTIVE_QUEUE_TARGET . "
     ");
-    $stActive->execute([$username]);
+    $stActive->execute([$username, $username]);
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
 
     $stNoAns = $pdo->prepare("
