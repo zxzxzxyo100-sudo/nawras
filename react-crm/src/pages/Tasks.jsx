@@ -1278,6 +1278,22 @@ export default function Tasks() {
     }).slice(0, 50)
   }, [isTaskTabUser, mainTasks, callLogs, assignments, user?.role])
 
+  /** أعداد مراحل المكالمة ضمن نفس مصفوفة تبويب «متابعة دورية» (تفادي جمع وسوم خاطئة مع العدد الإجمالي) */
+  const moPeriodicRetroCounts = useMemo(() => {
+    let c1 = 0
+    let c2 = 0
+    let c3 = 0
+    let other = 0
+    for (const t of moPeriodicTasks) {
+      const k = t.moRetro?.key
+      if (k === 'call_1' || k === 'call_1_delayed') c1 += 1
+      else if (k === 'call_2') c2 += 1
+      else if (k === 'call_3') c3 += 1
+      else other += 1
+    }
+    return { c1, c2, c3, other }
+  }, [moPeriodicTasks])
+
   const moContactedTasks = useMemo(() => {
     if (!isTaskTabUser) return []
     return mainTasks.filter(t => t.moContactedToday)
@@ -1922,6 +1938,22 @@ export default function Tasks() {
               </span>
             </motion.button>
           ))
+        )}
+        {isTaskTabUser && moTab === 'periodic' && moPeriodicTasks.length > 0 && (
+          <p className="w-full text-xs text-slate-500 pt-1 leading-relaxed">
+            توزيع المراحل في هذه القائمة فقط: أولى (ومؤجلة){' '}
+            {moPeriodicRetroCounts.c1.toLocaleString('ar-SA')} — ثانية{' '}
+            {moPeriodicRetroCounts.c2.toLocaleString('ar-SA')} — ثالثة{' '}
+            {moPeriodicRetroCounts.c3.toLocaleString('ar-SA')}
+            {moPeriodicRetroCounts.other > 0
+              ? ` — أخرى ${moPeriodicRetroCounts.other.toLocaleString('ar-SA')}`
+              : ''}
+            . المجموع {moPeriodicTasks.length.toLocaleString('ar-SA')}
+            {user?.role === 'active_manager'
+              ? ' (يُعرض حتى 50 متجراً؛ قد يوجد المزيد خارج القائمة)'
+              : ''}
+            .
+          </p>
         )}
       </motion.div>
 
