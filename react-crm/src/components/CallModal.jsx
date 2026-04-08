@@ -21,6 +21,7 @@ import {
   getSatisfactionQuestionsForUi,
   needsActiveSatisfactionSurvey,
   isInactiveMerchantCategory,
+  PENDING_CALL_PIPELINE_CATEGORIES,
 } from '../constants/satisfactionSurvey'
 import {
   NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV,
@@ -221,13 +222,34 @@ export default function CallModal({
       && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds),
     [callType, store, newMerchantOnboardingDoneIds],
   )
+  /**
+   * استبيان الرضا (٦ أسئلة): مرة واحدة لكل متجر في المسار العادي؛
+   * في «المتابعة الدورية» (مهام يومية + مسؤول المتاجر) يبقى إلزامياً عند كل «تم الرد»
+   * طالما المتجر لا يزال ضمن قيد المكالمة — وإلا يختفي الاستبيان بعد أول تعبئة.
+   */
   const surveyNeeded = useMemo(
-    () =>
-      callType === 'general'
-      && outcome === 'answered'
-      && !inactiveFeedbackNeeded
-      && needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId),
-    [callType, store.id, dbCategory, surveyByStoreId, inactiveFeedbackNeeded, outcome],
+    () => {
+      if (callType !== 'general' || outcome !== 'answered' || inactiveFeedbackNeeded) {
+        return false
+      }
+      const inPendingPipeline = PENDING_CALL_PIPELINE_CATEGORIES.has(dbCategory)
+      const periodicFollowUpMandatory =
+        fromDailyTasks
+        && user?.role === 'active_manager'
+        && inPendingPipeline
+      if (periodicFollowUpMandatory) return true
+      return needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId)
+    },
+    [
+      callType,
+      store.id,
+      dbCategory,
+      surveyByStoreId,
+      inactiveFeedbackNeeded,
+      outcome,
+      fromDailyTasks,
+      user?.role,
+    ],
   )
   const showOnboarding = !simpleOnboardingFlow && onboardingNeeded && outcome === 'answered'
   const inactiveFeedbackOk = inactiveFeedback.trim().length >= MIN_INACTIVE_FEEDBACK_LEN
