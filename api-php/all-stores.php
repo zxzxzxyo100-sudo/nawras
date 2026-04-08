@@ -266,8 +266,8 @@ foreach ($new as $id => $s) {
     $regHrs  = $regTs ? ($now - $regTs) / 3600 : 0;
     $regDays = $regHrs / 24;
 
-    // يتوافق مع عمود «الطلبيات» في مسار الاحتضان (إجمالي Nawris) — لا نعتمد تاريخ شحنة بلا عدد طرود
-    $hasShipped = intval($s['total_shipments'] ?? 0) > 0;
+    $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
+               || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
 
     $s['_hours'] = round($regHrs, 1);
     $s['_days']  = round($regDays, 1);
@@ -430,8 +430,8 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // م1 مسجّلة وبدون شحن → لا يمكن المكالمة الثانية (بشرط شحن) — ساخن فوراً وليس «بين المكالمات» حتى يوم 3
-    if ($inc1 && !$inc2 && !$hasShipped) {
+    // م1 مسجّلة ويوم 3+ من التسجيل بدون أي شحنة → لا انتقال للمكالمة الثانية (غير نشط ساخن)
+    if ($inc1 && !$inc2 && $cycleDay >= $c2d && !$hasShipped) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }

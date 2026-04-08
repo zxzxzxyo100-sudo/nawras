@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Baby, Phone, RefreshCw, Filter, AlertCircle } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
-import { totalShipments } from '../utils/storeFields'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 import StoreDrawer from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
 import CallModal from '../components/CallModal'
@@ -237,7 +237,7 @@ export default function IncubationCallDelay() {
                   </tr>
                 )}
                 {filtered.map((s, i) => {
-                  const parcels = totalShipments(s)
+                  const parcels = parcelsInRangeDisplay(s)
                   const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
                   const delayD = s._delay_days != null ? s._delay_days : '—'
                   return (
