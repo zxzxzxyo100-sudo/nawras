@@ -1138,9 +1138,11 @@ export default function Tasks() {
         && ['incubation_manager', 'executive'].includes(user?.role)
       ) return true
     }
-    /** مسؤول المتاجر + متابعة دورية: افتح «تسجيل مكالمة» مباشرة (استبيان رضا إلزامي من CallModal) */
-    /** أي «متجر مسند» لمسؤول المتاجر: افتح نافذة التسجيل فوراً (استبيان رضا / تهيئة حسب الحالة) */
-    if (user?.role === 'active_manager' && selectedTask.type === 'assigned_store') {
+    /** مسؤول المتاجر: متجر مسند أو استبيان تهيئة — نافذة التسجيل فوراً (استبيان داخل النافذة ثم حفظ) */
+    if (
+      user?.role === 'active_manager'
+      && ['assigned_store', 'new_merchant_onboarding'].includes(selectedTask.type)
+    ) {
       return true
     }
     return false
@@ -2035,11 +2037,7 @@ export default function Tasks() {
                     onNoAnswerWorkflow={handleNoAnswerWorkflow}
                     noAnswerLoading={noAnswerLoadingId === task.id}
                     doneDisabled={blockDone}
-                    hideDoneButton={
-                      IS_STAGING_OR_DEV
-                      || (user?.role === 'active_manager'
-                        && ['assigned_store', 'new_merchant_onboarding'].includes(task.type))
-                    }
+                    hideDoneButton={isTaskTabUser && moTab === 'periodic'}
                     taskIsNoAnswerFn={taskIsNoAnswer}
                     callLogs={callLogs}
                     assignments={assignments}
@@ -2056,12 +2054,8 @@ export default function Tasks() {
                   userRole={user?.role}
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
-                  doneDisabled={blockDone}
-                  hideDoneButton={
-                    IS_STAGING_OR_DEV
-                    || (user?.role === 'active_manager'
-                      && ['assigned_store', 'new_merchant_onboarding'].includes(task.type))
-                  }
+                    doneDisabled={blockDone}
+                    hideDoneButton={isTaskTabUser && moTab === 'periodic'}
                 />
               )
             })}

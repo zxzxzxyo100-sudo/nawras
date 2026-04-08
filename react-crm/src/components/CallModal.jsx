@@ -137,13 +137,11 @@ async function runTaskCompletionAfterAnswered({
       }
     }
     if (taskCompletion.dailyTaskKey) {
-      const skipDismissal = taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager'
       const canMarkDailyDismissal =
-        !skipDismissal
-        && (IS_STAGING_OR_DEV
-          || user?.role === 'active_manager'
-          || user?.role === 'incubation_manager'
-          || user?.role === 'executive')
+        IS_STAGING_OR_DEV
+        || user?.role === 'active_manager'
+        || user?.role === 'incubation_manager'
+        || user?.role === 'executive'
       if (canMarkDailyDismissal) {
         await markDailyTaskDone({ username: u, task_key: taskCompletion.dailyTaskKey })
       }
@@ -208,12 +206,28 @@ export default function CallModal({
       return !isNewMerchantOnboardingSurveyDone(store, newMerchantOnboardingDoneIds)
     }
 
-    if (!needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) return false
-    if (callType !== 'general') return false
-    if (IS_SIMPLE_LOG_CALL_MODAL) return true
-    if (fromDailyTasks && user?.role === 'active_manager') return true
+    if (needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) {
+      if (callType !== 'general') return false
+      if (IS_SIMPLE_LOG_CALL_MODAL) return true
+      if (fromDailyTasks && user?.role === 'active_manager') return true
+      return false
+    }
+
+    /**
+     * متابعة دورية — مسؤول المتاجر من المهام اليومية: أسئلة نعم/لا (شحن/تتبع/مهام)
+     * طالما المتجر ليس في مسار «نشط قيد مكالمة» (هناك استبيان النجوم منفصل).
+     */
+    if (
+      fromDailyTasks
+      && user?.role === 'active_manager'
+      && callType === 'general'
+      && !PENDING_CALL_PIPELINE_CATEGORIES.has(dbCategory)
+    ) {
+      return true
+    }
+
     return false
-  }, [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded, fromDailyTasks, user?.role])
+  }, [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded, fromDailyTasks, user?.role, dbCategory])
 
   const onboardingNeeded = useMemo(
     () =>
