@@ -382,12 +382,28 @@ foreach ($new as $id => $s) {
         }
     }
     $s['_missed_c1_window'] = $missedC1Window;
+    $s['_missed_c2_window'] = false;
 
-    // المكالمة الثالثة — من يوم 10 من التسجيل (بعد تسجيل المكالمة الثانية)
-    if ($inc2 && !$inc3 && $cycleDay >= $c3d) {
+    // المكالمة الثالثة — من يوم 10 إلى 14: بعد تسجيل المكالمة الثانية، أو (م1 + شحن) حتى لو لم تُسجَّل المكالمة الثانية
+    $inCall3Window = !$inc3 && $cycleDay >= $c3d && $cycleDay <= 14;
+    $missedSecondCall = false;
+    $qualifiesCall3 = false;
+    if ($inCall3Window) {
+        if ($inc2) {
+            $qualifiesCall3 = true;
+        } elseif ($inc1 && $hasShipped) {
+            $qualifiesCall3 = true;
+            $missedSecondCall = true;
+        }
+    }
+    if ($qualifiesCall3) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_3';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
+        $s['_missed_c2_window'] = $missedSecondCall;
+        if ($missedSecondCall) {
+            $s['_inc_phase'] = 'المكالمة الثالثة — لم تُسجَّل المكالمة الثانية بعد';
+        }
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -416,8 +432,8 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // المكالمة الثانية — من يوم 3 التقويمي مع شحن مسجّل
-    if ($inc1 && !$inc2 && $cycleDay >= $c2d && $hasShipped) {
+    // المكالمة الثانية — من يوم 3 حتى قبل يوم 10 (يوم 10+ يُعرَض في المكالمة الثالثة حتى لو لم تُسجَّل م2)
+    if ($inc1 && !$inc2 && $cycleDay >= $c2d && $cycleDay < $c3d && $hasShipped) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_2';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
