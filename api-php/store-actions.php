@@ -331,6 +331,21 @@ elseif ($action === 'log_call') {
         VALUES (?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
 
+    // —— طابور المتابعة النشطة: «تم الرد» يُكمّل التعيين فوراً (لا يبقى تحت «لم يتم الرد») ——
+    $usernameForWorkflow = trim((string) ($input['username'] ?? ''));
+    if (
+        $callType === 'general'
+        && $outcome === 'answered'
+        && $usernameForWorkflow !== ''
+        && ($userRole ?? '') === 'active_manager'
+    ) {
+        require_once __DIR__ . '/workflow-queue-lib.php';
+        $sidInt = is_numeric($storeId) ? (int) $storeId : (int) preg_replace('/\D+/', '', (string) $storeId);
+        if ($sidInt > 0) {
+            workflow_try_complete_active_assignment_on_answered($pdo, $sidInt, (string) $storeName, $usernameForWorkflow);
+        }
+    }
+
     // —— نشط يشحن: تم الرد → منجز | لم يرد / مشغول → لم يتم الوصول (باستثناء احتضان واستعادة) ——
     if (!in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true) && strpos($callType, 'rcall') !== 0) {
         $sid = (int) $storeId;

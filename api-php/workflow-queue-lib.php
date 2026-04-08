@@ -654,3 +654,32 @@ function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $s
 
     // صف موجود لكن ليس ضمن مسار نشط يشحن — لا نغيّر الفئة (مثلاً inactive) لتجنّب أخطاء بيانات
 }
+
+/**
+ * عند «تم الرد» في مكالمة عامة لمسؤول المتاجر: إكمال تعيين الطابور النشط.
+ * يُصلح بقاء workflow_status = no_answer رغم تسجيل مكالمة ناجحة (قبل استدعاء release_after_survey أو عند فشله).
+ */
+function workflow_try_complete_active_assignment_on_answered(PDO $pdo, $storeId, $storeName, $username) {
+    $storeId = (int) $storeId;
+    $username = trim((string) $username);
+    if ($storeId <= 0 || $username === '') {
+        return false;
+    }
+    ensure_workflow_schema($pdo);
+    $sid = (string) $storeId;
+    $upd = $pdo->prepare("
+        UPDATE store_assignments
+        SET workflow_status = 'completed', workflow_updated_at = NOW()
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'
+        AND workflow_status IN ('active','no_answer')
+    ");
+    $upd->execute([$sid, $username]);
+    if ($upd->rowCount() === 0) {
+        return false;
+    }
+    ensure_active_daily_stats_schema($pdo);
+    increment_active_daily_success($pdo, $username);
+    fill_slots_for_user($pdo, $username, $username, null);
+    workflow_mark_active_store_contacted_completed($pdo, $storeId, (string) $storeName, $username);
+    return true;
+}

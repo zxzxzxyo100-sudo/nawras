@@ -360,6 +360,21 @@ elseif ($action === 'release_after_survey') {
     $upd = $pdo->prepare("UPDATE store_assignments SET workflow_status = 'completed' WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' AND workflow_status IN ('active','no_answer')");
     $upd->execute([$sid, $username]);
     if ($upd->rowCount() === 0) {
+        $chk = $pdo->prepare("SELECT workflow_status FROM store_assignments WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' LIMIT 1");
+        $chk->execute([$sid, $username]);
+        $ws = (string) ($chk->fetchColumn() ?: '');
+        if ($ws === 'completed') {
+            $count = get_active_daily_success_count($pdo, $username);
+            jsonResponse([
+                'success' => true,
+                'filled' => 0,
+                'daily_successful_contacts' => $count,
+                'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
+                'daily_target_reached' => $count >= ACTIVE_DAILY_SUCCESS_TARGET,
+                'goal_just_met' => false,
+                'already_completed' => true,
+            ]);
+        }
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
     }
     ensure_active_daily_stats_schema($pdo);

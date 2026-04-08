@@ -69,6 +69,21 @@ function latestCallEntry(log) {
   return entries[0]
 }
 
+/** هل وُجد «تم الرد» أو معاودة لاحقة لآخر «لم يرد» في السجل؟ (يُصلح التعارض في الواجهة) */
+function noAnswerSupersededByAnswered(log) {
+  const entries = Object.values(log || {}).filter(c => c?.date)
+  let lastAnswered = -1
+  let lastNoAnswer = -1
+  for (const e of entries) {
+    const t = new Date(e.date).getTime()
+    if (Number.isNaN(t)) continue
+    const oc = String(e.outcome ?? '').trim()
+    if (oc === 'answered' || oc === 'callback') lastAnswered = Math.max(lastAnswered, t)
+    if (oc === 'no_answer') lastNoAnswer = Math.max(lastNoAnswer, t)
+  }
+  return lastAnswered >= 0 && lastAnswered >= lastNoAnswer
+}
+
 /** مهمة ضمن تبويب «متاجر لم ترد»: آخر مكالمة عدم رد، أو تعيين سير عمل no_answer */
 function taskIsNoAnswer(task, callLogs, assignments) {
   if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
@@ -76,6 +91,7 @@ function taskIsNoAnswer(task, callLogs, assignments) {
     if (a?.workflow_status === 'completed') return false
   }
   const log = callLogs[task.store.id] || {}
+  if (noAnswerSupersededByAnswered(log)) return false
   const top = latestCallEntry(log)
   if (top && String(top.outcome ?? '').trim() === 'no_answer') return true
   if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
