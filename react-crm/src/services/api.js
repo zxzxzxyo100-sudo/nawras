@@ -131,7 +131,7 @@ export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
 // ─── سير عمل المتاجر النشطة (طابور 50، عدم الرد) ───────────────────────────
-/** queue: 'active' | 'inactive' — طابور المسؤول النشط أو موظف الاستعادة (50 متجر) */
+/** queue: 'active' | 'inactive' — طابور المسؤول النشط أو موظف الاستعادة (50 متجر). مع queue=active يمكن تمرير type=delayed لقائمة المتأخرات حسب مسار الاحتضان/التعيين (حتى 50). */
 export const getMyWorkflow = (username, extra = {}) =>
   http
     .get('/active-workflow.php', { params: { action: 'get_my_workflow', username, ...extra } })
