@@ -111,12 +111,13 @@ if ($action === 'get_my_workflow') {
             assigned_by = 'system_restore'
     ")->execute([$username, $username]);
 
+    require_once __DIR__ . '/incubation-delay-lib.php';
+    wf_sync_no_ship_inactive_after_48h($pdo);
+
     fill_slots_for_user($pdo, $username, $username, null);
 
     /** تبويب «تأخيرات المكالمات»: ?type=delayed — نوافذ احتضان متجاوزة أو تعيين متأخر، حتى 50، مرتبة بالأشد تأخيراً */
-    $listType = trim((string) ($_GET['type'] ?? ''));
     if ($listType === 'delayed') {
-        require_once __DIR__ . '/incubation-delay-lib.php';
         $delayed = wf_build_active_manager_delayed_task_list($pdo, $username);
         ensure_active_daily_stats_schema($pdo);
         $dailyActive = get_active_daily_success_count($pdo, $username);

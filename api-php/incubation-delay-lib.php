@@ -25,6 +25,10 @@ function wf_incubation_calendar_delay_meta(
 
     if (!$inc1) {
         if ($regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
+            /** بدون شحن بعد 48 ساعة لا يُعدّ تأخيراً للمتابعة — يُرحَّل لغير نشط */
+            if (!$hasShipped) {
+                return ['is_delayed' => false, 'delay_days' => 0];
+            }
             $days = max(0, (int) floor($regHrs / 24));
 
             return ['is_delayed' => true, 'delay_days' => $days];
@@ -80,6 +84,77 @@ function wf_assignment_operational_delayed(PDO $pdo, string $username, string $s
 }
 
 /**
+ * استبعاد من قائمة التأخير: مرّت نافذة المكالمة الأولى (48 ساعة) بلا شحن وبلا تسجيل م1.
+ */
+function wf_exclude_from_delayed_queue_no_ship_after_48h(?int $regTs, int $now, bool $hasShipped, $inc1): bool {
+    if ($inc1) {
+        return false;
+    }
+    if (!$regTs || $regTs <= 0) {
+        return false;
+    }
+    $regHrs = ($now - $regTs) / 3600;
+
+    return $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS && !$hasShipped;
+}
+
+/**
+ * ترحيل متاجر احتضان: 48 ساعة + لا شحن + لا مكالمة أولى → cold_inactive، وحذف تعيينات الطابور النشط.
+ *
+ * @return list<int|string>
+ */
+function wf_sync_no_ship_inactive_after_48h(PDO $pdo): array {
+    $hrs = max(1, (int) NAWRAS_ONBOARD_FIRST_CALL_HOURS);
+    try {
+        $pdo->exec('ALTER TABLE store_states ADD COLUMN state_reason VARCHAR(100) NULL DEFAULT NULL');
+    } catch (Throwable $e) {
+    }
+    $st = $pdo->prepare('
+        SELECT store_id FROM store_states
+        WHERE registration_date IS NOT NULL
+        AND registration_date <= DATE_SUB(NOW(), INTERVAL ' . (int) $hrs . ' HOUR)
+        AND first_shipped_date IS NULL
+        AND inc_call1_at IS NULL
+        AND category = ?
+    ');
+    $st->execute(['incubating']);
+    $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($ids)) {
+        return [];
+    }
+    $upd = $pdo->prepare('
+        UPDATE store_states
+        SET category = \'cold_inactive\',
+            state_reason = \'no_ship_after_48h\',
+            updated_by = \'system_no_ship_48h\'
+        WHERE store_id = ?
+        AND category = \'incubating\'
+    ');
+    foreach ($ids as $sid) {
+        $sidInt = (int) $sid;
+        if ($sidInt <= 0) {
+            continue;
+        }
+        $upd->execute([$sidInt]);
+    }
+    $strIds = array_map(static function ($x) {
+        return (string) $x;
+    }, $ids);
+    $strIds = array_values(array_unique(array_filter($strIds)));
+    if ($strIds === []) {
+        return [];
+    }
+    $ph = implode(',', array_fill(0, count($strIds), '?'));
+    $pdo->prepare("
+        DELETE FROM store_assignments
+        WHERE assignment_queue = 'active'
+        AND CAST(store_id AS CHAR) IN ($ph)
+    ")->execute($strIds);
+
+    return $strIds;
+}
+
+/**
  * قائمة متأخرات مسؤول المتاجر النشطة: تأخير تقويمي للاحتضان أو تأخير تعيين، مرتبة بالأشد تأخيراً ثم الأقدم تسجيلاً.
  *
  * @return list<array<string,mixed>>
@@ -124,6 +199,9 @@ function wf_build_active_manager_delayed_task_list(PDO $pdo, string $username): 
             $regTs = (int) $regTs;
         }
         $hasShipped = !empty($row['first_shipped_date']);
+        if (wf_exclude_from_delayed_queue_no_ship_after_48h($regTs, $now, $hasShipped, $row['inc_call1_at'] ?? null)) {
+            continue;
+        }
         $incMeta = wf_incubation_calendar_delay_meta(
             $regTs,
             $now,

@@ -161,6 +161,8 @@ $incubation_counts = [
 
 /** متاجر تُحدَّث فوراً: م1 مسجّلة ويوم 3+ بدون شحنة → غير نشط ساخن */
 $syncMoNoShipBeforeC2Ids = [];
+/** مزامنة DB: 48 ساعة بدون شحن وبدون م1 → بارد */
+$syncMoNoShip48hIds = [];
 
 $newIds = array_fill_keys(array_keys($new), true);
 
@@ -297,6 +299,21 @@ foreach ($new as $id => $s) {
         $s['_mo_auto_hot'] = true;
         $result['hot_inactive'][] = $s;
         $counts['hot_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // بارد من قاعدة البيانات (مثلاً no_ship_after_48h)
+    if ($db && $dbCat === 'cold_inactive') {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'cold_inactive';
+        $s['_inc'] = 'never_started';
+        $s['_never_started'] = true;
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
         $counts['total_active']++;
         $counts['total']++;
         continue;
@@ -501,7 +518,26 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // تأخّر المكالمة الأولى — مرّت 48 ساعة دون تسجيل المكالمة الأولى (ولا زال ضمن المسار قبل الترحيل/البارد)
+    // بعد 48 ساعة بدون شحن وبدون مكالمة أولى → غير نشط بارد (لا يُعرَض في «تأخير المكالمة»)
+    if (!$inc1 && !$hasShipped && $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'cold_inactive';
+        $s['_inc'] = 'never_started';
+        $s['_never_started'] = true;
+        $result['cold_inactive'][] = $s;
+        $counts['cold_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        $sidSync48 = (int) $id;
+        if ($sidSync48 > 0) {
+            $syncMoNoShip48hIds[$sidSync48] = true;
+        }
+        continue;
+    }
+
+    // تأخّر المكالمة الأولى — مرّت 48 ساعة، يوجد شحن، دون تسجيل المكالمة الأولى
     if (!$inc1 && $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_1_delayed';
@@ -562,6 +598,29 @@ if (!empty($syncMoNoShipBeforeC2Ids)) {
         }
     } catch (Throwable $e) {
         // تجاهل — العرض يبقى صحيحاً من التصنيف أعلاه
+    }
+}
+
+if (!empty($syncMoNoShip48hIds)) {
+    try {
+        if (!isset($pdoDb)) {
+            require_once __DIR__ . '/db.php';
+            $pdoDb = getDB();
+        }
+        try {
+            $pdoDb->exec('ALTER TABLE store_states ADD COLUMN state_reason VARCHAR(100) NULL DEFAULT NULL');
+        } catch (Throwable $e) {
+        }
+        $st48 = $pdoDb->prepare(
+            'INSERT INTO store_states (store_id, store_name, category, state_reason, updated_by)
+             VALUES (?, ?, \'cold_inactive\', \'no_ship_after_48h\', \'system\')
+             ON DUPLICATE KEY UPDATE category = \'cold_inactive\', state_reason = VALUES(state_reason), store_name = COALESCE(VALUES(store_name), store_name)'
+        );
+        foreach (array_keys($syncMoNoShip48hIds) as $sid48) {
+            $nm = isset($new[$sid48]['name']) ? (string) $new[$sid48]['name'] : '';
+            $st48->execute([$sid48, $nm !== '' ? $nm : (string) $sid48]);
+        }
+    } catch (Throwable $e) {
     }
 }
 
