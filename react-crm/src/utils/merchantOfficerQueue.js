@@ -55,37 +55,88 @@ export function isMoPeriodicTouchCycleDay(cycleDay, incBucket = '') {
   )
 }
 
-export function retroStageMeta(days) {
-  if (days <= 2) {
+/**
+ * مراحل العرض حسب يوم الدورة 1…14 (مطابق لـ _cycle_day / getIncubationCycleDay).
+ * لا تستخدم أيام التقويم منذ التسجيل وحدها — كانت تسبب يوم دورة 3 بوسم «مكالمة 1».
+ */
+export function retroStageMetaFromCycleDay(cycleDay) {
+  const cd = Math.min(14, Math.max(1, Math.floor(Number(cycleDay) || 1)))
+  if (cd <= 2) {
     return {
       key: 'call_1',
       label: 'مكالمة 1: ترحيب',
       badge: '[مكالمة 1: ترحيب]',
-      rangeLabel: 'اليوم 0 — 2',
+      rangeLabel: 'اليوم 1 — 2 من الدورة',
     }
   }
-  if (days <= 9) {
+  if (cd <= 9) {
     return {
       key: 'call_2',
       label: 'مكالمة 2: متابعة',
       badge: '[مكالمة 2: متابعة]',
-      rangeLabel: 'اليوم 3 — 9',
+      rangeLabel: 'اليوم 3 — 9 من الدورة',
     }
   }
-  if (days <= 13) {
+  if (cd <= 14) {
     return {
       key: 'call_3',
       label: 'مكالمة 3: تقييم',
       badge: '[مكالمة 3: تقييم]',
-      rangeLabel: 'اليوم 10 — 13',
+      rangeLabel: 'اليوم 10 — 14 من الدورة',
     }
   }
   return {
     key: 'beyond',
-    label: 'بعد اليوم 13',
+    label: 'بعد اليوم 14',
     badge: '[خارج النافذة]',
-    rangeLabel: `يوم ${days}`,
+    rangeLabel: `يوم ${cd}`,
   }
+}
+
+/** توافق خلفي: يحوّل أياماً مكتملة منذ التسجيل إلى يوم دورة تقريبي (days+1) */
+export function retroStageMeta(days) {
+  const d = Number(days) || 0
+  return retroStageMetaFromCycleDay(Math.min(14, Math.max(1, d + 1)))
+}
+
+/**
+ * وسم الصف في «متابعة دورية» يطابق المكالمة المطلوب تنفيذها (وليس نطاق يوم الدورة فقط).
+ */
+export function moRetroForPeriodicTouchpoint(periodicInc, cycleDay) {
+  const cd = Math.min(14, Math.max(1, Math.floor(Number(cycleDay) || 1)))
+  if (periodicInc === 'call_1_delayed') {
+    return {
+      key: 'call_1_delayed',
+      label: 'مكالمة 1 (تأخير)',
+      badge: '[مكالمة 1 — تأخير]',
+      rangeLabel: 'تأخير المكالمة الأولى',
+    }
+  }
+  if (periodicInc === 'call_1') {
+    return {
+      key: 'call_1',
+      label: 'مكالمة 1: ترحيب',
+      badge: '[مكالمة 1: ترحيب]',
+      rangeLabel: `يوم الدورة ${cd} — المكالمة الأولى`,
+    }
+  }
+  if (periodicInc === 'call_2') {
+    return {
+      key: 'call_2',
+      label: 'مكالمة 2: متابعة',
+      badge: '[مكالمة 2: متابعة]',
+      rangeLabel: `يوم الدورة ${cd} — المكالمة الثانية`,
+    }
+  }
+  if (periodicInc === 'call_3') {
+    return {
+      key: 'call_3',
+      label: 'مكالمة 3: تقييم',
+      badge: '[مكالمة 3: تقييم]',
+      rangeLabel: `يوم الدورة ${cd} — المكالمة الثالثة`,
+    }
+  }
+  return retroStageMetaFromCycleDay(cd)
 }
 
 export function countAnsweredCalls(log) {
@@ -290,12 +341,11 @@ export function generateIncubationOfficerStagingTasks(
     if (cat === 'hot_inactive' || cat === 'frozen') return
 
     const days = daysInSystem(store)
-    const retro = retroStageMeta(days)
+    const cycleDay = getIncubationCycleDay(store)
+    const retro = retroStageMetaFromCycleDay(cycleDay)
 
     if (days >= 14 && !storeHasShipped(store)) return
     if (days >= 11 && storeHasShipped(store) && countAnsweredCalls(log) === 0) return
-
-    const cycleDay = getIncubationCycleDay(store)
     /** أي مهمة في هذه الصفحة فقط في أيام الموعد 1 و 3 و 10 — ما عدا «تأخير المكالمة الأولى» (يظهر يومياً) */
     if (incBucket !== 'call_1_delayed' && !isMoPeriodicTouchCycleDay(cycleDay, incBucket)) return
 
@@ -330,14 +380,15 @@ export function generateIncubationOfficerStagingTasks(
       const periodicInc = resolvePeriodicIncTouchpoint(incBucket, store, storeStates)
       if (!periodicInc) return
 
+      const retroRow = moRetroForPeriodicTouchpoint(periodicInc, cycleDay)
       const incubationBadge =
-        periodicInc === 'call_1_delayed'
+        isStagingOrDev && periodicInc === 'call_1_delayed'
           ? '⏰ تأخير المكالمة الأولى'
           : isStagingOrDev && periodicInc === 'call_2'
             ? '⚠️ المكالمة الثانية للمتجر'
             : isStagingOrDev && periodicInc === 'call_3'
               ? '🚨 المكالمة الثالثة والأخيرة'
-              : retro.badge
+              : retroRow.badge
 
       const answeredToday = isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
       const overdueInfo = isOverdueForStage(store, storeStates, days)
@@ -355,7 +406,7 @@ export function generateIncubationOfficerStagingTasks(
               ? 'مسار الاحتضان — المكالمة الثانية'
               : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
 
-      const descBase = `سجّل المكالمة — يوم الدورة ${cycleDay} من 14 — كود ${store.id} — ${retro.label}`
+      const descBase = `سجّل المكالمة — يوم الدورة ${cycleDay} من 14 — كود ${store.id} — ${retroRow.label}`
 
       if (answeredToday) {
         tasks.push({
@@ -366,14 +417,14 @@ export function generateIncubationOfficerStagingTasks(
           label: 'تم التواصل اليوم',
           desc: `${descBase}`,
           incubationBadge,
-        moDays: days,
-        moCycleDay: cycleDay,
-        moRetro: retro,
-        moStoreCode: store.id,
-        moContactedToday: true,
-        moOverdue: false,
-        moOverdueHint: '',
-        _incBucket: periodicInc,
+          moDays: days,
+          moCycleDay: cycleDay,
+          moRetro: retroRow,
+          moStoreCode: store.id,
+          moContactedToday: true,
+          moOverdue: false,
+          moOverdueHint: '',
+          _incBucket: periodicInc,
         })
         return
       }
@@ -393,7 +444,7 @@ export function generateIncubationOfficerStagingTasks(
         incubationBadge,
         moDays: days,
         moCycleDay: cycleDay,
-        moRetro: retro,
+        moRetro: retroRow,
         moStoreCode: store.id,
         moContactedToday: false,
         moOverdue: overdueInfo.overdue,
