@@ -58,7 +58,7 @@ const TABS = [
     label: 'المكالمة الثالثة',
     icon:  PhoneCall,
     color: 'amber',
-    desc:  `تظهر من يوم ${ONBOARD_CYCLE_CALL3_DAY} من التسجيل بعد تسجيل المكالمة الثانية — حتى التخريج.`,
+    desc:  `تظهر من يوم ${ONBOARD_CYCLE_CALL3_DAY} إلى يوم 14 من التسجيل — حتى التخريج. إن وُجد شحن ومكالمة أولى مسجّلة ولم تُسجَّل المكالمة الثانية، يظهر المتجر هنا مع تنبيه.`,
     badge: () => (
       <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">يوم {ONBOARD_CYCLE_CALL3_DAY}</span>
     ),
@@ -276,6 +276,11 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false
                         {tab.key === 'call_2' && s._missed_c1_window ? (
                           <span className="mt-1.5 block text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 leading-snug">
                             تنبيه: لم يُسجَّل التواصل في نافذة المكالمة الأولى (48 ساعة)
+                          </span>
+                        ) : null}
+                        {tab.key === 'call_3' && s._missed_c2_window ? (
+                          <span className="mt-1.5 block text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1 leading-snug">
+                            تنبيه: لم يُسجَّل التواصل للمكالمة الثانية
                           </span>
                         ) : null}
                       </td>

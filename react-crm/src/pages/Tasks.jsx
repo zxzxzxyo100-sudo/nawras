@@ -435,6 +435,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           amTaskInDelays: false,
           assignedAtTs,
           moMissedC1Window: incBucket === 'call_2' && Boolean(store._missed_c1_window),
+          moMissedC2Window: incBucket === 'call_3' && Boolean(store._missed_c2_window),
         }
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
@@ -655,6 +656,11 @@ function MerchantOfficerTaskRow({
           {task.moMissedC1Window ? (
             <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
               تنبيه: لم يُسجَّل التواصل في المكالمة الأولى خلال 48 ساعة
+            </span>
+          ) : null}
+          {task.moMissedC2Window ? (
+            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-900 border border-rose-200">
+              تنبيه: لم يُسجَّل التواصل للمكالمة الثانية
             </span>
           ) : null}
           {task.moContactedToday ? (

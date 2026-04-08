@@ -44,7 +44,10 @@ export function getIncubationCycleDay(store) {
   return Math.min(14, Math.max(1, days + 1))
 }
 
-export function isMoPeriodicTouchCycleDay(cycleDay) {
+export function isMoPeriodicTouchCycleDay(cycleDay, incBucket = '') {
+  if (incBucket === 'call_3') {
+    return cycleDay >= INCUBATION_PERIODIC_CALL3_CYCLE_DAY && cycleDay <= 14
+  }
   return (
     cycleDay === INCUBATION_PERIODIC_CALL1_CYCLE_DAY
     || cycleDay === INCUBATION_PERIODIC_CALL2_CYCLE_DAY
@@ -215,15 +218,22 @@ export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates) {
 
   const betweenC1C2 = incBucket === 'between_calls' && st.inc_call1_at && !st.inc_call2_at
   if (!st.inc_call2_at && st.inc_call1_at && (incBucket === 'call_2' || betweenC1C2)) {
+    if (cd >= INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return null
     if (cd > INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return null
     if (cd === INCUBATION_PERIODIC_CALL2_CYCLE_DAY) return 'call_2'
     return null
   }
 
   const betweenC2C3 = incBucket === 'between_calls' && st.inc_call2_at && !st.inc_call3_at
-  if (!st.inc_call3_at && st.inc_call2_at && (incBucket === 'call_3' || betweenC2C3)) {
-    if (cd > INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return null
-    if (cd === INCUBATION_PERIODIC_CALL3_CYCLE_DAY) return 'call_3'
+  if (!st.inc_call3_at && st.inc_call2_at && betweenC2C3) {
+    if (cd < INCUBATION_PERIODIC_CALL3_CYCLE_DAY || cd > 14) return null
+    return 'call_3'
+  }
+
+  if (!st.inc_call3_at && incBucket === 'call_3') {
+    if (cd < INCUBATION_PERIODIC_CALL3_CYCLE_DAY || cd > 14) return null
+    if (st.inc_call2_at) return 'call_3'
+    if (st.inc_call1_at && storeHasShipped(store)) return 'call_3'
     return null
   }
 
@@ -287,7 +297,7 @@ export function generateIncubationOfficerStagingTasks(
 
     const cycleDay = getIncubationCycleDay(store)
     /** أي مهمة في هذه الصفحة فقط في أيام الموعد 1 و 3 و 10 — ما عدا «تأخير المكالمة الأولى» (يظهر يومياً) */
-    if (incBucket !== 'call_1_delayed' && !isMoPeriodicTouchCycleDay(cycleDay)) return
+    if (incBucket !== 'call_1_delayed' && !isMoPeriodicTouchCycleDay(cycleDay, incBucket)) return
 
     if (
       store.bucket === 'incubating'
