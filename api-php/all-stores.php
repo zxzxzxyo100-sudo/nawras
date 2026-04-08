@@ -142,20 +142,25 @@ $counts = [
     'total'                => 0,
 ];
 
-// ── مسار الاحتضان: م1 من اليوم 1؛ م2 بعد X يوماً من تسجيل م1؛ م3 بعد Y يوماً من تسجيل م2 (انظر onboarding-config.php) ──
+// ── مسار الاحتضان: م1 خلال 48 ساعة؛ متأخّرو الم1 → call_delay؛ م2 من يوم 3 التقويمي مع شحن؛ م3 من يوم 10 ──
 $incubation_path = [
     'call_1' => [],
+    'call_delay' => [],
     'call_2' => [],
     'call_3' => [],
     'between' => [],
 ];
 $incubation_counts = [
     'call_1' => 0,
+    'call_delay' => 0,
     'call_2' => 0,
     'call_3' => 0,
     'between' => 0,
     'total'  => 0,
 ];
+
+/** متاجر تُحدَّث فوراً: م1 مسجّلة ويوم 3+ بدون شحنة → غير نشط ساخن */
+$syncMoNoShipBeforeC2Ids = [];
 
 $newIds = array_fill_keys(array_keys($new), true);
 
@@ -170,49 +175,60 @@ function incubation_cycle_day($regTs, $now) {
 }
 
 /** مرحلة المسار + أيام التأخير (عرض وبين المكالمات وتأخير المكالمة وجميع خانات المكالمات) */
-function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped) {
+function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs = null) {
     $cd = min(14, max(1, (int) $cycleDay));
     $s['_cycle_day'] = $cd;
     $s['_inc_stage_key'] = '';
     $s['_delay_days'] = 0;
+    $c2d = NAWRAS_ONBOARD_CYCLE_CALL2_DAY;
+    $c3d = NAWRAS_ONBOARD_CYCLE_CALL3_DAY;
     if (!$inc1) {
-        $s['_inc_phase'] = $hasShipped
-            ? 'شحن مسجّل — لم تُسجَّل المكالمة الأولى بعد'
-            : ($cd > 1 ? 'تأخّر عن نافذة المكالمة الأولى (يوم 1 من 14)' : '');
-        $s['_days_until_window'] = max(0, 3 - $cd);
-        $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
-        $s['_inc_stage_key'] = $hasShipped ? 'shipped_no_c1' : 'late_c1';
-        $s['_delay_days'] = max(0, $cd - 1);
+        $hrs = $regHrs !== null ? (float) $regHrs : PHP_INT_MAX;
+        if ($hrs < NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
+            $s['_inc_phase'] = 'المكالمة الأولى — ضمن 48 ساعة من التسجيل';
+            $s['_days_until_window'] = max(0, (int) ceil(NAWRAS_ONBOARD_FIRST_CALL_HOURS - $hrs));
+            $s['_next_window_hint'] = 'بعد 48 ساعة دون تسجيل تُعرَض في «تأخير المكالمة»';
+            $s['_inc_stage_key'] = '';
+            $s['_delay_days'] = 0;
+        } else {
+            $s['_inc_phase'] = $hasShipped
+                ? 'شحن مسجّل — لم تُسجَّل المكالمة الأولى بعد'
+                : 'تجاوز 48 ساعة دون مكالمة أولى';
+            $s['_days_until_window'] = max(0, $c2d - $cd);
+            $s['_next_window_hint'] = 'المكالمة الثانية (يوم ' . $c2d . ' من 14) بعد تسجيل الأولى';
+            $s['_inc_stage_key'] = $hasShipped ? 'shipped_no_c1' : 'late_c1';
+            $s['_delay_days'] = max(0, (int) floor($hrs / 24));
+        }
 
         return;
     }
     if (!$inc2) {
-        if ($cd < 3) {
-            $s['_inc_phase'] = 'بين المكالمة الأولى والثانية — انتظار يوم 3 من 14';
-            $s['_days_until_window'] = max(0, 3 - $cd);
-            $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم 3 من 14)';
+        if ($cd < $c2d) {
+            $s['_inc_phase'] = 'بين المكالمة الأولى والثانية — حتى يوم ' . $c2d . ' من التسجيل';
+            $s['_days_until_window'] = max(0, $c2d - $cd);
+            $s['_next_window_hint'] = 'خانة المكالمة الثانية (يوم ' . $c2d . ' من 14، يشترط شحن)';
             $s['_inc_stage_key'] = 'wait_c2';
             $s['_delay_days'] = 0;
         } else {
-            $s['_inc_phase'] = $cd > 3
-                ? 'تأخّر عن نافذة المكالمة الثانية (يوم 3 من 14)'
+            $s['_inc_phase'] = $cd > $c2d
+                ? 'تأخّر عن نافذة المكالمة الثانية (يوم ' . $c2d . ' من 14)'
                 : '';
-            $s['_days_until_window'] = max(0, 10 - $cd);
-            $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
-            $s['_inc_stage_key'] = $cd > 3 ? 'late_c2' : 'wait_c2';
-            $s['_delay_days'] = $cd > 3 ? max(0, $cd - 3) : 0;
+            $s['_days_until_window'] = max(0, $c3d - $cd);
+            $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم ' . $c3d . ' من 14)';
+            $s['_inc_stage_key'] = $cd > $c2d ? 'late_c2' : 'wait_c2';
+            $s['_delay_days'] = $cd > $c2d ? max(0, $cd - $c2d) : 0;
         }
 
         return;
     }
     if (!$inc3) {
-        $s['_inc_phase'] = $cd < 10
-            ? 'بين المكالمة الثانية والثالثة — انتظار يوم 10 من 14'
-            : 'تأخّر عن نافذة المكالمة الثالثة (يوم 10 من 14)';
-        $s['_days_until_window'] = max(0, 10 - $cd);
-        $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم 10 من 14)';
-        $s['_inc_stage_key'] = $cd < 10 ? 'wait_c3' : 'late_c3';
-        $s['_delay_days'] = $cd > 10 ? max(0, $cd - 10) : 0;
+        $s['_inc_phase'] = $cd < $c3d
+            ? 'بين المكالمة الثانية والثالثة — حتى يوم ' . $c3d . ' من التسجيل'
+            : 'تأخّر عن نافذة المكالمة الثالثة (يوم ' . $c3d . ' من 14)';
+        $s['_days_until_window'] = max(0, $c3d - $cd);
+        $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم ' . $c3d . ' من 14)';
+        $s['_inc_stage_key'] = $cd < $c3d ? 'wait_c3' : 'late_c3';
+        $s['_delay_days'] = $cd > $c3d ? max(0, $cd - $c3d) : 0;
     }
 }
 
@@ -244,7 +260,8 @@ if (!empty($new)) {
 foreach ($new as $id => $s) {
     $db = $dbMap[$id] ?? null;
     $regTs   = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
-    $regHrs  = $regTs ? ($now - $regTs) / 3600 : PHP_INT_MAX;
+    /** بدون تاريخ تسجيل: نعتبره حديثاً ضمن نافذة المكالمة الأولى */
+    $regHrs  = $regTs ? ($now - $regTs) / 3600 : 0;
     $regDays = $regHrs / 24;
 
     $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
@@ -259,7 +276,20 @@ foreach ($new as $id => $s) {
     $dbCat = $db['category'] ?? '';
 
     // مسار مسؤول المتاجر: تصنيف صريح غير نشط ساخن من قاعدة البيانات
-    if ($db && $dbCat === 'hot_inactive' && (isset($db['state_reason']) ? (string) $db['state_reason'] : '') === 'mo_d14_no_ship') {
+    $dbReason = isset($db['state_reason']) ? (string) $db['state_reason'] : '';
+    if ($db && $dbCat === 'hot_inactive' && $dbReason === 'mo_d14_no_ship') {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'hot_inactive';
+        $s['_mo_auto_hot'] = true;
+        $result['hot_inactive'][] = $s;
+        $counts['hot_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+    if ($db && $dbCat === 'hot_inactive' && $dbReason === 'mo_no_ship_before_c2') {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
@@ -341,15 +371,23 @@ foreach ($new as $id => $s) {
     $cycleDay = incubation_cycle_day($regTs, $now);
     $s['_cycle_day'] = $cycleDay;
 
-    $todayStr = date('Y-m-d', $now);
-    $dueCall2 = $inc1 ? nawras_date_plus_days($inc1, NAWRAS_ONBOARD_DAYS_AFTER_CALL1) : null;
-    $dueCall3 = $inc2 ? nawras_date_plus_days($inc2, NAWRAS_ONBOARD_DAYS_AFTER_CALL2) : null;
+    $c2d = NAWRAS_ONBOARD_CYCLE_CALL2_DAY;
+    $c3d = NAWRAS_ONBOARD_CYCLE_CALL3_DAY;
 
-    // المكالمة الثالثة — بعد Y يوماً من تسجيل المكالمة الثانية (تم)
-    if ($inc2 && !$inc3 && $dueCall3 && $todayStr >= $dueCall3) {
+    $missedC1Window = false;
+    if ($inc1 && $regTs) {
+        $c1ts = strtotime((string) $inc1);
+        if ($c1ts !== false && $c1ts > $regTs + NAWRAS_ONBOARD_FIRST_CALL_HOURS * 3600) {
+            $missedC1Window = true;
+        }
+    }
+    $s['_missed_c1_window'] = $missedC1Window;
+
+    // المكالمة الثالثة — من يوم 10 من التسجيل (بعد تسجيل المكالمة الثانية)
+    if ($inc2 && !$inc3 && $cycleDay >= $c3d) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_3';
-        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -359,11 +397,30 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // المكالمة الثانية — بعد X يوماً من تسجيل المكالمة الأولى (تم)
-    if ($inc1 && !$inc2 && $dueCall2 && $todayStr >= $dueCall2) {
+    // م1 مسجّلة ويوم 3+ من التسجيل بدون أي شحنة → لا انتقال للمكالمة الثانية (غير نشط ساخن)
+    if ($inc1 && !$inc2 && $cycleDay >= $c2d && !$hasShipped) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = 'hot_inactive';
+        $s['_mo_auto_hot'] = true;
+        $s['_inc'] = 'no_ship_before_stage2';
+        $result['hot_inactive'][] = $s;
+        $counts['hot_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        $sidSync = (int) $id;
+        if ($sidSync > 0) {
+            $syncMoNoShipBeforeC2Ids[$sidSync] = true;
+        }
+        continue;
+    }
+
+    // المكالمة الثانية — من يوم 3 التقويمي مع شحن مسجّل
+    if ($inc1 && !$inc2 && $cycleDay >= $c2d && $hasShipped) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_2';
-        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -414,11 +471,11 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // المكالمة الأولى — أي متجر لم تُسجَّل مكالمته الأولى بعد (ضمن المسار قبل الترحيل)
-    if (!$inc1) {
+    // المكالمة الأولى — خلال 48 ساعة من التسجيل فقط
+    if (!$inc1 && $regHrs < NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_1';
-        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -428,14 +485,25 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // بين المكالمات — قبل موعد المكالمة التالية (لم يحن بعد تاريخ الاستحقاق)
-    if (
-        ($inc1 && !$inc2 && $dueCall2 && $todayStr < $dueCall2)
-        || ($inc2 && !$inc3 && $dueCall3 && $todayStr < $dueCall3)
-    ) {
+    // تأخّر المكالمة الأولى — مرّت 48 ساعة دون تسجيل المكالمة الأولى (ولا زال ضمن المسار قبل الترحيل/البارد)
+    if (!$inc1 && $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'call_1_delayed';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['call_delay'][] = $s;
+        $incubation_counts['call_delay']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+
+    // بين المكالمة 1 و 2 — قبل يوم 3 (م1 مسجّلة)
+    if ($inc1 && !$inc2 && $cycleDay < $c2d) {
         $s['_cat'] = 'incubating';
         $s['_inc'] = 'between_calls';
-        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped);
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
         $result['incubating'][] = $s;
         $counts['incubating']++;
         $counts['total']++;
@@ -443,6 +511,41 @@ foreach ($new as $id => $s) {
         $incubation_counts['between']++;
         $incubation_counts['total']++;
         continue;
+    }
+
+    // بين المكالمة 2 و 3 — قبل يوم 10
+    if ($inc2 && !$inc3 && $cycleDay < $c3d) {
+        $s['_cat'] = 'incubating';
+        $s['_inc'] = 'between_calls';
+        incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+        $counts['total']++;
+        $incubation_path['between'][] = $s;
+        $incubation_counts['between']++;
+        $incubation_counts['total']++;
+        continue;
+    }
+}
+
+// مزامنة: يوم 3+ بعد المكالمة الأولى بدون شحن → hot_inactive + سبب ثابت (للتقارير ولوحة المسؤول)
+if (!empty($syncMoNoShipBeforeC2Ids)) {
+    try {
+        if (!isset($pdoDb)) {
+            require_once __DIR__ . '/db.php';
+            $pdoDb = getDB();
+        }
+        $stMo = $pdoDb->prepare(
+            'INSERT INTO store_states (store_id, store_name, category, state_reason, updated_by)
+             VALUES (?, ?, \'hot_inactive\', \'mo_no_ship_before_c2\', \'system\')
+             ON DUPLICATE KEY UPDATE category = \'hot_inactive\', state_reason = VALUES(state_reason), store_name = VALUES(store_name)'
+        );
+        foreach (array_keys($syncMoNoShipBeforeC2Ids) as $sidMo) {
+            $nm = isset($new[$sidMo]['name']) ? (string) $new[$sidMo]['name'] : '';
+            $stMo->execute([$sidMo, $nm !== '' ? $nm : (string) $sidMo]);
+        }
+    } catch (Throwable $e) {
+        // تجاهل — العرض يبقى صحيحاً من التصنيف أعلاه
     }
 }
 
@@ -565,6 +668,7 @@ try {
         nawras_filter_out_store_id($result['cold_inactive'], $fid);
         nawras_filter_out_store_id($result['incubating'], $fid);
         nawras_filter_out_store_id($incubation_path['call_1'], $fid);
+        nawras_filter_out_store_id($incubation_path['call_delay'], $fid);
         nawras_filter_out_store_id($incubation_path['call_2'], $fid);
         nawras_filter_out_store_id($incubation_path['call_3'], $fid);
         nawras_filter_out_store_id($incubation_path['between'], $fid);
@@ -595,10 +699,11 @@ try {
     $counts['cold_inactive'] = count($result['cold_inactive']);
     $counts['incubating'] = count($result['incubating']);
     $incubation_counts['call_1'] = count($incubation_path['call_1']);
+    $incubation_counts['call_delay'] = count($incubation_path['call_delay']);
     $incubation_counts['call_2'] = count($incubation_path['call_2']);
     $incubation_counts['call_3'] = count($incubation_path['call_3']);
     $incubation_counts['between'] = count($incubation_path['between']);
-    $incubation_counts['total'] = $incubation_counts['call_1'] + $incubation_counts['call_2'] + $incubation_counts['call_3'] + $incubation_counts['between'];
+    $incubation_counts['total'] = $incubation_counts['call_1'] + $incubation_counts['call_delay'] + $incubation_counts['call_2'] + $incubation_counts['call_3'] + $incubation_counts['between'];
     $counts['total_active'] = $counts['active_shipping'] + $counts['completed_merchants'] + $counts['unreachable_merchants']
         + $counts['hot_inactive'] + $counts['cold_inactive'];
 } catch (Throwable $e) {

@@ -29,6 +29,7 @@ export default function IncubationCallDelay() {
     const out = []
     for (const s of [
       ...(incubationPath.call_1 || []),
+      ...(incubationPath.call_delay || []),
       ...(incubationPath.call_2 || []),
       ...(incubationPath.call_3 || []),
       ...(incubationPath.between_calls || []),
@@ -41,6 +42,7 @@ export default function IncubationCallDelay() {
     return out
   }, [
     incubationPath.call_1,
+    incubationPath.call_delay,
     incubationPath.call_2,
     incubationPath.call_3,
     incubationPath.between_calls,

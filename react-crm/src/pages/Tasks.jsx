@@ -54,7 +54,9 @@ function storeHasShipped(store) {
 
 /** نوع المكالمة لـ log_call حسب مفتاح المهمة */
 function taskIdToCallType(taskId) {
-  const m = String(taskId).match(/-inc-(call_[123])(?:-done)?$/)
+  const sid = String(taskId)
+  if (/-inc-call_1_delayed(?:-done)?$/.test(sid)) return 'inc_call1'
+  const m = sid.match(/-inc-(call_[123])(?:-done)?$/)
   if (m) {
     const n = m[1].replace('call_', '')
     return `inc_call${n}`
@@ -161,19 +163,25 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
       return {
         label: 'متجر مُسنَد إليك',
         incubationBadge: '[مكالمة أولى]',
-        descHint: 'جديد — المكالمة الأولى',
+        descHint: 'ضمن 48 ساعة من التسجيل — المكالمة الأولى',
+      }
+    case 'call_1_delayed':
+      return {
+        label: 'متجر مُسنَد إليك',
+        incubationBadge: '[تأخير — المكالمة الأولى]',
+        descHint: 'تجاوز 48 ساعة دون تسجيل المكالمة الأولى — راجع «تأخير المكالمة»',
       }
     case 'call_2':
       return {
         label: 'متجر مُسنَد إليك',
         incubationBadge: '[مكالمة ثانية]',
-        descHint: 'بعد 3 أيام من إتمام المكالمة الأولى',
+        descHint: 'يوم 3 من التسجيل (يشترط شحن) — المكالمة الثانية',
       }
     case 'call_3':
       return {
         label: 'متجر مُسنَد إليك',
         incubationBadge: '[مكالمة ثالثة]',
-        descHint: 'بعد 10 أيام من إتمام المكالمة الثانية',
+        descHint: 'يوم 10 من التسجيل — المكالمة الثالثة والتخريج',
       }
     case 'between_calls':
       return {
@@ -187,6 +195,18 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
         incubationBadge: null,
         descHint: '',
       }
+  }
+}
+
+/** أولوية مراحل الاحتضان في «متابعة دورية» لمسؤول المتاجر (الأصغر = أعلى أولوية) */
+function amIncStageRank(inc) {
+  switch (inc) {
+    case 'call_1_delayed': return 0
+    case 'call_1': return 1
+    case 'call_2': return 2
+    case 'call_3': return 3
+    case 'between_calls': return 4
+    default: return 5
   }
 }
 
@@ -297,23 +317,26 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       ? 'اضغط «اتصل» ليظهر استبيان التهيئة (ثلاثة أسئلة) فوراً، ثم سجّل المكالمة من البطاقة — أو من لوحة المتاجر الجديدة'
       : 'قيّم تجربة التاجر ثم اضغط «تم» في الاستبيان — أو من لوحة المتاجر الجديدة'
 
-    if (!skipExecMoDuplicates && ['call_1', 'call_2', 'call_3'].includes(incBucket) && execOrIncOfficer) {
+    if (!skipExecMoDuplicates && ['call_1', 'call_1_delayed', 'call_2', 'call_3'].includes(incBucket) && execOrIncOfficer) {
       const incubationBadge =
-        IS_STAGING_OR_DEV && incBucket === 'call_2'
-          ? '⚠️ المكالمة الثانية للمتجر'
-          : IS_STAGING_OR_DEV && incBucket === 'call_3'
-            ? '🚨 المكالمة الثالثة والأخيرة'
-            : null
+        incBucket === 'call_1_delayed'
+          ? '⏰ تأخير المكالمة الأولى'
+          : IS_STAGING_OR_DEV && incBucket === 'call_2'
+            ? '⚠️ المكالمة الثانية للمتجر'
+            : IS_STAGING_OR_DEV && incBucket === 'call_3'
+              ? '🚨 المكالمة الثالثة والأخيرة'
+              : null
       const incLabel =
-        incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
-          : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
-            : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
+        incBucket === 'call_1_delayed' ? 'مسار الاحتضان — تأخير المكالمة الأولى'
+          : incBucket === 'call_1' ? 'مسار الاحتضان — المكالمة الأولى'
+            : incBucket === 'call_2' ? 'مسار الاحتضان — المكالمة الثانية'
+              : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
       const incDesc =
         'سجّل المكالمة من صفحة المتاجر أو الاتصال السريع — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة'
       const incTask = {
         id: `${store.id}-inc-${incBucket}`,
         store,
-        priority: incBucket === 'call_1' || incBucket === 'call_3' ? 'high' : 'normal',
+        priority: incBucket === 'call_1' || incBucket === 'call_1_delayed' || incBucket === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
         label: incLabel,
         desc: incDesc,
@@ -334,7 +357,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
 
     if (!skipExecMoDuplicates && needsNewOnboarding) {
       const mergedIntoIncCall =
-        userRole === 'executive' && ['call_1', 'call_2', 'call_3'].includes(incBucket)
+        userRole === 'executive' && ['call_1', 'call_1_delayed', 'call_2', 'call_3'].includes(incBucket)
       if (!mergedIntoIncCall) {
         tasks.push({
           id: `${store.id}-new-onboarding`,
@@ -411,6 +434,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
           moContactedToday,
           amTaskInDelays: false,
           assignedAtTs,
+          moMissedC1Window: incBucket === 'call_2' && Boolean(store._missed_c1_window),
         }
         const daysSinceShip = store.last_shipment_date && store.last_shipment_date !== 'لا يوجد'
           ? Math.floor((new Date() - new Date(store.last_shipment_date)) / 86400000)
@@ -626,6 +650,11 @@ function MerchantOfficerTaskRow({
           {task.moOverdue ? (
             <span className="rounded-md bg-amber-200/90 px-2 py-0.5 text-[10px] font-black text-amber-950">
               تنبيه: {task.moOverdueHint}
+            </span>
+          ) : null}
+          {task.moMissedC1Window ? (
+            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
+              تنبيه: لم يُسجَّل التواصل في المكالمة الأولى خلال 48 ساعة
             </span>
           ) : null}
           {task.moContactedToday ? (
@@ -1228,6 +1257,9 @@ export default function Tasks() {
     )
     if (user?.role !== 'active_manager') return filtered
     return [...filtered].sort((a, b) => {
+      const ra = amIncStageRank(a.store?._inc)
+      const rb = amIncStageRank(b.store?._inc)
+      if (ra !== rb) return ra - rb
       const da = a.amTaskInDelays ? 1 : 0
       const db = b.amTaskInDelays ? 1 : 0
       if (da !== db) return db - da
