@@ -10,7 +10,20 @@ import {
   fillAllActiveQueues,
   listAllNoAnswerWorkflow,
   markSurveyNoAnswer,
+  markActiveWorkflowContacted,
 } from '../services/api'
+
+/** منع تكرار نفس store_id في الجدول إن عاد من الـ API */
+function dedupeWorkflowRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows
+  const seen = new Set()
+  return rows.filter((r) => {
+    const id = r?.store_id != null ? String(r.store_id) : ''
+    if (!id || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+}
 
 function findStoreInContext(stores, storeStates, id) {
   const all = [
@@ -39,6 +52,7 @@ export default function ActiveWorkflow() {
   const [filling, setFilling] = useState(false)
   const [execNoAnswer, setExecNoAnswer] = useState([])
   const [noAnswerRowLoading, setNoAnswerRowLoading] = useState(null)
+  const [contactedLoading, setContactedLoading] = useState(null)
   const [selected, setSelected] = useState(null)
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [workflowStatusForDrawer, setWorkflowStatusForDrawer] = useState(null)
@@ -111,6 +125,7 @@ export default function ActiveWorkflow() {
         store_id: row.store_id,
         store_name: row.store_name || '',
         username,
+        queue: 'active',
       })
       await reload()
       await loadWf()
@@ -121,10 +136,29 @@ export default function ActiveWorkflow() {
     }
   }
 
+  async function handleActiveContacted(row) {
+    if (!username) return
+    setContactedLoading(row.store_id)
+    setErr('')
+    try {
+      await markActiveWorkflowContacted({
+        store_id: row.store_id,
+        store_name: row.store_name || '',
+        username,
+      })
+      await reload()
+      await loadWf()
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message || 'تعذّر تسجيل تم التواصل')
+    } finally {
+      setContactedLoading(null)
+    }
+  }
+
   const target = wf?.target ?? 50
 
-  const activeRows = useMemo(() => wf?.active_tasks ?? [], [wf])
-  const noAnswerRows = useMemo(() => wf?.no_answer_tasks ?? [], [wf])
+  const activeRows = useMemo(() => dedupeWorkflowRows(wf?.active_tasks ?? []), [wf])
+  const noAnswerRows = useMemo(() => dedupeWorkflowRows(wf?.no_answer_tasks ?? []), [wf])
 
   return (
     <div className="space-y-5 max-w-6xl mx-auto" dir="rtl">
@@ -135,10 +169,10 @@ export default function ActiveWorkflow() {
               <Users size={22} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-black text-slate-900">طابور المتاجر النشطة</h1>
+              <h1 className="text-lg font-black text-slate-900">المتابعة الدورية — طابور المتاجر النشطة</h1>
               <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                هدف {target} متجراً نشطاً لكل مسؤول متاجر؛ بعد الاستبيان يُستبدل من المجمع إن وُجد متجر مؤهل (بدون استبيان خلال 30 يوماً).
-                «عدم رد» يُبقي المتجر في المتابعة ويستبدل بمتجر آخر.
+                يظهر حتى {target} متجراً في قائمة الاتصال اليوم؛ زر «تم التواصل» ينقل المتجر إلى المنجزة ويُحلّ مكانه فوراً من المجمع.
+                «لم يرد» يبقي المتابعة تحت تبويب عدم الرد (في آخر القائمة) ويُضاف متجر بديل للطابور. الاستبيان يبقى متاحاً عند الحاجة.
               </p>
             </div>
           </div>
@@ -219,10 +253,13 @@ export default function ActiveWorkflow() {
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => openDrawer(row, 'active')}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
+                              onClick={() => handleActiveContacted(row)}
+                              disabled={contactedLoading === row.store_id || noAnswerRowLoading === row.store_id}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50"
+                              title="تسجيل تم التواصل وإحلال المتجر في الطابور"
                             >
-                              تفاصيل
+                              <Phone size={14} />
+                              {contactedLoading === row.store_id ? 'جارٍ…' : 'تم التواصل'}
                             </button>
                             {(() => {
                               const st = findStoreInContext(stores, storeStates, row.store_id)
@@ -232,21 +269,27 @@ export default function ActiveWorkflow() {
                                   href={tel ? `tel:${tel}` : undefined}
                                   aria-disabled={!tel}
                                   onClick={e => { if (!tel) e.preventDefault() }}
-                                  className={`text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 ${!tel ? 'pointer-events-none opacity-40' : ''}`}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 ${!tel ? 'pointer-events-none opacity-40' : ''}`}
                                 >
-                                  <Phone size={14} />
-                                  اتصل
+                                  اتصال هاتفي
                                 </a>
                               )
                             })()}
                             <button
                               type="button"
                               onClick={() => handleNoAnswerActiveRow(row)}
-                              disabled={noAnswerRowLoading === row.store_id}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border-2 border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                              disabled={noAnswerRowLoading === row.store_id || contactedLoading === row.store_id}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 border-2 border-orange-400 bg-orange-50 text-orange-950 hover:bg-orange-100 disabled:opacity-50"
                             >
                               <PhoneOff size={14} />
-                              {noAnswerRowLoading === row.store_id ? 'جارٍ…' : 'عدم الرد'}
+                              {noAnswerRowLoading === row.store_id ? 'جارٍ…' : 'لم يرد'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openDrawer(row, 'active')}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            >
+                              تفاصيل
                             </button>
                             <button
                               type="button"
