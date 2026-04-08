@@ -171,6 +171,20 @@ export const getAssignmentStatus = (storeId, username) =>
     .get('/active-workflow.php', { params: { action: 'get_assignment_status', store_id: storeId, username } })
     .then(r => r.data)
 
+/** متاجر جديدة ضمن الاحتضان: تعيين مهام يومية — تم التواصل / لم يرد */
+export const getIncubationFollowupStores = (params = {}) =>
+  http
+    .get('/incubation-followup-stores.php', {
+      params: {
+        user_role: params.user_role ?? '',
+        username: params.username ?? '',
+        q: params.q ?? '',
+        reg_from: params.reg_from ?? '',
+        reg_to: params.reg_to ?? '',
+      },
+    })
+    .then(r => r.data)
+
 /** لوحة تحليلات المدير — يتطلب user_role=executive */
 export const getManagerAnalytics = (params) =>
   http.get('/manager-analytics.php', { params }).then(r => r.data)
