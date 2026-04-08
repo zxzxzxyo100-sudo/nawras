@@ -196,6 +196,27 @@ elseif ($action === 'mark_no_answer') {
         VALUES (?, ?, ?, ?, ?, ?)
     ")->execute([$storeId, $input['store_name'] ?? '', $queue === 'inactive' ? 'استعادة — عدم رد' : 'استبيان — عدم الرد', $detail, $username, $roleLabel]);
 
+    if ($queue === 'active') {
+        wf_ensure_call_logs_outcome($pdo);
+        $roleStmt = $pdo->prepare('SELECT role FROM users WHERE username = ? LIMIT 1');
+        $roleStmt->execute([$username]);
+        $performedRole = (string) ($roleStmt->fetchColumn() ?: 'active_manager');
+        $sn = trim((string) ($input['store_name'] ?? ''));
+        $pdo->prepare('
+            INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ')->execute([
+            $storeId,
+            $sn,
+            'periodic_followup',
+            'متابعة دورية — لم يرد (يُصنَّف كـ لم يتم الوصول للمتجر)',
+            'no_answer',
+            $username,
+            $performedRole,
+        ]);
+        workflow_mark_active_store_no_answer_unreachable($pdo, $storeId, $sn, $username);
+    }
+
     $added = $queue === 'inactive'
         ? fill_inactive_slots_for_user($pdo, $username, $username, null)
         : fill_slots_for_user($pdo, $username, $username, null);
@@ -212,7 +233,9 @@ elseif ($action === 'mark_no_answer') {
         $payload['active_daily_target'] = ACTIVE_DAILY_SUCCESS_TARGET;
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
         if ($added > 0) {
-            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر نشط آخر إلى قائمتك.';
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في «لم يتم الوصول للمتجر» وفي قائمة المتابعة. تمت إضافة متجر آخر للطابور.';
+        } else {
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في «لم يتم الوصول للمتجر» وفي قائمة المتابعة.';
         }
     }
     jsonResponse($payload);

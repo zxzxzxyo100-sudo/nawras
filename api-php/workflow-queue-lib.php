@@ -598,3 +598,59 @@ function workflow_mark_active_store_contacted_completed(PDO $pdo, $storeId, $sto
         ")->execute([$username, $storeId]);
     }
 }
+
+/**
+ * «لم يرد» من طابور المتابعة النشط = نفس خانة «لم يتم الوصول للمتجر» في نشط يشحن
+ * (all-stores.php يفرز unreachable من active_shipping عند category = unreachable).
+ */
+function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $storeName, $username) {
+    $storeId = (int) $storeId;
+    if ($storeId <= 0) {
+        return;
+    }
+    $storeName = (string) $storeName;
+    $username = trim((string) $username);
+
+    $chk = $pdo->prepare('SELECT category FROM store_states WHERE store_id = ? LIMIT 1');
+    $chk->execute([$storeId]);
+    $row = $chk->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        $cat = (string) ($row['category'] ?? '');
+        if (in_array($cat, ['frozen', 'restoring', 'completed', 'contacted'], true)) {
+            return;
+        }
+    }
+
+    $upd = $pdo->prepare("
+        UPDATE store_states
+        SET category = 'unreachable',
+            last_call_date = NOW(),
+            updated_by = ?
+        WHERE store_id = ?
+        AND category IN ('active_pending_calls','active','active_shipping','unreachable','incubating')
+    ");
+    $upd->execute([$username, $storeId]);
+    if ($upd->rowCount() > 0) {
+        return;
+    }
+
+    if (!$row) {
+        try {
+            $pdo->prepare("
+                INSERT INTO store_states (store_id, store_name, category, last_call_date, updated_by)
+                VALUES (?, ?, 'unreachable', NOW(), ?)
+            ")->execute([$storeId, $storeName, $username]);
+        } catch (Throwable $e) {
+            try {
+                $pdo->prepare("
+                    INSERT INTO store_states (store_id, store_name, category, updated_by)
+                    VALUES (?, ?, 'unreachable', ?)
+                ")->execute([$storeId, $storeName, $username]);
+            } catch (Throwable $e2) {
+            }
+        }
+        return;
+    }
+
+    // صف موجود لكن ليس ضمن مسار نشط يشحن — لا نغيّر الفئة (مثلاً inactive) لتجنّب أخطاء بيانات
+}
