@@ -33,6 +33,7 @@ import {
   COLD_INACTIVE_DAILY_LIMIT,
   ACTIVE_MANAGER_COLD_VERIFY_LIMIT,
 } from '../utils/coldVerificationDaily'
+import { ONBOARD_FIRST_CALL_HOURS } from '../constants/onboardingSchedule'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
@@ -223,13 +224,32 @@ function sortActiveManagerPeriodicTasks(a, b) {
   return String(a.id).localeCompare(String(b.id))
 }
 
+/** بعد 48 ساعة بلا شحن وبلا م1 مسجّلة — لا يُعرَض في «تأخيرات المكالمات» (المسار يُرحَّل لبارد في الخادم) */
+function isIncubationNoShipPastFirstCallWindow(store, storeStateRow) {
+  if (storeStateRow?.inc_call1_at) return false
+  if (!store?.registered_at) return false
+  const reg = new Date(store.registered_at).getTime()
+  if (!Number.isFinite(reg)) return false
+  const hrs = (Date.now() - reg) / 3600
+  if (hrs < ONBOARD_FIRST_CALL_HOURS) return false
+  const n = Number(store.total_shipments ?? 0)
+  const hasShip =
+    n > 0
+    || (store.last_shipment_date
+      && String(store.last_shipment_date).trim() !== ''
+      && store.last_shipment_date !== 'لا يوجد')
+  return !hasShip
+}
+
 /** تبويب «تأخيرات المكالمات»: نوافذ احتضان متجاوزة، تعيين متأخر، أو فوات نافذة مكالمة */
-function isDailyTasksCallDelayTask(task) {
+function isDailyTasksCallDelayTask(task, storeStates = {}) {
   if (!task) return false
+  const s = task.store
+  const stRow = s ? storeStates[s.id] : null
+  if (s && isIncubationNoShipPastFirstCallWindow(s, stRow)) return false
   if (task.amTaskInDelays) return true
   if (task.moOverdue) return true
   if (task.moMissedC1Window || task.moMissedC2Window) return true
-  const s = task.store
   if (!s) return false
   if (s._inc === 'call_1_delayed') return true
   const d = Number(s._delay_days)
@@ -357,6 +377,9 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
+    if (userRole === 'active_manager' && (dbCat === 'cold_inactive' || store.bucket === 'cold_inactive')) {
+      return
+    }
     const incBucket    = store._inc
     const topCall      = latestCallEntry(log)
     const lastCallDate = topCall?.date
@@ -1365,7 +1388,7 @@ export default function Tasks() {
 
   const moDelayedTasks = useMemo(() => {
     if (!isTaskTabUser) return []
-    let pool = moPeriodicEligibleTasks.filter(isDailyTasksCallDelayTask)
+    let pool = moPeriodicEligibleTasks.filter(t => isDailyTasksCallDelayTask(t, storeStates))
     if (user?.role === 'active_manager' && delayedOrderIndex.size > 0) {
       pool = [...pool].sort((a, b) => {
         const ia = delayedOrderIndex.get(String(a.store.id))
@@ -1380,7 +1403,7 @@ export default function Tasks() {
     }
     if (user?.role !== 'active_manager') return pool
     return pool.slice(0, 50)
-  }, [isTaskTabUser, moPeriodicEligibleTasks, user?.role, delayedOrderIndex])
+  }, [isTaskTabUser, moPeriodicEligibleTasks, user?.role, delayedOrderIndex, storeStates])
 
   /** أعداد مراحل المكالمة ضمن نفس مصفوفة تبويب «متابعة دورية» (تفادي جمع وسوم خاطئة مع العدد الإجمالي) */
   const moPeriodicRetroCounts = useMemo(() => {
