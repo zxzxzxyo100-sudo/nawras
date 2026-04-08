@@ -21,6 +21,7 @@ import {
   countAnsweredCalls,
   dedupeIncubationDailyTasksByStore,
   hideDailyTaskDueToCallToday,
+  isCallLogDateLocalToday,
   isContactedAnsweredToday,
 } from '../utils/merchantOfficerQueue'
 import {
@@ -69,19 +70,38 @@ function latestCallEntry(log) {
   return entries[0]
 }
 
-/** هل وُجد «تم الرد» أو معاودة لاحقة لآخر «لم يرد» في السجل؟ (يُصلح التعارض في الواجهة) */
-function noAnswerSupersededByAnswered(log) {
-  const entries = Object.values(log || {}).filter(c => c?.date)
-  let lastAnswered = -1
-  let lastNoAnswer = -1
-  for (const e of entries) {
-    const t = new Date(e.date).getTime()
-    if (Number.isNaN(t)) continue
-    const oc = String(e.outcome ?? '').trim()
-    if (oc === 'answered' || oc === 'callback') lastAnswered = Math.max(lastAnswered, t)
-    if (oc === 'no_answer') lastNoAnswer = Math.max(lastNoAnswer, t)
+/** كل صفوف السجل ذات تاريخ (يشمل general_answered من الخادم) */
+function callLogTimelineEntries(log) {
+  return Object.values(log || {}).filter(c => c && typeof c === 'object' && c.date)
+}
+
+/**
+ * أحدث حدث زمنياً بين كل أنواع المكالمات — عند التعادل تُفضَّل «تم الرد» على «لم يرد»
+ * (مهم عندما يكون general = لم يرد لكن general_answered = تم الرد سابقاً).
+ */
+function lastChronologicalCallEntry(log) {
+  const entries = callLogTimelineEntries(log)
+  if (!entries.length) return null
+  const rank = o => {
+    const x = String(o ?? '').trim()
+    if (x === 'answered' || x === 'callback' || x === '') return 2
+    if (x === 'no_answer') return 0
+    return 1
   }
-  return lastAnswered >= 0 && lastAnswered >= lastNoAnswer
+  entries.sort((a, b) => {
+    const tb = new Date(b.date).getTime()
+    const ta = new Date(a.date).getTime()
+    if (tb !== ta) return tb - ta
+    return rank(b.outcome) - rank(a.outcome)
+  })
+  return entries[0]
+}
+
+/** آخر نتيجة في الخط الزمني تُلغي بقاء المتجر تحت «لم يرد» في الواجهة */
+function latestOutcomeClearsNoAnswerUi(log) {
+  const top = lastChronologicalCallEntry(log)
+  const oc = String(top?.outcome ?? '').trim()
+  return oc === 'answered' || oc === 'callback' || oc === ''
 }
 
 /** مهمة ضمن تبويب «متاجر لم ترد»: آخر مكالمة عدم رد، أو تعيين سير عمل no_answer */
@@ -91,8 +111,8 @@ function taskIsNoAnswer(task, callLogs, assignments) {
     if (a?.workflow_status === 'completed') return false
   }
   const log = callLogs[task.store.id] || {}
-  if (noAnswerSupersededByAnswered(log)) return false
-  const top = latestCallEntry(log)
+  if (latestOutcomeClearsNoAnswerUi(log)) return false
+  const top = lastChronologicalCallEntry(log)
   if (top && String(top.outcome ?? '').trim() === 'no_answer') return true
   if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
     const a = assignments[String(task.store.id)] || assignments[task.store.id]
@@ -170,7 +190,28 @@ function activeManagerStagingCallPhase(incBucket, needsOnboarding) {
   }
 }
 
-function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds) {
+/** هل سجل المكالمة يخص المستخدم الحالي؟ (الخادم يخزّن performed_by أحياناً كاسم كامل وأحياناً كاسم الدخول) */
+function callLogPerformedByMatchesUser(performedBy, username, fullname) {
+  const w = String(performedBy ?? '').trim()
+  if (!w) return false
+  const u = String(username ?? '').trim()
+  if (u && w === u) return true
+  const f = String(fullname ?? '').trim()
+  if (f && w === f) return true
+  return false
+}
+
+/** «تم الرد» اليوم من نفس المستخدم (اسم الدخول أو الاسم الظاهر في سجل المكالمات) */
+function isContactedAnsweredTodayForUser(log, username, fullname, ref = new Date()) {
+  return callLogTimelineEntries(log).some(c => {
+    if (!c?.date || !isCallLogDateLocalToday(c.date, ref)) return false
+    if (!callLogPerformedByMatchesUser(c.performed_by, username, fullname)) return false
+    const o = String(c.outcome ?? '').trim()
+    return o === 'answered' || o === 'callback' || o === ''
+  })
+}
+
+function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds, userFullname = '') {
   /** مسؤول الاستعادة: طابور 50 متجر غير نشط فقط (سير عمل من الخادم) */
   if (userRole === 'inactive_manager') {
     const tasks = []
@@ -356,11 +397,14 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
-        /** «تم التواصل» = workflow_status=completed (خلال 7 أيام) أو تسجيل مكالمة بـ «تم الرد» اليوم */
-        const moContactedToday = asgn?.workflow_status === 'completed' || isContactedAnsweredToday(log)
+        /** «تم التواصل» = workflow مكتمل أو «تم الرد» اليوم من نفس الموظف (performed_by = اسم كامل أو يوزر) */
+        const moContactedToday =
+          asgn?.workflow_status === 'completed'
+          || isContactedAnsweredTodayForUser(log, username, userFullname)
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
-          hideDailyTaskDueToCallToday(log) && !isContactedAnsweredToday(log)
+          hideDailyTaskDueToCallToday(log)
+          && !isContactedAnsweredTodayForUser(log, username, userFullname)
         const assignedBeforeToday = assignmentLocalCalendarBeforeToday(asgn?.assigned_at)
         const draft = {
           store,
@@ -431,10 +475,11 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     allStores.forEach(store => {
       if (generatedIds.has(String(store.id))) return
       const log = callLogs[store.id] || {}
-      const hasAnsweredThisMonth = Object.values(log).some(entry => {
+      const hasAnsweredThisMonth = callLogTimelineEntries(log).some(entry => {
         if (!entry?.date) return false
-        if (String(entry?.performed_by ?? '').trim() !== username) return false
-        if (String(entry?.outcome ?? '').trim() !== 'answered') return false
+        if (!callLogPerformedByMatchesUser(entry?.performed_by, username, userFullname)) return false
+        const o = String(entry?.outcome ?? '').trim()
+        if (o !== 'answered' && o !== 'callback' && o !== '') return false
         const d = new Date(entry.date)
         return d >= cutoff
       })
@@ -1084,6 +1129,7 @@ export default function Tasks() {
     let t = generateTasks(
       allStores, callLogs, storeStates, user?.role, user?.username, assignments, inactiveWf,
       newMerchantOnboardingDoneIds,
+      user?.fullname ?? '',
     )
     t = dedupeIncubationDailyTasksByStore(t)
     return t

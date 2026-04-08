@@ -571,6 +571,35 @@ elseif ($action === 'get_all_calllogs') {
             'performed_by' => $row['performed_by'] ?? '',
         ];
     }
+
+    // آخر مكالمة «عامة» بنتيجة «تم الرد» لكل متجر — حتى لا يُستبدل بـ «لم يرد» في المفتاح general وحده
+    $stmtAns = $pdo->query("
+        SELECT cl.store_id, cl.created_at, cl.note, cl.outcome, cl.performed_by
+        FROM call_logs cl
+        INNER JOIN (
+            SELECT store_id, MAX(created_at) AS max_date
+            FROM call_logs
+            WHERE call_type = 'general'
+            AND (outcome = 'answered' OR outcome = 'callback' OR IFNULL(outcome, '') = '')
+            GROUP BY store_id
+        ) latest
+        ON cl.store_id = latest.store_id
+        AND cl.created_at = latest.max_date
+        AND cl.call_type = 'general'
+    ");
+    while ($row = $stmtAns->fetch(PDO::FETCH_ASSOC)) {
+        $sid = $row['store_id'];
+        if (!isset($result[$sid])) {
+            $result[$sid] = [];
+        }
+        $result[$sid]['general_answered'] = [
+            'date'         => $row['created_at'],
+            'note'         => $row['note']         ?? '',
+            'outcome'      => ($row['outcome'] ?? '') !== '' ? $row['outcome'] : 'answered',
+            'performed_by' => $row['performed_by'] ?? '',
+        ];
+    }
+
     jsonResponse(['success' => true, 'data' => $result]);
 }
 
