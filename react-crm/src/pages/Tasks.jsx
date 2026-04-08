@@ -14,6 +14,7 @@ import {
   getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow,
   completeInactiveQueueSuccess,
   postMerchantOfficerAutomation,
+  markActiveWorkflowContacted,
 } from '../services/api'
 import {
   generateIncubationOfficerStagingTasks,
@@ -526,11 +527,12 @@ function SeagullMark({ size = 100, opacity = 0.07 }) {
 // ══════════════════════════════════════════════════════════════════
 // زر الاتصال مع تأثير Ripple
 // ══════════════════════════════════════════════════════════════════
-function CallButton({ onClick }) {
+function CallButton({ onClick, disabled = false }) {
   const [rippling, setRippling] = useState(false)
 
   function handleClick(e) {
     e.stopPropagation()
+    if (disabled) return
     setRippling(true)
     setTimeout(() => setRippling(false), 650)
     onClick()
@@ -538,10 +540,12 @@ function CallButton({ onClick }) {
 
   return (
     <motion.button
+      type="button"
       onClick={handleClick}
-      whileHover={{ scale: 1.06, y: -1 }}
-      whileTap={{ scale: 0.9 }}
-      className="relative overflow-hidden flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
+      disabled={disabled}
+      whileHover={{ scale: disabled ? 1 : 1.06, y: disabled ? 0 : -1 }}
+      whileTap={{ scale: disabled ? 1 : 0.9 }}
+      className="relative overflow-hidden flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-50 disabled:pointer-events-none"
       style={{
         background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
         boxShadow: '0 4px 14px rgba(124,58,237,0.45)',
@@ -575,6 +579,7 @@ function MerchantOfficerTaskRow({
   onDone,
   onNoAnswerWorkflow,
   noAnswerLoading,
+  contactLoading = false,
   userRole,
   doneDisabled,
   hideDoneButton,
@@ -668,12 +673,12 @@ function MerchantOfficerTaskRow({
           </motion.button>
         ) : (
           <>
-            <CallButton onClick={() => onCall(task)} />
+            <CallButton disabled={contactLoading} onClick={() => onCall(task)} />
             {showNoAnswer && (
               <motion.button
                 type="button"
                 onClick={() => onNoAnswerWorkflow(task)}
-                disabled={noAnswerLoading}
+                disabled={noAnswerLoading || contactLoading}
                 whileHover={{ scale: noAnswerLoading ? 1 : 1.04 }}
                 className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 disabled:opacity-50"
               >
@@ -727,6 +732,7 @@ function TaskCard({
   onDone,
   onNoAnswerWorkflow,
   noAnswerLoading,
+  contactLoading = false,
   userRole,
   doneDisabled,
   hideDoneButton,
@@ -805,12 +811,12 @@ function TaskCard({
 
       {/* أزرار الإجراء */}
       <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-        <CallButton label={callButtonLabel} onClick={() => onCall(task)} />
+        <CallButton disabled={contactLoading} onClick={() => onCall(task)} />
         {showNoAnswer && (
           <motion.button
             type="button"
             onClick={() => onNoAnswerWorkflow(task)}
-            disabled={noAnswerLoading}
+            disabled={noAnswerLoading || contactLoading}
             whileHover={{ scale: noAnswerLoading ? 1 : 1.06, y: -1 }}
             whileTap={{ scale: 0.9 }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
@@ -919,6 +925,7 @@ export default function Tasks() {
   const [doneSaving, setDoneSaving] = useState(false)
   const [doneModalErr, setDoneModalErr] = useState('')
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
+  const [amContactLoadingId, setAmContactLoadingId] = useState(null)
   /** إشعار بعد «لم يرد» أو بلوغ الهدف */
   const [toastMsg, setToastMsg] = useState('')
   /** فتح استبيان تهيئة المتجر الجديد من «تم» أو من «اتصل» */
@@ -1102,7 +1109,7 @@ export default function Tasks() {
     return false
   }, [user?.role, selectedTask, newMerchantOnboardingDoneIds])
 
-  function handleTaskCall(taskRow) {
+  async function handleTaskCall(taskRow) {
     /** استبيان التهيئة: الدرج + CallModal — مسؤول المتاجر دائماً؛ التجريبي لباقي الأدوار عند تفعيل النافذة المبسّطة */
     if (taskRow.type === 'new_merchant_onboarding') {
       if (IS_SIMPLE_LOG_CALL_MODAL || user?.role === 'active_manager') {
@@ -1116,6 +1123,46 @@ export default function Tasks() {
       setSelectedTask(taskRow)
       return
     }
+    /**
+     * مسؤول المتاجر + متجر مسند: نفس سلوك صفحة «طابور المتابعة» — «اتصل» = تم التواصل فوراً
+     * (بدون انتظار نافذة المكالمة). من يحتاج استبيان تهيئة يبقى يفتح الدرج.
+     * إن وُسِم المتجر «تم التواصل اليوم» يفتح الدرج فقط (مراجعة سجل).
+     */
+    const amAssignedOneTap =
+      user?.role === 'active_manager'
+      && taskRow.type === 'assigned_store'
+      && user?.username
+      && !taskRow.moContactedToday
+      && !needsNewMerchantOnboardingSurvey(taskRow.store, newMerchantOnboardingDoneIds)
+
+    if (amAssignedOneTap) {
+      setDismissErr('')
+      setAmContactLoadingId(taskRow.id)
+      try {
+        const res = await markActiveWorkflowContacted({
+          store_id: taskRow.store.id,
+          store_name: taskRow.store.name || '',
+          username: user.username,
+        })
+        if (!DISABLE_POINTS_AND_PERFORMANCE) {
+          onCallSaved(10)
+        }
+        await reload()
+        await loadActiveWf()
+        setMoTab('contacted')
+        if (res?.goal_just_met) {
+          setToastMsg('تم بلوغ هدف 50 اتصالاً ناجحاً اليوم.')
+        }
+      } catch (e) {
+        const msg = e?.response?.data?.error || e?.message || 'تعذّر تسجيل تم التواصل'
+        setDismissErr(msg)
+        setSelectedTask(taskRow)
+      } finally {
+        setAmContactLoadingId(null)
+      }
+      return
+    }
+
     setSelectedTask(taskRow)
   }
 
@@ -1987,6 +2034,7 @@ export default function Tasks() {
                     userRole={user?.role}
                     onNoAnswerWorkflow={handleNoAnswerWorkflow}
                     noAnswerLoading={noAnswerLoadingId === task.id}
+                    contactLoading={amContactLoadingId === task.id}
                     doneDisabled={blockDone}
                     hideDoneButton={
                       IS_STAGING_OR_DEV
@@ -2009,6 +2057,7 @@ export default function Tasks() {
                   userRole={user?.role}
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
+                  contactLoading={amContactLoadingId === task.id}
                   doneDisabled={blockDone}
                   hideDoneButton={
                     IS_STAGING_OR_DEV
