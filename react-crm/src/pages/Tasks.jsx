@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake,
+  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake, Clock,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
@@ -208,6 +208,63 @@ function amIncStageRank(inc) {
     case 'between_calls': return 4
     default: return 5
   }
+}
+
+function sortActiveManagerPeriodicTasks(a, b) {
+  const ra = amIncStageRank(a.store?._inc)
+  const rb = amIncStageRank(b.store?._inc)
+  if (ra !== rb) return ra - rb
+  const da = a.amTaskInDelays ? 1 : 0
+  const db = b.amTaskInDelays ? 1 : 0
+  if (da !== db) return db - da
+  const ta = Number(a.assignedAtTs || 0)
+  const tb = Number(b.assignedAtTs || 0)
+  if (ta !== tb) return ta - tb
+  return String(a.id).localeCompare(String(b.id))
+}
+
+/** تبويب «تأخيرات المكالمات»: نوافذ احتضان متجاوزة، تعيين متأخر، أو فوات نافذة مكالمة */
+function isDailyTasksCallDelayTask(task) {
+  if (!task) return false
+  if (task.amTaskInDelays) return true
+  if (task.moOverdue) return true
+  if (task.moMissedC1Window || task.moMissedC2Window) return true
+  const s = task.store
+  if (!s) return false
+  if (s._inc === 'call_1_delayed') return true
+  const d = Number(s._delay_days)
+  if (Number.isFinite(d) && d > 0) {
+    if (s.bucket === 'incubating') return true
+    if (task.moCycleDay != null || task._incBucket) return true
+    if (task.type === 'new_merchant_onboarding') return true
+    if (task.type === 'new_call' && /-inc-/.test(String(task.id))) return true
+  }
+  return false
+}
+
+function storeRegisteredAtTs(store) {
+  if (!store?.registered_at) return 0
+  const t = new Date(store.registered_at).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+/** الأشد تأخيراً أولاً ثم الأقدم تسجيلاً */
+function sortDailyTasksDelayed(a, b) {
+  function effDelayDays(t) {
+    let n = Number(t.store?._delay_days) || 0
+    if (t.moOverdue) n = Math.max(n, 1)
+    if (t.moMissedC1Window) n = Math.max(n, 2)
+    if (t.moMissedC2Window) n = Math.max(n, 3)
+    if (t.amTaskInDelays) n = Math.max(n, 1)
+    return n
+  }
+  const ea = effDelayDays(a)
+  const eb = effDelayDays(b)
+  if (eb !== ea) return eb - ea
+  const ra = storeRegisteredAtTs(a.store)
+  const rb = storeRegisteredAtTs(b.store)
+  if (ra !== rb) return ra - rb
+  return String(a.id).localeCompare(String(b.id))
 }
 
 /** هل سجل المكالمة يخص المستخدم الحالي؟ (الخادم يخزّن performed_by أحياناً كاسم كامل وأحياناً كاسم الدخول) */
@@ -947,9 +1004,11 @@ export default function Tasks() {
   const [filter, setFilter]     = useState('all') // 'all' | 'high' | 'no_answer'
   /** تبويبات مسؤول المتاجر الجديدة (تجريبي): متابعة دورية | تم التواصل | لم يتم الرد */
   const [moTab, setMoTab] = useState('periodic')
+  const moTabRef = useRef(moTab)
   useEffect(() => {
-    if (moTab === 'am_delays') setMoTab('periodic')
+    moTabRef.current = moTab
   }, [moTab])
+  const [activeDelayedWf, setActiveDelayedWf] = useState(null)
   const moSweepLoadedRef = useRef(null)
   const [dismissErr, setDismissErr] = useState('')
   /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
@@ -999,6 +1058,20 @@ export default function Tasks() {
     }
   }, [user?.role, user?.username])
 
+  const loadActiveDelayedWf = useCallback(async () => {
+    if (user?.role !== 'active_manager' || !user?.username) {
+      setActiveDelayedWf(null)
+      return
+    }
+    try {
+      const res = await getMyWorkflow(user.username, { queue: 'active', type: 'delayed' })
+      if (res?.success && res?.type === 'delayed') setActiveDelayedWf(res)
+      else setActiveDelayedWf(null)
+    } catch {
+      setActiveDelayedWf(null)
+    }
+  }, [user?.role, user?.username])
+
   const loadDismissals = useCallback(() => {
     const u = user?.username
     if (!u) return
@@ -1015,10 +1088,10 @@ export default function Tasks() {
     loadDismissals()
   }, [loadDismissals, lastLoaded])
 
-  /** فتح تبويب محدد من لوحة التحكم (تحقيق نشط / بارد) */
+  /** فتح تبويب محدد من لوحة التحكم (تحقيق نشط / بارد / تأخيرات المكالمات) */
   useEffect(() => {
     const t = location.state?.openTasksTab
-    if (t === 'am_cold_verify' || t === 'cold_verify') {
+    if (t === 'am_cold_verify' || t === 'cold_verify' || t === 'delayed_calls') {
       setMoTab(t)
     }
   }, [location.state])
@@ -1037,6 +1110,12 @@ export default function Tasks() {
   useEffect(() => {
     loadActiveWf()
   }, [loadActiveWf, lastLoaded])
+
+  useEffect(() => {
+    if (user?.role === 'active_manager' && moTab === 'delayed_calls') {
+      void loadActiveDelayedWf()
+    }
+  }, [user?.role, moTab, loadActiveDelayedWf, lastLoaded])
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
@@ -1256,27 +1335,52 @@ export default function Tasks() {
     [amColdVerificationTasksAll, dismissalKeys],
   )
 
-  const moPeriodicTasks = useMemo(() => {
-    if (!isTaskTabUser) return mainTasks
-    const filtered = mainTasks.filter(
+  /** نفس شرط «متابعة دورية» و«تأخيرات المكالمات» قبل الترتيب/حد 50 لمسؤول النشطين */
+  const moPeriodicEligibleTasks = useMemo(() => {
+    if (!isTaskTabUser) return []
+    return mainTasks.filter(
       t =>
         !t.moContactedToday
         && !taskIsNoAnswer(t, callLogs, assignments),
     )
+  }, [isTaskTabUser, mainTasks, callLogs, assignments])
+
+  const delayedOrderIndex = useMemo(() => {
+    const rows = activeDelayedWf?.delayed_tasks
+    if (!Array.isArray(rows) || !rows.length) return new Map()
+    const m = new Map()
+    rows.forEach((row, i) => {
+      const id = row?.store_id
+      if (id != null) m.set(String(id), i)
+    })
+    return m
+  }, [activeDelayedWf])
+
+  const moPeriodicTasks = useMemo(() => {
+    if (!isTaskTabUser) return mainTasks
+    const filtered = moPeriodicEligibleTasks
     if (user?.role !== 'active_manager') return filtered
-    return [...filtered].sort((a, b) => {
-      const ra = amIncStageRank(a.store?._inc)
-      const rb = amIncStageRank(b.store?._inc)
-      if (ra !== rb) return ra - rb
-      const da = a.amTaskInDelays ? 1 : 0
-      const db = b.amTaskInDelays ? 1 : 0
-      if (da !== db) return db - da
-      const ta = Number(a.assignedAtTs || 0)
-      const tb = Number(b.assignedAtTs || 0)
-      if (ta !== tb) return ta - tb
-      return String(a.id).localeCompare(String(b.id))
-    }).slice(0, 50)
-  }, [isTaskTabUser, mainTasks, callLogs, assignments, user?.role])
+    return [...filtered].sort(sortActiveManagerPeriodicTasks).slice(0, 50)
+  }, [isTaskTabUser, mainTasks, moPeriodicEligibleTasks, user?.role])
+
+  const moDelayedTasks = useMemo(() => {
+    if (!isTaskTabUser) return []
+    let pool = moPeriodicEligibleTasks.filter(isDailyTasksCallDelayTask)
+    if (user?.role === 'active_manager' && delayedOrderIndex.size > 0) {
+      pool = [...pool].sort((a, b) => {
+        const ia = delayedOrderIndex.get(String(a.store.id))
+        const ib = delayedOrderIndex.get(String(b.store.id))
+        if (ia !== undefined && ib !== undefined) return ia - ib
+        if (ia !== undefined) return -1
+        if (ib !== undefined) return 1
+        return sortDailyTasksDelayed(a, b)
+      })
+    } else {
+      pool = [...pool].sort(sortDailyTasksDelayed)
+    }
+    if (user?.role !== 'active_manager') return pool
+    return pool.slice(0, 50)
+  }, [isTaskTabUser, moPeriodicEligibleTasks, user?.role, delayedOrderIndex])
 
   /** أعداد مراحل المكالمة ضمن نفس مصفوفة تبويب «متابعة دورية» (تفادي جمع وسوم خاطئة مع العدد الإجمالي) */
   const moPeriodicRetroCounts = useMemo(() => {
@@ -1305,6 +1409,7 @@ export default function Tasks() {
       if (moTab === 'am_cold_verify') return pendingAmColdVerifyTasks
       if (moTab === 'contacted') return moContactedTasks
       if (moTab === 'no_answer') return noAnswerTasks
+      if (moTab === 'delayed_calls') return moDelayedTasks
       return moPeriodicTasks
     }
     if (filter === 'no_answer') return noAnswerTasks
@@ -1314,6 +1419,7 @@ export default function Tasks() {
     isTaskTabUser,
     moTab,
     moPeriodicTasks,
+    moDelayedTasks,
     moContactedTasks,
     pendingColdVerifyTasks,
     pendingAmColdVerifyTasks,
@@ -1526,6 +1632,7 @@ export default function Tasks() {
         if (mar?.notify_ar) setToastMsg(mar.notify_ar)
         await reload()
         await loadActiveWf()
+        if (moTabRef.current === 'delayed_calls') void loadActiveDelayedWf()
         loadDismissals()
         focusNoAnswerView()
         return
@@ -1695,9 +1802,14 @@ export default function Tasks() {
                 {coldInactivePoolCount.toLocaleString('ar-SA')}
               </p>
             )}
-            {['incubation_manager', 'executive'].includes(user?.role) && moTab !== 'cold_verify' && moTab !== 'am_cold_verify' && (
+            {['incubation_manager', 'executive'].includes(user?.role) && moTab !== 'cold_verify' && moTab !== 'am_cold_verify' && moTab !== 'delayed_calls' && (
               <p className="text-violet-200/90 text-xs mt-2 max-w-2xl leading-relaxed">
                 في «متابعة دورية» تُعرَض المتاجر في أيام الدورة 1 و 3 و 10 فقط (لا يوم 2 ولا 5 ولا 9، إلخ). استبيان التهيئة واستعادة المسار يخضعان لنفس أيام اللمس. يوم 14 بدون شحن يُرحّل تلقائياً إلى غير نشط ساخن؛ يوم 11 مع شحن وبدون مكالمات مجابة يُرحّل إلى النشط مع تنبيه أداء. سجّل ملاحظة المكالمة لتظهر في سجلات النظام.
+              </p>
+            )}
+            {['incubation_manager', 'executive'].includes(user?.role) && moTab === 'delayed_calls' && (
+              <p className="text-orange-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-orange-300/30 bg-orange-500/10">
+                «تأخيرات المكالمات»: متاجر تجاوزت نافذة المكالمة الأولى (بعد 48 ساعة)، أو الثانية (بعد يوم 3 مع الشحن)، أو الثالثة (بعد يوم 10)، أو بها تنبيه فوات نافذة / تأخّر في التعيين. تُرتَّب بالأشد تأخيراً ثم الأقدم تسجيلاً — نفس أزرار «اتصل» و«عدم الرد» والاستبيان.
               </p>
             )}
             {user?.role === 'active_manager' && moTab === 'am_cold_verify' && (
@@ -1708,9 +1820,15 @@ export default function Tasks() {
             {user?.role === 'active_manager'
               && moTab !== 'am_cold_verify'
               && moTab !== 'cold_verify'
+              && moTab !== 'delayed_calls'
               && (
               <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
                 يُعبَّأ طابورك تلقائياً حتى 50 متجراً نشطاً؛ لا يُعاد اختيار نفس المتجر من المجمع في يومَي العمل السابقين. في «متابعة دورية» تُعرَض كل المهام غير المنجزة مع تثبيت المتأخّرات أعلى القائمة؛ سجّل المكالمة أو استخدم صفحة «طابور المهام» للإجراءات «تم التواصل» و«لم يرد».
+              </p>
+            )}
+            {user?.role === 'active_manager' && moTab === 'delayed_calls' && (
+              <p className="text-orange-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-orange-300/30 bg-orange-500/10">
+                يُحدَّد التأخير من مسار الاحتضان (48 ساعة / يوم 3 / يوم 10) أو من تعيين متأخر في الطابور. يُعرض حتى 50 متجراً؛ عند إتمام المكالمة أو «لم يرد» يُحلّ المتجر ويُستبدل من المجمع كما في «المتابعة الدورية». الترتيب يطابق الخادم عند توفر بيانات التسجيل في قاعدة البيانات.
               </p>
             )}
             {pendingTasks.length > 0 && (
@@ -1732,7 +1850,12 @@ export default function Tasks() {
 
           {/* زر التحديث */}
           <motion.button
-            onClick={reload}
+            onClick={() => {
+              reload()
+              if (user?.role === 'active_manager' && moTab === 'delayed_calls') {
+                void loadActiveDelayedWf()
+              }
+            }}
             disabled={loading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -1778,6 +1901,34 @@ export default function Tasks() {
                 }`}
               >
                 {moPeriodicTasks.length}
+              </span>
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('delayed_calls')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'delayed_calls'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-orange-200 text-orange-900 hover:bg-orange-50'
+              }`}
+              style={
+                moTab === 'delayed_calls'
+                  ? {
+                      background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                      boxShadow: '0 4px 14px rgba(234,88,12,0.38)',
+                    }
+                  : {}
+              }
+            >
+              <Clock size={16} className={moTab === 'delayed_calls' ? 'text-white/95' : 'text-orange-600'} aria-hidden />
+              تأخيرات المكالمات
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'delayed_calls' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-800'
+                }`}
+              >
+                {moDelayedTasks.length}
               </span>
             </motion.button>
             <motion.button
@@ -1939,6 +2090,11 @@ export default function Tasks() {
             </motion.button>
           ))
         )}
+        {isTaskTabUser && moTab === 'delayed_calls' && moDelayedTasks.length > 0 && (
+          <p className="w-full text-xs text-orange-800/90 pt-1 leading-relaxed">
+            قائمة التأخير: نفس حدّ الطابور (50 لمسؤول النشطين) — الأشد تأخيراً والأقدم تسجيلاً في الأعلى. بعد حفظ المكالمة يُحدَّث المتجر ويختفي من التأخيرات عند زوال السبب.
+          </p>
+        )}
         {isTaskTabUser && moTab === 'periodic' && moPeriodicTasks.length > 0 && (
           <p className="w-full text-xs text-slate-500 pt-1 leading-relaxed">
             توزيع المراحل في هذه القائمة فقط: أولى (ومؤجلة){' '}
@@ -2018,6 +2174,14 @@ export default function Tasks() {
               <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم يتم الرد»</p>
               <p className="text-slate-500 text-sm mt-2">عند الضغط على «عدم الرد» يُسجَّل عدم الرد ويظهر المتجر هنا</p>
             </>
+          ) : isTaskTabUser && moTab === 'delayed_calls' ? (
+            <>
+              <Clock size={56} className="text-orange-300 mx-auto mb-4" aria-hidden />
+              <p className="font-black text-slate-700 text-xl">لا توجد تأخيرات في هذه القائمة حالياً</p>
+              <p className="text-slate-500 text-sm mt-2">
+                إما لا يوجد متجر تجاوز نوافذ المكالمات ضمن المهام غير المنجزة، أو التأخير انتهى بعد آخر تحديث. جرّب «متابعة دورية» أو اضغط «تحديث».
+              </p>
+            </>
           ) : filter === 'high' ? (
             <>
               <CheckCircle size={56} className="text-slate-300 mx-auto mb-4" />
@@ -2069,7 +2233,7 @@ export default function Tasks() {
                     onNoAnswerWorkflow={handleNoAnswerWorkflow}
                     noAnswerLoading={noAnswerLoadingId === task.id}
                     doneDisabled={blockDone}
-                    hideDoneButton={isTaskTabUser && moTab === 'periodic'}
+                    hideDoneButton={isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls')}
                     taskIsNoAnswerFn={taskIsNoAnswer}
                     callLogs={callLogs}
                     assignments={assignments}
@@ -2087,7 +2251,7 @@ export default function Tasks() {
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
                     doneDisabled={blockDone}
-                    hideDoneButton={isTaskTabUser && moTab === 'periodic'}
+                    hideDoneButton={isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls')}
                 />
               )
             })}
@@ -2144,10 +2308,14 @@ export default function Tasks() {
             loadDismissals()
             void loadInactiveWf()
             void loadActiveWf()
+            if (user?.role === 'active_manager' && moTabRef.current === 'delayed_calls') {
+              void loadActiveDelayedWf()
+            }
             if (
               user?.role === 'active_manager'
               && selectedTask
               && ['assigned_store', 'new_merchant_onboarding'].includes(selectedTask.type)
+              && moTabRef.current !== 'delayed_calls'
             ) {
               setMoTab('contacted')
             }

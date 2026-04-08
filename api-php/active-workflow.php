@@ -31,6 +31,7 @@ if ($action === 'get_my_workflow') {
         jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400);
     }
     $queue = trim((string) ($_GET['queue'] ?? 'active'));
+    $listType = trim((string) ($_GET['type'] ?? ''));
     if ($queue === 'inactive') {
         fill_inactive_slots_for_user($pdo, $username, $username, null);
         $st = $pdo->prepare("
@@ -111,6 +112,27 @@ if ($action === 'get_my_workflow') {
     ")->execute([$username, $username]);
 
     fill_slots_for_user($pdo, $username, $username, null);
+
+    /** تبويب «تأخيرات المكالمات»: ?type=delayed — نوافذ احتضان متجاوزة أو تعيين متأخر، حتى 50، مرتبة بالأشد تأخيراً */
+    $listType = trim((string) ($_GET['type'] ?? ''));
+    if ($listType === 'delayed') {
+        require_once __DIR__ . '/incubation-delay-lib.php';
+        $delayed = wf_build_active_manager_delayed_task_list($pdo, $username);
+        ensure_active_daily_stats_schema($pdo);
+        $dailyActive = get_active_daily_success_count($pdo, $username);
+        jsonResponse([
+            'success' => true,
+            'queue' => 'active',
+            'type' => 'delayed',
+            'target' => ACTIVE_QUEUE_TARGET,
+            'delayed_tasks' => $delayed,
+            'delayed_count' => count($delayed),
+            'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_successful_contacts' => $dailyActive,
+            'daily_target_reached' => $dailyActive >= ACTIVE_DAILY_SUCCESS_TARGET,
+            'cooldown_days' => SURVEY_COOLDOWN_DAYS,
+        ]);
+    }
 
     // طابور المتابعة الدورية: حتى 50 تعيين نشط (يشمل متأخّرات أيام سابقة) — المتأخّر أولاً ثم الأقدم
     $stActive = $pdo->prepare("
