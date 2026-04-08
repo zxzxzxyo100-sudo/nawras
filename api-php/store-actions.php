@@ -133,24 +133,14 @@ function ensure_surveys_survey_kind(PDO $pdo) {
     $done = true;
 }
 
-/** أعمدة سير العمل في التعيينات (طابور 50 / عدم رد) */
+/** أعمدة سير العمل في التعيينات — يجب أن يشمل completed مثل active-workflow.php */
 function ensure_store_assignments_workflow(PDO $pdo) {
     static $done = false;
     if ($done) {
         return;
     }
-    try {
-        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active'");
-    } catch (Throwable $e) {
-    }
-    try {
-        $pdo->exec('ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP');
-    } catch (Throwable $e) {
-    }
-    try {
-        $pdo->exec("ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active'");
-    } catch (Throwable $e) {
-    }
+    require_once __DIR__ . '/workflow-queue-lib.php';
+    ensure_workflow_schema($pdo);
     $done = true;
 }
 
