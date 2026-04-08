@@ -10,7 +10,10 @@ import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
 import StoreFilterDrawer from '../components/StoreFilterDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { ONBOARD_DAYS_AFTER_CALL1, ONBOARD_DAYS_AFTER_CALL2 } from '../constants/onboardingSchedule'
+import {
+  ONBOARD_CYCLE_CALL2_DAY,
+  ONBOARD_CYCLE_CALL3_DAY,
+} from '../constants/onboardingSchedule'
 
 // ── مساعد: أيام منذ التسجيل ───────────────────────────────────────
 function regDays(s) {
@@ -35,7 +38,7 @@ const TABS = [
     label: 'المكالمة الأولى',
     icon:  Baby,
     color: 'blue',
-    desc:  'يظهر المتجر هنا ما دامت المكالمة الأولى غير مسجّلة (أي يوم في الدورة قبل الترحيل أو التصنيف الآخر).',
+    desc:  'يظهر المتجر هنا في أول 48 ساعة من التسجيل ما دامت المكالمة الأولى غير مسجّلة. بعدها يُعرَض في «تأخير المكالمة».',
     badge: () => (
       <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">مطلوبة</span>
     ),
@@ -45,9 +48,9 @@ const TABS = [
     label: 'المكالمة الثانية',
     icon:  Clock,
     color: 'indigo',
-    desc:  `تظهر المكالمة بعد ${ONBOARD_DAYS_AFTER_CALL1} يوماً من تسجيل المكالمة الأولى (تم) — حتى يُسجَّل الاتصال الثاني.`,
+    desc:  `تظهر من يوم ${ONBOARD_CYCLE_CALL2_DAY} من التسجيل (دورة 14 يوماً) مع وجود شحن مسجّل — حتى يُسجَّل الاتصال الثاني.`,
     badge: () => (
-      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">+{ONBOARD_DAYS_AFTER_CALL1} يوم</span>
+      <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">يوم {ONBOARD_CYCLE_CALL2_DAY}</span>
     ),
   },
   {
@@ -55,9 +58,9 @@ const TABS = [
     label: 'المكالمة الثالثة',
     icon:  PhoneCall,
     color: 'amber',
-    desc:  `تظهر المكالمة بعد ${ONBOARD_DAYS_AFTER_CALL2} يوماً من تسجيل المكالمة الثانية (تم) — حتى التخريج.`,
+    desc:  `تظهر من يوم ${ONBOARD_CYCLE_CALL3_DAY} من التسجيل بعد تسجيل المكالمة الثانية — حتى التخريج.`,
     badge: () => (
-      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">+{ONBOARD_DAYS_AFTER_CALL2} يوم</span>
+      <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">يوم {ONBOARD_CYCLE_CALL3_DAY}</span>
     ),
   },
   {
@@ -270,6 +273,11 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false
                       </td>
                       <td className="px-5 py-4 text-slate-700">
                         {tab.badge(s)}
+                        {tab.key === 'call_2' && s._missed_c1_window ? (
+                          <span className="mt-1.5 block text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 leading-snug">
+                            تنبيه: لم يُسجَّل التواصل في نافذة المكالمة الأولى (48 ساعة)
+                          </span>
+                        ) : null}
                       </td>
                     </>
                   )}

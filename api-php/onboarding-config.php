@@ -1,11 +1,21 @@
 <?php
 /**
- * مسار الاحتضان — جدولة المكالمات بعد إكمال السابقة (وليس فقط يوم الدورة من التسجيل).
- *
- * Call 2 تظهر بعد مرور X يوماً كاملة من تاريخ تسجيل المكالمة الأولى (تم).
- * Call 3 تظهر بعد مرور Y يوماً كاملة من تاريخ تسجيل المكالمة الثانية (تم).
+ * مسار الاحتضان — نافذة المكالمة 2 و 3 من يوم التسجيل (دورة 14 يوماً): اليوم 3 واليوم 10.
+ * (بعد تسجيل المكالمة السابقة؛ المكالمة 2 لا تظهر إلا مع شحن مسجّل.)
  */
-// بيئة التطوير المحلي (localhost): 3 يوماً بعد المكالمة الأولى، 10 أيام بعد الثانية — كما في مواصفات DEV
+if (!defined('NAWRAS_ONBOARD_CYCLE_CALL2_DAY')) {
+    define('NAWRAS_ONBOARD_CYCLE_CALL2_DAY', 3);
+}
+if (!defined('NAWRAS_ONBOARD_CYCLE_CALL3_DAY')) {
+    define('NAWRAS_ONBOARD_CYCLE_CALL3_DAY', 10);
+}
+
+/** مهلة المكالمة الأولى من لحظة التسجيل (ساعات) */
+if (!defined('NAWRAS_ONBOARD_FIRST_CALL_HOURS')) {
+    define('NAWRAS_ONBOARD_FIRST_CALL_HOURS', 48);
+}
+
+// للتوافق مع واجهات قديمة (عرض نصوص) — لم يعد يُستخدم لتوجيه الطوابير
 $_h = $_SERVER['HTTP_HOST'] ?? '';
 $_devLocalApi = (PHP_SAPI === 'cli-server')
     || stripos($_h, 'localhost') !== false

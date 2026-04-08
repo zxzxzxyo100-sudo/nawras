@@ -159,12 +159,12 @@ export function isDueForPeriodicStage(store, storeStates, days) {
  * «عدم رد» لا يُعتبر إتماماً — يبقى المتابعة أو تبويب لم يتم الرد.
  */
 export function incubationStageCallDocumentedNonNoAnswer(log, storeStateRow, incBucket) {
-  if (!['call_1', 'call_2', 'call_3'].includes(incBucket)) return false
+  if (!['call_1', 'call_1_delayed', 'call_2', 'call_3'].includes(incBucket)) return false
   const st = storeStateRow || {}
-  if (incBucket === 'call_1' && st.inc_call1_at) return true
+  if ((incBucket === 'call_1' || incBucket === 'call_1_delayed') && st.inc_call1_at) return true
   if (incBucket === 'call_2' && st.inc_call2_at) return true
   if (incBucket === 'call_3' && st.inc_call3_at) return true
-  const key = incBucket === 'call_1' ? 'inc_call1' : incBucket === 'call_2' ? 'inc_call2' : 'inc_call3'
+  const key = incBucket === 'call_2' ? 'inc_call2' : incBucket === 'call_3' ? 'inc_call3' : 'inc_call1'
   const e = log?.[key]
   if (!e?.date) return false
   const o = String(e.outcome ?? '').trim()
@@ -205,6 +205,9 @@ export function resolvePeriodicIncTouchpoint(incBucket, store, storeStates) {
   const st = storeStates[store.id] || {}
   const cd = getIncubationCycleDay(store)
 
+  if (!st.inc_call1_at && incBucket === 'call_1_delayed') {
+    return 'call_1_delayed'
+  }
   if (!st.inc_call1_at && incBucket === 'call_1') {
     if (cd === INCUBATION_PERIODIC_CALL1_CYCLE_DAY) return 'call_1'
     return null
@@ -283,8 +286,8 @@ export function generateIncubationOfficerStagingTasks(
     if (days >= 11 && storeHasShipped(store) && countAnsweredCalls(log) === 0) return
 
     const cycleDay = getIncubationCycleDay(store)
-    /** أي مهمة في هذه الصفحة فقط في أيام الموعد 1 و 3 و 10 (لا يوم 2 ولا 9…) */
-    if (!isMoPeriodicTouchCycleDay(cycleDay)) return
+    /** أي مهمة في هذه الصفحة فقط في أيام الموعد 1 و 3 و 10 — ما عدا «تأخير المكالمة الأولى» (يظهر يومياً) */
+    if (incBucket !== 'call_1_delayed' && !isMoPeriodicTouchCycleDay(cycleDay)) return
 
     if (
       store.bucket === 'incubating'
@@ -313,16 +316,18 @@ export function generateIncubationOfficerStagingTasks(
       return
     }
 
-    if (['call_1', 'call_2', 'call_3', 'between_calls'].includes(incBucket)) {
+    if (['call_1', 'call_1_delayed', 'call_2', 'call_3', 'between_calls'].includes(incBucket)) {
       const periodicInc = resolvePeriodicIncTouchpoint(incBucket, store, storeStates)
       if (!periodicInc) return
 
       const incubationBadge =
-        isStagingOrDev && periodicInc === 'call_2'
-          ? '⚠️ المكالمة الثانية للمتجر'
-          : isStagingOrDev && periodicInc === 'call_3'
-            ? '🚨 المكالمة الثالثة والأخيرة'
-            : retro.badge
+        periodicInc === 'call_1_delayed'
+          ? '⏰ تأخير المكالمة الأولى'
+          : isStagingOrDev && periodicInc === 'call_2'
+            ? '⚠️ المكالمة الثانية للمتجر'
+            : isStagingOrDev && periodicInc === 'call_3'
+              ? '🚨 المكالمة الثالثة والأخيرة'
+              : retro.badge
 
       const answeredToday = isContactedAnsweredToday(log) && hideDailyTaskDueToCallToday(log)
       const overdueInfo = isOverdueForStage(store, storeStates, days)
@@ -332,11 +337,13 @@ export function generateIncubationOfficerStagingTasks(
       const stageDocumentedOk = incubationStageCallDocumentedNonNoAnswer(log, stRow, periodicInc)
 
       const label =
-        periodicInc === 'call_1'
-          ? 'مسار الاحتضان — المكالمة الأولى'
-          : periodicInc === 'call_2'
-            ? 'مسار الاحتضان — المكالمة الثانية'
-            : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
+        periodicInc === 'call_1_delayed'
+          ? 'مسار الاحتضان — تأخير المكالمة الأولى'
+          : periodicInc === 'call_1'
+            ? 'مسار الاحتضان — المكالمة الأولى'
+            : periodicInc === 'call_2'
+              ? 'مسار الاحتضان — المكالمة الثانية'
+              : 'مسار الاحتضان — المكالمة الثالثة (تخريج)'
 
       const descBase = `سجّل المكالمة — يوم الدورة ${cycleDay} من 14 — كود ${store.id} — ${retro.label}`
 
@@ -369,7 +376,7 @@ export function generateIncubationOfficerStagingTasks(
       tasks.push({
         id: `${store.id}-inc-${periodicInc}`,
         store,
-        priority: periodicInc === 'call_1' || periodicInc === 'call_3' ? 'high' : 'normal',
+        priority: periodicInc === 'call_1' || periodicInc === 'call_1_delayed' || periodicInc === 'call_3' ? 'high' : 'normal',
         type: 'new_call',
         label,
         desc: `${descBase} — الموعد يُحسب من الخادم بعد إتمام المكالمة السابقة`,
