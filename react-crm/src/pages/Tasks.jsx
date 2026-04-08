@@ -1037,7 +1037,6 @@ export default function Tasks() {
   useEffect(() => {
     moTabRef.current = moTab
   }, [moTab])
-  const [activeDelayedWf, setActiveDelayedWf] = useState(null)
   const moSweepLoadedRef = useRef(null)
   const [dismissErr, setDismissErr] = useState('')
   /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
@@ -1087,20 +1086,6 @@ export default function Tasks() {
     }
   }, [user?.role, user?.username])
 
-  const loadActiveDelayedWf = useCallback(async () => {
-    if (user?.role !== 'active_manager' || !user?.username) {
-      setActiveDelayedWf(null)
-      return
-    }
-    try {
-      const res = await getMyWorkflow(user.username, { queue: 'active', type: 'delayed' })
-      if (res?.success && res?.type === 'delayed') setActiveDelayedWf(res)
-      else setActiveDelayedWf(null)
-    } catch {
-      setActiveDelayedWf(null)
-    }
-  }, [user?.role, user?.username])
-
   const loadDismissals = useCallback(() => {
     const u = user?.username
     if (!u) return
@@ -1121,9 +1106,13 @@ export default function Tasks() {
   useEffect(() => {
     const t = location.state?.openTasksTab
     if (t === 'am_cold_verify' || t === 'cold_verify' || t === 'delayed_calls') {
-      setMoTab(t)
+      if (user?.role === 'active_manager' && t === 'delayed_calls') {
+        setMoTab('periodic')
+      } else {
+        setMoTab(t)
+      }
     }
-  }, [location.state])
+  }, [location.state, user?.role])
 
   /** مسؤول المتاجر النشطة: تبويبه «am_cold_verify» وليس دفعة مسؤول المتاجر الجديدة */
   useEffect(() => {
@@ -1140,11 +1129,12 @@ export default function Tasks() {
     loadActiveWf()
   }, [loadActiveWf, lastLoaded])
 
+  /** مسؤول المتاجر النشطة: تأخيرات المكالمات لمسؤول المتاجر فقط — لا يُعرَض التبويب هنا */
   useEffect(() => {
     if (user?.role === 'active_manager' && moTab === 'delayed_calls') {
-      void loadActiveDelayedWf()
+      setMoTab('periodic')
     }
-  }, [user?.role, moTab, loadActiveDelayedWf, lastLoaded])
+  }, [user?.role, moTab])
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
@@ -1320,6 +1310,9 @@ export default function Tasks() {
     user?.role === 'incubation_manager' || user?.role === 'executive'
   /** دفعة «تحقيق بارد» لمسؤول المتاجر النشطة — من غير نشط بارد (20 ثابتة، تخزين منفصل) */
   const showAmColdTab = user?.role === 'active_manager'
+  /** «تأخيرات المكالمات» لمسؤول المتاجر الجديدة والتنفيذي فقط — وليس لمسؤول المتاجر النشطة */
+  const showMoDelayedCallsTab =
+    user?.role === 'incubation_manager' || user?.role === 'executive'
   const bizDateKeyCold = useMemo(() => getBizDateKeyAt9am(new Date(nowTick)), [nowTick])
 
   const coldInactivePoolCount = useMemo(
@@ -1364,7 +1357,7 @@ export default function Tasks() {
     [amColdVerificationTasksAll, dismissalKeys],
   )
 
-  /** نفس شرط «متابعة دورية» و«تأخيرات المكالمات» قبل الترتيب/حد 50 لمسؤول النشطين */
+  /** نفس شرط «متابعة دورية» و«تأخيرات المكالمات» (لمن يملك التبويب) قبل الترتيب/حد 50 لمسؤول النشطين */
   const moPeriodicEligibleTasks = useMemo(() => {
     if (!isTaskTabUser) return []
     return mainTasks.filter(
@@ -1374,17 +1367,6 @@ export default function Tasks() {
     )
   }, [isTaskTabUser, mainTasks, callLogs, assignments])
 
-  const delayedOrderIndex = useMemo(() => {
-    const rows = activeDelayedWf?.delayed_tasks
-    if (!Array.isArray(rows) || !rows.length) return new Map()
-    const m = new Map()
-    rows.forEach((row, i) => {
-      const id = row?.store_id
-      if (id != null) m.set(String(id), i)
-    })
-    return m
-  }, [activeDelayedWf])
-
   const moPeriodicTasks = useMemo(() => {
     if (!isTaskTabUser) return mainTasks
     const filtered = moPeriodicEligibleTasks
@@ -1393,23 +1375,11 @@ export default function Tasks() {
   }, [isTaskTabUser, mainTasks, moPeriodicEligibleTasks, user?.role])
 
   const moDelayedTasks = useMemo(() => {
-    if (!isTaskTabUser) return []
-    let pool = moPeriodicEligibleTasks.filter(t => isDailyTasksCallDelayTask(t, storeStates))
-    if (user?.role === 'active_manager' && delayedOrderIndex.size > 0) {
-      pool = [...pool].sort((a, b) => {
-        const ia = delayedOrderIndex.get(String(a.store.id))
-        const ib = delayedOrderIndex.get(String(b.store.id))
-        if (ia !== undefined && ib !== undefined) return ia - ib
-        if (ia !== undefined) return -1
-        if (ib !== undefined) return 1
-        return sortDailyTasksDelayed(a, b)
-      })
-    } else {
-      pool = [...pool].sort(sortDailyTasksDelayed)
-    }
-    if (user?.role !== 'active_manager') return pool
-    return pool.slice(0, 50)
-  }, [isTaskTabUser, moPeriodicEligibleTasks, user?.role, delayedOrderIndex, storeStates])
+    if (!isTaskTabUser || !showMoDelayedCallsTab) return []
+    const pool = moPeriodicEligibleTasks
+      .filter(t => isDailyTasksCallDelayTask(t, storeStates))
+    return [...pool].sort(sortDailyTasksDelayed)
+  }, [isTaskTabUser, showMoDelayedCallsTab, moPeriodicEligibleTasks, storeStates])
 
   /** أعداد مراحل المكالمة ضمن نفس مصفوفة تبويب «متابعة دورية» (تفادي جمع وسوم خاطئة مع العدد الإجمالي) */
   const moPeriodicRetroCounts = useMemo(() => {
@@ -1661,7 +1631,6 @@ export default function Tasks() {
         if (mar?.notify_ar) setToastMsg(mar.notify_ar)
         await reload()
         await loadActiveWf()
-        if (moTabRef.current === 'delayed_calls') void loadActiveDelayedWf()
         loadDismissals()
         focusNoAnswerView()
         return
@@ -1849,15 +1818,9 @@ export default function Tasks() {
             {user?.role === 'active_manager'
               && moTab !== 'am_cold_verify'
               && moTab !== 'cold_verify'
-              && moTab !== 'delayed_calls'
               && (
               <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
-                يُعبَّأ طابورك تلقائياً حتى 50 متجراً نشطاً؛ لا يُعاد اختيار نفس المتجر من المجمع في يومَي العمل السابقين. في «متابعة دورية» تُعرَض كل المهام غير المنجزة مع تثبيت المتأخّرات أعلى القائمة؛ سجّل المكالمة أو استخدم صفحة «طابور المهام» للإجراءات «تم التواصل» و«لم يرد».
-              </p>
-            )}
-            {user?.role === 'active_manager' && moTab === 'delayed_calls' && (
-              <p className="text-orange-100/95 text-xs mt-2 max-w-2xl leading-relaxed rounded-xl px-3 py-2 border border-orange-300/30 bg-orange-500/10">
-                يُحدَّد التأخير من مسار الاحتضان (48 ساعة / يوم 3 / يوم 10) أو من تعيين متأخر في الطابور. يُعرض حتى 50 متجراً؛ عند إتمام المكالمة أو «لم يرد» يُحلّ المتجر ويُستبدل من المجمع كما في «المتابعة الدورية». الترتيب يطابق الخادم عند توفر بيانات التسجيل في قاعدة البيانات.
+                يُعبَّأ طابورك تلقائياً حتى 50 متجراً نشطاً؛ لا يُعاد اختيار نفس المتجر من المجمع في يومَي العمل السابقين. في «متابعة دورية» تُعرَض المهام غير المنجزة مع ترتيب يفضّل المراحل الأشدّ حاجة؛ سجّل المكالمة أو استخدم «تم التواصل» و«لم يرد». تأخيرات نوافذ الاحتضان تظهر لمسؤول المتاجر وليس في حسابك.
               </p>
             )}
             {pendingTasks.length > 0 && (
@@ -1881,9 +1844,6 @@ export default function Tasks() {
           <motion.button
             onClick={() => {
               reload()
-              if (user?.role === 'active_manager' && moTab === 'delayed_calls') {
-                void loadActiveDelayedWf()
-              }
             }}
             disabled={loading}
             whileHover={{ scale: 1.05 }}
@@ -1932,34 +1892,36 @@ export default function Tasks() {
                 {moPeriodicTasks.length}
               </span>
             </motion.button>
-            <motion.button
-              type="button"
-              onClick={() => setMoTab('delayed_calls')}
-              whileTap={{ scale: 0.97 }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                moTab === 'delayed_calls'
-                  ? 'text-white shadow-lg'
-                  : 'bg-white border border-orange-200 text-orange-900 hover:bg-orange-50'
-              }`}
-              style={
-                moTab === 'delayed_calls'
-                  ? {
-                      background: 'linear-gradient(135deg, #ea580c, #c2410c)',
-                      boxShadow: '0 4px 14px rgba(234,88,12,0.38)',
-                    }
-                  : {}
-              }
-            >
-              <Clock size={16} className={moTab === 'delayed_calls' ? 'text-white/95' : 'text-orange-600'} aria-hidden />
-              تأخيرات المكالمات
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                  moTab === 'delayed_calls' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-800'
+            {showMoDelayedCallsTab && (
+              <motion.button
+                type="button"
+                onClick={() => setMoTab('delayed_calls')}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  moTab === 'delayed_calls'
+                    ? 'text-white shadow-lg'
+                    : 'bg-white border border-orange-200 text-orange-900 hover:bg-orange-50'
                 }`}
+                style={
+                  moTab === 'delayed_calls'
+                    ? {
+                        background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                        boxShadow: '0 4px 14px rgba(234,88,12,0.38)',
+                      }
+                    : {}
+                }
               >
-                {moDelayedTasks.length}
-              </span>
-            </motion.button>
+                <Clock size={16} className={moTab === 'delayed_calls' ? 'text-white/95' : 'text-orange-600'} aria-hidden />
+                تأخيرات المكالمات
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    moTab === 'delayed_calls' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-800'
+                  }`}
+                >
+                  {moDelayedTasks.length}
+                </span>
+              </motion.button>
+            )}
             <motion.button
               type="button"
               onClick={() => setMoTab('contacted')}
@@ -2337,14 +2299,10 @@ export default function Tasks() {
             loadDismissals()
             void loadInactiveWf()
             void loadActiveWf()
-            if (user?.role === 'active_manager' && moTabRef.current === 'delayed_calls') {
-              void loadActiveDelayedWf()
-            }
             if (
               user?.role === 'active_manager'
               && selectedTask
               && ['assigned_store', 'new_merchant_onboarding'].includes(selectedTask.type)
-              && moTabRef.current !== 'delayed_calls'
             ) {
               setMoTab('contacted')
             }
