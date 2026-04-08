@@ -5,6 +5,19 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/workflow-queue-lib.php';
 
+/** عمود outcome في call_logs (قواعد قديمة) */
+function wf_ensure_call_logs_outcome(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec('ALTER TABLE call_logs ADD COLUMN outcome VARCHAR(32) NULL DEFAULT NULL AFTER note');
+    } catch (Throwable $e) {
+    }
+    $done = true;
+}
+
 $pdo = getDB();
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
@@ -150,7 +163,7 @@ elseif ($action === 'mark_no_answer') {
     $sid = (string) $storeId;
     $upd = $pdo->prepare("
         UPDATE store_assignments
-        SET workflow_status = 'no_answer', workflow_updated_at = NOW()
+        SET workflow_status = 'no_answer', workflow_updated_at = NOW(), assigned_at = NOW()
         WHERE store_id = ? AND assigned_to = ? AND workflow_status = 'active' AND assignment_queue = ?
     ");
     $upd->execute([$sid, $username, $queue]);
@@ -186,6 +199,77 @@ elseif ($action === 'mark_no_answer') {
         }
     }
     jsonResponse($payload);
+}
+
+// ========== POST: متابعة دورية — تم التواصل (إكمال التعيين + سجل مكالمة + إحلال من المجمع) ==========
+elseif ($action === 'mark_active_contacted') {
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $username = trim((string) ($input['username'] ?? ''));
+    if ($storeId <= 0 || $username === '') {
+        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    $sid = (string) $storeId;
+    $storeName = trim((string) ($input['store_name'] ?? ''));
+
+    $upd = $pdo->prepare("
+        UPDATE store_assignments
+        SET workflow_status = 'completed', workflow_updated_at = NOW()
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
+    ");
+    $upd->execute([$sid, $username]);
+    if ($upd->rowCount() === 0) {
+        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط (قيد المتابعة) لهذا المتجر أو تمت معالجته.'], 400);
+    }
+
+    wf_ensure_call_logs_outcome($pdo);
+    $roleStmt = $pdo->prepare('SELECT role FROM users WHERE username = ? LIMIT 1');
+    $roleStmt->execute([$username]);
+    $performedRole = (string) ($roleStmt->fetchColumn() ?: 'active_manager');
+    $pdo->prepare('
+        INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ')->execute([
+        $storeId,
+        $storeName,
+        'periodic_followup',
+        'متابعة دورية — تم التواصل من طابور المهام',
+        'answered',
+        $username,
+        $performedRole,
+    ]);
+
+    try {
+        $pdo->prepare("
+            UPDATE store_states SET category = 'completed', last_call_date = NOW()
+            WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')
+        ")->execute([$storeId]);
+    } catch (Throwable $e) {
+    }
+
+    $pdo->prepare("
+        INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([
+        $storeId,
+        $storeName,
+        'متابعة دورية — تم التواصل',
+        'إكمال من الطابور النشط وإحلال من المجمع',
+        $username,
+        $performedRole,
+    ]);
+
+    ensure_active_daily_stats_schema($pdo);
+    increment_active_daily_success($pdo, $username);
+    $filled = fill_slots_for_user($pdo, $username, $username, null);
+    $count = get_active_daily_success_count($pdo, $username);
+    jsonResponse([
+        'success' => true,
+        'replacement_added' => $filled,
+        'daily_successful_contacts' => $count,
+        'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_target_reached' => $count >= ACTIVE_DAILY_SUCCESS_TARGET,
+        'goal_just_met' => $count === ACTIVE_DAILY_SUCCESS_TARGET,
+    ]);
 }
 
 // ========== POST: اتصال ناجح (تم) — إزالة من الطابور النشط + عدّ اليوم + تعبئة ==========

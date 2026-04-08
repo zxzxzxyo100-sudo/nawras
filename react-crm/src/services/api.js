@@ -143,6 +143,10 @@ export const fillAllInactiveQueues = (data) =>
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
 
+/** متابعة دورية — تم التواصل: إكمال التعيين + سجل مكالمة + إحلال من المجمع */
+export const markActiveWorkflowContacted = (data) =>
+  http.post('/active-workflow.php?action=mark_active_contacted', data).then(r => r.data)
+
 /** اتصال ناجح (تم) — طابور استعادة غير النشط: حذف من الطابور + عدّ يومي + تعبئة */
 export const completeInactiveQueueSuccess = (data) =>
   http.post('/active-workflow.php?action=complete_inactive_success', data).then(r => r.data)
