@@ -338,11 +338,10 @@ elseif ($action === 'log_call') {
         if ($oc === 'answered') {
             $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
                 ->execute([$sid]);
-        } elseif ($oc === 'busy') {
+        } elseif ($oc === 'busy' || $oc === 'no_answer') {
             $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
                 ->execute([$sid]);
         }
-        // no_answer: لا تغيير لفئة المتجر — يبقى في المهام اليومية معلّقاً حتى اتصال ناجح
     }
 
     // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——
