@@ -248,7 +248,7 @@ if (!empty($new)) {
         }
         $ids = array_keys($new);
         $ph = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category, state_reason FROM store_states WHERE store_id IN ($ph)");
+        $stmt = $pdoDb->prepare("SELECT store_id, inc_call1_at, inc_call2_at, inc_call3_at, category, state_reason, last_call_date FROM store_states WHERE store_id IN ($ph)");
         $stmt->execute(array_map('intval', $ids));
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $dbMap[(int) $row['store_id']] = $row;
@@ -314,6 +314,22 @@ foreach ($new as $id => $s) {
         $s['_never_started'] = true;
         $result['cold_inactive'][] = $s;
         $counts['cold_inactive']++;
+        $counts['total_active']++;
+        $counts['total']++;
+        continue;
+    }
+
+    // منجز / تم التواصل من المتابعة الدورية أو الواجهة — إخراج من مسار الاحتضان ونقل لقائمة المنجزين
+    if ($db && in_array($dbCat, ['completed', 'contacted'], true)) {
+        if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $s['_cat'] = $dbCat;
+        if (!empty($db['last_call_date'])) {
+            $s['last_call_date'] = $db['last_call_date'];
+        }
+        $result['completed_merchants'][] = $s;
+        $counts['completed_merchants']++;
         $counts['total_active']++;
         $counts['total']++;
         continue;
@@ -700,10 +716,21 @@ try {
                 }
             }
             $result['active_shipping'] = $activePending;
-            $result['completed_merchants'] = $completed;
+            $mergedCompleted = array_merge($result['completed_merchants'] ?? [], $completed);
+            $seenC = [];
+            $dedupCompleted = [];
+            foreach ($mergedCompleted as $row) {
+                $cid = (int) ($row['id'] ?? 0);
+                if ($cid <= 0 || isset($seenC[$cid])) {
+                    continue;
+                }
+                $seenC[$cid] = true;
+                $dedupCompleted[] = $row;
+            }
+            $result['completed_merchants'] = $dedupCompleted;
             $result['unreachable_merchants'] = $unreachable;
             $counts['active_shipping'] = count($activePending);
-            $counts['completed_merchants'] = count($completed);
+            $counts['completed_merchants'] = count($dedupCompleted);
             $counts['unreachable_merchants'] = count($unreachable);
         }
     }
