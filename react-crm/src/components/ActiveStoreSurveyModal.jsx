@@ -97,7 +97,11 @@ export default function ActiveStoreSurveyModal({
     saveSurvey(payload)
       .then(async () => {
         if (workflowMode && workflowUsername) {
-          await releaseAfterSurvey({ store_id: store.id, username: workflowUsername })
+          await releaseAfterSurvey({
+            store_id: store.id,
+            store_name: store.name || '',
+            username: workflowUsername,
+          })
         }
         onSaved?.()
       })

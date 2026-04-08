@@ -231,7 +231,8 @@ elseif ($action === 'mark_active_contacted') {
     $upd = $pdo->prepare("
         UPDATE store_assignments
         SET workflow_status = 'completed', workflow_updated_at = NOW()
-        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'
+        AND workflow_status IN ('active','no_answer')
     ");
     $upd->execute([$sid, $username]);
     if ($upd->rowCount() === 0) {
@@ -255,13 +256,7 @@ elseif ($action === 'mark_active_contacted') {
         $performedRole,
     ]);
 
-    try {
-        $pdo->prepare("
-            UPDATE store_states SET category = 'completed', last_call_date = NOW()
-            WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')
-        ")->execute([$storeId]);
-    } catch (Throwable $e) {
-    }
+    workflow_mark_active_store_contacted_completed($pdo, $storeId, $storeName, $username);
 
     $pdo->prepare("
         INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
@@ -348,6 +343,8 @@ elseif ($action === 'release_after_survey') {
     increment_active_daily_success($pdo, $username);
     $fill = fill_slots_for_user($pdo, $username, $username, null);
     $count = get_active_daily_success_count($pdo, $username);
+    $sn = trim((string) ($input['store_name'] ?? ''));
+    workflow_mark_active_store_contacted_completed($pdo, $storeId, $sn, $username);
     jsonResponse([
         'success' => true,
         'filled' => $fill,

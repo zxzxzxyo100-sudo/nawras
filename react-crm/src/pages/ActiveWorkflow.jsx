@@ -140,11 +140,24 @@ export default function ActiveWorkflow() {
     if (!username) return
     setContactedLoading(row.store_id)
     setErr('')
+    const sid = String(row.store_id)
     try {
       await markActiveWorkflowContacted({
         store_id: row.store_id,
         store_name: row.store_name || '',
         username,
+      })
+      setWf((prev) => {
+        if (!prev?.success) return prev
+        const nextActive = (prev.active_tasks || []).filter((r) => String(r.store_id) !== sid)
+        const nextNoAns = (prev.no_answer_tasks || []).filter((r) => String(r.store_id) !== sid)
+        return {
+          ...prev,
+          active_tasks: nextActive,
+          no_answer_tasks: nextNoAns,
+          active_count: nextActive.length,
+          no_answer_count: nextNoAns.length,
+        }
       })
       await reload()
       await loadWf()

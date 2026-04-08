@@ -130,7 +130,7 @@ async function runTaskCompletionAfterAnswered({
         taskCompletion.onInactiveGoalBurst?.()
       }
     } else if (taskCompletion.releaseActiveWorkflow && user?.role === 'active_manager') {
-      const rel = await releaseAfterSurvey({ store_id: sid, username: u })
+      const rel = await releaseAfterSurvey({ store_id: sid, store_name: sname || '', username: u })
       if (rel?.goal_just_met) {
         taskCompletion.onActiveGoalBurst?.()
       }
