@@ -122,6 +122,53 @@ function active_pipeline_where_sql() {
     return "ss.category IN ('active','active_shipping','active_pending_calls')";
 }
 
+/**
+ * إزالة تعيينات طابور «متابعة دورية» (assignment_queue = active) عندما لم يعد المتجر ضمن احتضان المسؤول النشط.
+ * يُستدعى من all-stores.php بعد التصنيف حتى لا يبقى متجر «ساخن/بارد/منجز…» مُسنداً بعد تغيّر حالته.
+ */
+function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array $result) {
+    ensure_workflow_schema($pdo);
+    try {
+        $pdo->exec("
+            DELETE sa FROM store_assignments sa
+            INNER JOIN store_states ss ON CAST(sa.store_id AS CHAR) = CAST(ss.store_id AS CHAR)
+            WHERE sa.assignment_queue = 'active'
+            AND ss.category IN (
+                'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
+            )
+        ");
+    } catch (Throwable $e) {
+    }
+    $seen = [];
+    foreach (['hot_inactive', 'cold_inactive', 'completed_merchants', 'frozen_merchants', 'unreachable_merchants'] as $key) {
+        foreach ($result[$key] ?? [] as $s) {
+            $id = isset($s['id']) ? (int) $s['id'] : 0;
+            if ($id > 0) {
+                $seen[$id] = true;
+            }
+        }
+    }
+    if ($seen === []) {
+        return;
+    }
+    $ids = array_keys($seen);
+    foreach (array_chunk($ids, 200) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $bind = array_map(static function ($x) {
+            return (string) $x;
+        }, $chunk);
+        try {
+            $st = $pdo->prepare("
+                DELETE FROM store_assignments
+                WHERE assignment_queue = 'active'
+                AND CAST(store_id AS CHAR) IN ($ph)
+            ");
+            $st->execute($bind);
+        } catch (Throwable $e) {
+        }
+    }
+}
+
 /** سجل متاجر اختيرت من المجمع لمسؤول النشط — لعدم تكرار نفس المتجر في أمس والأمس السابق */
 function ensure_active_pool_rotation_schema(PDO $pdo) {
     static $done = false;
