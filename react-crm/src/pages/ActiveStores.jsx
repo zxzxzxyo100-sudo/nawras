@@ -363,7 +363,9 @@ export default function ActiveStores() {
               <span>{completed.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
             )}
             {isUnreachableTab && (
-              <span>{unreachable.length} متجر — «لم يرد» أو «مشغول»؛ يُنقل للمنجزة عند «تم الرد»</span>
+              <span>
+                {unreachable.length} متجر — من مكالمة عامة («لم يرد»/«مشغول») أو زر «لم يرد» في المتابعة الدورية؛ يُنقل للمنجزة عند «تم الرد»
+              </span>
             )}
             {isPendingTab && (stores.incubating || []).some(s => {
               const c = storeStates[s.id]?.category
@@ -565,7 +567,7 @@ export default function ActiveStores() {
               المتاجر النشطة — قيد المكالمة
             </h2>
             <p className="text-[11px] text-emerald-800/80 mt-0.5">
-              «تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول للمتجر». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المكالمة.
+              «تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» في المكالمة العامة، أو «لم يرد» من المتابعة الدورية (طابور المهام)، يُضاف إلى «لم يتم الوصول للمتجر». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المكالمة.
             </p>
           </div>
 
@@ -665,7 +667,7 @@ export default function ActiveStores() {
               لم يتم الوصول للمتجر
             </h2>
             <p className="text-[11px] text-amber-900/80 mt-0.5">
-              تُسجَّل هنا عند اختيار «لم يرد» أو «مشغول» في مكالمة عامة. عند «تم الرد» في مكالمة لاحقة يُنقل المتجر إلى «المتاجر المنجزة».
+              تُسجَّل هنا عند اختيار «لم يرد» أو «مشغول» في مكالمة عامة، أو عند زر «لم يرد» في المتابعة الدورية (طابور المهام). عند «تم الرد» في مكالمة لاحقة يُنقل المتجر إلى «المتاجر المنجزة».
             </p>
           </div>
           <StoreTable
@@ -674,7 +676,7 @@ export default function ActiveStores() {
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={unreachableExtraColumns}
-            emptyMsg="لا توجد متاجر — تظهر هنا عند تسجيل مكالمة بـ «لم يرد» أو «مشغول»"
+            emptyMsg="لا توجد متاجر — تظهر هنا عند «لم يرد» أو «مشغول» في مكالمة عامة أو عند «لم يرد» من المتابعة الدورية"
             parcelsColumnSub={
               shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
                 ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
