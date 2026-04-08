@@ -2,6 +2,9 @@
 /**
  * متاجر جديدة ضمن دورة الاحتضان (≤14 يوماً) لها سجل في طابور المتابعة الدورية (المهام اليومية):
  * تم التواصل (workflow completed) أو لم يرد (no_answer).
+ *
+ * المصادر: تعيينات الطابور + (احتياطي) سجلات مكالمات «تم الرد» + صفوف store_states منجزة
+ * حتى لا تختفي المتاجر إذا لم يُحدَّث workflow_status أو حُذف التعيين.
  */
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/config.php';
@@ -107,14 +110,115 @@ function ifs_call_type_label_ar($t) {
     }
 }
 
+/** نتيجة مكالمة تُعد «تم الرد» في الواجهة */
+function ifs_answered_outcome($o) {
+    $x = trim((string) $o);
+
+    return $x === 'answered' || $x === 'callback' || $x === '';
+}
+
+function ifs_pb_matches($pb, $username, $fullname) {
+    $w = mb_strtolower(trim((string) $pb), 'UTF-8');
+    if ($w === '') {
+        return false;
+    }
+    $u = mb_strtolower(trim((string) $username), 'UTF-8');
+    $f = mb_strtolower(trim((string) $fullname), 'UTF-8');
+    if ($u !== '' && $w === $u) {
+        return true;
+    }
+    if ($f !== '' && $w === $f) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * @param array<string,mixed> $m
+ * @param array{assigned_to?:string,assigned_at?:?string,workflow_updated_at?:?string,store_name?:string} $meta
+ * @param array<string,mixed>|null $lc
+ */
+function ifs_try_build_row(
+    int $mid,
+    array $m,
+    array $meta,
+    $lc,
+    string $followupStatus,
+    $now,
+    string $regFrom,
+    string $regTo,
+    string $q,
+    int $maxDaysReg
+) {
+    $regAt = !empty($m['registered_at']) ? (string) $m['registered_at'] : '';
+    $regTs = $regAt !== '' ? strtotime($regAt) : false;
+    $daysReg = ($regTs !== false && $regTs > 0) ? ($now - $regTs) / 86400 : 0;
+    if ($daysReg > $maxDaysReg) {
+        return null;
+    }
+
+    if ($regFrom !== '') {
+        $fromTs = strtotime($regFrom . ' 00:00:00');
+        if ($regTs !== false && $regTs < $fromTs) {
+            return null;
+        }
+    }
+    if ($regTo !== '') {
+        $toTs = strtotime($regTo . ' 23:59:59');
+        if ($regTs !== false && $regTs > $toTs) {
+            return null;
+        }
+    }
+
+    if ($q !== '') {
+        $needle = mb_strtolower($q, 'UTF-8');
+        $name   = mb_strtolower((string) ($m['name'] ?? $meta['store_name'] ?? ''), 'UTF-8');
+        $idStr  = (string) $mid;
+        if (mb_strpos($name, $needle, 0, 'UTF-8') === false && mb_strpos($idStr, $needle, 0, 'UTF-8') === false) {
+            return null;
+        }
+    }
+
+    $cycleDay = ifs_incubation_cycle_day($regTs !== false ? $regTs : null, $now);
+    $stageLabel = $lc ? ifs_call_type_label_ar($lc['call_type'] ?? '') : '—';
+
+    return [
+        'id'                     => $mid,
+        'name'                   => (string) ($m['name'] ?? $meta['store_name'] ?? ''),
+        'registered_at'          => $regAt,
+        '_cycle_day'             => $cycleDay,
+        '_days_since_reg'        => round($daysReg, 2),
+        'assigned_to'            => (string) ($meta['assigned_to'] ?? ''),
+        'assigned_at'            => $meta['assigned_at'] ?? null,
+        'workflow_updated_at'    => $meta['workflow_updated_at'] ?? null,
+        'followup_status'        => $followupStatus,
+        'last_call_type'         => $lc['call_type'] ?? null,
+        'last_call_stage_label'  => $stageLabel,
+        'last_call_at'           => $lc['created_at'] ?? null,
+        'is_onboarding'          => true,
+        'total_shipments'        => $m['total_shipments'] ?? 0,
+        'last_shipment_date'     => $m['last_shipment_date'] ?? null,
+        'status'                 => $m['status'] ?? null,
+    ];
+}
+
 $pdo = getDB();
 ensure_workflow_schema($pdo);
 
-$role     = trim((string) ($_GET['user_role'] ?? ''));
-$username = trim((string) ($_GET['username'] ?? ''));
-$q        = trim((string) ($_GET['q'] ?? ''));
-$regFrom  = trim((string) ($_GET['reg_from'] ?? ''));
-$regTo    = trim((string) ($_GET['reg_to'] ?? ''));
+$role      = trim((string) ($_GET['user_role'] ?? ''));
+$username  = trim((string) ($_GET['username'] ?? ''));
+$fullname  = trim((string) ($_GET['user_fullname'] ?? ''));
+$q         = trim((string) ($_GET['q'] ?? ''));
+$regFrom   = trim((string) ($_GET['reg_from'] ?? ''));
+$regTo     = trim((string) ($_GET['reg_to'] ?? ''));
+$maxDaysReg = (int) ($_GET['max_days_reg'] ?? 14);
+if ($maxDaysReg < 1) {
+    $maxDaysReg = 14;
+}
+if ($maxDaysReg > 30) {
+    $maxDaysReg = 30;
+}
 
 $now = time();
 
@@ -195,64 +299,188 @@ foreach ($deduped as $r) {
         continue;
     }
 
-    $regAt = !empty($m['registered_at']) ? (string) $m['registered_at'] : '';
-    $regTs = $regAt !== '' ? strtotime($regAt) : false;
-    $daysReg = ($regTs !== false && $regTs > 0) ? ($now - $regTs) / 86400 : 0;
-    if ($daysReg > 14) {
+    $followupStatus = ($r['workflow_status'] ?? '') === 'completed' ? 'contacted' : 'no_answer';
+    $lc = $lastCalls[$sidKey] ?? $lastCalls[(string) $mid] ?? null;
+    $meta = [
+        'assigned_to'         => (string) ($r['assigned_to'] ?? ''),
+        'assigned_at'         => $r['assigned_at'] ?? null,
+        'workflow_updated_at' => $r['workflow_updated_at'] ?? null,
+        'store_name'          => (string) ($r['store_name'] ?? ''),
+    ];
+    $item = ifs_try_build_row($mid, $m, $meta, $lc, $followupStatus, $now, $regFrom, $regTo, $q, $maxDaysReg);
+    if ($item === null) {
         continue;
     }
-
-    if ($regFrom !== '') {
-        $fromTs = strtotime($regFrom . ' 00:00:00');
-        if ($regTs !== false && $regTs < $fromTs) {
-            continue;
-        }
-    }
-    if ($regTo !== '') {
-        $toTs = strtotime($regTo . ' 23:59:59');
-        if ($regTs !== false && $regTs > $toTs) {
-            continue;
-        }
-    }
-
-    if ($q !== '') {
-        $needle = mb_strtolower($q, 'UTF-8');
-        $name   = mb_strtolower((string) ($m['name'] ?? $r['store_name'] ?? ''), 'UTF-8');
-        $idStr  = (string) $mid;
-        if (mb_strpos($name, $needle, 0, 'UTF-8') === false && mb_strpos($idStr, $needle, 0, 'UTF-8') === false) {
-            continue;
-        }
-    }
-
-    $cycleDay = ifs_incubation_cycle_day($regTs !== false ? $regTs : null, $now);
-    $lc       = $lastCalls[$sidKey] ?? $lastCalls[(string) $mid] ?? null;
-    $stageLabel = $lc ? ifs_call_type_label_ar($lc['call_type'] ?? '') : '—';
-
-    $followupStatus = ($r['workflow_status'] ?? '') === 'completed' ? 'contacted' : 'no_answer';
-
-    $item = [
-        'id'                     => $mid,
-        'name'                   => (string) ($m['name'] ?? $r['store_name'] ?? ''),
-        'registered_at'          => $regAt,
-        '_cycle_day'             => $cycleDay,
-        '_days_since_reg'        => round($daysReg, 2),
-        'assigned_to'            => (string) ($r['assigned_to'] ?? ''),
-        'assigned_at'            => $r['assigned_at'] ?? null,
-        'workflow_updated_at'    => $r['workflow_updated_at'] ?? null,
-        'followup_status'        => $followupStatus,
-        'last_call_type'         => $lc['call_type'] ?? null,
-        'last_call_stage_label'  => $stageLabel,
-        'last_call_at'           => $lc['created_at'] ?? null,
-        'is_onboarding'          => true,
-        'total_shipments'        => $m['total_shipments'] ?? 0,
-        'last_shipment_date'     => $m['last_shipment_date'] ?? null,
-        'status'                 => $m['status'] ?? null,
-    ];
 
     if ($followupStatus === 'contacted') {
         $contacted[] = $item;
     } else {
         $noAnswer[] = $item;
+    }
+}
+
+$listedIds = [];
+foreach ($contacted as $it) {
+    $listedIds[(string) $it['id']] = true;
+}
+foreach ($noAnswer as $it) {
+    $listedIds[(string) $it['id']] = true;
+}
+
+// ── احتياطي «تم التواصل»: آخر مكالمة ناجحة خلال 30 يوماً (مهام يومية / احتضان) ──
+$logStmt = $pdo->query("
+    SELECT store_id, call_type, outcome, created_at, performed_by
+    FROM call_logs
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    AND call_type IN ('periodic_followup', 'inc_call1', 'inc_call2', 'inc_call3', 'general')
+    ORDER BY created_at DESC
+");
+$latestAnsweredByStore = [];
+if ($logStmt) {
+    while ($row = $logStmt->fetch(PDO::FETCH_ASSOC)) {
+        $sk = (string) ($row['store_id'] ?? '');
+        if ($sk === '' || isset($latestAnsweredByStore[$sk])) {
+            continue;
+        }
+        if (!ifs_answered_outcome($row['outcome'] ?? '')) {
+            continue;
+        }
+        $latestAnsweredByStore[$sk] = $row;
+    }
+}
+
+foreach ($latestAnsweredByStore as $sk => $lc) {
+    if (isset($listedIds[$sk])) {
+        continue;
+    }
+    if ($role === 'active_manager' && $username !== '') {
+        if (!ifs_pb_matches($lc['performed_by'] ?? '', $username, $fullname)) {
+            continue;
+        }
+    }
+    $mid = (int) $sk;
+    if ($mid <= 0) {
+        continue;
+    }
+    $m = ifs_pick_merchant($merchants, $mid);
+    if (!$m) {
+        continue;
+    }
+    $meta = [
+        'assigned_to'         => (string) ($lc['performed_by'] ?? ''),
+        'assigned_at'         => null,
+        'workflow_updated_at' => $lc['created_at'] ?? null,
+        'store_name'          => '',
+    ];
+    $item = ifs_try_build_row($mid, $m, $meta, $lc, 'contacted', $now, $regFrom, $regTo, $q, $maxDaysReg);
+    if ($item === null) {
+        continue;
+    }
+    $contacted[] = $item;
+    $listedIds[$sk] = true;
+}
+
+// ── احتياطي: منجز في store_states ضمن نافذة تسجيل Nawris ──
+try {
+    $ssStmt = $pdo->query("
+        SELECT store_id, store_name, category, updated_by, last_call_date
+        FROM store_states
+        WHERE category IN ('completed', 'contacted')
+    ");
+    if ($ssStmt) {
+        while ($ss = $ssStmt->fetch(PDO::FETCH_ASSOC)) {
+            $sk = (string) ($ss['store_id'] ?? '');
+            if ($sk === '' || isset($listedIds[$sk])) {
+                continue;
+            }
+            $mid = (int) $sk;
+            if ($mid <= 0) {
+                continue;
+            }
+            $m = ifs_pick_merchant($merchants, $mid);
+            if (!$m) {
+                continue;
+            }
+            if ($role === 'active_manager' && $username !== '') {
+                $ub = trim((string) ($ss['updated_by'] ?? ''));
+                if ($ub !== '' && $ub !== 'system' && $ub !== 'system_no_ship_48h' && !ifs_pb_matches($ub, $username, $fullname)) {
+                    continue;
+                }
+            }
+            $lc = $latestAnsweredByStore[$sk] ?? null;
+            $wfAt = !empty($ss['last_call_date']) ? (string) $ss['last_call_date'] : null;
+            $meta = [
+                'assigned_to'         => (string) ($ss['updated_by'] ?? ''),
+                'assigned_at'         => null,
+                'workflow_updated_at' => $wfAt,
+                'store_name'          => (string) ($ss['store_name'] ?? ''),
+            ];
+            if ($lc === null && $wfAt) {
+                $lc = [
+                    'call_type'   => 'general',
+                    'outcome'     => 'answered',
+                    'created_at'  => $wfAt,
+                    'performed_by'=> $meta['assigned_to'],
+                ];
+            }
+            $item = ifs_try_build_row($mid, $m, $meta, $lc, 'contacted', $now, $regFrom, $regTo, $q, $maxDaysReg);
+            if ($item === null) {
+                continue;
+            }
+            if ($lc === null) {
+                $item['last_call_stage_label'] = 'منجز — سجل الحالة';
+            }
+            $contacted[] = $item;
+            $listedIds[$sk] = true;
+        }
+    }
+} catch (Throwable $e) {
+    // عمود last_call_date قد يكون غير موجوداً في نسخ قديمة
+    try {
+        $ssStmt = $pdo->query("
+            SELECT store_id, store_name, category, updated_by
+            FROM store_states
+            WHERE category IN ('completed', 'contacted')
+        ");
+        if ($ssStmt) {
+            while ($ss = $ssStmt->fetch(PDO::FETCH_ASSOC)) {
+                $sk = (string) ($ss['store_id'] ?? '');
+                if ($sk === '' || isset($listedIds[$sk])) {
+                    continue;
+                }
+                $mid = (int) $sk;
+                if ($mid <= 0) {
+                    continue;
+                }
+                $m = ifs_pick_merchant($merchants, $mid);
+                if (!$m) {
+                    continue;
+                }
+                if ($role === 'active_manager' && $username !== '') {
+                    $ub = trim((string) ($ss['updated_by'] ?? ''));
+                    if ($ub !== '' && $ub !== 'system' && $ub !== 'system_no_ship_48h' && !ifs_pb_matches($ub, $username, $fullname)) {
+                        continue;
+                    }
+                }
+                $lc = $latestAnsweredByStore[$sk] ?? null;
+                $meta = [
+                    'assigned_to'         => (string) ($ss['updated_by'] ?? ''),
+                    'assigned_at'         => null,
+                    'workflow_updated_at' => null,
+                    'store_name'          => (string) ($ss['store_name'] ?? ''),
+                ];
+                $item = ifs_try_build_row($mid, $m, $meta, $lc, 'contacted', $now, $regFrom, $regTo, $q, $maxDaysReg);
+                if ($item === null) {
+                    continue;
+                }
+                if ($lc === null) {
+                    $item['last_call_stage_label'] = 'منجز — سجل الحالة';
+                }
+                $contacted[] = $item;
+                $listedIds[$sk] = true;
+            }
+        }
+    } catch (Throwable $e2) {
     }
 }
 

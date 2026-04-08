@@ -178,9 +178,11 @@ export const getIncubationFollowupStores = (params = {}) =>
       params: {
         user_role: params.user_role ?? '',
         username: params.username ?? '',
+        user_fullname: params.user_fullname ?? '',
         q: params.q ?? '',
         reg_from: params.reg_from ?? '',
         reg_to: params.reg_to ?? '',
+        max_days_reg: params.max_days_reg ?? '',
       },
     })
     .then(r => r.data)
