@@ -377,15 +377,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
-    if (
-      userRole === 'active_manager'
-      && (
-        dbCat === 'cold_inactive'
-        || store.bucket === 'cold_inactive'
-        || dbCat === 'hot_inactive'
-        || store.bucket === 'hot_inactive'
-      )
-    ) {
+    if (userRole === 'active_manager' && (dbCat === 'cold_inactive' || store.bucket === 'cold_inactive')) {
       return
     }
     const incBucket    = store._inc
