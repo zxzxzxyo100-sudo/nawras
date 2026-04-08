@@ -505,7 +505,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       isActive
                         ? 'text-white'
                         : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                    }${navLockSuffix(item.to)}`
+                    }`
                   }
                   style={({ isActive }) => isActive
                     ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
@@ -563,9 +563,9 @@ export default function Sidebar({ isOpen, onClose }) {
                       const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group'
                       if (frostDash) {
                         if (isActive) {
-                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35${navLockSuffix(item.to)}`
+                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35`
                         }
-                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]${navLockSuffix(item.to)}`
+                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]`
                       }
                       return `${base} ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`
                     }}
