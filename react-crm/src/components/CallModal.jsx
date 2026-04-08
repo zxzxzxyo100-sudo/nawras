@@ -317,6 +317,7 @@ export default function CallModal({
         note: note.trim(),
         performed_by: user?.fullname || user?.username || '',
         performed_role: user?.role,
+        username: user?.username ?? '',
         registration_date: store.registered_at || null,
       }
       if (callType === 'inc_call3') {
@@ -351,6 +352,7 @@ export default function CallModal({
         note: note.trim(),
         performed_by: user?.fullname || user?.username || '',
         performed_role: user?.role,
+        username: user?.username ?? '',
         registration_date: store.registered_at || null,
       }
       if (callType === 'inc_call3') {
@@ -471,6 +473,7 @@ export default function CallModal({
         note: note.trim(),
         performed_by: user?.fullname || user?.username || '',
         performed_role: user?.role,
+        username: user?.username ?? '',
         registration_date: store.registered_at || null,
       }
       if (callType === 'inc_call3') {
