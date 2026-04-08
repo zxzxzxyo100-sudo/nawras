@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake, Clock,
+  Phone, RefreshCw, CheckCircle, X, ClipboardList, Snowflake, Clock, Flame, ListOrdered,
 } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { useAuth }    from '../contexts/AuthContext'
@@ -306,6 +306,25 @@ function isContactedAnsweredTodayForUser(log, username, fullname, ref = new Date
     const o = String(c.outcome ?? '').trim()
     return o === 'answered' || o === 'callback' || o === ''
   })
+}
+
+/** ترتيب مجمّع الاستعادة: أقدم تاريخ شحنة أولاً (ثم بلا تاريخ) */
+function lastShipmentSortTsForInactive(store) {
+  const d = store?.last_shipment_date
+  if (!d || String(d).trim() === '' || d === 'لا يوجد') return null
+  const t = new Date(d).getTime()
+  return Number.isFinite(t) ? t : null
+}
+
+function inactiveQueueStatus(assignments, username, storeId) {
+  const a = assignments?.[String(storeId)] ?? assignments?.[Number(storeId)] ?? assignments?.[storeId]
+  if (!a || a.assignment_queue !== 'inactive') {
+    return { kind: 'waiting', label: 'في انتظار التعيين' }
+  }
+  if (String(a.assigned_to ?? '').trim() === String(username ?? '').trim()) {
+    return { kind: 'mine', label: 'معيّنة لك' }
+  }
+  return { kind: 'other', label: `لـ ${a.assigned_to}` }
 }
 
 function generateTasks(allStores, callLogs, storeStates, userRole, username, assignments, inactiveWf, newMerchantOnboardingDoneIds, userFullname = '') {
@@ -1037,6 +1056,8 @@ export default function Tasks() {
   useEffect(() => {
     moTabRef.current = moTab
   }, [moTab])
+  /** مسؤول الاستعادة: معيّنة كلها | ساخنة معيّنة | مجمّع غير النشط حسب آخر شحنة */
+  const [inactiveRecoveryView, setInactiveRecoveryView] = useState('assigned_all')
   const moSweepLoadedRef = useRef(null)
   const [dismissErr, setDismissErr] = useState('')
   /** مسؤول المتاجر: يجب كتابة ملاحظة مكالمة قبل الإخفاء */
@@ -1300,6 +1321,63 @@ export default function Tasks() {
     }
   }, [pendingTasks, callLogs, assignments])
 
+  const inactiveRecoveryTasksAll = useMemo(() => {
+    if (user?.role !== 'inactive_manager') return []
+    return mainTasks.filter(t => t.type === 'recovery_call' && t.workflowQueue === 'inactive')
+  }, [user?.role, mainTasks])
+
+  const inactiveRecoveryHotTasks = useMemo(
+    () => inactiveRecoveryTasksAll.filter(t => t.store?.bucket === 'hot_inactive'),
+    [inactiveRecoveryTasksAll],
+  )
+
+  const inactiveRecoveryNoAnswerTasks = useMemo(() => {
+    if (user?.role !== 'inactive_manager') return []
+    return noAnswerTasks.filter(t => t.type === 'recovery_call' && t.workflowQueue === 'inactive')
+  }, [user?.role, noAnswerTasks])
+
+  const inactivePoolByLastShipment = useMemo(() => {
+    if (user?.role !== 'inactive_manager') return []
+    const m = new Map()
+    for (const s of allStores) {
+      if (s.bucket !== 'hot_inactive' && s.bucket !== 'cold_inactive') continue
+      const id = String(s.id)
+      if (!m.has(id)) m.set(id, s)
+    }
+    const arr = [...m.values()]
+    arr.sort((a, b) => {
+      const ta = lastShipmentSortTsForInactive(a)
+      const tb = lastShipmentSortTsForInactive(b)
+      if (ta == null && tb == null) return String(a.id).localeCompare(String(b.id), 'ar')
+      if (ta == null) return 1
+      if (tb == null) return -1
+      return ta - tb
+    })
+    return arr
+  }, [user?.role, allStores])
+
+  const showInactivePoolTable =
+    user?.role === 'inactive_manager' && inactiveRecoveryView === 'pool'
+
+  const inactiveSubFilterCounts = useMemo(() => {
+    const base =
+      inactiveRecoveryView === 'assigned_hot' ? inactiveRecoveryHotTasks : inactiveRecoveryTasksAll
+    const noAns =
+      inactiveRecoveryView === 'assigned_hot'
+        ? inactiveRecoveryNoAnswerTasks.filter(t => t.store?.bucket === 'hot_inactive')
+        : inactiveRecoveryNoAnswerTasks
+    return {
+      all: base.length,
+      high: base.filter(t => t.priority === 'high').length,
+      no_answer: noAns.length,
+    }
+  }, [
+    inactiveRecoveryView,
+    inactiveRecoveryHotTasks,
+    inactiveRecoveryTasksAll,
+    inactiveRecoveryNoAnswerTasks,
+  ])
+
   /** مسؤول المتاجر الجديدة + مسؤول المتاجر النشطة + التنفيذي — تبويبات المهام (دورة 14 / تم التواصل / لم يتم الرد) */
   const isTaskTabUser =
     user?.role === 'incubation_manager'
@@ -1411,6 +1489,20 @@ export default function Tasks() {
       if (moTab === 'delayed_calls') return moDelayedTasks
       return moPeriodicTasks
     }
+    if (user?.role === 'inactive_manager') {
+      if (inactiveRecoveryView === 'pool') {
+        return []
+      }
+      const base =
+        inactiveRecoveryView === 'assigned_hot' ? inactiveRecoveryHotTasks : inactiveRecoveryTasksAll
+      if (filter === 'no_answer') {
+        return inactiveRecoveryView === 'assigned_hot'
+          ? inactiveRecoveryNoAnswerTasks.filter(t => t.store?.bucket === 'hot_inactive')
+          : inactiveRecoveryNoAnswerTasks
+      }
+      if (filter === 'high') return base.filter(t => t.priority === 'high')
+      return base
+    }
     if (filter === 'no_answer') return noAnswerTasks
     if (filter === 'high') return mainTasks.filter(t => t.priority === 'high')
     return mainTasks
@@ -1425,6 +1517,11 @@ export default function Tasks() {
     filter,
     mainTasks,
     noAnswerTasks,
+    user?.role,
+    inactiveRecoveryView,
+    inactiveRecoveryTasksAll,
+    inactiveRecoveryHotTasks,
+    inactiveRecoveryNoAnswerTasks,
   ])
 
   const focusNoAnswerView = useCallback(() => {
@@ -1754,6 +1851,9 @@ export default function Tasks() {
                   {' / '}
                   {inactiveWf.target ?? 50} متجراً غير نشط
                 </p>
+                <p className="text-violet-300/80 text-xs mt-1.5 max-w-2xl leading-relaxed">
+                  استخدم التبويبات أدناه: «معيّنة لي اليوم»، «ساخنة معيّنة لي»، و«المجمّع — حسب آخر شحنة» لرؤية كل غير النشط وترتيبهم التقريبي.
+                </p>
                 <p
                   className={`text-sm mt-1.5 flex flex-wrap items-center gap-2 ${
                     inactiveWf.daily_target_reached ? 'text-emerald-200' : 'text-amber-200/95'
@@ -2041,6 +2141,142 @@ export default function Tasks() {
             </motion.button>
             )}
           </>
+        ) : user?.role === 'inactive_manager' ? (
+          <>
+            <div className="w-full flex flex-wrap gap-2">
+              <motion.button
+                type="button"
+                onClick={() => setInactiveRecoveryView('assigned_all')}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  inactiveRecoveryView === 'assigned_all'
+                    ? 'text-white shadow-lg'
+                    : 'bg-white/10 border border-white/25 text-violet-100 hover:bg-white/15'
+                }`}
+                style={
+                  inactiveRecoveryView === 'assigned_all'
+                    ? {
+                        background: 'linear-gradient(135deg, #6d28d9, #5b21b6)',
+                        boxShadow: '0 4px 14px rgba(109,40,217,0.4)',
+                      }
+                    : {}
+                }
+              >
+                معيّنة لي اليوم
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    inactiveRecoveryView === 'assigned_all' ? 'bg-white/20 text-white' : 'bg-violet-950/40 text-violet-200'
+                  }`}
+                >
+                  {inactiveRecoveryTasksAll.length}
+                </span>
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => setInactiveRecoveryView('assigned_hot')}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  inactiveRecoveryView === 'assigned_hot'
+                    ? 'text-white shadow-lg'
+                    : 'bg-white/10 border border-white/25 text-violet-100 hover:bg-white/15'
+                }`}
+                style={
+                  inactiveRecoveryView === 'assigned_hot'
+                    ? {
+                        background: 'linear-gradient(135deg, #ea580c, #c2410c)',
+                        boxShadow: '0 4px 14px rgba(234,88,12,0.4)',
+                      }
+                    : {}
+                }
+              >
+                <Flame size={16} className={inactiveRecoveryView === 'assigned_hot' ? 'text-white/95' : 'text-orange-300'} aria-hidden />
+                ساخنة معيّنة لي
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    inactiveRecoveryView === 'assigned_hot' ? 'bg-white/20 text-white' : 'bg-violet-950/40 text-orange-200'
+                  }`}
+                >
+                  {inactiveRecoveryHotTasks.length}
+                </span>
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => setInactiveRecoveryView('pool')}
+                whileTap={{ scale: 0.97 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  inactiveRecoveryView === 'pool'
+                    ? 'text-white shadow-lg'
+                    : 'bg-white/10 border border-white/25 text-violet-100 hover:bg-white/15'
+                }`}
+                style={
+                  inactiveRecoveryView === 'pool'
+                    ? {
+                        background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                        boxShadow: '0 4px 14px rgba(13,148,136,0.4)',
+                      }
+                    : {}
+                }
+              >
+                <ListOrdered size={16} className={inactiveRecoveryView === 'pool' ? 'text-white/95' : 'text-teal-300'} aria-hidden />
+                المجمّع — حسب آخر شحنة
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    inactiveRecoveryView === 'pool' ? 'bg-white/20 text-white' : 'bg-violet-950/40 text-teal-200'
+                  }`}
+                >
+                  {inactivePoolByLastShipment.length}
+                </span>
+              </motion.button>
+            </div>
+            {inactiveRecoveryView !== 'pool' && (
+              <div className="w-full flex flex-wrap gap-2 mt-2">
+                {[
+                  { val: 'all', label: 'الكل', count: inactiveSubFilterCounts.all },
+                  { val: 'high', label: 'عالية الأولوية', count: inactiveSubFilterCounts.high },
+                  { val: 'no_answer', label: 'متاجر لم ترد', count: inactiveSubFilterCounts.no_answer },
+                ].map(tab => (
+                  <motion.button
+                    key={tab.val}
+                    type="button"
+                    onClick={() => setFilter(tab.val)}
+                    whileTap={{ scale: 0.97 }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                      filter === tab.val
+                        ? 'text-white shadow-lg'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                    style={
+                      filter === tab.val
+                        ? tab.val === 'no_answer'
+                          ? {
+                              background: 'linear-gradient(135deg, #d97706, #b45309)',
+                              boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                            }
+                          : {
+                              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                            }
+                        : {}
+                    }
+                  >
+                    {tab.label}
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                        filter === tab.val ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+            {inactiveRecoveryView === 'pool' && (
+              <p className="w-full text-violet-100/90 text-xs mt-2 leading-relaxed max-w-3xl">
+                قائمة كل المتاجر «غير النشط» (ساخن وبارد) مرتبّة بتاريخ آخر شحنة (الأقدم أولاً) — يقارب ترتيب دخولها إلى طابور التعيين. يظهر هل المتجر معيّن لك أو لزميل أو في انتظار التعيين.
+              </p>
+            )}
+          </>
         ) : (
           [
             { val: 'all', label: 'الكل', count: mainTasks.length },
@@ -2105,7 +2341,98 @@ export default function Tasks() {
       </motion.div>
 
       {/* ══ قائمة المهام ════════════════════════════════════════════ */}
-      {displayed.length === 0 ? (
+      {showInactivePoolTable ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden"
+        >
+          {inactivePoolByLastShipment.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="font-bold text-slate-700 text-lg">لا توجد متاجر غير نشطة في البيانات الحالية</p>
+              <p className="text-slate-500 text-sm mt-2">جرّب «تحديث» بعد تشغيل جلب المتاجر من الخادم</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-[min(70vh,520px)] overflow-y-auto">
+              <table className="w-full text-sm text-right border-collapse">
+                <thead className="sticky top-0 z-[1] bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="p-3 font-bold text-slate-700">المتجر</th>
+                    <th className="p-3 font-bold text-slate-700 whitespace-nowrap">النوع</th>
+                    <th className="p-3 font-bold text-slate-700 whitespace-nowrap">آخر شحنة</th>
+                    <th className="p-3 font-bold text-slate-700">حالة الطابور</th>
+                    <th className="p-3 font-bold text-slate-700 w-28">إجراء</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inactivePoolByLastShipment.map(store => {
+                    const st = inactiveQueueStatus(assignments, user?.username, store.id)
+                    const ship = store.last_shipment_date
+                    const shipLabel =
+                      ship && ship !== 'لا يوجد' ? String(ship) : '—'
+                    const isHot = store.bucket === 'hot_inactive'
+                    return (
+                      <tr key={store.id} className="border-b border-slate-100 hover:bg-slate-50/80">
+                        <td className="p-3 align-middle">
+                          <StoreNameWithId store={store} />
+                        </td>
+                        <td className="p-3 align-middle whitespace-nowrap">
+                          {isHot ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 text-orange-900 px-2 py-0.5 text-xs font-bold">
+                              <Flame size={12} className="shrink-0" aria-hidden />
+                              ساخن
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-slate-200 text-slate-800 px-2 py-0.5 text-xs font-bold">
+                              بارد
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 align-middle text-slate-600 tabular-nums whitespace-nowrap">
+                          {shipLabel}
+                        </td>
+                        <td className="p-3 align-middle">
+                          <span
+                            className={
+                              st.kind === 'mine'
+                                ? 'text-emerald-700 font-semibold'
+                                : st.kind === 'other'
+                                  ? 'text-amber-800 font-medium'
+                                  : 'text-slate-500'
+                            }
+                          >
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="p-3 align-middle">
+                          <button
+                            type="button"
+                            className="text-violet-700 font-bold text-xs hover:underline"
+                            onClick={() => {
+                              setSelectedTask({
+                                id: `pool-view-${store.id}`,
+                                store,
+                                priority: 'normal',
+                                type: 'recovery_call',
+                                label: 'مكالمة استعادة',
+                                desc: st.kind === 'mine' ? 'من المجمّع — معيّنة لك' : 'عرض من المجمّع',
+                                workflowQueue: 'inactive',
+                              })
+                            }}
+                          >
+                            فتح
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </motion.div>
+      ) : displayed.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.93 }}
           animate={{ opacity: 1, scale: 1 }}
