@@ -4,7 +4,7 @@ import {
   Baby, Clock, Filter, RefreshCw, Phone, PhoneCall, Layers,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
-import { parcelsInRangeDisplay } from '../utils/storeFields'
+import { totalShipments } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
@@ -233,7 +233,7 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false
               const hours   = regHours(s)
               const days    = regDays(s)
               const sdays   = shipDays(s)
-              const parcels = parcelsInRangeDisplay(s)
+              const parcels = totalShipments(s)
               const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
               const cycleD = s._cycle_day != null ? s._cycle_day : '—'
               return (
