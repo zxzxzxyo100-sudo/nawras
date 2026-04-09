@@ -18,21 +18,11 @@ import ColdInactive from './pages/ColdInactive'
 import IncubationPath from './pages/IncubationPath'
 import IncubationCallDelay from './pages/IncubationCallDelay'
 import IncubationNewCompleted from './pages/IncubationNewCompleted'
-import Tasks from './pages/Tasks'
 import Users from './pages/Users'
 import Kanban from './pages/Kanban'
 import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
-
-/** مسؤول المتاجر النشطة: يُوجَّه لصفحة المهام بدل طوابير «نشط / مجمّد» وKanban */
-function GuardActiveManagerHiddenRoutes({ children }) {
-  const { user } = useAuth()
-  if (user?.role === 'active_manager') {
-    return <Navigate to="/tasks" replace />
-  }
-  return children
-}
 
 function PrivateRoute({ children, view, viewAny }) {
   const { user, loading, can } = useAuth()
@@ -64,9 +54,7 @@ function AppRoutes() {
           path="/active"
           element={(
             <PrivateRoute view="active">
-              <GuardActiveManagerHiddenRoutes>
-                <Navigate to="/active/pending" replace />
-              </GuardActiveManagerHiddenRoutes>
+              <Navigate to="/active/pending" replace />
             </PrivateRoute>
           )}
         />
@@ -75,9 +63,7 @@ function AppRoutes() {
           path="/frozen"
           element={(
             <PrivateRoute view="active">
-              <GuardActiveManagerHiddenRoutes>
-                <FrozenStores />
-              </GuardActiveManagerHiddenRoutes>
+              <FrozenStores />
             </PrivateRoute>
           )}
         />
@@ -85,9 +71,7 @@ function AppRoutes() {
           path="/active/workflow"
           element={(
             <PrivateRoute view="active">
-              <GuardActiveManagerHiddenRoutes>
-                <ActiveWorkflow />
-              </GuardActiveManagerHiddenRoutes>
+              <ActiveWorkflow />
             </PrivateRoute>
           )}
         />
@@ -95,9 +79,7 @@ function AppRoutes() {
           path="/active/:activeSegment"
           element={(
             <PrivateRoute view="active">
-              <GuardActiveManagerHiddenRoutes>
-                <ActiveStores />
-              </GuardActiveManagerHiddenRoutes>
+              <ActiveStores />
             </PrivateRoute>
           )}
         />
@@ -125,13 +107,12 @@ function AppRoutes() {
           path="/incubation/:tabKey"
           element={<PrivateRoute view="incubation"><IncubationPath /></PrivateRoute>}
         />
-        <Route path="/tasks"        element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route
           path="/performance"
           element={(
-            <PrivateRoute view="tasks">
+            <PrivateRoute view="dashboard">
               {DISABLE_POINTS_AND_PERFORMANCE
-                ? <Navigate to="/tasks" replace />
+                ? <Navigate to="/" replace />
                 : <MyPerformance />}
             </PrivateRoute>
           )}
@@ -149,9 +130,7 @@ function AppRoutes() {
           path="/kanban"
           element={(
             <PrivateRoute view="dashboard">
-              <GuardActiveManagerHiddenRoutes>
-                <Kanban />
-              </GuardActiveManagerHiddenRoutes>
+              <Kanban />
             </PrivateRoute>
           )}
         />

@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
-  ClipboardList, Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
+  Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
   ChevronDown, Circle, Layers, Lock, BarChart3, BadgeCheck, Package,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
@@ -17,8 +17,7 @@ const NAV_ALL = [
   { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
-  { to: '/tasks',         label: 'المهام اليومية',      icon: ClipboardList,   view: 'tasks'        },
-  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'tasks'        },
+  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
   { to: '/analytics/manager', label: 'تحليلات المدير', icon: BarChart3,        view: 'manager_analytics' },
   { to: '/analytics/logistics', label: 'تحليلات اللوجستيات', icon: Package,   view: 'dashboard' },
@@ -411,17 +410,19 @@ const NAV_GROUPS = [
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/tasks', '/users', '/analytics/manager']
-      : ['/tasks', '/performance', '/users', '/analytics/manager'],
+      ? ['/users', '/analytics/manager']
+      : ['/performance', '/users', '/analytics/manager'],
   },
 ]
 
-/** مسؤول المتاجر النشطة: لوحة جانبية مبسّطة — لوحة التحكم + المهام اليومية فقط */
+/** مسؤول المتاجر النشطة: لوحة جانبية مبسّطة — لوحة التحكم + أدائي (إن وُجد) */
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
       { label: 'الرئيسية', keys: ['/'] },
-      { label: 'الإدارة', keys: ['/tasks'] },
+      ...(DISABLE_POINTS_AND_PERFORMANCE
+        ? []
+        : [{ label: 'الإدارة', keys: ['/performance'] }]),
     ]
   }
   return NAV_GROUPS
