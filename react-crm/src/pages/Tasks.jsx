@@ -32,7 +32,7 @@ export default function Tasks() {
     return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
         <TasksIntro title="قائمة متاجرك المعيّنة في «قيد المكالمة»: دفعة صغيرة من الطابور، حفظ الاستبيان أو «لم يرد» يُحدّث العدّ حتى 50 متجراً يومياً." />
-        <ActiveStores embeddedSegment="pending" />
+        <ActiveStores embeddedSegment="pending" fromDailyTasks />
       </div>
     )
   }
