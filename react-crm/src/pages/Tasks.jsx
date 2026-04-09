@@ -127,6 +127,16 @@ function taskIsNoAnswer(task, callLogs, assignments) {
   return false
 }
 
+/**
+ * نفس منطق عرض «المتاجر المنجزة» تحت نشط يشحن — لا يُحسب «تم التواصل» لمتجر ما زال قيد المتابعة النشطة.
+ */
+function storeInCompletedMerchantsPipeline(store, storeStates) {
+  if (!store) return false
+  const cat = storeStates?.[store.id]?.category || store.category || ''
+  if (cat === 'completed') return true
+  return store.bucket === 'completed_merchants'
+}
+
 /** تاريخ التعيين قبل اليوم التقويمي المحلي (متابعة متأخرة من يوم سابق) */
 function assignmentLocalCalendarBeforeToday(assignedAtStr, ref = new Date()) {
   if (!assignedAtStr) return false
@@ -524,12 +534,15 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
-        /** «تم التواصل» = workflow مكتمل أو «تم الرد» اليوم — ما دام التعيين ليس «لم يتم الرد» في الطابور */
+        /** «تم التواصل» يطابق «المتاجر المنجزة»: تعيين مكتمل أو متجر فعلاً في دلو/تصنيف المنجز (لا يكفي مكالمة قديمة وهو لا يزال نشطاً) */
         const moContactedToday =
           asgn?.workflow_status === 'no_answer'
             ? false
             : asgn?.workflow_status === 'completed'
-              || isContactedAnsweredTodayForUser(log, username, userFullname)
+              || (
+                isContactedAnsweredTodayForUser(log, username, userFullname)
+                && storeInCompletedMerchantsPipeline(store, storeStates)
+              )
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
           hideDailyTaskDueToCallToday(log)
@@ -596,8 +609,8 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   })
 
   /**
-   * مسؤول المتاجر النشطة: أي متجر سجّل له «تم الرد» هذا الشهر من هذا المستخدم
-   * يظهر في «تم التواصل» حتى لو لم يعد التعيين موجوداً في قاعدة البيانات.
+   * مسؤول المتاجر النشطة: متجر منجز في المجمع مع «تم الرد» خلال 60 يوماً ولم يعد له صف مهمة —
+   * يُكمّل القائمة فقط لمن يطابق «المتاجر المنجزة» (لا يضخّم العدد بمتاجر ما زالت نشطة).
    */
   if (userRole === 'active_manager' && username) {
     const now = new Date()
@@ -605,6 +618,7 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     const generatedIds = new Set(tasks.map(t => String(t.store.id)))
     allStores.forEach(store => {
       if (generatedIds.has(String(store.id))) return
+      if (!storeInCompletedMerchantsPipeline(store, storeStates)) return
       const log = callLogs[store.id] || {}
       const hasAnsweredThisMonth = callLogTimelineEntries(log).some(entry => {
         if (!entry?.date) return false
@@ -2027,6 +2041,11 @@ export default function Tasks() {
               type="button"
               onClick={() => setMoTab('contacted')}
               whileTap={{ scale: 0.97 }}
+              title={
+                user?.role === 'active_manager'
+                  ? 'يُعرَض ما يطابق «المتاجر المنجزة» في نشط يشحن: متجر في المجمع كمنجز، أو إكمال تعيين المتابعة الدورية — وليس كل مكالمة ناجحة قديمة.'
+                  : undefined
+              }
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 moTab === 'contacted'
                   ? 'text-white shadow-lg'
