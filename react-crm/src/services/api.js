@@ -187,6 +187,22 @@ export const getIncubationFollowupStores = (params = {}) =>
     })
     .then(r => r.data)
 
+/** غير النشط بعد الاستعادة: مهام يومية — تم التواصل / لم يرد (طابور inactive) */
+export const getInactiveRestoredFollowupStores = (params = {}) =>
+  http
+    .get('/inactive-restored-followup-stores.php', {
+      params: {
+        user_role: params.user_role ?? '',
+        username: params.username ?? '',
+        user_fullname: params.user_fullname ?? '',
+        q: params.q ?? '',
+        reg_from: params.reg_from ?? '',
+        reg_to: params.reg_to ?? '',
+        max_days_reg: params.max_days_reg ?? '',
+      },
+    })
+    .then(r => r.data)
+
 /** بورصة الرضا اليوم — للداشبورد فقط (مسار خفيف، منفصل عن التحليلات) */
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)

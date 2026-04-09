@@ -9,6 +9,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getMyWorkflow } from '../services/api'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
+import InactiveRestoredFollowupSection from '../components/InactiveRestoredFollowupSection'
 import { formatCallOutcome } from '../constants/callOutcomes'
 import {
   isRestoredCategory,
@@ -352,7 +353,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
             </p>
           ) : (
             <p className="text-xs mt-1 text-amber-900/85">
-              الحد الصارم: {quotaLimit} متجراً يومياً — يُحتسب كل متجر مرة واحدة (حفظ استبيان، أو «لم يرد» من الطابور، أو إكمال استعادة).
+              الحد الصارم: {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» وإكمال الاستعادة؛ تبويب «لم يرد» في متابعة المهام بعد الاستعادة لا يُحتسب في الـ{quotaLimit}.
             </p>
           )}
         </div>
@@ -390,6 +391,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           تحديث
         </button>
       </div>
+
+      {isRestoredTab && user?.role === 'inactive_manager' && <InactiveRestoredFollowupSection />}
 
       {/* إحصاءات حسب آخر من حدّث حالة المتجر في النظام */}
       {userStats.length > 0 && (
