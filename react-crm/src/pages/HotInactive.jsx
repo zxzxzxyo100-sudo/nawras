@@ -83,7 +83,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const recoverySegment = embeddedRecoverySegment ?? recoverySegmentParam
   const { user } = useAuth()
   const { stores, counts, callLogs, storeStates, assignments, loading, reload, lastLoaded } = useStores()
-  const [inactiveWfSummary, setInactiveWfSummary] = useState(null)
+  /** undefined = لم يُجلب الطابور بعد؛ null = فشل الطلب؛ object = نجاح */
+  const [inactiveWfSummary, setInactiveWfSummary] = useState(undefined)
   const [callModalStore, setCallModalStore] = useState(null)
   const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
   const [goalBurstNonce, setGoalBurstNonce] = useState(0)
@@ -202,7 +203,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
    */
   const managerBatchStores = useMemo(() => {
     if (user?.role !== 'inactive_manager') return null
-    if (!inactiveWfSummary) return null
+    if (inactiveWfSummary === undefined) return undefined
+    if (inactiveWfSummary === null) return []
     if (inactiveWfSummary.daily_quota?.quota_reached) return []
 
     const activeList = inactiveWfSummary.active_tasks || []
@@ -219,7 +221,20 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     return recoveryTasksHotQueue ? [] : filteredStores
   }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
 
-  const storesForTable = managerBatchStores === null ? filteredStores : managerBatchStores
+  /**
+   * صفحة المهام: لا تعرض جميع «ساخن» عندما managerBatchStores === null (كان يحدث عندما inactiveWfSummary
+   * لم يُحمَّل بعد أو فشل الطلب — فيُعرض ~كل المتاجر ويبدو أن الإنجاز لا يزيل الصفوف).
+   */
+  const storesForTable = useMemo(() => {
+    if (user?.role === 'inactive_manager' && recoveryTasksHotQueue) {
+      if (inactiveWfSummary === undefined || inactiveWfSummary === null) return []
+      return managerBatchStores ?? []
+    }
+    if (managerBatchStores === null || managerBatchStores === undefined) {
+      return filteredStores
+    }
+    return managerBatchStores
+  }, [user?.role, recoveryTasksHotQueue, inactiveWfSummary, managerBatchStores, filteredStores])
 
   const dq = inactiveWfSummary?.daily_quota
   const quotaCount = dq?.count ?? inactiveWfSummary?.daily_successful_contacts ?? 0
