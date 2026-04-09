@@ -19,6 +19,7 @@ import IncubationNewCompleted from './pages/IncubationNewCompleted'
 import Users from './pages/Users'
 import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
+import Tasks from './pages/Tasks'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
 function PrivateRoute({ children, view, viewAny }) {
@@ -42,6 +43,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<Dashboard />} />
+        <Route path="/tasks"       element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route
           path="/quick-verification"
           element={<PrivateRoute view="quick_verification"><QuickVerification /></PrivateRoute>}

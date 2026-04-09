@@ -13,8 +13,9 @@ import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
 
-export default function ActiveStores() {
-  const { activeSegment } = useParams()
+export default function ActiveStores({ embeddedSegment } = {}) {
+  const params = useParams()
+  const activeSegment = embeddedSegment ?? params.activeSegment
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta, surveyByStoreId, lastLoaded } =
     useStores()
   const { user } = useAuth()
@@ -354,7 +355,7 @@ export default function ActiveStores() {
     Boolean(selected)
     && needsActiveSatisfactionSurvey(selected.id, selectedDbCategory, surveyByStoreId)
 
-  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
+  if (!embeddedSegment && !ACTIVE_SEGMENTS.has(activeSegment || '')) {
     return <Navigate to="/active/pending" replace />
   }
 
