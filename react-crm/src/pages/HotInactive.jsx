@@ -205,7 +205,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     if (user?.role !== 'inactive_manager') return null
     if (inactiveWfSummary === undefined) return undefined
     if (inactiveWfSummary === null) return []
-    if (inactiveWfSummary.daily_quota?.quota_reached) return []
+    if (inactiveWfSummary.daily_target_reached) return []
 
     const activeList = inactiveWfSummary.active_tasks || []
     const noAnsList = inactiveWfSummary.no_answer_tasks || []
@@ -237,9 +237,10 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   }, [user?.role, recoveryTasksHotQueue, inactiveWfSummary, managerBatchStores, filteredStores])
 
   const dq = inactiveWfSummary?.daily_quota
-  const quotaCount = dq?.count ?? inactiveWfSummary?.daily_successful_contacts ?? 0
-  const quotaLimit = dq?.limit ?? inactiveWfSummary?.inactive_daily_target ?? 50
-  const quotaReached = dq?.quota_reached ?? inactiveWfSummary?.daily_target_reached
+  const quotaCount =
+    inactiveWfSummary?.daily_successful_contacts ?? dq?.count ?? 0
+  const quotaLimit = inactiveWfSummary?.inactive_daily_target ?? dq?.limit ?? 50
+  const quotaReached = Boolean(inactiveWfSummary?.daily_target_reached)
 
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
@@ -436,7 +437,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         }`}
       >
         <p className="font-black text-sm flex flex-wrap items-center gap-2">
-          <span>معالَجات اليوم (استبيان / لم يرد / إكمال استعادة):</span>
+          <span>اتصالات ناجحة اليوم (تم التواصل — مكالمة + استبيان):</span>
           <InactiveGoalCounterBadge
             successfulCount={quotaCount}
             target={quotaLimit}
@@ -445,23 +446,26 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         </p>
         {quotaReached ? (
           <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
-            {dq?.message_ar || 'أكملت حصتك اليومية. لن تُعرض متاجر جديدة في الطابور حتى الغد.'}
+            أُنجز هدف اليوم ({quotaLimit} تم التواصل). لن يُضاف متجر جديد إلى طابور المهام حتى الغد. يمكنك متابعة «لم
+            يرد» والمتاجر المنجزة أدناه.
           </p>
         ) : (
           <p className="text-xs mt-1 text-amber-900/85">
-            {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» (مكالمة + استبيان) فقط؛ «لم يرد» في قائمة المتابعة المنجزة لا يُحتسب
-            في الـ{quotaLimit}.
+            الهدف {quotaLimit} «تم التواصل» يومياً؛ «لم يرد» لا يُحتسب ويُستبدل متجر من «غير نشط ساخن» للإبقاء على
+            الطابور ممتلئاً ما دام الهدف غير مكتمل.
           </p>
         )}
       </div>
     ) : null
 
   const inactiveQuotaReachedBanner =
-    user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached ? (
+    user?.role === 'inactive_manager' && inactiveWfSummary?.daily_target_reached ? (
       <div className="rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-l from-emerald-50 to-white px-5 py-6 text-center shadow-md">
-        <p className="text-lg font-black text-emerald-900">{inactiveWfSummary.daily_quota.message_ar}</p>
+        <p className="text-lg font-black text-emerald-900">
+          أحسنت — أكملت هدف «تم التواصل» اليوم ({quotaLimit} اتصالاً ناجحاً).
+        </p>
         <p className="text-sm text-emerald-800/90 mt-2" dir="ltr">
-          {inactiveWfSummary.daily_quota.message_en}
+          Daily goal reached: {quotaLimit} successful contacts (answered + survey).
         </p>
       </div>
     ) : null
@@ -522,7 +526,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         </div>
       )}
 
-      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached) && (
+      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_target_reached) && (
       <InactiveRowColorToolbar
         activeColorKey={rowColorKey}
         onSelectColorKey={setRowColorKey}
@@ -532,7 +536,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       />
       )}
 
-      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached) && (
+      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_target_reached) && (
       <StoreTable
         variant="elite"
         stores={storesForTable}

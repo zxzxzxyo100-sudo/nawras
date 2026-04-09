@@ -348,6 +348,11 @@ function inactive_pipeline_where_sql() {
     return "ss.category IN ('hot_inactive','cold_inactive')";
 }
 
+/** طابور مهام مسؤول الاستعادة اليومية: تعيين من «غير نشط ساخن» فقط (لا البارد). */
+function inactive_hot_pipeline_where_sql() {
+    return "ss.category = 'hot_inactive'";
+}
+
 /**
  * نفس مصدر الواجهة: ملف يُحدَّث عند كل تشغيل لـ all-stores.php
  * (تصنيف ساخن/بارد يُحسب من API وليس مخزّناً في store_states لكل متجر).
@@ -367,6 +372,10 @@ function pick_next_inactive_pool_store(PDO $pdo) {
             }
             foreach ($stores as $row) {
                 $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
+                $bucket = (string) ($row['bucket'] ?? '');
+                if ($bucket === 'cold_inactive') {
+                    continue;
+                }
                 if ($sid === '' || isset($assigned[$sid])) {
                     continue;
                 }
@@ -386,7 +395,7 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
     $sql = "
         SELECT ss.store_id, ss.store_name
         FROM store_states ss
-        WHERE " . inactive_pipeline_where_sql() . "
+        WHERE " . inactive_hot_pipeline_where_sql() . "
         AND CAST(ss.store_id AS CHAR) NOT IN (
             SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
         )
@@ -416,9 +425,8 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
     ensure_workflow_schema($pdo);
     ensure_inactive_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'inactive');
-    require_once __DIR__ . '/daily-quota-lib.php';
-    nawras_ensure_daily_quota_schema($pdo);
-    if (getDailyProgress($pdo, $username)['quota_reached']) {
+    /** إيقاف التعبئة عند بلوغ 50 «تم التواصل» يومياً — لا يُمنع بـ employee_daily_processed_stores (50 معالجة عامة) وإلا لا يُستبدل متجر بعد «لم يرد». */
+    if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
         return 0;
     }
     $have = count_inactive_queue($pdo, $username);
