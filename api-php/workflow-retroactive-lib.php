@@ -1,25 +1,27 @@
 <?php
 /**
- * تصحيح تراكمي: متجر له استبيان رضا (active_csat) ومكالمة نجاح في السجل
- * وما زال في مسار «نشط يشحن» → منجز + إكمال تعيين المتابعة الدورية إن وُجد.
+ * تصحيح: استبيان active_csat + مكالمة outcome=answered قبل وقت حفظ الاستبيان
+ * والتعيين/الحالة ما زالا في مسار المتابعة → منجز (دفعات محدودة لكل طلب).
  */
 require_once __DIR__ . '/workflow-queue-lib.php';
 
-function workflow_retroactive_complete_from_csat_and_answered(PDO $pdo, $batchLimit = 35) {
+function workflow_retroactive_complete_from_csat_and_answered(PDO $pdo, $batchLimit = 80) {
     ensure_workflow_schema($pdo);
-    $limit = max(1, min(150, (int) $batchLimit));
+    try {
+        $pdo->exec('ALTER TABLE call_logs ADD COLUMN outcome VARCHAR(32) NULL DEFAULT NULL AFTER note');
+    } catch (Throwable $e) {
+    }
+    $limit = max(1, min(200, (int) $batchLimit));
 
     $sql = "
         SELECT DISTINCT s.store_id
         FROM surveys s
-        INNER JOIN call_logs cl ON CAST(cl.store_id AS CHAR) = CAST(s.store_id AS CHAR)
-        INNER JOIN store_states ss ON ss.store_id = s.store_id
         WHERE COALESCE(s.survey_kind, '') = 'active_csat'
-        AND ss.category IN ('active_pending_calls', 'active', 'active_shipping', 'unreachable')
-        AND (
-            cl.outcome IN ('answered', 'callback')
-            OR cl.outcome IS NULL
-            OR TRIM(COALESCE(cl.outcome, '')) = ''
+        AND EXISTS (
+            SELECT 1 FROM call_logs cl
+            WHERE CAST(cl.store_id AS CHAR) = CAST(s.store_id AS CHAR)
+            AND cl.outcome = 'answered'
+            AND cl.created_at <= s.created_at
         )
         LIMIT " . (int) $limit . "
     ";
