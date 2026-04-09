@@ -93,6 +93,69 @@ function ifs_pick_merchant(array $merchants, $mid) {
     return null;
 }
 
+/**
+ * بيانات المتجر للصف: واجهة العملاء الجدد ثم store_states ثم التعيين (إن غاب من النورس).
+ */
+function ifs_resolve_merchant(PDO $pdo, array $merchants, int $mid, $fallbackStoreName = '') {
+    $m = ifs_pick_merchant($merchants, $mid);
+    if ($m !== null) {
+        return $m;
+    }
+    $st = $pdo->prepare('SELECT store_name, registration_date FROM store_states WHERE store_id = ? LIMIT 1');
+    $st->execute([$mid]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row) {
+        $regRaw = $row['registration_date'] ?? null;
+        $regAt  = '';
+        if ($regRaw) {
+            $ts = strtotime((string) $regRaw);
+            $regAt = $ts > 0 ? date('Y-m-d H:i:s', $ts) : '';
+        }
+
+        return [
+            'id'                 => $mid,
+            'name'               => (string) ($row['store_name'] ?? $fallbackStoreName ?? ''),
+            'registered_at'      => $regAt,
+            'total_shipments'    => 0,
+            'last_shipment_date' => null,
+            'status'             => null,
+        ];
+    }
+    $asn = $pdo->prepare('SELECT store_name FROM store_assignments WHERE store_id = ? ORDER BY assigned_at DESC LIMIT 1');
+    $asn->execute([$mid]);
+    $arow = $asn->fetch(PDO::FETCH_ASSOC);
+    if ($arow) {
+        return [
+            'id'                 => $mid,
+            'name'               => (string) ($arow['store_name'] ?? $fallbackStoreName ?? ''),
+            'registered_at'      => '',
+            'total_shipments'    => 0,
+            'last_shipment_date' => null,
+            'status'             => null,
+        ];
+    }
+
+    return null;
+}
+
+/** مسؤول المتاجر: يطابق الاسم في السجل أو وجود تعيين لهذا المتجر */
+function ifs_active_manager_sees_call(PDO $pdo, $role, $username, $fullname, $performedBy, $storeId) {
+    if ($role !== 'active_manager' || $username === '') {
+        return true;
+    }
+    if (ifs_pb_matches($performedBy, $username, $fullname)) {
+        return true;
+    }
+    $sid = (int) $storeId;
+    if ($sid <= 0) {
+        return false;
+    }
+    $chk = $pdo->prepare('SELECT 1 FROM store_assignments WHERE store_id = ? AND assigned_to = ? LIMIT 1');
+    $chk->execute([$sid, $username]);
+
+    return (bool) $chk->fetchColumn();
+}
+
 function ifs_call_type_label_ar($t) {
     $t = (string) $t;
     switch ($t) {
@@ -118,9 +181,16 @@ function ifs_answered_outcome($o) {
     return $x === 'answered' || $x === 'callback' || $x === '';
 }
 
+/** احتياطي من call_logs: لا نعدّ الفراغ «تم تواصل» حتى لا يُستبعد «لم يرد» خطأً */
+function ifs_log_explicit_success($o) {
+    $x = strtolower(trim((string) $o));
+
+    return $x === 'answered' || $x === 'callback';
+}
+
 /** لم يتم التواصل — يظهر في تبويب «لم يرد» */
 function ifs_no_success_outcome($o) {
-    $x = trim((string) $o);
+    $x = strtolower(trim((string) $o));
 
     return $x === 'no_answer' || $x === 'busy';
 }
@@ -302,7 +372,7 @@ $noAnswer  = [];
 foreach ($deduped as $r) {
     $sidKey = (string) $r['store_id'];
     $mid    = (int) $r['store_id'];
-    $m = ifs_pick_merchant($merchants, $mid);
+    $m = ifs_resolve_merchant($pdo, $merchants, $mid, (string) ($r['store_name'] ?? ''));
     if (!$m) {
         continue;
     }
@@ -356,7 +426,7 @@ if ($logStmt) {
 
 $latestAnsweredByStore = [];
 foreach ($latestCallByStore as $sk => $row) {
-    if (ifs_answered_outcome($row['outcome'] ?? '')) {
+    if (ifs_log_explicit_success($row['outcome'] ?? '')) {
         $latestAnsweredByStore[$sk] = $row;
     }
 }
@@ -365,16 +435,14 @@ foreach ($latestAnsweredByStore as $sk => $lc) {
     if (isset($listedIds[$sk])) {
         continue;
     }
-    if ($role === 'active_manager' && $username !== '') {
-        if (!ifs_pb_matches($lc['performed_by'] ?? '', $username, $fullname)) {
-            continue;
-        }
+    if (!ifs_active_manager_sees_call($pdo, $role, $username, $fullname, $lc['performed_by'] ?? '', $sk)) {
+        continue;
     }
     $mid = (int) $sk;
     if ($mid <= 0) {
         continue;
     }
-    $m = ifs_pick_merchant($merchants, $mid);
+    $m = ifs_resolve_merchant($pdo, $merchants, $mid, '');
     if (!$m) {
         continue;
     }
@@ -400,16 +468,14 @@ foreach ($latestCallByStore as $sk => $lc) {
     if (!ifs_no_success_outcome($lc['outcome'] ?? '')) {
         continue;
     }
-    if ($role === 'active_manager' && $username !== '') {
-        if (!ifs_pb_matches($lc['performed_by'] ?? '', $username, $fullname)) {
-            continue;
-        }
+    if (!ifs_active_manager_sees_call($pdo, $role, $username, $fullname, $lc['performed_by'] ?? '', $sk)) {
+        continue;
     }
     $mid = (int) $sk;
     if ($mid <= 0) {
         continue;
     }
-    $m = ifs_pick_merchant($merchants, $mid);
+    $m = ifs_resolve_merchant($pdo, $merchants, $mid, '');
     if (!$m) {
         continue;
     }
@@ -444,7 +510,7 @@ try {
             if ($mid <= 0) {
                 continue;
             }
-            $m = ifs_pick_merchant($merchants, $mid);
+            $m = ifs_resolve_merchant($pdo, $merchants, $mid, (string) ($ss['store_name'] ?? ''));
             if (!$m) {
                 continue;
             }
@@ -499,7 +565,7 @@ try {
                 if ($mid <= 0) {
                     continue;
                 }
-                $m = ifs_pick_merchant($merchants, $mid);
+                $m = ifs_resolve_merchant($pdo, $merchants, $mid, (string) ($ss['store_name'] ?? ''));
                 if (!$m) {
                     continue;
                 }
