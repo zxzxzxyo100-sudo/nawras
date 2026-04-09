@@ -534,15 +534,15 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
-        /** «تم التواصل» يطابق «المتاجر المنجزة»: تعيين مكتمل أو متجر فعلاً في دلو/تصنيف المنجز (لا يكفي مكالمة قديمة وهو لا يزال نشطاً) */
+        /**
+         * «تم التواصل»: تعيين مكتمل، أو «تم الرد» اليوم (يظهر حتى يُحدَّث المجمع)؛
+         * قائمة الـ 60 يوماً أدناه تبقى مقيّدة بالمنجز فقط حتى لا يضخّم العدد.
+         */
         const moContactedToday =
           asgn?.workflow_status === 'no_answer'
             ? false
             : asgn?.workflow_status === 'completed'
-              || (
-                isContactedAnsweredTodayForUser(log, username, userFullname)
-                && storeInCompletedMerchantsPipeline(store, storeStates)
-              )
+              || isContactedAnsweredTodayForUser(log, username, userFullname)
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
           hideDailyTaskDueToCallToday(log)
@@ -2043,7 +2043,7 @@ export default function Tasks() {
               whileTap={{ scale: 0.97 }}
               title={
                 user?.role === 'active_manager'
-                  ? 'يُعرَض ما يطابق «المتاجر المنجزة» في نشط يشحن: متجر في المجمع كمنجز، أو إكمال تعيين المتابعة الدورية — وليس كل مكالمة ناجحة قديمة.'
+                  ? 'متاجر سجّلت لها «تم الرد» اليوم، أو تعيين متابعة دورية مكتمل، أو منجزة في المجمع ضمن آخر 60 يوماً — العدد الكبير القديم يُقيَّد بالمنجز فقط.'
                   : undefined
               }
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
