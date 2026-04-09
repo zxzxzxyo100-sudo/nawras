@@ -34,8 +34,9 @@ const LIFECYCLE_UI = {
   hot: { bg: 'bg-amber-100', text: 'text-amber-900' },
   active: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   at_risk: { bg: 'bg-orange-50', text: 'text-orange-800' },
+  recovery_warm: { bg: 'bg-orange-100', text: 'text-orange-900' },
   cold: { bg: 'bg-slate-200', text: 'text-slate-800' },
-  inactive: { bg: 'bg-red-100', text: 'text-red-700' },
+  inactive: { bg: 'bg-slate-200', text: 'text-slate-800' },
 }
 
 export default function StoreDrawer({
@@ -106,7 +107,7 @@ export default function StoreDrawer({
   /** فئة السجل في DB — تُستخدم للإجراءات (تجميد، old_status) */
   const dbCategory = dbState?.category || store.category || 'incubating'
   /**
-   * خانة المتجر من all-stores.php (_cat): تُربَط بدورة حياة حصرية في الخادم (نشط 7 أيام، بارد 15–30، إلخ).
+   * خانة المتجر من all-stores.php (_cat): دورة حياة من الخادم (نشط 7 أيام، ساخن حتى 60 يوماً منذ آخر شحنة، بارد فوق 60).
    * إن وُجد lifecycle_label_ar نعرضه كتسمية دقيقة مع الإبقاء على خانة الاستعادة من _cat.
    */
   const merchantListBucket = store.bucket || store._cat || ''
