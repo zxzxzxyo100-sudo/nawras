@@ -338,14 +338,8 @@ elseif ($action === 'complete_inactive_success') {
     if ($storeId <= 0 || $username === '') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
+    /** طابور الاستعادة: الحدّ عبر INACTIVE_DAILY_SUCCESS_TARGET وليس حصّة الـ50 العامة (مثل مسار «لم يرد»). */
     nawras_ensure_daily_quota_schema($pdo);
-    if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
-        jsonResponse([
-            'success' => false,
-            'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
-            'daily_quota' => getDailyProgress($pdo, $username),
-        ], 403);
-    }
     ensure_inactive_daily_stats_schema($pdo);
     $sid = (string) $storeId;
     $upd = $pdo->prepare("
@@ -401,13 +395,6 @@ elseif ($action === 'inactive_followup_success') {
 
     if ($ws === 'active' || $ws === 'no_answer') {
         nawras_ensure_daily_quota_schema($pdo);
-        if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
-            jsonResponse([
-                'success' => false,
-                'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
-                'daily_quota' => getDailyProgress($pdo, $username),
-            ], 403);
-        }
         ensure_inactive_daily_stats_schema($pdo);
         $upd = $pdo->prepare("
             UPDATE store_assignments SET workflow_status = 'completed', workflow_updated_at = NOW()
@@ -447,13 +434,6 @@ elseif ($action === 'inactive_followup_success') {
 
     if ($ws === 'completed') {
         nawras_ensure_daily_quota_schema($pdo);
-        if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
-            jsonResponse([
-                'success' => false,
-                'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
-                'daily_quota' => getDailyProgress($pdo, $username),
-            ], 403);
-        }
         ensure_inactive_daily_stats_schema($pdo);
         register_daily_store_processed($pdo, $username, $storeId, 'inactive_followup_repeat');
         increment_inactive_daily_success($pdo, $username);
