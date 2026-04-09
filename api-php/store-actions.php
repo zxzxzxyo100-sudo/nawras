@@ -690,6 +690,20 @@ elseif ($action === 'save_survey') {
             VALUES (?, ?, 'استبيان تهيئة متجر جديد', ?, ?, ?)")
             ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
 
+        /**
+         * مسار المهام اليومية المبسّط (نعم/لا): يُحفظ كـ new_merchant_onboarding بينما كان إكمال الطابور
+         * يُربَط سابقاً بـ active_csat فقط — فيختفي المنجز عن مسؤول النشط ويظهر للتنفيذي عبر حالات المتجر.
+         */
+        if (trim((string) ($input['user_role'] ?? '')) === 'active_manager' && $submittedUser !== '') {
+            require_once __DIR__ . '/workflow-queue-lib.php';
+            workflow_try_complete_active_assignment_on_answered(
+                $pdo,
+                $storeId,
+                (string) ($input['store_name'] ?? ''),
+                $submittedUser
+            );
+        }
+
         jsonResponse(['success' => true]);
     }
 
