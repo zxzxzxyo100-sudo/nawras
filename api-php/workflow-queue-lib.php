@@ -69,20 +69,29 @@ function ensure_active_daily_stats_schema(PDO $pdo) {
     $done = true;
 }
 
+/**
+ * إنتاجية اليوم — عدد التعيينات المكتملة اليوم فقط (تم الرد + استبيان عبر save_survey).
+ * المصدر: store_assignments وليس عدّاداً منفصلاً.
+ */
 function get_active_daily_success_count(PDO $pdo, $username) {
-    ensure_active_daily_stats_schema($pdo);
-    $st = $pdo->prepare('SELECT COALESCE(successful_contacts, 0) FROM active_manager_daily_stats WHERE username = ? AND work_date = CURDATE()');
-    $st->execute([$username]);
+    ensure_workflow_schema($pdo);
+    $u = trim((string) $username);
+    if ($u === '') {
+        return 0;
+    }
+    $st = $pdo->prepare("
+        SELECT COUNT(*) FROM store_assignments
+        WHERE assigned_to = ?
+        AND assignment_queue = 'active'
+        AND workflow_status = 'completed'
+        AND DATE(COALESCE(workflow_updated_at, assigned_at)) = CURDATE()
+    ");
+    $st->execute([$u]);
     return (int) $st->fetchColumn();
 }
 
+/** @deprecated لا يُستخدم — الإنتاجية تُحسب من store_assignments */
 function increment_active_daily_success(PDO $pdo, $username) {
-    ensure_active_daily_stats_schema($pdo);
-    $pdo->prepare("
-        INSERT INTO active_manager_daily_stats (username, work_date, successful_contacts)
-        VALUES (?, CURDATE(), 1)
-        ON DUPLICATE KEY UPDATE successful_contacts = successful_contacts + 1
-    ")->execute([$username]);
 }
 
 function ensure_inactive_daily_stats_schema(PDO $pdo) {
@@ -430,30 +439,14 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
     return $added;
 }
 
+/**
+ * لا تُضاف متاجر تلقائياً من المجمع — القائمة = التعيينات الحالية للموظف فقط.
+ * يُبقى تقليم المنجز القديم فقط.
+ */
 function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
-    ensure_active_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
-    trim_active_queue_excess($pdo, $username);
-    $pending = count_pending_active_queue($pdo, $username);
-    $need = ACTIVE_QUEUE_TARGET - $pending;
-    if ($need <= 0) {
-        return 0;
-    }
-    if ($maxToAdd !== null) {
-        $need = min($need, (int) $maxToAdd);
-    }
-    $added = 0;
-    while ($need > 0) {
-        $row = pick_next_pool_store_for_user($pdo, $username);
-        if (!$row) {
-            break;
-        }
-        assign_store_to_user($pdo, $row['store_id'], $row['store_name'] ?? '', $username, $assignedBy);
-        $added++;
-        $need--;
-    }
-    return $added;
+    return 0;
 }
 
 /**
@@ -664,9 +657,6 @@ function workflow_try_complete_active_assignment_on_answered(PDO $pdo, $storeId,
     if ($upd->rowCount() === 0) {
         return false;
     }
-    ensure_active_daily_stats_schema($pdo);
-    increment_active_daily_success($pdo, $username);
-    fill_slots_for_user($pdo, $username, $username, null);
     workflow_mark_active_store_contacted_completed($pdo, $storeId, (string) $storeName, $username);
     return true;
 }
@@ -708,6 +698,5 @@ function workflow_sync_active_queue_after_no_success_call(PDO $pdo, $storeId, $s
         return false;
     }
     workflow_mark_active_store_no_answer_unreachable($pdo, (int) $storeId, (string) $storeName, $u);
-    fill_slots_for_user($pdo, $u, $u, null);
     return true;
 }

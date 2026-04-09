@@ -67,6 +67,35 @@ try {
     $inactiveRecoveryDaily = [];
 }
 
+/** مسؤولو المتابعة النشطة — إنتاجية اليوم = تعيينات مكتملة اليوم (تم الرد + استبيان) */
+$activeFollowupDaily = [];
+try {
+    ensure_workflow_schema($pdo);
+    $st = $pdo->query("
+        SELECT u.username, u.fullname, COUNT(sa.store_id) AS completed_today
+        FROM users u
+        LEFT JOIN store_assignments sa
+            ON sa.assigned_to = u.username
+            AND sa.assignment_queue = 'active'
+            AND sa.workflow_status = 'completed'
+            AND DATE(COALESCE(sa.workflow_updated_at, sa.assigned_at)) = CURDATE()
+        WHERE u.role = 'active_manager'
+        GROUP BY u.username, u.fullname
+        ORDER BY u.username ASC
+    ");
+    while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+        $c = (int) ($r['completed_today'] ?? 0);
+        $activeFollowupDaily[] = [
+            'username' => $r['username'],
+            'fullname' => $r['fullname'] ?? '',
+            'completed_today' => $c,
+            'daily_goal_met' => $c >= (defined('ACTIVE_DAILY_SUCCESS_TARGET') ? ACTIVE_DAILY_SUCCESS_TARGET : 50),
+        ];
+    }
+} catch (Throwable $e) {
+    $activeFollowupDaily = [];
+}
+
 /** استبيانات تُحتسب في CSAT فقط (استبعاد ملاحظات المتاجر غير النشطة) */
 function ma_csat_kind_sql() {
     return " AND (COALESCE(survey_kind, 'active_csat') <> 'inactive_feedback') ";
@@ -399,9 +428,12 @@ echo json_encode([
     'quarters' => $period === 'quarterly' ? $quarters : null,
     'inactive_recovery_daily' => $inactiveRecoveryDaily,
     'inactive_daily_target' => defined('INACTIVE_DAILY_SUCCESS_TARGET') ? INACTIVE_DAILY_SUCCESS_TARGET : 50,
+    'active_followup_daily' => $activeFollowupDaily,
+    'active_daily_target' => defined('ACTIVE_DAILY_SUCCESS_TARGET') ? ACTIVE_DAILY_SUCCESS_TARGET : 50,
     'notes' => [
         'conversion' => 'نسبة التحويل اليومية: من متاجر Nawris المسجّلة في ذلك اليوم والتي لديها shipments > 0.',
         'recovery' => 'نسبة الاستعادة الشهرية: من متاجر مجمّدة في قاعدة النظام وظهرت لها طرود في orders-summary ضمن نطاق الشهر.',
         'csat' => 'متوسط تقييم 1–5 من متوسط الستة أسئلة في جدول surveys.',
+        'active_followup' => 'إنتاجية مسؤول المتاجر النشطة: عدد التعيينات المكتملة اليوم (store_assignments، workflow_status=completed، تاريخ اليوم).',
     ],
 ], JSON_UNESCAPED_UNICODE);

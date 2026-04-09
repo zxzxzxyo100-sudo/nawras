@@ -221,6 +221,38 @@ export default function ManagerAnalytics() {
             </div>
           </div>
 
+          {Array.isArray(data?.active_followup_daily) && data.active_followup_daily.length > 0 && (
+            <div className="rounded-2xl border border-cyan-200/90 bg-gradient-to-br from-cyan-50/80 to-white p-4 lg:p-6 shadow-sm">
+              <h2 className="text-sm font-black text-slate-800 mb-1 flex items-center gap-2">
+                مسؤولو المتابعة النشطة — إنتاجية اليوم (منجز)
+                <span className="text-xs font-bold text-cyan-900 bg-cyan-100 px-2 py-0.5 rounded-full">
+                  تعيينات مكتملة اليوم / هدف {data.active_daily_target ?? 50}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-600 mb-4">
+                العدد = متاجر أُكملت اليوم (تم الرد + استبيان رضا)، من جدول التعيينات.
+              </p>
+              <ul className="flex flex-wrap gap-3">
+                {data.active_followup_daily.map(row => (
+                  <li
+                    key={row.username}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm"
+                  >
+                    {row.daily_goal_met ? (
+                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" aria-hidden />
+                    ) : (
+                      <Circle size={18} className="text-slate-300 shrink-0" aria-hidden />
+                    )}
+                    <span className="font-semibold text-slate-800">{row.fullname || row.username}</span>
+                    <span className="text-xs text-slate-500 tabular-nums">
+                      ({row.completed_today ?? 0}/{data.active_daily_target ?? 50})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {Array.isArray(data?.inactive_recovery_daily) && data.inactive_recovery_daily.length > 0 && (
             <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/80 to-white p-4 lg:p-6 shadow-sm">
               <h2 className="text-sm font-black text-slate-800 mb-1 flex items-center gap-2">

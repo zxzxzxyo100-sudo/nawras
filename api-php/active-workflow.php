@@ -69,15 +69,12 @@ if ($action === 'get_my_workflow') {
     require_once __DIR__ . '/workflow-retroactive-lib.php';
     workflow_retroactive_complete_from_csat_and_answered($pdo, 80);
 
-    require_once __DIR__ . '/incubation-delay-lib.php';
-    wf_sync_no_ship_inactive_after_48h($pdo);
-
     fill_slots_for_user($pdo, $username, $username, null);
 
     /** تبويب «تأخيرات المكالمات»: ?type=delayed — نوافذ احتضان متجاوزة أو تعيين متأخر، حتى 50، مرتبة بالأشد تأخيراً */
     if ($listType === 'delayed') {
+        require_once __DIR__ . '/incubation-delay-lib.php';
         $delayed = wf_build_active_manager_delayed_task_list($pdo, $username);
-        ensure_active_daily_stats_schema($pdo);
         $dailyActive = get_active_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
@@ -118,10 +115,18 @@ if ($action === 'get_my_workflow') {
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
 
     $stNoAns = $pdo->prepare("
-        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
-        FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'no_answer'
-        ORDER BY assigned_at ASC
+        SELECT sa.store_id, sa.store_name, sa.assigned_to, sa.assigned_at, sa.workflow_status, sa.assignment_queue
+        FROM store_assignments sa
+        WHERE sa.assigned_to = ?
+        AND sa.assignment_queue = 'active'
+        AND sa.workflow_status = 'no_answer'
+        AND EXISTS (
+            SELECT 1 FROM call_logs cl
+            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
+            AND DATE(cl.created_at) = CURDATE()
+            AND cl.outcome IN ('no_answer', 'busy')
+        )
+        ORDER BY sa.workflow_updated_at DESC, sa.assigned_at ASC
     ");
     $stNoAns->execute([$username]);
     $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
@@ -130,8 +135,9 @@ if ($action === 'get_my_workflow') {
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
         FROM store_assignments
         WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'completed'
+        AND DATE(COALESCE(workflow_updated_at, assigned_at)) = CURDATE()
         ORDER BY workflow_updated_at DESC
-        LIMIT 400
+        LIMIT 200
     ");
     $stCompleted->execute([$username]);
     $completedTasks = $stCompleted->fetchAll(PDO::FETCH_ASSOC);
@@ -154,7 +160,6 @@ if ($action === 'get_my_workflow') {
     $stAllAssigned->execute([$username]);
     $allAssignedTasks = $stAllAssigned->fetchAll(PDO::FETCH_ASSOC);
 
-    ensure_active_daily_stats_schema($pdo);
     $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
         'success' => true,
@@ -172,6 +177,7 @@ if ($action === 'get_my_workflow') {
         'completed_count' => count($completedTasks),
         'all_assigned_tasks' => $allAssignedTasks,
         'all_assigned_count' => count($allAssignedTasks),
+        'productivity_note' => 'daily_successful_contacts = تعيينات مكتملة اليوم (تم الرد + استبيان).',
     ]);
 }
 
@@ -237,83 +243,20 @@ elseif ($action === 'mark_no_answer') {
             $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد إلى قائمتك.';
         }
     } elseif ($queue === 'active') {
-        ensure_active_daily_stats_schema($pdo);
         $payload['daily_successful_contacts'] = get_active_daily_success_count($pdo, $username);
         $payload['active_daily_target'] = ACTIVE_DAILY_SUCCESS_TARGET;
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
-        if ($added > 0) {
-            $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في «لم يتم الوصول للمتجر» وفي قائمة المتابعة. تمت إضافة متجر آخر للطابور.';
-        } else {
-            $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في «لم يتم الوصول للمتجر» وفي قائمة المتابعة.';
-        }
+        $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في خانة «لم يرد». التعيينات الإضافية تتم يدوياً من الإسناد.';
     }
     jsonResponse($payload);
 }
 
-// ========== POST: متابعة دورية — تم التواصل (إكمال التعيين + سجل مكالمة + إحلال من المجمع) ==========
+// ========== POST: متابعة دورية — تم التواصل (معطّل: الإكمال فقط عبر مكالمة + استبيان) ==========
 elseif ($action === 'mark_active_contacted') {
-    $storeId = (int) ($input['store_id'] ?? 0);
-    $username = trim((string) ($input['username'] ?? ''));
-    if ($storeId <= 0 || $username === '') {
-        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
-    }
-    $sid = (string) $storeId;
-    $storeName = trim((string) ($input['store_name'] ?? ''));
-
-    $upd = $pdo->prepare("
-        UPDATE store_assignments
-        SET workflow_status = 'completed', workflow_updated_at = NOW()
-        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'
-        AND workflow_status IN ('active','no_answer')
-    ");
-    $upd->execute([$sid, $username]);
-    if ($upd->rowCount() === 0) {
-        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط (قيد المتابعة) لهذا المتجر أو تمت معالجته.'], 400);
-    }
-
-    wf_ensure_call_logs_outcome($pdo);
-    $roleStmt = $pdo->prepare('SELECT role FROM users WHERE username = ? LIMIT 1');
-    $roleStmt->execute([$username]);
-    $performedRole = (string) ($roleStmt->fetchColumn() ?: 'active_manager');
-    $pdo->prepare('
-        INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ')->execute([
-        $storeId,
-        $storeName,
-        'periodic_followup',
-        'متابعة دورية — تم التواصل من طابور المهام',
-        'answered',
-        $username,
-        $performedRole,
-    ]);
-
-    workflow_mark_active_store_contacted_completed($pdo, $storeId, $storeName, $username);
-
-    $pdo->prepare("
-        INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ")->execute([
-        $storeId,
-        $storeName,
-        'متابعة دورية — تم التواصل',
-        'إكمال من الطابور النشط وإحلال من المجمع',
-        $username,
-        $performedRole,
-    ]);
-
-    ensure_active_daily_stats_schema($pdo);
-    increment_active_daily_success($pdo, $username);
-    $filled = fill_slots_for_user($pdo, $username, $username, null);
-    $count = get_active_daily_success_count($pdo, $username);
     jsonResponse([
-        'success' => true,
-        'replacement_added' => $filled,
-        'daily_successful_contacts' => $count,
-        'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
-        'daily_target_reached' => $count >= ACTIVE_DAILY_SUCCESS_TARGET,
-        'goal_just_met' => $count === ACTIVE_DAILY_SUCCESS_TARGET,
-    ]);
+        'success' => false,
+        'error' => 'لم يعد هذا المسار مستخدماً. أكمل المتجر عبر «حفظ المكالمة» مع «تم الرد» ثم استبيان الرضا.',
+    ], 400);
 }
 
 // ========== POST: اتصال ناجح (تم) — إزالة من الطابور النشط + عدّ اليوم + تعبئة ==========
@@ -386,15 +329,13 @@ elseif ($action === 'release_after_survey') {
         }
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
     }
-    ensure_active_daily_stats_schema($pdo);
-    increment_active_daily_success($pdo, $username);
-    $fill = fill_slots_for_user($pdo, $username, $username, null);
+    fill_slots_for_user($pdo, $username, $username, null);
     $count = get_active_daily_success_count($pdo, $username);
     $sn = trim((string) ($input['store_name'] ?? ''));
     workflow_mark_active_store_contacted_completed($pdo, $storeId, $sn, $username);
     jsonResponse([
         'success' => true,
-        'filled' => $fill,
+        'filled' => 0,
         'daily_successful_contacts' => $count,
         'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
         'daily_target_reached' => $count >= ACTIVE_DAILY_SUCCESS_TARGET,
@@ -416,7 +357,11 @@ elseif ($action === 'fill_all_queues') {
         $n = fill_slots_for_user($pdo, $u, $by, null);
         $report[$u] = $n;
     }
-    jsonResponse(['success' => true, 'filled_per_user' => $report]);
+    jsonResponse([
+        'success' => true,
+        'filled_per_user' => $report,
+        'note' => 'تعيين المتابعة النشطة يدوي؛ لا تُضاف متاجر تلقائياً من المجمع.',
+    ]);
 }
 
 elseif ($action === 'fill_all_inactive_queues') {
@@ -444,7 +389,7 @@ elseif ($action === 'list_all_no_answer') {
     $st = $pdo->query("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_updated_at
         FROM store_assignments
-        WHERE workflow_status = 'no_answer'
+        WHERE workflow_status = 'no_answer' AND assignment_queue = 'active'
         ORDER BY workflow_updated_at DESC
     ");
     jsonResponse(['success' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
