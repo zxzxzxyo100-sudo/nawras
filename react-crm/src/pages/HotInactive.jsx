@@ -320,79 +320,105 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       : { Icon: RefreshCw, iconClass: 'text-cyan-600', line: 'جاري الاستعادة' }
   const PageIcon = titleBlock.Icon
 
+  /** تحت «تمت الاستعادة» مباشرة: عنوان الصفحة ثم «المتاجر غير النشطة المنجزة» ثم بقية الكتل. */
+  const restoredInactiveFirst =
+    isRestoredTab && user?.role === 'inactive_manager'
+
+  const titleRow = (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+          <PageIcon size={24} className={titleBlock.iconClass} />
+          {titleBlock.line}
+        </h1>
+        <p className="text-slate-600 text-sm mt-0.5">
+          {filteredStores.length} متجر في هذا الفرع
+          {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
+          {recoverySegment === 'restoring' && ' — ساخن وبارد ونشط إن بقيت الحالة «قيد الاستعادة» في السجل'}
+          {isRestoredTab && ' — يشمل من اكتملت شحنياً أو حالة recovered في السجل'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={reload}
+        disabled={loading}
+        className="flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 border border-white/40 bg-white/50 hover:bg-white/80 shadow-sm backdrop-blur-sm transition-colors disabled:opacity-60"
+      >
+        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+        تحديث
+      </button>
+    </div>
+  )
+
+  const inactiveCelebrationBlock =
+    user?.role === 'inactive_manager' && user?.username ? (
+      <InactiveGoalCelebration
+        username={user.username}
+        successfulCount={quotaCount}
+        target={quotaLimit}
+        dailyTargetReached={quotaReached}
+        burstNonce={0}
+      />
+    ) : null
+
+  const inactiveQuotaBanner =
+    user?.role === 'inactive_manager' && inactiveWfSummary ? (
+      <div
+        className={`rounded-2xl border px-4 py-3 shadow-sm ${
+          quotaReached
+            ? 'border-emerald-300 bg-emerald-50/95 text-emerald-950'
+            : 'border-amber-200/90 bg-amber-50/90 text-amber-950'
+        }`}
+      >
+        <p className="font-black text-sm flex flex-wrap items-center gap-2">
+          <span>معالَجات اليوم (استبيان / لم يرد / إكمال استعادة):</span>
+          <InactiveGoalCounterBadge
+            successfulCount={quotaCount}
+            target={quotaLimit}
+            dailyTargetReached={quotaReached}
+          />
+        </p>
+        {quotaReached ? (
+          <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
+            {dq?.message_ar || 'أكملت حصتك اليومية. لن تُعرض متاجر جديدة في الطابور حتى الغد.'}
+          </p>
+        ) : (
+          <p className="text-xs mt-1 text-amber-900/85">
+            {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» فقط تبويب «لم يرد» في متابعة المهام بعد الاستعادة لا يُحتسب في الـ
+            {quotaLimit}.
+          </p>
+        )}
+      </div>
+    ) : null
+
+  const inactiveQuotaReachedBanner =
+    user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached ? (
+      <div className="rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-l from-emerald-50 to-white px-5 py-6 text-center shadow-md">
+        <p className="text-lg font-black text-emerald-900">{inactiveWfSummary.daily_quota.message_ar}</p>
+        <p className="text-sm text-emerald-800/90 mt-2" dir="ltr">
+          {inactiveWfSummary.daily_quota.message_en}
+        </p>
+      </div>
+    ) : null
+
   return (
     <div className="space-y-5" dir="rtl">
-      {user?.role === 'inactive_manager' && user?.username && (
-        <InactiveGoalCelebration
-          username={user.username}
-          successfulCount={quotaCount}
-          target={quotaLimit}
-          dailyTargetReached={quotaReached}
-          burstNonce={0}
-        />
+      {restoredInactiveFirst ? (
+        <>
+          {titleRow}
+          <InactiveRestoredFollowupSection underRestoredHeading />
+          {inactiveCelebrationBlock}
+          {inactiveQuotaBanner}
+          {inactiveQuotaReachedBanner}
+        </>
+      ) : (
+        <>
+          {inactiveCelebrationBlock}
+          {inactiveQuotaBanner}
+          {inactiveQuotaReachedBanner}
+          {titleRow}
+        </>
       )}
-      {user?.role === 'inactive_manager' && inactiveWfSummary && (
-        <div
-          className={`rounded-2xl border px-4 py-3 shadow-sm ${
-            quotaReached
-              ? 'border-emerald-300 bg-emerald-50/95 text-emerald-950'
-              : 'border-amber-200/90 bg-amber-50/90 text-amber-950'
-          }`}
-        >
-          <p className="font-black text-sm flex flex-wrap items-center gap-2">
-            <span>معالَجات اليوم (استبيان / لم يرد / إكمال استعادة):</span>
-            <InactiveGoalCounterBadge
-              successfulCount={quotaCount}
-              target={quotaLimit}
-              dailyTargetReached={quotaReached}
-            />
-          </p>
-          {quotaReached ? (
-            <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
-              {dq?.message_ar || 'أكملت حصتك اليومية. لن تُعرض متاجر جديدة في الطابور حتى الغد.'}
-            </p>
-          ) : (
-            <p className="text-xs mt-1 text-amber-900/85">
-              الحد الصارم: {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» وإكمال الاستعادة؛ تبويب «لم يرد» في متابعة المهام بعد الاستعادة لا يُحتسب في الـ{quotaLimit}.
-            </p>
-          )}
-        </div>
-      )}
-
-      {user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached && (
-        <div className="rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-l from-emerald-50 to-white px-5 py-6 text-center shadow-md">
-          <p className="text-lg font-black text-emerald-900">{inactiveWfSummary.daily_quota.message_ar}</p>
-          <p className="text-sm text-emerald-800/90 mt-2" dir="ltr">
-            {inactiveWfSummary.daily_quota.message_en}
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-violet-200/30">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 flex-wrap">
-            <PageIcon size={24} className={titleBlock.iconClass} />
-            {titleBlock.line}
-          </h1>
-          <p className="text-slate-600 text-sm mt-0.5">
-            {filteredStores.length} متجر في هذا الفرع
-            {isAllTab && ` — إجمالي غير نشط ساخن: ${counts.hot_inactive || 0}`}
-            {recoverySegment === 'restoring' && ' — ساخن وبارد ونشط إن بقيت الحالة «قيد الاستعادة» في السجل'}
-            {isRestoredTab && ' — يشمل من اكتملت شحنياً أو حالة recovered في السجل'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={reload}
-          disabled={loading}
-          className="flex shrink-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 border border-white/40 bg-white/50 hover:bg-white/80 shadow-sm backdrop-blur-sm transition-colors disabled:opacity-60"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          تحديث
-        </button>
-      </div>
-
-      {isRestoredTab && user?.role === 'inactive_manager' && <InactiveRestoredFollowupSection />}
 
       {/* إحصاءات حسب آخر من حدّث حالة المتجر في النظام */}
       {userStats.length > 0 && (
