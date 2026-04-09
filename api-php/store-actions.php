@@ -341,6 +341,25 @@ elseif ($action === 'log_call') {
         workflow_sync_active_queue_after_no_success_call($pdo, $sidInt, (string) $storeName, $usernameForWorkflow);
     }
 
+    /**
+     * مسار احتضان (inc_call*) + «لم يرد»/«مشغول»: تحديث تعيين المهام اليومية في الطابور النشط
+     * (لا يمرّ دائماً عبر متابعة دورية ولا يُستدعى mark_no_answer من الواجهة).
+     */
+    if (
+        in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true)
+        && in_array($outcome, ['no_answer', 'busy'], true)
+        && $usernameForWorkflow !== ''
+        && ($userRole ?? '') === 'active_manager'
+        && $sidInt > 0
+    ) {
+        $updIncNa = $pdo->prepare("
+            UPDATE store_assignments
+            SET workflow_status = 'no_answer', workflow_updated_at = NOW(), assigned_at = NOW()
+            WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'active'
+        ");
+        $updIncNa->execute([$sidInt, $usernameForWorkflow]);
+    }
+
     // —— نشط يشحن: تم الرد → منجز | لم يرد / مشغول → لم يتم الوصول (باستثناء احتضان واستعادة) ——
     if (!in_array($callType, ['inc_call1', 'inc_call2', 'inc_call3'], true) && strpos($callType, 'rcall') !== 0) {
         $sid = (int) $storeId;
@@ -402,9 +421,14 @@ elseif ($action === 'log_call') {
             'inc_call2' => 'مسار الاحتضان — المكالمة الثانية',
             'inc_call3' => 'مسار الاحتضان — المكالمة الثالثة (تخريج)',
         ];
+        $auditDetailInc = trim((string) $note);
+        if ($auditDetailInc === '' && $outcome !== '') {
+            $ocAr = $outcome === 'no_answer' ? 'لم يرد' : ($outcome === 'busy' ? 'مشغول' : ($outcome === 'answered' ? 'تم الرد' : $outcome));
+            $auditDetailInc = 'نتيجة المكالمة: ' . $ocAr;
+        }
         $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
             VALUES (?, ?, ?, ?, ?, ?)")
-            ->execute([$storeId, $storeName, $labels[$callType] ?? $callType, $note, $user, $userRole]);
+            ->execute([$storeId, $storeName, $labels[$callType] ?? $callType, $auditDetailInc, $user, $userRole]);
 
         jsonResponse(['success' => true, 'points_awarded' => 0]);
     }
@@ -553,13 +577,13 @@ elseif ($action === 'get_all_calllogs') {
         SELECT cl.store_id, cl.call_type, cl.created_at, cl.note, cl.outcome, cl.performed_by
         FROM call_logs cl
         INNER JOIN (
-            SELECT store_id, call_type, MAX(created_at) AS max_date
+            SELECT store_id, call_type, MAX(id) AS max_id
             FROM call_logs
             GROUP BY store_id, call_type
         ) latest
         ON  cl.store_id   = latest.store_id
         AND cl.call_type  = latest.call_type
-        AND cl.created_at = latest.max_date
+        AND cl.id         = latest.max_id
     ");
     $result = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
