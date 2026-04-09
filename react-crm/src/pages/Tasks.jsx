@@ -112,15 +112,14 @@ function taskIsNoAnswer(task, callLogs, assignments) {
   if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
     const a = assignments[String(task.store.id)] || assignments[task.store.id]
     if (a?.workflow_status === 'completed') return false
+    /** حالة الخادم أولاً: لا تسمح لمكالمة «تم الرد» القديمة بإخفاء «لم يتم الرد» بعد mark_no_answer */
+    const q = a?.assignment_queue ?? 'active'
+    if (a?.workflow_status === 'no_answer' && q === 'active') return true
   }
   const log = callLogs[task.store.id] || {}
   if (latestOutcomeClearsNoAnswerUi(log)) return false
   const top = lastChronologicalCallEntry(log)
   if (top && String(top.outcome ?? '').trim() === 'no_answer') return true
-  if ((task.type === 'assigned_store' || task.type === 'new_merchant_onboarding') && assignments) {
-    const a = assignments[String(task.store.id)] || assignments[task.store.id]
-    if (a?.workflow_status === 'no_answer') return true
-  }
   if (task.type === 'recovery_call' && task.workflowQueue === 'inactive' && assignments) {
     const a = assignments[String(task.store.id)] || assignments[task.store.id]
     if (a?.assignment_queue === 'inactive' && a?.workflow_status === 'no_answer') return true
@@ -525,10 +524,12 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
     if (userRole === 'active_manager' && username && assignments && amActiveIds) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
       if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
-        /** «تم التواصل» = workflow مكتمل أو «تم الرد» اليوم من نفس الموظف (performed_by = اسم كامل أو يوزر) */
+        /** «تم التواصل» = workflow مكتمل أو «تم الرد» اليوم — ما دام التعيين ليس «لم يتم الرد» في الطابور */
         const moContactedToday =
-          asgn?.workflow_status === 'completed'
-          || isContactedAnsweredTodayForUser(log, username, userFullname)
+          asgn?.workflow_status === 'no_answer'
+            ? false
+            : asgn?.workflow_status === 'completed'
+              || isContactedAnsweredTodayForUser(log, username, userFullname)
         const assignedAtTs = asgn?.assigned_at ? new Date(asgn.assigned_at).getTime() : 0
         const limboCallNotAnsweredToday =
           hideDailyTaskDueToCallToday(log)
