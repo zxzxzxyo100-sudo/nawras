@@ -5,6 +5,7 @@ import { ar } from 'date-fns/locale'
 import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff, Star } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
+import CallModal from '../components/CallModal'
 import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,7 +14,7 @@ import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
 
-export default function ActiveStores({ embeddedSegment } = {}) {
+export default function ActiveStores({ embeddedSegment, fromDailyTasks = false } = {}) {
   const params = useParams()
   const activeSegment = embeddedSegment ?? params.activeSegment
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta, surveyByStoreId, lastLoaded } =
@@ -41,10 +42,17 @@ export default function ActiveStores({ embeddedSegment } = {}) {
   const [assignFilter, setAssignFilter]   = useState('all')
   /** متجر نافذة الاستبيان (منفصل عن «المحدد» حتى يبقى الاستبيان مفتوحاً عند إغلاق الدرج) */
   const [surveyModalStore, setSurveyModalStore] = useState(null)
+  const [callModalStore, setCallModalStore] = useState(null)
   const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
 
   const isExecutive = user?.role === 'executive'
   const isActiveManager = user?.role === 'active_manager'
+
+  function handleEliteCall(store) {
+    const p = store?.phone?.replace(/\s/g, '')
+    if (!p) return
+    setCallModalStore(store)
+  }
 
   async function handleWorkflowNoAnswer(store) {
     if (!user?.username) return
@@ -679,6 +687,7 @@ export default function ActiveStores({ embeddedSegment } = {}) {
             )}
             onEliteWorkflowNoAnswer={handleWorkflowNoAnswer}
             eliteWorkflowNoAnswerLoadingId={workflowNoAnswerLoading}
+            onCallStore={handleEliteCall}
           />
           )}
         </>
@@ -708,6 +717,7 @@ export default function ActiveStores({ embeddedSegment } = {}) {
                 : undefined
             }
             selectable={false}
+            onCallStore={handleEliteCall}
           />
         </>
       )}
@@ -736,11 +746,25 @@ export default function ActiveStores({ embeddedSegment } = {}) {
                 : undefined
             }
             selectable={false}
+            onCallStore={handleEliteCall}
           />
         </>
       )}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+
+      {callModalStore && (
+        <CallModal
+          store={callModalStore}
+          callType="general"
+          fromDailyTasks={fromDailyTasks}
+          onClose={() => setCallModalStore(null)}
+          onSaved={async () => {
+            await reload()
+            setCallModalStore(null)
+          }}
+        />
+      )}
 
       {surveyModalStore &&
         needsActiveSatisfactionSurvey(
