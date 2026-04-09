@@ -98,7 +98,6 @@ export default function StoreTable({
       ...(listPreset === 'new48'
         ? { registeredWithinHours: 48, strictNewOnly: true }
         : {}),
-      ...(listPreset === 'incubating' ? { excludeStrictNew: true } : {}),
     }),
     [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, listPreset]
   )
