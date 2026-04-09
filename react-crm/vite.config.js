@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
     __STAGING__: false,
+    __BUILD_ID__: JSON.stringify(''),
   },
   build: {
     outDir: '../',

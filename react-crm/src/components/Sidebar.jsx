@@ -52,7 +52,7 @@ const INACTIVE_SUB = [
   { to: '/hot-inactive/all',       label: 'غير نشطة ساخنة', view: 'hot_inactive' },
   { to: '/cold-inactive',          label: 'غير نشطة باردة', view: 'cold_inactive' },
   { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', viewAny: ['hot_inactive', 'cold_inactive'] },
-  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة',  viewAny: ['hot_inactive', 'cold_inactive'] },
+  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة — المنجزة',  viewAny: ['hot_inactive', 'cold_inactive'] },
 ]
 
 function canInactiveSub(item, canFn) {
@@ -627,6 +627,11 @@ export default function Sidebar({ isOpen, onClose }) {
           <LogOut size={13} />
           تسجيل الخروج
         </button>
+        {typeof __BUILD_ID__ !== 'undefined' && __BUILD_ID__ ? (
+          <p className="text-white/30 text-[9px] text-center leading-tight px-1" title="يتحدّد عند كل npm run build:staging — إن لم يتغيَر بعد الرفع فالمتصفح أو السيرفر يعرض نسخة قديمة">
+            واجهة: {__BUILD_ID__}
+          </p>
+        ) : null}
       </div>
     </aside>
   )
