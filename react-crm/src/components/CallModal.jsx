@@ -11,7 +11,7 @@ import {
   completeInactiveQueueSuccess,
   releaseAfterSurvey,
 } from '../services/api'
-import { IS_STAGING_OR_DEV, IS_SIMPLE_LOG_CALL_MODAL } from '../config/envFlags'
+import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import StoreNameWithId         from './StoreNameWithId'
 import { useAuth }             from '../contexts/AuthContext'
 import { useStores }           from '../contexts/StoresContext'
@@ -26,7 +26,6 @@ import {
 import {
   NEW_MERCHANT_ONBOARDING_QUESTIONS_DEV,
   needsNewMerchantOnboardingSurvey,
-  isNewMerchantOnboardingSurveyDone,
   buildOnboardingYesNoForApi,
 } from '../constants/newMerchantOnboardingSurvey'
 
@@ -190,27 +189,20 @@ export default function CallModal({
 
   /**
    * مسار مبسّط: استبيان 3 أسئلة + حفظ / لم يرد
-   * — التجريبي/التطوير: IS_SIMPLE_LOG_CALL_MODAL
-   * — مسؤول المتاجر من «المهام اليومية»: نفس الواجهة لكل المتاجر التي ما زالت تحتاج استبيان التهيئة (قديمة أو جديدة)
-   * — مسؤول الاحتضان + inc_call*: يظهر المسار المبسّط فقط إذا لم يُسجَّل استبيان تهيئة بعد (لا إعادة إجبارية)
+   * — استبيان التهيئة إلزامي عند أول مكالمة (تم الرد) لكل متجر احتضان لم يُكمَّل له الاستبيان بعد:
+   *   مكالمة عامة أو inc_call1/2/3، في كل البيئات (ليس فقط التجريبي).
+   * — مسؤول المتاجر من «المهام اليومية»: متابعة دورية لغير «قيد المكالمة» — نفس واجهة نعم/لا أدناه.
    */
+  const ONBOARDING_CALL_TYPES = useMemo(
+    () => new Set(['general', 'inc_call1', 'inc_call2', 'inc_call3']),
+    [],
+  )
+
   const simpleOnboardingFlow = useMemo(() => {
     if (inactiveFeedbackNeeded) return false
 
-    const incCallMoDaily =
-      fromDailyTasks
-      && user?.role === 'incubation_manager'
-      && ['inc_call1', 'inc_call2', 'inc_call3'].includes(callType)
-
-    if (incCallMoDaily && IS_SIMPLE_LOG_CALL_MODAL) {
-      return !isNewMerchantOnboardingSurveyDone(store, newMerchantOnboardingDoneIds)
-    }
-
     if (needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) {
-      if (callType !== 'general') return false
-      if (IS_SIMPLE_LOG_CALL_MODAL) return true
-      if (fromDailyTasks && user?.role === 'active_manager') return true
-      return false
+      return ONBOARDING_CALL_TYPES.has(callType)
     }
 
     /**
@@ -227,14 +219,23 @@ export default function CallModal({
     }
 
     return false
-  }, [callType, store, newMerchantOnboardingDoneIds, inactiveFeedbackNeeded, fromDailyTasks, user?.role, dbCategory])
+  }, [
+    callType,
+    store,
+    newMerchantOnboardingDoneIds,
+    inactiveFeedbackNeeded,
+    fromDailyTasks,
+    user?.role,
+    dbCategory,
+    ONBOARDING_CALL_TYPES,
+  ])
 
+  /** نسخة احتياطية إذا لم يُفعَّل المسار المبسّط — يجب أن تبقى متوافقة مع simpleOnboardingFlow للتهيئة */
   const onboardingNeeded = useMemo(
     () =>
-      IS_STAGING_OR_DEV
-      && callType === 'general'
-      && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds),
-    [callType, store, newMerchantOnboardingDoneIds],
+      needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)
+      && ONBOARDING_CALL_TYPES.has(callType),
+    [callType, store, newMerchantOnboardingDoneIds, ONBOARDING_CALL_TYPES],
   )
   /**
    * استبيان الرضا (٦ أسئلة): مرة واحدة لكل متجر في المسار العادي؛
