@@ -359,7 +359,8 @@ function pick_next_inactive_pool_store(PDO $pdo) {
         $j = is_string($raw) ? json_decode($raw, true) : null;
         $stores = is_array($j) && isset($j['stores']) && is_array($j['stores']) ? $j['stores'] : [];
         if ($stores !== []) {
-            $stmt = $pdo->query("SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')");
+            /** أي تعيين inactive (بما فيه completed) يمنع إعادة سحب المتجر — وإلا ON DUPLICATE يعيد الحالة إلى active ويُفقد «تم التواصل». */
+            $stmt = $pdo->query("SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'");
             $assigned = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $assigned[(string) ($row['store_id'] ?? '')] = true;
@@ -387,7 +388,7 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
         FROM store_states ss
         WHERE " . inactive_pipeline_where_sql() . "
         AND CAST(ss.store_id AS CHAR) NOT IN (
-            SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')
+            SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
         )
         ORDER BY ss.store_id ASC
         LIMIT 1
