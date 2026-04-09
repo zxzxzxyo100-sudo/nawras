@@ -40,8 +40,8 @@ export default function Tasks() {
   if (role === 'inactive_manager') {
     return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
-        <TasksIntro title="متاجر «جاري الاستعادة»: نفس منطق الطابور والحصة اليومية (50). للتفاصيل الأخرى استخدم قسم «غير نشطة» من القائمة." />
-        <HotInactive embeddedRecoverySegment="restoring" />
+        <TasksIntro title="متاجر «غير نشط ساخن» التي لم تُنقل بعد إلى «قيد الاستعادة». هدف المهمة: متابعة المتجر وتحويل حالته إلى جاري الاستعادة؛ الطابور والحصة اليومية (50) كما في بقية النظام." />
+        <HotInactive embeddedRecoverySegment="all" recoveryTasksHotQueue />
       </div>
     )
   }
