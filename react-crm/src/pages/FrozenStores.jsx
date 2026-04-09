@@ -6,7 +6,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import { assignStore, listUsers } from '../services/api'
 
-export default function FrozenStores() {
+export default function FrozenStores({ embedded = false } = {}) {
   const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta } = useStores()
   const { user } = useAuth()
   const [selected, setSelected] = useState(null)
@@ -123,6 +123,32 @@ export default function FrozenStores() {
     ...extraColumns,
   ]
 
+  const tableBlock = (
+      <StoreTable
+        variant="elite"
+        stores={frozenList}
+        onSelectStore={setSelected}
+        onRestoreStore={setSelected}
+        extraColumns={frozenExtraColumns}
+        emptyMsg="لا توجد متاجر مجمدة — تُضاف عند اختيار «تجميد» من بطاقة المتجر"
+        parcelsColumnSub={
+          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+            : undefined
+        }
+        selectable={false}
+      />
+  )
+
+  if (embedded) {
+    return (
+      <div className="space-y-4" dir="rtl">
+        {tableBlock}
+        {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-white/25 bg-white/45 backdrop-blur-xl px-5 py-4 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/40">
@@ -156,20 +182,7 @@ export default function FrozenStores() {
         </p>
       </div>
 
-      <StoreTable
-        variant="elite"
-        stores={frozenList}
-        onSelectStore={setSelected}
-        onRestoreStore={setSelected}
-        extraColumns={frozenExtraColumns}
-        emptyMsg="لا توجد متاجر مجمدة — تُضاف عند اختيار «تجميد» من بطاقة المتجر"
-        parcelsColumnSub={
-          shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
-            ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
-            : undefined
-        }
-        selectable={false}
-      />
+      {tableBlock}
 
       {selected && <StoreDrawer store={selected} onClose={() => setSelected(null)} />}
     </div>

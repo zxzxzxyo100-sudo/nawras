@@ -1,9 +1,17 @@
+import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { ClipboardList } from 'lucide-react'
+import {
+  ClipboardList,
+  TrendingUp,
+  BadgeCheck,
+  PhoneOff,
+  Lock,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import ActiveStores from './ActiveStores'
 import HotInactive from './HotInactive'
 import IncubationPath from './IncubationPath'
+import FrozenStores from './FrozenStores'
 
 function TasksIntro({ title, children }) {
   return (
@@ -21,6 +29,46 @@ function TasksIntro({ title, children }) {
   )
 }
 
+/** تبويبات مسار «نشط يشحن» + المجمدة — مطابقة للقائمة الجانبية */
+const ACTIVE_MANAGER_TASK_TABS = [
+  { id: 'pending', label: 'قيد المكالمة', Icon: TrendingUp },
+  { id: 'completed', label: 'المتاجر المنجزة', Icon: BadgeCheck },
+  { id: 'unreachable', label: 'لم يتم الوصول', Icon: PhoneOff },
+  { id: 'frozen', label: 'المجمدة', Icon: Lock },
+]
+
+function ActiveManagerTasksView() {
+  const [tab, setTab] = useState('pending')
+
+  return (
+    <div className="space-y-4 lg:space-y-5" dir="rtl">
+      <TasksIntro title="جميع خانات «نشط يشحن» والمجمدة في مكان واحد: اختر التبويب أدناه. الحصة اليومية (50) والطابور الصغير يخصّان «قيد المكالمة» فقط عند تعيينك." />
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-violet-200/70 bg-white/70 p-2 shadow-sm ring-1 ring-violet-100/80">
+        {ACTIVE_MANAGER_TASK_TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              tab === id
+                ? 'bg-violet-600 text-white shadow-md shadow-violet-500/25'
+                : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-violet-50/90 hover:border-violet-200'
+            }`}
+          >
+            <Icon size={16} className="shrink-0 opacity-90" />
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'frozen' ? (
+        <FrozenStores embedded />
+      ) : (
+        <ActiveStores embeddedSegment={tab} fromDailyTasks={tab === 'pending'} />
+      )}
+    </div>
+  )
+}
+
 /**
  * صفحة موحّدة للمهام اليومية: الحصة 50، دفعات الطابور، الاستبيان — حسب الدور.
  */
@@ -29,12 +77,7 @@ export default function Tasks() {
   const role = user?.role
 
   if (role === 'active_manager') {
-    return (
-      <div className="space-y-4 lg:space-y-5" dir="rtl">
-        <TasksIntro title="قائمة متاجرك المعيّنة في «قيد المكالمة»: دفعة صغيرة من الطابور، حفظ الاستبيان أو «لم يرد» يُحدّث العدّ حتى 50 متجراً يومياً." />
-        <ActiveStores embeddedSegment="pending" fromDailyTasks />
-      </div>
-    )
+    return <ActiveManagerTasksView />
   }
 
   if (role === 'inactive_manager') {
