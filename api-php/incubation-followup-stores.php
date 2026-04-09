@@ -5,6 +5,7 @@
  *
  * المصادر: تعيينات الطابور + (احتياطي) سجلات مكالمات «تم الرد» + صفوف store_states منجزة
  * حتى لا تختفي المتاجر إذا لم يُحدَّث workflow_status أو حُذف التعيين.
+ * احتياطي «لم يرد»: آخر مكالمة = no_answer/busy (مثلاً مسار inc_call دون تحديث التعيين).
  */
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/config.php';
@@ -115,6 +116,13 @@ function ifs_answered_outcome($o) {
     $x = trim((string) $o);
 
     return $x === 'answered' || $x === 'callback' || $x === '';
+}
+
+/** لم يتم التواصل — يظهر في تبويب «لم يرد» */
+function ifs_no_success_outcome($o) {
+    $x = trim((string) $o);
+
+    return $x === 'no_answer' || $x === 'busy';
 }
 
 function ifs_pb_matches($pb, $username, $fullname) {
@@ -327,7 +335,7 @@ foreach ($noAnswer as $it) {
     $listedIds[(string) $it['id']] = true;
 }
 
-// ── احتياطي «تم التواصل»: آخر مكالمة ناجحة خلال 30 يوماً (مهام يومية / احتضان) ──
+// ── آخر مكالمة لكل متجر (30 يوماً) — أساس احتياطي «تم التواصل» و«لم يرد» ──
 $logStmt = $pdo->query("
     SELECT store_id, call_type, outcome, created_at, performed_by
     FROM call_logs
@@ -335,16 +343,20 @@ $logStmt = $pdo->query("
     AND call_type IN ('periodic_followup', 'inc_call1', 'inc_call2', 'inc_call3', 'general')
     ORDER BY created_at DESC
 ");
-$latestAnsweredByStore = [];
+$latestCallByStore = [];
 if ($logStmt) {
     while ($row = $logStmt->fetch(PDO::FETCH_ASSOC)) {
         $sk = (string) ($row['store_id'] ?? '');
-        if ($sk === '' || isset($latestAnsweredByStore[$sk])) {
+        if ($sk === '' || isset($latestCallByStore[$sk])) {
             continue;
         }
-        if (!ifs_answered_outcome($row['outcome'] ?? '')) {
-            continue;
-        }
+        $latestCallByStore[$sk] = $row;
+    }
+}
+
+$latestAnsweredByStore = [];
+foreach ($latestCallByStore as $sk => $row) {
+    if (ifs_answered_outcome($row['outcome'] ?? '')) {
         $latestAnsweredByStore[$sk] = $row;
     }
 }
@@ -377,6 +389,41 @@ foreach ($latestAnsweredByStore as $sk => $lc) {
         continue;
     }
     $contacted[] = $item;
+    $listedIds[$sk] = true;
+}
+
+// ── احتياطي «لم يرد»: آخر مكالمة = no_answer أو مشغول (مثلاً inc_call دون تحديث workflow في التعيين) ──
+foreach ($latestCallByStore as $sk => $lc) {
+    if (isset($listedIds[$sk])) {
+        continue;
+    }
+    if (!ifs_no_success_outcome($lc['outcome'] ?? '')) {
+        continue;
+    }
+    if ($role === 'active_manager' && $username !== '') {
+        if (!ifs_pb_matches($lc['performed_by'] ?? '', $username, $fullname)) {
+            continue;
+        }
+    }
+    $mid = (int) $sk;
+    if ($mid <= 0) {
+        continue;
+    }
+    $m = ifs_pick_merchant($merchants, $mid);
+    if (!$m) {
+        continue;
+    }
+    $meta = [
+        'assigned_to'         => (string) ($lc['performed_by'] ?? ''),
+        'assigned_at'         => null,
+        'workflow_updated_at' => $lc['created_at'] ?? null,
+        'store_name'          => '',
+    ];
+    $item = ifs_try_build_row($mid, $m, $meta, $lc, 'no_answer', $now, $regFrom, $regTo, $q, $maxDaysReg);
+    if ($item === null) {
+        continue;
+    }
+    $noAnswer[] = $item;
     $listedIds[$sk] = true;
 }
 
