@@ -19,6 +19,7 @@ const NAV_ALL = [
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
+  { to: '/staff-performance', label: 'أداء الفريق',   icon: Users,           view: 'staff_performance' },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
   { to: '/analytics/logistics', label: 'تحليلات اللوجستيات', icon: Package,   view: 'dashboard' },
 ]
@@ -407,8 +408,8 @@ const NAV_GROUPS = [
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/users']
-      : ['/performance', '/users'],
+      ? ['/users', '/staff-performance']
+      : ['/performance', '/users', '/staff-performance'],
   },
 ]
 
