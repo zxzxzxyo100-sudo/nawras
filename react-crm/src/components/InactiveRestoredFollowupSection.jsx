@@ -146,11 +146,13 @@ export default function InactiveRestoredFollowupSection({
     setError(null)
     try {
       const wf = await getMyWorkflow(user?.username ?? '', { queue: 'inactive' })
-      if (wf?.success && Array.isArray(wf.inactive_followup_contacted)) {
-        const c = (wf.inactive_followup_contacted || []).map(r =>
+      if (wf?.success) {
+        const rawC = wf.inactive_followup_contacted
+        const rawN = wf.inactive_followup_no_answer
+        const c = (Array.isArray(rawC) ? rawC : []).map(r =>
           mapWorkflowFollowupRow(r, storeStates, allStores)
         )
-        const n = (wf.inactive_followup_no_answer || []).map(r =>
+        const n = (Array.isArray(rawN) ? rawN : []).map(r =>
           mapWorkflowFollowupRow(r, storeStates, allStores)
         )
         setContactedAll(c)
