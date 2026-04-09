@@ -19,14 +19,14 @@ declare(strict_types=1);
  *   WHEN last_shipment_at IS NOT NULL
  *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) <= 7 THEN 'active'
  *   WHEN last_shipment_at IS NOT NULL
- *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) BETWEEN 15 AND 30 THEN 'cold'
+ *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) BETWEEN 15 AND 60 THEN 'recovery_warm' → hot_inactive
+ *   WHEN last_shipment_at IS NOT NULL
+ *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) > 60 THEN 'inactive' → cold_inactive
  *   WHEN last_shipment_at IS NOT NULL
  *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) > 7
  *        AND TIMESTAMPDIFF(DAY, last_shipment_at, NOW()) < 15 THEN 'at_risk'
  *   ELSE 'inactive'
  * END
- *
- * ملاحظة: الفجوة 8–14 يوماً (at_risk) تُضاف تشغيلياً بين «نشط» و«بارد» حتى لا يُصنّف المتجر «غير نشط» خطأً.
  */
 
 /** @return array<string,int> */
@@ -36,8 +36,8 @@ function nawras_lifecycle_constants(): array
         'new_hours'       => 48,
         'incubation_days' => 14,
         'active_days'     => 7,
-        'cold_min_days'   => 15,
-        'cold_max_days'   => 30,
+        /** أكثر من هذا العدد من الأيام منذ آخر شحنة → حاوية cold_inactive («غير نشط بارد»). */
+        'recovery_cold_inactive_days' => 60,
         'hot_total'       => 300,
         'hot_weekly'      => 20,
     ];
@@ -130,22 +130,33 @@ function nawras_compute_lifecycle(array $s, int $now): string
         return 'hot';
     }
 
+    $recoveryColdDays = (int) ($c['recovery_cold_inactive_days'] ?? 60);
+
     // 4. نشط — شحن خلال 7 أيام
     if ($hasShipped && $daysSinceLast !== null && $daysSinceLast <= $c['active_days']) {
         return 'active';
     }
 
-    // 4b. فجوة تشغيلية 8–14 يوماً (بين شرط النشط 7 والبارد 15)
-    if ($hasShipped && $daysSinceLast !== null && $daysSinceLast > $c['active_days'] && $daysSinceLast < $c['cold_min_days']) {
+    // 4b. 8–14 يوماً منذ آخر شحنة — يحتاج متابعة عاجلة (ليس «بارد» بعد)
+    if ($hasShipped && $daysSinceLast !== null && $daysSinceLast > $c['active_days'] && $daysSinceLast < 15) {
         return 'at_risk';
     }
 
-    // 5. بارد — 15–30 يوماً بدون شحن
-    if ($hasShipped && $daysSinceLast !== null && $daysSinceLast >= $c['cold_min_days'] && $daysSinceLast <= $c['cold_max_days']) {
-        return 'cold';
+    // 5. 15–60 يوماً منذ آخر شحنة — غير نشط ساخن (استعادة)، لا يُعرَض كـ«بارد» في الواجهة
+    if ($hasShipped && $daysSinceLast !== null && $daysSinceLast >= 15 && $daysSinceLast <= $recoveryColdDays) {
+        return 'recovery_warm';
     }
 
-    // 6. غير نشط — أكثر من 30 يوماً، أو لم يشحن بعد خارج نافذة الاحتضان
+    // 6. أكثر من 60 يوماً منذ آخر شحنة — غير نشط بارد (cold_inactive)
+    if ($hasShipped && $daysSinceLast !== null && $daysSinceLast > $recoveryColdDays) {
+        return 'inactive';
+    }
+
+    // بدون شحنة بعد نافذة الاحتضان: ساخن حتى 60 يوماً من التسجيل، ثم بارد
+    if (!$hasShipped && $regDays > $c['incubation_days'] && $regDays <= $recoveryColdDays) {
+        return 'recovery_warm';
+    }
+
     return 'inactive';
 }
 
@@ -157,8 +168,9 @@ function nawras_lifecycle_label_ar(string $lc): string
         'hot'        => 'ساخن / VIP',
         'active'     => 'نشط',
         'at_risk'    => 'يحتاج متابعة عاجلة',
+        'recovery_warm' => 'غير نشط ساخن',
         'cold'       => 'بارد',
-        'inactive'   => 'غير نشط',
+        'inactive'   => 'غير نشط بارد',
     ];
 
     return $map[$lc] ?? $lc;
@@ -179,6 +191,7 @@ function nawras_lifecycle_legacy_bucket(string $lc): string
         case 'active':
             return 'active_shipping';
         case 'at_risk':
+        case 'recovery_warm':
         case 'cold':
             return 'hot_inactive';
         case 'inactive':
