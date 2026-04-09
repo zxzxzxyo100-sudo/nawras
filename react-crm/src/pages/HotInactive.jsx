@@ -194,20 +194,30 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     return dedupeById([...hot, ...cold, ...activeR, ...incR])
   }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
-  /** مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [] */
+  /**
+   * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
+   * صفحة المهام (recoveryTasksHotQueue): يُعرض فقط تعيين «active» — يختفي المتجر بعد «تم الرد» (completed)
+   * أو بعد «لم يرد» (no_answer) لأن «لم يرد» يُدار من قائمة المتابعة وليس من جدول المهام.
+   * عند فراغ الطابور لا نُرجع كل «ساخن» (ذلك كان يُبقي المتاجر ظاهرة بعد الإنجاز).
+   */
   const managerBatchStores = useMemo(() => {
     if (user?.role !== 'inactive_manager') return null
     if (!inactiveWfSummary) return null
     if (inactiveWfSummary.daily_quota?.quota_reached) return []
-    const wfIds = new Set(
-      [...(inactiveWfSummary.active_tasks || []), ...(inactiveWfSummary.no_answer_tasks || [])].map(t =>
-        Number(t.store_id),
-      ),
-    )
-    if (wfIds.size === 0) return filteredStores
+
+    const activeList = inactiveWfSummary.active_tasks || []
+    const noAnsList = inactiveWfSummary.no_answer_tasks || []
+
+    const queueRows = recoveryTasksHotQueue ? activeList : [...activeList, ...noAnsList]
+    const wfIds = new Set(queueRows.map(t => Number(t.store_id)))
+
+    if (wfIds.size === 0) {
+      return recoveryTasksHotQueue ? [] : filteredStores
+    }
     const scoped = filteredStores.filter(s => wfIds.has(Number(s.id)))
-    return scoped.length ? scoped : filteredStores
-  }, [user?.role, inactiveWfSummary, filteredStores])
+    if (scoped.length > 0) return scoped
+    return recoveryTasksHotQueue ? [] : filteredStores
+  }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
 
   const storesForTable = managerBatchStores === null ? filteredStores : managerBatchStores
 
