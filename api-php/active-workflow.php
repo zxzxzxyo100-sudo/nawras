@@ -1,6 +1,6 @@
 <?php
 /**
- * سير عمل المتاجر النشطة: طابور 50، عدم الرد، تعبئة من المجمع (استبيان +30 يوم)
+ * سير عمل المتاجر النشطة: 50 بلا مكالمة اليوم، عدم الرد، منجز بعد الاستبيان، تعبئة من المجمع.
  */
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/workflow-queue-lib.php';
@@ -66,10 +66,8 @@ if ($action === 'get_my_workflow') {
             'no_answer_count' => count($noAnswer),
         ]);
     }
-    reset_active_assignments_as_fresh_once($pdo, $username);
-
     require_once __DIR__ . '/workflow-retroactive-lib.php';
-    workflow_retroactive_complete_from_csat_and_answered($pdo, 40);
+    workflow_retroactive_complete_from_csat_and_answered($pdo, 80);
 
     require_once __DIR__ . '/incubation-delay-lib.php';
     wf_sync_no_ship_inactive_after_48h($pdo);
@@ -95,7 +93,7 @@ if ($action === 'get_my_workflow') {
         ]);
     }
 
-    // طابور المتابعة الدورية: حتى 50 تعيين نشط (يشمل متأخّرات أيام سابقة) — المتأخّر أولاً ثم الأقدم
+    // المتابعة الدورية: حتى 50 — تعيين نشط ولم تُسجَّل له أي مكالمة اليوم
     $stActive = $pdo->prepare("
         SELECT
             sa.store_id,
@@ -103,24 +101,20 @@ if ($action === 'get_my_workflow') {
             sa.assigned_to,
             sa.assigned_at,
             sa.workflow_status,
-            sa.assignment_queue,
-            CASE
-                WHEN DATE(sa.assigned_at) < CURDATE() THEN 1
-                WHEN EXISTS (
-                    SELECT 1 FROM call_logs cl
-                    WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
-                    AND cl.performed_by = ?
-                    AND DATE(cl.created_at) = CURDATE()
-                    AND (cl.outcome IS NULL OR cl.outcome <> 'answered')
-                ) THEN 1
-                ELSE 0
-            END AS is_delayed
+            sa.assignment_queue
         FROM store_assignments sa
-        WHERE sa.assigned_to = ? AND sa.assignment_queue = 'active' AND sa.workflow_status = 'active'
-        ORDER BY is_delayed DESC, sa.assigned_at ASC
+        WHERE sa.assigned_to = ?
+        AND sa.assignment_queue = 'active'
+        AND sa.workflow_status = 'active'
+        AND NOT EXISTS (
+            SELECT 1 FROM call_logs cl
+            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
+            AND DATE(cl.created_at) = CURDATE()
+        )
+        ORDER BY sa.assigned_at ASC
         LIMIT " . (int) ACTIVE_QUEUE_TARGET . "
     ");
-    $stActive->execute([$username, $username]);
+    $stActive->execute([$username]);
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
 
     $stNoAns = $pdo->prepare("
@@ -142,16 +136,23 @@ if ($action === 'get_my_workflow') {
     $stCompleted->execute([$username]);
     $completedTasks = $stCompleted->fetchAll(PDO::FETCH_ASSOC);
 
-    $seenAll = [];
-    $allAssignedTasks = [];
-    foreach (array_merge($active, $noAnswer, $completedTasks) as $row) {
-        $k = (string) ($row['store_id'] ?? '');
-        if ($k === '' || isset($seenAll[$k])) {
-            continue;
-        }
-        $seenAll[$k] = true;
-        $allAssignedTasks[] = $row;
-    }
+    /** كل التعيينات (يشمل active بمكالمة اليوم بانتظار الاستبيان — لا يُصفّى كقائمة المتابعة الدورية) */
+    $stAllAssigned = $pdo->prepare("
+        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
+        FROM store_assignments
+        WHERE assigned_to = ? AND assignment_queue = 'active'
+        ORDER BY
+            CASE workflow_status
+                WHEN 'active' THEN 0
+                WHEN 'no_answer' THEN 1
+                WHEN 'completed' THEN 2
+                ELSE 3
+            END,
+            assigned_at ASC
+        LIMIT 500
+    ");
+    $stAllAssigned->execute([$username]);
+    $allAssignedTasks = $stAllAssigned->fetchAll(PDO::FETCH_ASSOC);
 
     ensure_active_daily_stats_schema($pdo);
     $dailyActive = get_active_daily_success_count($pdo, $username);

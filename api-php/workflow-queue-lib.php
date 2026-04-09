@@ -247,58 +247,26 @@ function log_active_manager_pool_pick(PDO $pdo, $username, $storeId) {
 }
 
 /**
- * متجر نشط من المجمع — يستبعد ما عُيّن لنفس المستخدم في أمس أو أمس السابق (تدوير يومي ~50).
+ * متجر من مجمع «النشط» — بدون تبريد استبيان 30 يوماً ولا تدوير أمس؛ فقط غير معيّن حالياً في الطابور.
  */
-function pick_next_pool_store_for_user(PDO $pdo, $username) {
-    ensure_active_pool_rotation_schema($pdo);
-    $u = trim((string) $username);
+function pick_next_pool_store_for_user(PDO $pdo, $_username = '') {
     $sql = "
         SELECT ss.store_id, ss.store_name
         FROM store_states ss
         WHERE " . active_pipeline_where_sql() . "
-        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments WHERE workflow_status IN ('active','no_answer'))
-        AND NOT EXISTS (
-            SELECT 1 FROM surveys s
-            WHERE s.store_id = ss.store_id
-            AND s.created_at >= DATE_SUB(NOW(), INTERVAL " . SURVEY_COOLDOWN_DAYS . " DAY)
-        )
-    ";
-    if ($u !== '') {
-        /** لا يُعاد نفس المتجر الذي ظهر في «المتابعة الدورية» أمس لهذا المستخدم */
-        $sql .= "
         AND CAST(ss.store_id AS CHAR) NOT IN (
-            SELECT store_id FROM active_manager_pool_rotation
-            WHERE username = ?
-            AND slot_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-        )";
-    }
-    $sql .= ' ORDER BY ss.store_id ASC LIMIT 1';
-    $st = $pdo->prepare($sql);
-    if ($u !== '') {
-        $st->execute([$u]);
-    } else {
-        $st->execute();
-    }
-    return $st->fetch(PDO::FETCH_ASSOC) ?: null;
-}
-
-/** @deprecated استخدم pick_next_pool_store_for_user مع اسم المستخدم */
-function pick_next_pool_store(PDO $pdo) {
-    $sql = "
-        SELECT ss.store_id, ss.store_name
-        FROM store_states ss
-        WHERE " . active_pipeline_where_sql() . "
-        AND CAST(ss.store_id AS CHAR) NOT IN (SELECT store_id FROM store_assignments WHERE workflow_status IN ('active','no_answer'))
-        AND NOT EXISTS (
-            SELECT 1 FROM surveys s
-            WHERE s.store_id = ss.store_id
-            AND s.created_at >= DATE_SUB(NOW(), INTERVAL " . SURVEY_COOLDOWN_DAYS . " DAY)
+            SELECT store_id FROM store_assignments
+            WHERE assignment_queue = 'active' AND workflow_status IN ('active','no_answer')
         )
         ORDER BY ss.store_id ASC
         LIMIT 1
     ";
-    $stmt = $pdo->query($sql);
-    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    return $pdo->query($sql)->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** @deprecated استخدم pick_next_pool_store_for_user */
+function pick_next_pool_store(PDO $pdo) {
+    return pick_next_pool_store_for_user($pdo, '');
 }
 
 function count_active_queue(PDO $pdo, $username) {
@@ -308,8 +276,7 @@ function count_active_queue(PDO $pdo, $username) {
 }
 
 /**
- * عدد المتاجر النشطة المعيّنة اليوم التي لم يُتصل بها اليوم بنجاح.
- * هذا هو فقط ما يدخل في سعة «المتابعة الدورية» اليومية (50).
+ * عدد خانات «المتابعة الدورية»: تعيينات active بلا أي مكالمة مسجّلة لذلك المتجر اليوم (أي نتيجة).
  */
 function count_pending_active_queue(PDO $pdo, $username) {
     $st = $pdo->prepare("
@@ -317,12 +284,10 @@ function count_pending_active_queue(PDO $pdo, $username) {
         WHERE sa.assigned_to = ?
         AND sa.workflow_status = 'active'
         AND sa.assignment_queue = 'active'
-        AND DATE(sa.assigned_at) = CURDATE()
         AND NOT EXISTS (
             SELECT 1 FROM call_logs cl
-            WHERE cl.store_id = sa.store_id
+            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
             AND DATE(cl.created_at) = CURDATE()
-            AND cl.outcome = 'answered'
         )
     ");
     $st->execute([$username]);
@@ -335,34 +300,9 @@ function count_inactive_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
-/**
- * تقليم: نبقي أحدث 50 تعيين نشط من تعيينات اليوم لم يُتصل به اليوم + كل المتصل بهم اليوم،
- * ونحذف الزائد من تعيينات اليوم فقط. التعيينات الأقدم تبقى لتبويب «تأخيرات المهمات».
- */
+/** لم يعد يُستخدم — العرض يقتصر على 50 في الاستعلام والتعبئة تضبط العدد فقط. */
 function trim_active_queue_excess(PDO $pdo, $username) {
-    $pending = count_pending_active_queue($pdo, $username);
-    $excess = $pending - ACTIVE_QUEUE_TARGET;
-    if ($excess <= 0) return 0;
-    $st = $pdo->prepare("
-        SELECT sa.store_id FROM store_assignments sa
-        WHERE sa.assigned_to = ? AND sa.workflow_status = 'active' AND sa.assignment_queue = 'active'
-        AND DATE(sa.assigned_at) = CURDATE()
-        AND NOT EXISTS (
-            SELECT 1 FROM call_logs cl
-            WHERE cl.store_id = sa.store_id
-            AND DATE(cl.created_at) = CURDATE()
-            AND cl.outcome = 'answered'
-        )
-        ORDER BY sa.assigned_at ASC
-        LIMIT " . (int) $excess . "
-    ");
-    $st->execute([$username]);
-    $ids = $st->fetchAll(PDO::FETCH_COLUMN);
-    if (empty($ids)) return 0;
-    $ph = implode(',', array_fill(0, count($ids), '?'));
-    $pdo->prepare("DELETE FROM store_assignments WHERE store_id IN ($ph) AND assigned_to = ? AND assignment_queue = 'active'")
-        ->execute(array_merge($ids, [$username]));
-    return count($ids);
+    return 0;
 }
 
 function cleanup_completed_assignments(PDO $pdo, $username, $queue) {
@@ -510,7 +450,6 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
             break;
         }
         assign_store_to_user($pdo, $row['store_id'], $row['store_name'] ?? '', $username, $assignedBy);
-        log_active_manager_pool_pick($pdo, $username, $row['store_id']);
         $added++;
         $need--;
     }
