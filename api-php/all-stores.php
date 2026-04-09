@@ -306,25 +306,30 @@ foreach ($new as $id => $s) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        $s['_cat'] = 'hot_inactive';
-        $s['_mo_auto_hot'] = true;
-        $result['hot_inactive'][] = $s;
-        $counts['hot_inactive']++;
-        $counts['total_active']++;
-        $counts['total']++;
-        continue;
+        /** سبب DB قديم — إن وُجد شحن في بيانات الواجهة نُعيد التصنيف ولا نُجبر «ساخن». */
+        if (!$hasShipped) {
+            $s['_cat'] = 'hot_inactive';
+            $s['_mo_auto_hot'] = true;
+            $result['hot_inactive'][] = $s;
+            $counts['hot_inactive']++;
+            $counts['total_active']++;
+            $counts['total']++;
+            continue;
+        }
     }
     if ($db && $dbCat === 'hot_inactive' && $dbReason === 'mo_no_ship_before_c2') {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        $s['_cat'] = 'hot_inactive';
-        $s['_mo_auto_hot'] = true;
-        $result['hot_inactive'][] = $s;
-        $counts['hot_inactive']++;
-        $counts['total_active']++;
-        $counts['total']++;
-        continue;
+        if (!$hasShipped) {
+            $s['_cat'] = 'hot_inactive';
+            $s['_mo_auto_hot'] = true;
+            $result['hot_inactive'][] = $s;
+            $counts['hot_inactive']++;
+            $counts['total_active']++;
+            $counts['total']++;
+            continue;
+        }
     }
 
     // بارد من قاعدة البيانات (مثلاً no_ship_after_48h)
