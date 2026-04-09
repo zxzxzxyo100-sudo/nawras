@@ -187,10 +187,6 @@ export const getIncubationFollowupStores = (params = {}) =>
     })
     .then(r => r.data)
 
-/** لوحة تحليلات المدير — يتطلب user_role=executive */
-export const getManagerAnalytics = (params) =>
-  http.get('/manager-analytics.php', { params }).then(r => r.data)
-
 /** بورصة الرضا اليوم — للداشبورد فقط (مسار خفيف، منفصل عن التحليلات) */
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)

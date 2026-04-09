@@ -5,7 +5,7 @@ const AuthContext = createContext(null)
 
 export const ROLES = {
   /** مسار الاحتضان (incubation): التنفيذي + مسؤول المتاجر الجديدة */
-  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'users', 'vip_merchants', 'manager_analytics'] },
+  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'users', 'vip_merchants'] },
   /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم — التحقيق السريع للتنفيذي فقط */
   active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active'] },
   inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive'] },

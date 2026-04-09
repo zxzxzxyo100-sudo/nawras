@@ -1,6 +1,6 @@
 <?php
 /**
- * بناء قائمة «بورصة الرضا اليوم» من جدول surveys — للداشبورد فقط (منفصل عن تحليلات المدير).
+ * بناء قائمة «بورصة الرضا اليوم» من جدول surveys — للداشبورد فقط.
  */
 function nawras_build_daily_staff_missions(PDO $pdo) {
     $dailyStaffMissions = [];
