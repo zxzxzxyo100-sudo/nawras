@@ -674,6 +674,9 @@ export default function CallModal({
             <>
               <div className="space-y-2">
                 <p className="text-sm font-black text-slate-900">نتيجة المكالمة</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  من بين الخيارات أدناه — مثلاً «لم يرد» ثم اضغط «حفظ المكالمة» في الأسفل.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {OUTCOME_OPTIONS.map(o => {
                     const selected = outcome === o.id
@@ -785,34 +788,39 @@ export default function CallModal({
         </div>
 
         {simpleOnboardingFlow ? (
-          <div className="flex flex-col gap-2 px-5 pb-5">
-            <motion.button
-              type="button"
-              onClick={saveAnsweredSimple}
-              disabled={saving || !allOnboardingYesNo}
-              whileHover={{ scale: saving ? 1 : 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-55 min-h-[48px]"
-              style={{
-                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
-              }}
-            >
-              {saving
-                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
-              }
-            </motion.button>
-            <motion.button
-              type="button"
-              onClick={saveNoAnswerSimple}
-              disabled={saving}
-              whileHover={{ scale: saving ? 1 : 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50"
-            >
-              {saving ? 'جارٍ التسجيل…' : 'لم يرد'}
-            </motion.button>
+          <div className="shrink-0 border-t border-slate-200/90 bg-slate-50/80 px-5 py-4 space-y-3">
+            <p className="text-[11px] text-slate-600 text-center leading-relaxed">
+              لم يتجاوب المتجر؟ سجّل «لم يرد» دون تعبئة الاستبيان — أو أكمل الأسئلة ثم «حفظ المكالمة».
+            </p>
+            <div className="flex flex-row-reverse flex-wrap gap-2">
+              <motion.button
+                type="button"
+                onClick={saveAnsweredSimple}
+                disabled={saving || !allOnboardingYesNo}
+                whileHover={{ scale: saving ? 1 : 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex-1 min-w-[140px] py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-55 min-h-[48px]"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+                }}
+              >
+                {saving
+                  ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                  : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+                }
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={saveNoAnswerSimple}
+                disabled={saving}
+                whileHover={{ scale: saving ? 1 : 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex-1 min-w-[140px] py-3 font-black rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-950 text-sm disabled:opacity-50 shadow-sm"
+              >
+                {saving ? 'جارٍ التسجيل…' : 'لم يرد'}
+              </motion.button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
