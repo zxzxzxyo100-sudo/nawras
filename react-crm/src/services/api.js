@@ -99,6 +99,10 @@ export const logCall = (data) =>
 export const getAllCallLogs = () =>
   http.get('/store-actions.php?action=get_all_calllogs').then(r => r.data)
 
+/** كل صفوف سجل المكالمات للمتجر (للدرج — لا يعتمد على التجميع) */
+export const getStoreCallLogsRaw = (storeId) =>
+  http.get(`/store-actions.php?action=get_calls&store_id=${encodeURIComponent(storeId)}`).then(r => r.data)
+
 export const getAllRecoveryCalls = () =>
   http.get('/store-actions.php?action=get_all_recovery_calls').then(r => r.data)
 

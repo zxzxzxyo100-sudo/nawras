@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle } from 'lucide-react'
-import { setStoreStatus, getAuditLog, postQuickVerificationSubmitNeedsFreeze } from '../services/api'
+import { setStoreStatus, getAuditLog, postQuickVerificationSubmitNeedsFreeze, getStoreCallLogsRaw } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import CallModal from './CallModal'
@@ -56,7 +56,7 @@ export default function StoreDrawer({
   qvNeedsFreezeSource = null,
 }) {
   const { user } = useAuth()
-  const { callLogs, storeStates, reload } = useStores()
+  const { callLogs, storeStates, reload, lastLoaded } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
   /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
   const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
@@ -67,8 +67,41 @@ export default function StoreDrawer({
   const [saving, setSaving]                 = useState(false)
   const [auditLog, setAuditLog]             = useState([])
   const [loadingAudit, setLoadingAudit]     = useState(false)
+  /** سجل مكالمات كامل من الخادم — يعرض inc_call و no_answer بلا اعتماد على التجميع */
+  const [rawCallRows, setRawCallRows]       = useState(null)
+  const [loadingRawCalls, setLoadingRawCalls] = useState(false)
 
   const storeLog = callLogs[store.id] || {}
+
+  useEffect(() => {
+    if (!store?.id) return
+    let cancelled = false
+    setLoadingRawCalls(true)
+    getStoreCallLogsRaw(store.id)
+      .then(res => {
+        if (cancelled) return
+        if (res?.success && Array.isArray(res.data)) {
+          const mapped = res.data.map(row => ({
+            type: row.call_type || 'general',
+            outcome: row.outcome || '',
+            note: row.note || '',
+            performed_by: row.performed_by || '',
+            date: row.created_at,
+          }))
+          mapped.sort((a, b) => new Date(b.date) - new Date(a.date))
+          setRawCallRows(mapped)
+        } else {
+          setRawCallRows(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRawCallRows(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRawCalls(false)
+      })
+    return () => { cancelled = true }
+  }, [store?.id, lastLoaded])
   const dbState  = storeStates[store.id]
   /** فئة السجل في DB — تُستخدم للإجراءات (تجميد، old_status) */
   const dbCategory = dbState?.category || store.category || 'incubating'
@@ -247,8 +280,21 @@ export default function StoreDrawer({
     setSaving(false)
   }
 
-  const calls = Object.entries(storeLog).map(([type, data]) => ({ type, ...data }))
+  const CALL_TYPE_LABEL_AR = {
+    general: 'مكالمة عامة',
+    periodic_followup: 'متابعة دورية',
+    inc_call1: 'المكالمة الأولى (احتضان)',
+    inc_call2: 'المكالمة الثانية (احتضان)',
+    inc_call3: 'المكالمة الثالثة (احتضان)',
+    day0: 'يوم 0',
+    day3: 'يوم 3',
+    day10: 'يوم 10',
+    graduation: 'تخريج',
+  }
+
+  const callsFallback = Object.entries(storeLog).map(([type, data]) => ({ type, ...data }))
     .sort((a, b) => new Date(b.date) - new Date(a.date))
+  const calls = rawCallRows !== null ? rawCallRows : callsFallback
 
   function requestCallModal() {
     setShowCallModal(true)
@@ -451,16 +497,20 @@ export default function StoreDrawer({
           <div>
             <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3">
               <Phone size={16} className="text-green-600" />
-              سجل المكالمات ({calls.length})
+              سجل المكالمات ({loadingRawCalls ? '…' : calls.length})
             </h3>
-            {calls.length === 0 ? (
+            {loadingRawCalls && calls.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center py-4">جارٍ تحميل السجل…</p>
+            ) : calls.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-4">لا توجد مكالمات مسجلة</p>
             ) : (
               <div className="space-y-2">
                 {calls.map((c, i) => (
                   <div key={i} className="bg-slate-50 rounded-xl p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-700 capitalize">{c.type}</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        {CALL_TYPE_LABEL_AR[c.type] || c.type}
+                      </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         c.outcome === 'answered' ? 'bg-green-100 text-green-700' :
                         c.outcome === 'no_answer' ? 'bg-red-100 text-red-700' :
