@@ -5,9 +5,10 @@ import StoreTable from '../components/StoreTable'
 import InactiveRowColorToolbar from '../components/InactiveRowColorToolbar'
 import { useInactiveRowColors } from '../hooks/useInactiveRowColors'
 import StoreDrawer from '../components/StoreDrawer'
+import CallModal from '../components/CallModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getMyWorkflow } from '../services/api'
+import { getMyWorkflow, markSurveyNoAnswer } from '../services/api'
 import InactiveGoalCelebration, { InactiveGoalCounterBadge } from '../components/InactiveGoalCelebration'
 import InactiveRestoredFollowupSection from '../components/InactiveRestoredFollowupSection'
 import { formatCallOutcome } from '../constants/callOutcomes'
@@ -81,8 +82,11 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const { recoverySegment: recoverySegmentParam } = useParams()
   const recoverySegment = embeddedRecoverySegment ?? recoverySegmentParam
   const { user } = useAuth()
-  const { stores, counts, callLogs, storeStates, loading, reload, lastLoaded } = useStores()
+  const { stores, counts, callLogs, storeStates, assignments, loading, reload, lastLoaded } = useStores()
   const [inactiveWfSummary, setInactiveWfSummary] = useState(null)
+  const [callModalStore, setCallModalStore] = useState(null)
+  const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
+  const [goalBurstNonce, setGoalBurstNonce] = useState(0)
 
   useEffect(() => {
     if (user?.role !== 'inactive_manager' || !user?.username) {
@@ -107,6 +111,42 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     },
     [inactiveRowColors, rowColorKey]
   )
+
+  function handleHotInactiveCall(store) {
+    setCallModalStore(store)
+  }
+
+  async function handleInactiveWorkflowNoAnswer(store) {
+    if (!user?.username) return
+    setWorkflowNoAnswerLoading(store.id)
+    try {
+      await markSurveyNoAnswer({
+        store_id: store.id,
+        store_name: store.name,
+        username: user.username,
+        queue: 'inactive',
+      })
+      await reload()
+      const r = await getMyWorkflow(user.username, { queue: 'inactive' })
+      if (r?.success) setInactiveWfSummary(r)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setWorkflowNoAnswerLoading(null)
+    }
+  }
+
+  const inactiveEliteWorkflowNoAnswer =
+    user?.role === 'inactive_manager'
+      ? s => {
+          const a = assignments[s.id]
+          return (
+            a?.assigned_to === user?.username
+            && a?.assignment_queue === 'inactive'
+            && a?.workflow_status === 'active'
+          )
+        }
+      : undefined
 
   const isAllTab = recoverySegment === 'all'
   const isRestoredTab = recoverySegment === 'restored'
@@ -357,7 +397,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         successfulCount={quotaCount}
         target={quotaLimit}
         dailyTargetReached={quotaReached}
-        burstNonce={0}
+        burstNonce={goalBurstNonce}
       />
     ) : null
 
@@ -475,6 +515,10 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           paintMode: rowPaintMode,
           onPaintClick: handlePaintClick,
         }}
+        onCallStore={handleHotInactiveCall}
+        eliteWorkflowNoAnswer={inactiveEliteWorkflowNoAnswer}
+        onEliteWorkflowNoAnswer={user?.role === 'inactive_manager' ? handleInactiveWorkflowNoAnswer : undefined}
+        eliteWorkflowNoAnswerLoadingId={workflowNoAnswerLoading}
         emptyMsg={
           isAllTab
             ? 'لا توجد متاجر في غير نشط ساخن'
@@ -487,6 +531,35 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
 
       {selected && (
         <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />
+      )}
+
+      {callModalStore && (
+        <CallModal
+          store={callModalStore}
+          callType="general"
+          fromDailyTasks={Boolean(recoveryTasksHotQueue && user?.role === 'inactive_manager')}
+          onClose={() => setCallModalStore(null)}
+          onSaved={async () => {
+            await reload()
+            setCallModalStore(null)
+            if (user?.role === 'inactive_manager' && user?.username) {
+              try {
+                const r = await getMyWorkflow(user.username, { queue: 'inactive' })
+                if (r?.success) setInactiveWfSummary(r)
+              } catch {
+                /* ignore */
+              }
+            }
+          }}
+          taskCompletion={
+            user?.role === 'inactive_manager'
+              ? {
+                  inactiveRecovery: true,
+                  onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
+                }
+              : null
+          }
+        />
       )}
     </div>
   )

@@ -503,7 +503,7 @@ export default function StoreTable({
                           <button
                             type="button"
                             title="اتصال"
-                            disabled={!store.phone}
+                            disabled={!onCallStore && !store.phone}
                             onClick={e => {
                               e.stopPropagation()
                               ;(onCallStore || defaultCall)(store)
