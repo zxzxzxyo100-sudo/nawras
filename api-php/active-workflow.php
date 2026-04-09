@@ -71,6 +71,25 @@ if ($action === 'get_my_workflow') {
             $active = [];
             $noAnswer = [];
         }
+        /** متابعة بعد إكمال المهمة: تعيينات منجزة (تم التواصل / لم يرد) — نفس مصدر الواجهة دون ملف PHP إضافي */
+        $stFollow = $pdo->prepare("
+            SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, workflow_updated_at
+            FROM store_assignments
+            WHERE assigned_to = ? AND assignment_queue = 'inactive'
+            AND workflow_status IN ('completed', 'no_answer')
+            ORDER BY workflow_updated_at DESC, assigned_at DESC
+        ");
+        $stFollow->execute([$username]);
+        $followRows = $stFollow->fetchAll(PDO::FETCH_ASSOC);
+        $inactive_followup_contacted = [];
+        $inactive_followup_no_answer = [];
+        foreach ($followRows as $fr) {
+            if (($fr['workflow_status'] ?? '') === 'completed') {
+                $inactive_followup_contacted[] = $fr;
+            } else {
+                $inactive_followup_no_answer[] = $fr;
+            }
+        }
         $dailySuccess = get_inactive_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
@@ -85,6 +104,10 @@ if ($action === 'get_my_workflow') {
             'no_answer_tasks' => $noAnswer,
             'active_count' => count($active),
             'no_answer_count' => count($noAnswer),
+            'inactive_followup_contacted' => $inactive_followup_contacted,
+            'inactive_followup_no_answer' => $inactive_followup_no_answer,
+            'inactive_followup_contacted_count' => count($inactive_followup_contacted),
+            'inactive_followup_no_answer_count' => count($inactive_followup_no_answer),
         ]);
     }
     require_once __DIR__ . '/workflow-retroactive-lib.php';

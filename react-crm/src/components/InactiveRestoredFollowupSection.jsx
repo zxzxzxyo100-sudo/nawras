@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { CheckCircle2, RefreshCw, Phone, Search, CheckCircle, PhoneOff, Filter } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getInactiveRestoredFollowupStores } from '../services/api'
+import { getInactiveRestoredFollowupStores, getMyWorkflow } from '../services/api'
 import StoreDrawer from './StoreDrawer'
 import CallModal from './CallModal'
 import StoreNameWithId from './StoreNameWithId'
@@ -36,18 +36,75 @@ function rowToStore(row) {
   }
 }
 
+function mapWorkflowFollowupRow(r, storeStates, allStores) {
+  const sid = Number(r.store_id)
+  const st = storeStates[sid]
+  const fromList = allStores.find(s => Number(s.id) === sid)
+  const regRaw = st?.registration_date
+  let registered_at = ''
+  if (regRaw) {
+    const ts = new Date(regRaw).getTime()
+    registered_at = !Number.isNaN(ts) ? new Date(ts).toISOString().slice(0, 19).replace('T', ' ') : ''
+  }
+  const wfAt = r.workflow_updated_at || r.assigned_at
+  const wfMs = wfAt ? new Date(wfAt).getTime() : NaN
+  const cycle = Number.isNaN(wfMs) ? 1 : Math.min(90, Math.max(1, Math.floor((Date.now() - wfMs) / 86400000) + 1))
+  const regTs = registered_at ? new Date(registered_at).getTime() : NaN
+  const daysReg = !Number.isNaN(regTs) && regTs > 0 ? (Date.now() - regTs) / 86400000 : 0
+  const name =
+    (r.store_name && String(r.store_name).trim()) || st?.store_name || fromList?.name || `متجر ${sid}`
+  const ws = r.workflow_status || ''
+  return {
+    id: sid,
+    name,
+    registered_at,
+    _cycle_day: cycle,
+    _days_since_reg: Math.round(daysReg * 100) / 100,
+    assigned_to: r.assigned_to || '',
+    assigned_at: r.assigned_at,
+    workflow_updated_at: r.workflow_updated_at,
+    followup_status: ws === 'completed' ? 'contacted' : 'no_answer',
+    last_call_type: null,
+    last_call_stage_label: ws === 'completed' ? 'تم التواصل (مهمة يومية)' : 'لم يرد (مهمة يومية)',
+    last_call_at: null,
+    total_shipments: fromList != null ? totalShipments(fromList) : 0,
+    last_shipment_date: fromList?.last_shipment_date ?? null,
+    status: fromList?.status ?? null,
+  }
+}
+
+function applyClientFilters(rows, q, regFrom, regTo) {
+  const needle = q.trim().toLowerCase()
+  return rows.filter(row => {
+    if (needle) {
+      const name = (row.name || '').toLowerCase()
+      const idStr = String(row.id)
+      if (!name.includes(needle) && !idStr.includes(needle)) return false
+    }
+    if (regFrom && row.registered_at) {
+      const d = String(row.registered_at).slice(0, 10)
+      if (d && d < regFrom) return false
+    }
+    if (regTo && row.registered_at) {
+      const d = String(row.registered_at).slice(0, 10)
+      if (d && d > regTo) return false
+    }
+    return true
+  })
+}
+
 /**
- * خانة «المتاجر غير النشطة المنجزة» — تحت عنوان «تمت الاستعادة» في المسار المخصص، أو ضمن «المهام».
+ * خانة «المتاجر غير النشطة المنجزة» — تحميل من get_my_workflow (طابور inactive) حتى يعمل بدون ملف PHP إضافي.
  */
 export default function InactiveRestoredFollowupSection({ underRestoredHeading = false } = {}) {
   const { user } = useAuth()
-  const { callLogs, reload: reloadStores, storeStates } = useStores()
+  const { callLogs, reload: reloadStores, storeStates, allStores, lastLoaded } = useStores()
 
   const [tab, setTab] = useState('contacted')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [contacted, setContacted] = useState([])
-  const [noAnswer, setNoAnswer] = useState([])
+  const [contactedAll, setContactedAll] = useState([])
+  const [noAnswerAll, setNoAnswerAll] = useState([])
 
   const [qInput, setQInput] = useState('')
   const [qApplied, setQApplied] = useState('')
@@ -57,37 +114,59 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
   const [selected, setSelected] = useState(null)
   const [callStore, setCallStore] = useState(null)
 
+  const contacted = useMemo(
+    () => applyClientFilters(contactedAll, qApplied, regFrom, regTo),
+    [contactedAll, qApplied, regFrom, regTo]
+  )
+  const noAnswer = useMemo(
+    () => applyClientFilters(noAnswerAll, qApplied, regFrom, regTo),
+    [noAnswerAll, qApplied, regFrom, regTo]
+  )
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const wf = await getMyWorkflow(user?.username ?? '', { queue: 'inactive' })
+      if (wf?.success && Array.isArray(wf.inactive_followup_contacted)) {
+        const c = (wf.inactive_followup_contacted || []).map(r =>
+          mapWorkflowFollowupRow(r, storeStates, allStores)
+        )
+        const n = (wf.inactive_followup_no_answer || []).map(r =>
+          mapWorkflowFollowupRow(r, storeStates, allStores)
+        )
+        setContactedAll(c)
+        setNoAnswerAll(n)
+        return
+      }
       const res = await getInactiveRestoredFollowupStores({
         user_role: user?.role ?? '',
         username: user?.username ?? '',
         user_fullname: user?.fullname ?? '',
-        q: qApplied.trim(),
-        reg_from: regFrom.trim(),
-        reg_to: regTo.trim(),
+        q: '',
+        reg_from: '',
+        reg_to: '',
       })
       if (!res?.success) {
         throw new Error(res?.error || 'تعذّر التحميل')
       }
-      setContacted(res.contacted || [])
-      setNoAnswer(res.no_answer || [])
+      setContactedAll(res.contacted || [])
+      setNoAnswerAll(res.no_answer || [])
     } catch (e) {
-      setError(e?.message || String(e))
-      setContacted([])
-      setNoAnswer([])
+      const msg = e?.response?.data?.error || e?.message || String(e)
+      setError(msg)
+      setContactedAll([])
+      setNoAnswerAll([])
     } finally {
       setLoading(false)
     }
-  }, [user?.role, user?.username, user?.fullname, qApplied, regFrom, regTo])
+  }, [user?.role, user?.username, user?.fullname, storeStates, allStores])
 
   useEffect(() => {
     if (user?.username) {
       load()
     }
-  }, [user?.username, qApplied, regFrom, regTo, load])
+  }, [user?.username, load, lastLoaded])
 
   const rows = useMemo(
     () => (tab === 'contacted' ? contacted : noAnswer),
@@ -137,7 +216,7 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
               تعيينات المهام اليومية لطابور غير النشط بعد اكتمال الاستعادة —{' '}
               <strong className="font-semibold text-teal-900">تم التواصل</strong> أو{' '}
               <strong className="font-semibold text-amber-900">لم يرد</strong>. يُحتسب نحو الحصة «تم التواصل» فقط؛ «لم يرد»
-              هنا لا يُحتسب في الـ50.
+              هنا لا يُحتسب في الـ50. البيانات تُجلب من طابورك (نفس «المهام»).
             </p>
           </div>
           <button
@@ -289,7 +368,8 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
                 {rows.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-5 py-12 text-center text-slate-500">
-                      لا توجد متاجر في هذا التبويب
+                      لا توجد متاجر في هذا التبويب — إن لم تُكمل أي مهمة يومية بعد، ستبقى القائمة فارغة حتى يُسجَّل «تم
+                      التواصل» أو «لم يرد» على التعيين.
                     </td>
                   </tr>
                 )}
