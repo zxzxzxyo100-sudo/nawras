@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import ActiveStores from './ActiveStores'
 import HotInactive from './HotInactive'
+import InactiveRestoredFollowupSection from '../components/InactiveRestoredFollowupSection'
 import IncubationPath from './IncubationPath'
 import FrozenStores from './FrozenStores'
 
@@ -84,6 +85,7 @@ export default function Tasks() {
     return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
         <TasksIntro title="متاجر «غير نشط ساخن» التي لم تُنقل بعد إلى «قيد الاستعادة». هدف المهمة: متابعة المتجر وتحويل حالته إلى جاري الاستعادة؛ الطابور والحصة اليومية (50) كما في بقية النظام." />
+        <InactiveRestoredFollowupSection />
         <HotInactive embeddedRecoverySegment="all" recoveryTasksHotQueue />
       </div>
     )
