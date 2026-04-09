@@ -630,6 +630,8 @@ elseif ($action === 'get_all_calllogs') {
 elseif ($action === 'save_survey') {
     ensure_surveys_survey_kind($pdo);
     $surveyKind = trim((string) ($input['survey_kind'] ?? 'active_csat'));
+    $userRoleForQuota = trim((string) ($input['user_role'] ?? ''));
+    $skipGenericDailyQuotaForInactiveMgr = $userRoleForQuota === 'inactive_manager';
 
     // ── متجر غير نشط: ملاحظة نصية إلزامية (لا أسئلة متعددة) — لا تُحتسب ضمن CSAT ──
     if ($surveyKind === 'inactive_feedback') {
@@ -648,7 +650,7 @@ elseif ($action === 'save_survey') {
         require_once __DIR__ . '/daily-quota-lib.php';
         $submittedUser = trim((string) ($input['username'] ?? ''));
         $quotaUser = $submittedUser !== '' ? $submittedUser : trim((string) ($input['user'] ?? ''));
-        if ($quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
+        if (!$skipGenericDailyQuotaForInactiveMgr && $quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
             jsonResponse([
                 'success' => false,
                 'error' => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
@@ -703,7 +705,7 @@ elseif ($action === 'save_survey') {
     $submittedUser = trim((string) ($input['username'] ?? ''));
     require_once __DIR__ . '/daily-quota-lib.php';
     $quotaUser = $submittedUser !== '' ? $submittedUser : trim((string) ($input['user'] ?? ''));
-    if ($quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
+    if (!$skipGenericDailyQuotaForInactiveMgr && $quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
         jsonResponse([
             'success' => false,
             'error' => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
