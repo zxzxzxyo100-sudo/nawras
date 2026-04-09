@@ -67,7 +67,9 @@ if ($action === 'get_my_workflow') {
                 $active[] = $r;
             }
         }
-        if ($dailyQuota['quota_reached']) {
+        $inactiveDailySuccess = get_inactive_daily_success_count($pdo, $username);
+        /** إخفاء الطابور عند 50 «تم التواصل» يومياً — لا يعتمد على حصة الـ50 معالجة العامة. */
+        if ($inactiveDailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET) {
             $active = [];
             $noAnswer = [];
         }
@@ -90,14 +92,13 @@ if ($action === 'get_my_workflow') {
                 $inactive_followup_no_answer[] = $fr;
             }
         }
-        $dailySuccess = get_inactive_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
             'queue' => 'inactive',
             'target' => INACTIVE_QUEUE_TARGET,
             'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
-            'daily_successful_contacts' => $dailySuccess,
-            'daily_target_reached' => $dailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_successful_contacts' => $inactiveDailySuccess,
+            'daily_target_reached' => $inactiveDailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET,
             'daily_quota' => $dailyQuota,
             'cooldown_days' => SURVEY_COOLDOWN_DAYS,
             'active_tasks' => $active,
