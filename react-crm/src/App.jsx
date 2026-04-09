@@ -34,6 +34,15 @@ function PrivateRoute({ children, view, viewAny }) {
   return children
 }
 
+/** مسؤول الاستعادة: يفتح «المهام» مباشرة حيث تُعرض خانة المتابعة والطابور */
+function HomeRoot() {
+  const { user } = useAuth()
+  if (user?.role === 'inactive_manager') {
+    return <Navigate to="/tasks" replace />
+  }
+  return <Dashboard />
+}
+
 function AppRoutes() {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">جارٍ التحميل...</div>
@@ -42,7 +51,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route path="/"             element={<Dashboard />} />
+        <Route path="/"             element={<HomeRoot />} />
         <Route path="/tasks"       element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
         <Route
           path="/quick-verification"
