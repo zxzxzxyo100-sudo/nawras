@@ -264,11 +264,12 @@ function pick_next_pool_store_for_user(PDO $pdo, $username) {
         )
     ";
     if ($u !== '') {
+        /** لا يُعاد نفس المتجر الذي ظهر في «المتابعة الدورية» أمس لهذا المستخدم */
         $sql .= "
         AND CAST(ss.store_id AS CHAR) NOT IN (
             SELECT store_id FROM active_manager_pool_rotation
             WHERE username = ?
-            AND slot_date IN (DATE_SUB(CURDATE(), INTERVAL 1 DAY), DATE_SUB(CURDATE(), INTERVAL 2 DAY))
+            AND slot_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
         )";
     }
     $sql .= ' ORDER BY ss.store_id ASC LIMIT 1';
@@ -728,5 +729,46 @@ function workflow_try_complete_active_assignment_on_answered(PDO $pdo, $storeId,
     increment_active_daily_success($pdo, $username);
     fill_slots_for_user($pdo, $username, $username, null);
     workflow_mark_active_store_contacted_completed($pdo, $storeId, (string) $storeName, $username);
+    return true;
+}
+
+function active_manager_open_periodic_assignment(PDO $pdo, $storeId, $username) {
+    ensure_workflow_schema($pdo);
+    $sid = (string) (is_numeric($storeId) ? (int) $storeId : (int) preg_replace('/\D+/', '', (string) $storeId));
+    $u = trim((string) $username);
+    if ($sid === '0' || $u === '') {
+        return false;
+    }
+    $st = $pdo->prepare("
+        SELECT 1 FROM store_assignments
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'active'
+        AND workflow_status IN ('active','no_answer')
+        LIMIT 1
+    ");
+    $st->execute([$sid, $u]);
+    return (bool) $st->fetchColumn();
+}
+
+/**
+ * بعد تسجيل مكالمة busy/no_answer: نقل التعيين إلى «عدم الرد» وإحلال من المجمع (سجل المكالمة مُدخل مسبقاً من log_call).
+ */
+function workflow_sync_active_queue_after_no_success_call(PDO $pdo, $storeId, $storeName, $username) {
+    ensure_workflow_schema($pdo);
+    $sid = (string) (is_numeric($storeId) ? (int) $storeId : (int) preg_replace('/\D+/', '', (string) $storeId));
+    $u = trim((string) $username);
+    if ($sid === '0' || $u === '') {
+        return false;
+    }
+    $upd = $pdo->prepare("
+        UPDATE store_assignments
+        SET workflow_status = 'no_answer', workflow_updated_at = NOW(), assigned_at = NOW()
+        WHERE store_id = ? AND assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'active'
+    ");
+    $upd->execute([$sid, $u]);
+    if ($upd->rowCount() === 0) {
+        return false;
+    }
+    workflow_mark_active_store_no_answer_unreachable($pdo, (int) $storeId, (string) $storeName, $u);
+    fill_slots_for_user($pdo, $u, $u, null);
     return true;
 }
