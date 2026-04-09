@@ -8,7 +8,6 @@ import {
   saveSurvey,
   markSurveyNoAnswer,
   markDailyTaskDone,
-  completeInactiveQueueSuccess,
   releaseAfterSurvey,
   postInactiveFollowupSuccess,
   postInactiveFollowupToNoAnswer,
@@ -124,9 +123,9 @@ async function runTaskCompletionAfterAnswered({
   const sname = store.name
   try {
     if (taskCompletion.inactiveRecovery && user?.role === 'inactive_manager') {
-      const cir = await completeInactiveQueueSuccess({
+      const cir = await postInactiveFollowupSuccess({
         store_id: sid,
-        store_name: sname,
+        store_name: sname || '',
         username: u,
       })
       if (cir?.goal_just_met) {
@@ -615,12 +614,13 @@ export default function CallModal({
         } catch { /* */ }
       }
 
-      if (
-        inactiveRestoredFollowup
-        && user?.role === 'inactive_manager'
+      const inactiveAnsweredSync =
+        user?.role === 'inactive_manager'
         && user?.username
         && outcome === 'answered'
-      ) {
+        && (inactiveRestoredFollowup || taskCompletion?.inactiveRecovery)
+
+      if (inactiveAnsweredSync) {
         try {
           const ir = await postInactiveFollowupSuccess({
             store_id: store.id,
@@ -629,6 +629,7 @@ export default function CallModal({
           })
           if (ir?.goal_just_met) {
             onInactiveFollowupGoalBurst?.()
+            taskCompletion?.onInactiveGoalBurst?.()
           }
         } catch (e) {
           const msg = e?.response?.data?.error || e?.message || 'تعذّر مزامنة إتمام المتابعة مع السجل.'
@@ -640,7 +641,6 @@ export default function CallModal({
         const shouldSyncWorkflow =
           IS_STAGING_OR_DEV
           || (user?.role === 'active_manager' && taskCompletion.releaseActiveWorkflow)
-          || (user?.role === 'inactive_manager' && taskCompletion.inactiveRecovery)
           || (Boolean(taskCompletion.dailyTaskKey)
             && ['incubation_manager', 'executive'].includes(user?.role))
         if (shouldSyncWorkflow) {
