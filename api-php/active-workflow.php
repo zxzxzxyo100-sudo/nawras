@@ -68,48 +68,8 @@ if ($action === 'get_my_workflow') {
     }
     reset_active_assignments_as_fresh_once($pdo, $username);
 
-    // تحويل أي تعيين نشط إلى «مكتمل» إذا اتّصل به هذا المستخدم بنجاح خلال آخر 60 يومًا
-    $pdo->prepare("
-        UPDATE store_assignments sa
-        INNER JOIN call_logs cl ON CAST(sa.store_id AS CHAR) = CAST(cl.store_id AS CHAR)
-        SET sa.workflow_status = 'completed',
-            sa.workflow_updated_at = NOW(),
-            sa.assigned_by = 'system_restore'
-        WHERE sa.assigned_to = ?
-        AND sa.assignment_queue = 'active'
-        AND sa.workflow_status = 'active'
-        AND cl.performed_by = ?
-        AND cl.outcome = 'answered'
-        AND cl.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-    ")->execute([$username, $username]);
-
-    // إعادة إسناد المتاجر التي حُذف تعيينها لكن سُجّل لها «تم الرد» خلال آخر 60 يومًا
-    $pdo->prepare("
-        INSERT INTO store_assignments
-            (store_id, store_name, assigned_to, assigned_by, notes, workflow_status, assignment_queue, assigned_at, workflow_updated_at)
-        SELECT DISTINCT
-            cl.store_id,
-            COALESCE(ss.store_name, ''),
-            ?,
-            'system_restore',
-            '',
-            'completed',
-            'active',
-            NOW(),
-            NOW()
-        FROM call_logs cl
-        LEFT JOIN store_states ss ON CAST(ss.store_id AS CHAR) = CAST(cl.store_id AS CHAR)
-        WHERE cl.performed_by = ?
-        AND cl.outcome = 'answered'
-        AND cl.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-        AND CAST(cl.store_id AS CHAR) NOT IN (
-            SELECT store_id FROM store_assignments
-        )
-        ON DUPLICATE KEY UPDATE
-            workflow_status = 'completed',
-            workflow_updated_at = NOW(),
-            assigned_by = 'system_restore'
-    ")->execute([$username, $username]);
+    require_once __DIR__ . '/workflow-retroactive-lib.php';
+    workflow_retroactive_complete_from_csat_and_answered($pdo, 40);
 
     require_once __DIR__ . '/incubation-delay-lib.php';
     wf_sync_no_ship_inactive_after_48h($pdo);
@@ -172,6 +132,27 @@ if ($action === 'get_my_workflow') {
     $stNoAns->execute([$username]);
     $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
 
+    $stCompleted = $pdo->prepare("
+        SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
+        FROM store_assignments
+        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'completed'
+        ORDER BY workflow_updated_at DESC
+        LIMIT 400
+    ");
+    $stCompleted->execute([$username]);
+    $completedTasks = $stCompleted->fetchAll(PDO::FETCH_ASSOC);
+
+    $seenAll = [];
+    $allAssignedTasks = [];
+    foreach (array_merge($active, $noAnswer, $completedTasks) as $row) {
+        $k = (string) ($row['store_id'] ?? '');
+        if ($k === '' || isset($seenAll[$k])) {
+            continue;
+        }
+        $seenAll[$k] = true;
+        $allAssignedTasks[] = $row;
+    }
+
     ensure_active_daily_stats_schema($pdo);
     $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
@@ -186,6 +167,10 @@ if ($action === 'get_my_workflow') {
         'no_answer_tasks' => $noAnswer,
         'active_count' => count($active),
         'no_answer_count' => count($noAnswer),
+        'completed_tasks' => $completedTasks,
+        'completed_count' => count($completedTasks),
+        'all_assigned_tasks' => $allAssignedTasks,
+        'all_assigned_count' => count($allAssignedTasks),
     ]);
 }
 

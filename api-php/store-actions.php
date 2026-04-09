@@ -321,21 +321,24 @@ elseif ($action === 'log_call') {
         VALUES (?, ?, ?, ?, ?, ?, ?)")
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
 
-    // —— طابور المتابعة النشطة: «تم الرد» يُكمّل التعيين فوراً (لا يبقى تحت «لم يتم الرد») ——
-    // يشمل general و periodic_followup (وسجلات أخرى قد تُحفظ بنوع المتابعة الدورية).
+    /**
+     * مسؤول المتاجر + تعيين متابعة دورية نشط:
+     * - «تم الرد» لا يُكمّل التعيين هنا — يُكمّل بعد حفظ استبيان رضا العميل (save_survey).
+     * - «لم يرد» / «مشغول» يُزامن طابور «عدم الرد» دون تكرار منطق قديم على store_states إن فشل التعيين.
+     */
     $usernameForWorkflow = trim((string) ($input['username'] ?? ''));
-    $workflowAnsweredCallTypes = ['general', 'periodic_followup'];
-    if (
-        in_array($callType, $workflowAnsweredCallTypes, true)
-        && $outcome === 'answered'
+    require_once __DIR__ . '/workflow-queue-lib.php';
+    $sidInt = is_numeric($storeId) ? (int) $storeId : (int) preg_replace('/\D+/', '', (string) $storeId);
+    $deferAmQueueComplete = ($userRole ?? '') === 'active_manager'
         && $usernameForWorkflow !== ''
-        && ($userRole ?? '') === 'active_manager'
+        && $sidInt > 0
+        && active_manager_open_periodic_assignment($pdo, $sidInt, $usernameForWorkflow);
+
+    if (
+        $deferAmQueueComplete
+        && in_array($outcome, ['busy', 'no_answer'], true)
     ) {
-        require_once __DIR__ . '/workflow-queue-lib.php';
-        $sidInt = is_numeric($storeId) ? (int) $storeId : (int) preg_replace('/\D+/', '', (string) $storeId);
-        if ($sidInt > 0) {
-            workflow_try_complete_active_assignment_on_answered($pdo, $sidInt, (string) $storeName, $usernameForWorkflow);
-        }
+        workflow_sync_active_queue_after_no_success_call($pdo, $sidInt, (string) $storeName, $usernameForWorkflow);
     }
 
     // —— نشط يشحن: تم الرد → منجز | لم يرد / مشغول → لم يتم الوصول (باستثناء احتضان واستعادة) ——
@@ -343,11 +346,15 @@ elseif ($action === 'log_call') {
         $sid = (int) $storeId;
         $oc = $outcome !== '' ? $outcome : '';
         if ($oc === 'answered') {
-            $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
-                ->execute([$sid]);
+            if (!$deferAmQueueComplete) {
+                $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                    ->execute([$sid]);
+            }
         } elseif ($oc === 'busy' || $oc === 'no_answer') {
-            $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
-                ->execute([$sid]);
+            if (!$deferAmQueueComplete) {
+                $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                    ->execute([$sid]);
+            }
         }
     }
 
@@ -711,6 +718,17 @@ elseif ($action === 'save_survey') {
     $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
         VALUES (?, ?, 'استبيان رضا العميل (نشط)', ?, ?, ?)")
         ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
+
+    /** إكمال تعيين «المتابعة الدورية» ونقل المتجر للمنجز بعد استبيان الرضا (وليس عند log_call فقط) */
+    if (trim((string) ($input['user_role'] ?? '')) === 'active_manager' && $submittedUser !== '') {
+        require_once __DIR__ . '/workflow-queue-lib.php';
+        workflow_try_complete_active_assignment_on_answered(
+            $pdo,
+            $storeId,
+            (string) ($input['store_name'] ?? ''),
+            $submittedUser
+        );
+    }
 
     jsonResponse(['success' => true]);
 }

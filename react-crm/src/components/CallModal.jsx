@@ -454,6 +454,7 @@ export default function CallModal({
             store_name: store.name,
             answers: ratings,
             suggestions: suggestions.trim(),
+            survey_kind: 'active_csat',
             user: user?.fullname ?? '',
             user_role: user?.role ?? '',
             username: user?.username ?? '',
@@ -498,7 +499,10 @@ export default function CallModal({
       const pts = res?.points_awarded ?? (outcome === 'answered' ? 10 : 0)
       onCallSaved(pts)
 
-      if (outcome === 'no_answer' && user?.role === 'active_manager') {
+      if (
+        (outcome === 'no_answer' || outcome === 'busy')
+        && user?.role === 'active_manager'
+      ) {
         const a = assignments?.[store.id] ?? assignments?.[String(store.id)]
         if (a?.assigned_to === user?.username) {
           try {

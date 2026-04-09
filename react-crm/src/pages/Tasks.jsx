@@ -33,6 +33,10 @@ import {
   COLD_INACTIVE_DAILY_LIMIT,
   ACTIVE_MANAGER_COLD_VERIFY_LIMIT,
 } from '../utils/coldVerificationDaily'
+import {
+  workflowRowsToAssignedTasks,
+  workflowMixedAssignedRowsToTasks,
+} from '../utils/activeManagerDailyTasks'
 import { ONBOARD_FIRST_CALL_HOURS } from '../constants/onboardingSchedule'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
@@ -376,6 +380,11 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       newMerchantOnboardingDoneIds,
       IS_STAGING_OR_DEV,
     )
+  }
+
+  /** مسؤول المتاجر النشطة: القوائم تُبنى من طابور API فقط (انظر activeManagerDailyTasks + activeWf). */
+  if (userRole === 'active_manager') {
+    return []
   }
 
   const tasks = []
@@ -897,7 +906,7 @@ function TaskCard({
   const showNoAnswer =
     typeof onNoAnswerWorkflow === 'function'
     && (
-      (task.type === 'assigned_store' && userRole === 'active_manager')
+      (task.type === 'assigned_store' && userRole === 'active_manager' && task.wfStatus !== 'completed')
       || (task.type === 'new_merchant_onboarding' && userRole === 'active_manager')
       || (task.type === 'cold_verification' && ['incubation_manager', 'executive'].includes(userRole))
       || (task.type === 'am_cold_verification' && userRole === 'active_manager')
@@ -1142,7 +1151,7 @@ export default function Tasks() {
   useEffect(() => {
     const t = location.state?.openTasksTab
     if (t === 'am_cold_verify' || t === 'cold_verify' || t === 'delayed_calls') {
-      if (user?.role === 'active_manager' && t === 'delayed_calls') {
+      if (user?.role === 'active_manager') {
         setMoTab('periodic')
       } else {
         setMoTab(t)
@@ -1150,10 +1159,11 @@ export default function Tasks() {
     }
   }, [location.state, user?.role])
 
-  /** مسؤول المتاجر النشطة: تبويبه «am_cold_verify» وليس دفعة مسؤول المتاجر الجديدة */
+  /** مسؤول المتاجر النشطة: تبويبات قديمة (بارد / تأخيرات) → متابعة دورية */
   useEffect(() => {
-    if (user?.role === 'active_manager' && moTab === 'cold_verify') {
-      setMoTab('am_cold_verify')
+    if (user?.role !== 'active_manager') return
+    if (['am_cold_verify', 'cold_verify', 'delayed_calls'].includes(moTab)) {
+      setMoTab('periodic')
     }
   }, [user?.role, moTab])
 
@@ -1164,13 +1174,6 @@ export default function Tasks() {
   useEffect(() => {
     loadActiveWf()
   }, [loadActiveWf, lastLoaded])
-
-  /** مسؤول المتاجر النشطة: تأخيرات المكالمات لمسؤول المتاجر فقط — لا يُعرَض التبويب هنا */
-  useEffect(() => {
-    if (user?.role === 'active_manager' && moTab === 'delayed_calls') {
-      setMoTab('periodic')
-    }
-  }, [user?.role, moTab])
 
   /** ترحيل آلي لمسار الاحتضان: يوم 14 بدون شحن → ساخن؛ يوم 11 بشحن وبدون مكالمات → نشط + أداء */
   useEffect(() => {
@@ -1315,7 +1318,34 @@ export default function Tasks() {
     return t
   }, [allStores, callLogs, storeStates, user, assignments, inactiveWf, newMerchantOnboardingDoneIds])
 
-  const pendingTasks = tasks.filter(t => t.moContactedToday || !dismissalKeys.has(t.id))
+  const amWorkflowDerived = useMemo(() => {
+    if (user?.role !== 'active_manager') return null
+    return {
+      periodic: workflowRowsToAssignedTasks(activeWf?.active_tasks, 'active', allStores),
+      noAnswer: workflowRowsToAssignedTasks(activeWf?.no_answer_tasks, 'no_answer', allStores),
+      completed: workflowRowsToAssignedTasks(activeWf?.completed_tasks, 'completed', allStores),
+      all: workflowMixedAssignedRowsToTasks(activeWf?.all_assigned_tasks, allStores),
+    }
+  }, [user?.role, activeWf, allStores])
+
+  const pendingTasks = useMemo(() => {
+    if (user?.role === 'active_manager' && amWorkflowDerived) {
+      const seen = new Set()
+      const flat = []
+      for (const t of [
+        ...amWorkflowDerived.periodic,
+        ...amWorkflowDerived.noAnswer,
+        ...amWorkflowDerived.completed,
+        ...amWorkflowDerived.all,
+      ]) {
+        if (seen.has(t.id)) continue
+        seen.add(t.id)
+        flat.push(t)
+      }
+      return flat.filter(x => x.moContactedToday || !dismissalKeys.has(x.id))
+    }
+    return tasks.filter(t => t.moContactedToday || !dismissalKeys.has(t.id))
+  }, [user?.role, amWorkflowDerived, tasks, dismissalKeys])
 
   const { mainTasks, noAnswerTasks, highCountMain } = useMemo(() => {
     const main = []
@@ -1401,8 +1431,8 @@ export default function Tasks() {
   /** دفعة «تحقيق بارد» لمسؤول المتاجر الجديدة والتنفيذي — من غير نشط بارد (حتى 30) */
   const showColdInactiveTab =
     user?.role === 'incubation_manager' || user?.role === 'executive'
-  /** دفعة «تحقيق بارد» لمسؤول المتاجر النشطة — من غير نشط بارد (20 ثابتة، تخزين منفصل) */
-  const showAmColdTab = user?.role === 'active_manager'
+  /** مسؤول المتاجر النشطة: طابور المتابعة من API فقط — بدون تبويب «تحقيق بارد». */
+  const showAmColdTab = false
   /** «تأخيرات المكالمات» لمسؤول المتاجر الجديدة والتنفيذي فقط — وليس لمسؤول المتاجر النشطة */
   const showMoDelayedCallsTab =
     user?.role === 'incubation_manager' || user?.role === 'executive'
@@ -1497,6 +1527,17 @@ export default function Tasks() {
 
   const displayed = useMemo(() => {
     if (isTaskTabUser) {
+      if (user?.role === 'active_manager' && amWorkflowDerived) {
+        const pass = list =>
+          list.filter(t => t.moContactedToday || !dismissalKeys.has(t.id))
+        if (moTab === 'all_assigned') return pass(amWorkflowDerived.all)
+        if (moTab === 'contacted') return pass(amWorkflowDerived.completed)
+        if (moTab === 'no_answer') return pass(amWorkflowDerived.noAnswer)
+        if (moTab === 'delayed_calls' || moTab === 'am_cold_verify' || moTab === 'cold_verify') {
+          return pass(amWorkflowDerived.periodic)
+        }
+        return pass(amWorkflowDerived.periodic)
+      }
       if (moTab === 'cold_verify') return pendingColdVerifyTasks
       if (moTab === 'am_cold_verify') return pendingAmColdVerifyTasks
       if (moTab === 'contacted') return moContactedTasks
@@ -1537,6 +1578,8 @@ export default function Tasks() {
     inactiveRecoveryTasksAll,
     inactiveRecoveryHotTasks,
     inactiveRecoveryNoAnswerTasks,
+    amWorkflowDerived,
+    dismissalKeys,
   ])
 
   const focusNoAnswerView = useCallback(() => {
@@ -1889,10 +1932,7 @@ export default function Tasks() {
             )}
             {user?.role === 'active_manager' && activeWf?.success && (
               <p className="text-cyan-100/95 text-sm mt-2">
-                قائمة «المتابعة الدورية»:{' '}
-                {activeWf.active_count ?? 0}
-                {' / '}
-                {activeWf.target ?? 50} متجراً — عند إتمام أي متجر أو نقله إلى «لم يرد» يُضاف بديل جديد فوراً ويظهر في آخر القائمة.
+                طابور اليوم: متابعة دورية حتى {activeWf.target ?? 50} متجراً — «عدم الرد» للمكالمات غير الناجحة — «المتاجر المنجزة» بعد «تم الرد» واستبيان الرضا. يمكنك مراجعة «كل المتاجر المعينة» في أي وقت.
               </p>
             )}
             {showColdInactiveTab && moTab === 'cold_verify' && (
@@ -1925,20 +1965,23 @@ export default function Tasks() {
                 «تأخيرات المكالمات»: متاجر تجاوزت نافذة المكالمة الأولى (بعد 48 ساعة)، أو الثانية (بعد يوم 3 مع الشحن)، أو الثالثة (بعد يوم 10)، أو بها تنبيه فوات نافذة / تأخّر في التعيين. تُرتَّب بالأشد تأخيراً ثم الأقدم تسجيلاً — نفس أزرار «اتصل» و«عدم الرد» والاستبيان.
               </p>
             )}
-            {user?.role === 'active_manager' && moTab === 'am_cold_verify' && (
+            {user?.role === 'active_manager' && (
               <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
-                راجع تبويب «تحقيق بارد» يومياً بعد 9:00 ص — {ACTIVE_MANAGER_COLD_VERIFY_LIMIT} متجراً من «غير نشط بارد» بانتظار التحقق (مع آخر شحنة).
+                يُحدَّد حتى 50 متجراً يومياً للمتابعة الدورية؛ لا يُعاد عرض نفس المتجر الذي ظهر لك أمس في هذه الخانة. «لم يرد» أو «مشغول» ينقل المتجر إلى «عدم الرد» حتى تُكمل اتصالاً ناجحاً مع استبيان الرضا.
               </p>
             )}
-            {user?.role === 'active_manager'
-              && moTab !== 'am_cold_verify'
-              && moTab !== 'cold_verify'
-              && (
-              <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
-                يُعبَّأ طابورك تلقائياً حتى 50 متجراً نشطاً؛ لا يُعاد اختيار نفس المتجر من المجمع في يومَي العمل السابقين. في «متابعة دورية» تُعرَض المهام غير المنجزة مع ترتيب يفضّل المراحل الأشدّ حاجة؛ سجّل المكالمة أو استخدم «تم التواصل» و«لم يرد». تأخيرات نوافذ الاحتضان تظهر لمسؤول المتاجر وليس في حسابك.
+            {pendingTasks.length > 0 && user?.role === 'active_manager' && amWorkflowDerived && (
+              <p className="text-white/40 text-sm mt-2">
+                متابعة دورية: {amWorkflowDerived.periodic.length.toLocaleString('ar-SA')}
+                {' — '}
+                عدم رد: {amWorkflowDerived.noAnswer.length.toLocaleString('ar-SA')}
+                {' — '}
+                منجز: {amWorkflowDerived.completed.length.toLocaleString('ar-SA')}
+                {' — '}
+                المعيّنات: {amWorkflowDerived.all.length.toLocaleString('ar-SA')}
               </p>
             )}
-            {pendingTasks.length > 0 && (
+            {pendingTasks.length > 0 && user?.role !== 'active_manager' && (
               <p className="text-white/40 text-sm mt-2">
                 {mainTasks.length.toLocaleString('ar-SA')} في القائمة الرئيسية
                 {noAnswerTasks.length > 0 && (
@@ -1978,7 +2021,121 @@ export default function Tasks() {
         transition={{ duration: 0.4, delay: 0.18 }}
         className="flex flex-wrap gap-2"
       >
-        {isTaskTabUser ? (
+        {user?.role === 'active_manager' ? (
+          <>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('periodic')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'periodic'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'periodic'
+                  ? {
+                      background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                      boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                    }
+                  : {}
+              }
+            >
+              المتابعة الدورية
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'periodic' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {(amWorkflowDerived?.periodic.length ?? activeWf?.active_count ?? 0)}
+              </span>
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('no_answer')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'no_answer'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'no_answer'
+                  ? {
+                      background: 'linear-gradient(135deg, #d97706, #b45309)',
+                      boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
+                    }
+                  : {}
+              }
+            >
+              عدم الرد
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'no_answer' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {(amWorkflowDerived?.noAnswer.length ?? activeWf?.no_answer_count ?? 0)}
+              </span>
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('contacted')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                moTab === 'contacted'
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'contacted'
+                  ? {
+                      background: 'linear-gradient(135deg, #059669, #047857)',
+                      boxShadow: '0 4px 14px rgba(5,150,105,0.35)',
+                    }
+                  : {}
+              }
+            >
+              المتاجر المنجزة
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'contacted' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {(amWorkflowDerived?.completed.length ?? activeWf?.completed_count ?? 0)}
+              </span>
+            </motion.button>
+            <motion.button
+              type="button"
+              onClick={() => setMoTab('all_assigned')}
+              whileTap={{ scale: 0.97 }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                moTab === 'all_assigned'
+                  ? 'text-slate-800 shadow-lg border-violet-200/80'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+              style={
+                moTab === 'all_assigned'
+                  ? {
+                      background: 'linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%)',
+                      boxShadow: '0 4px 14px rgba(124,58,237,0.2)',
+                    }
+                  : {}
+              }
+            >
+              <ClipboardList size={16} className={moTab === 'all_assigned' ? 'text-violet-700' : 'text-slate-400'} aria-hidden />
+              كل المتاجر المعينة
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  moTab === 'all_assigned'
+                    ? 'bg-violet-600/15 text-violet-900'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {(amWorkflowDerived?.all.length ?? activeWf?.all_assigned_count ?? 0)}
+              </span>
+            </motion.button>
+          </>
+        ) : isTaskTabUser ? (
           <>
             <motion.button
               type="button"
@@ -2041,11 +2198,6 @@ export default function Tasks() {
               type="button"
               onClick={() => setMoTab('contacted')}
               whileTap={{ scale: 0.97 }}
-              title={
-                user?.role === 'active_manager'
-                  ? 'متاجر سجّلت لها «تم الرد» اليوم، أو تعيين متابعة دورية مكتمل، أو منجزة في المجمع ضمن آخر 60 يوماً — العدد الكبير القديم يُقيَّد بالمنجز فقط.'
-                  : undefined
-              }
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 moTab === 'contacted'
                   ? 'text-white shadow-lg'
@@ -2337,12 +2489,12 @@ export default function Tasks() {
             </motion.button>
           ))
         )}
-        {isTaskTabUser && moTab === 'delayed_calls' && moDelayedTasks.length > 0 && (
+        {isTaskTabUser && user?.role !== 'active_manager' && moTab === 'delayed_calls' && moDelayedTasks.length > 0 && (
           <p className="w-full text-xs text-orange-800/90 pt-1 leading-relaxed">
             قائمة التأخير: نفس حدّ الطابور (50 لمسؤول النشطين) — الأشد تأخيراً والأقدم تسجيلاً في الأعلى. بعد حفظ المكالمة يُحدَّث المتجر ويختفي من التأخيرات عند زوال السبب.
           </p>
         )}
-        {isTaskTabUser && moTab === 'periodic' && moPeriodicTasks.length > 0 && (
+        {isTaskTabUser && user?.role !== 'active_manager' && moTab === 'periodic' && moPeriodicTasks.length > 0 && (
           <p className="w-full text-xs text-slate-500 pt-1 leading-relaxed">
             توزيع المراحل في هذه القائمة فقط: أولى (ومؤجلة){' '}
             {moPeriodicRetroCounts.c1.toLocaleString('ar-SA')} — ثانية{' '}
@@ -2352,9 +2504,6 @@ export default function Tasks() {
               ? ` — أخرى ${moPeriodicRetroCounts.other.toLocaleString('ar-SA')}`
               : ''}
             . المجموع {moPeriodicTasks.length.toLocaleString('ar-SA')}
-            {user?.role === 'active_manager'
-              ? ' (يُعرض حتى 50 متجراً؛ قد يوجد المزيد خارج القائمة)'
-              : ''}
             .
           </p>
         )}
@@ -2571,7 +2720,10 @@ export default function Tasks() {
                     onNoAnswerWorkflow={handleNoAnswerWorkflow}
                     noAnswerLoading={noAnswerLoadingId === task.id}
                     doneDisabled={blockDone}
-                    hideDoneButton={isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls')}
+                    hideDoneButton={
+                      user?.role === 'active_manager'
+                      || (isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls'))
+                    }
                     taskIsNoAnswerFn={taskIsNoAnswer}
                     callLogs={callLogs}
                     assignments={assignments}
@@ -2589,7 +2741,10 @@ export default function Tasks() {
                   onNoAnswerWorkflow={handleNoAnswerWorkflow}
                   noAnswerLoading={noAnswerLoadingId === task.id}
                     doneDisabled={blockDone}
-                    hideDoneButton={isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls')}
+                    hideDoneButton={
+                      user?.role === 'active_manager'
+                      || (isTaskTabUser && (moTab === 'periodic' || moTab === 'delayed_calls'))
+                    }
                 />
               )
             })}
