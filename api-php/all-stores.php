@@ -167,10 +167,13 @@ $syncMoNoShip48hIds = [];
 
 $newIds = array_fill_keys(array_keys($new), true);
 
-/** يوم الدورة من 1 إلى 14 (اليوم الأول من التسجيل = 1) */
+/**
+ * يوم الدورة من 1 إلى 14 (اليوم الأول من التسجيل = 1) للعرض داخل نافذة الاحتضان.
+ * بدون تاريخ تسجيل صالح: 15 — خارج النافذة حتى لا يُعامَل المتجر كيوم 1 وهمياً.
+ */
 function incubation_cycle_day($regTs, $now) {
     if (!$regTs || $regTs <= 0) {
-        return 1;
+        return 15;
     }
     $d = (int) floor(($now - $regTs) / 86400);
 
@@ -277,10 +280,14 @@ if (!empty($new)) {
 // ── تصنيف المتاجر الجديدة (مسار الاحتضان) ───────────────────────
 foreach ($new as $id => $s) {
     $db = $dbMap[$id] ?? null;
-    $regTs   = !empty($s['registered_at']) ? strtotime($s['registered_at']) : null;
-    /** بدون تاريخ تسجيل: نعتبره حديثاً ضمن نافذة المكالمة الأولى */
-    $regHrs  = $regTs ? ($now - $regTs) / 3600 : 0;
-    $regDays = $regHrs / 24;
+    $regRaw = trim((string) ($s['registered_at'] ?? ''));
+    $regTs = $regRaw !== '' ? strtotime($regRaw) : null;
+    if ($regTs === false) {
+        $regTs = null;
+    }
+    /** بدون تاريخ تسجيل صالح: لا نفترض «ساعة 0» (كان يُدخل كل المتاجر في م1) */
+    $regHrs = $regTs !== null ? ($now - $regTs) / 3600 : PHP_INT_MAX;
+    $regDays = $regTs !== null ? ($now - $regTs) / 86400 : PHP_INT_MAX;
 
     $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
                || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
@@ -447,11 +454,13 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // بعد 14 يومًا بدون مكالمة أولى وبدون شحن → بارد
-    if (!$inc1 && !$hasShipped && $cycleDay > 14) {
+    // بعد 14 يوماً تقويمياً من التسجيل بدون مكالمة أولى وبدون شحن → غير نشط بارد
+    // (لا نعتمد cycleDay>14 فقط: incubation_cycle_day يقصّ عند 14 فيُستبعد المتاجر القديمة خطأً)
+    if (!$inc1 && !$hasShipped && $regTs !== null && $regDays > 14) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
+        nawras_apply_lifecycle_tags($s, $now);
         $s['_cat'] = 'cold_inactive';
         $s['_inc'] = 'never_started';
         $s['_never_started'] = true;

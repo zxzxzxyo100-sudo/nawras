@@ -5,7 +5,7 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
-import { isStoreStrictlyNew } from '../utils/storeFilters'
+import { dateOnlyFromStoreField, isStoreStrictlyNew } from '../utils/storeFilters'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -80,9 +80,12 @@ export default function NewStores() {
       key: 'days_old',
       label: 'عمر المتجر',
       render: s => {
-        if (!s.registered_at) return '—'
-        const days = Math.floor((Date.now() - new Date(s.registered_at)) / 86400000)
-        return <span className="text-xs font-medium">{days} يوم</span>
+        const dOnly = dateOnlyFromStoreField(s.registered_at)
+        if (!dOnly) return '—'
+        const t = new Date(`${dOnly}T12:00:00`).getTime()
+        if (Number.isNaN(t)) return '—'
+        const days = Math.floor((Date.now() - t) / 86400000)
+        return <span className="text-xs font-medium">{Math.max(0, days)} يوم</span>
       },
     },
     {
