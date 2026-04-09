@@ -343,10 +343,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const wfIds = new Set(
       [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])].map(t => Number(t.store_id)),
     )
-    if (wfIds.size === 0) return mine.slice(0, 8)
+    if (wfIds.size === 0) return mine
     const scoped = mine.filter(s => wfIds.has(Number(s.id)))
-    const batch = scoped.length ? scoped : mine
-    return batch.slice(0, 8)
+    return scoped.length ? scoped : mine
   }, [isPendingTab, isActiveManager, user?.username, activeWf, filteredActive, assignments])
 
   const pendingDisplayStores =
@@ -616,7 +615,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             </p>
             {activeDailyQuota && !activeDailyQuota.quota_reached && (
               <p className="text-[11px] font-semibold text-emerald-900 mt-2 tabular-nums">
-                الحصة اليومية: {activeDailyQuota.count} / {activeDailyQuota.limit} — تُعرض دفعة صغيرة من طابورك (حتى 8 متاجر).
+                الحصة اليومية: {activeDailyQuota.count} / {activeDailyQuota.limit} — يُعرض طابورك كاملاً (المتاجر المعيّنة لك ضمن المتابعة الدورية).
               </p>
             )}
           </div>
