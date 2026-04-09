@@ -14,6 +14,7 @@ import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/tasks',         label: 'المهام',            icon: ClipboardList,   view: 'tasks'        },
+  { to: '/active/pending', label: 'قيد المكالمة',     icon: TrendingUp,      view: 'active'       },
   { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
@@ -415,7 +416,7 @@ const NAV_GROUPS = [
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
-      { label: 'الرئيسية', keys: ['/', '/tasks'] },
+      { label: 'الرئيسية', keys: ['/', '/tasks', '/active/pending'] },
       ...(DISABLE_POINTS_AND_PERFORMANCE
         ? []
         : [{ label: 'الإدارة', keys: ['/performance'] }]),
