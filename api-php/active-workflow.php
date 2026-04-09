@@ -382,6 +382,189 @@ elseif ($action === 'complete_inactive_success') {
     ]);
 }
 
+// ========== POST: متابعة «المتاجر غير النشطة المنجزة» — تم التواصل + استبيان (يُستدعى بعد log_call) ==========
+elseif ($action === 'inactive_followup_success') {
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $username = trim((string) ($input['username'] ?? ''));
+    $storeName = trim((string) ($input['store_name'] ?? ''));
+    if ($storeId <= 0 || $username === '') {
+        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    $sid = (string) $storeId;
+    $chk = $pdo->prepare("SELECT workflow_status FROM store_assignments WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' LIMIT 1");
+    $chk->execute([$sid, $username]);
+    $ws = (string) ($chk->fetchColumn() ?: '');
+    if ($ws === '') {
+        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
+    }
+
+    if ($ws === 'active' || $ws === 'no_answer') {
+        nawras_ensure_daily_quota_schema($pdo);
+        if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
+            jsonResponse([
+                'success' => false,
+                'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+                'daily_quota' => getDailyProgress($pdo, $username),
+            ], 403);
+        }
+        ensure_inactive_daily_stats_schema($pdo);
+        $upd = $pdo->prepare("
+            UPDATE store_assignments SET workflow_status = 'completed', workflow_updated_at = NOW()
+            WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status IN ('active','no_answer')
+        ");
+        $upd->execute([$sid, $username]);
+        if ($upd->rowCount() === 0) {
+            jsonResponse(['success' => false, 'error' => 'تعذّر تحديث التعيين.'], 400);
+        }
+        register_daily_store_processed($pdo, $username, $storeId, 'inactive_followup');
+        increment_inactive_daily_success($pdo, $username);
+        $filled = fill_inactive_slots_for_user($pdo, $username, $username, 1);
+        $count = get_inactive_daily_success_count($pdo, $username);
+        $reached = $count >= INACTIVE_DAILY_SUCCESS_TARGET;
+        $pdo->prepare("
+            INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $storeId,
+            $storeName,
+            'متابعة غير نشط — تم التواصل',
+            'تسجيل ناجح نحو هدف اليوم (' . $count . '/' . INACTIVE_DAILY_SUCCESS_TARGET . ') بعد مكالمة واستبيان. تعبئة: +' . (int) $filled,
+            $username,
+            'inactive_manager',
+        ]);
+        jsonResponse([
+            'success' => true,
+            'mode' => 'first_completion',
+            'replacement_added' => $filled,
+            'daily_successful_contacts' => $count,
+            'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_target_reached' => $reached,
+            'goal_just_met' => $count === INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_quota' => getDailyProgress($pdo, $username),
+        ]);
+    }
+
+    if ($ws === 'completed') {
+        nawras_ensure_daily_quota_schema($pdo);
+        if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
+            jsonResponse([
+                'success' => false,
+                'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+                'daily_quota' => getDailyProgress($pdo, $username),
+            ], 403);
+        }
+        ensure_inactive_daily_stats_schema($pdo);
+        register_daily_store_processed($pdo, $username, $storeId, 'inactive_followup_repeat');
+        increment_inactive_daily_success($pdo, $username);
+        $pdo->prepare("
+            UPDATE store_assignments SET workflow_updated_at = NOW()
+            WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status = 'completed'
+        ")->execute([$sid, $username]);
+        $count = get_inactive_daily_success_count($pdo, $username);
+        $reached = $count >= INACTIVE_DAILY_SUCCESS_TARGET;
+        $pdo->prepare("
+            INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $storeId,
+            $storeName,
+            'متابعة غير نشط — تم التواصل (منجزة)',
+            'إتمام متابعة دورية نحو هدف اليوم (' . $count . '/' . INACTIVE_DAILY_SUCCESS_TARGET . ') — السجل يشمل المكالمة المحفوظة مسبقاً.',
+            $username,
+            'inactive_manager',
+        ]);
+        jsonResponse([
+            'success' => true,
+            'mode' => 'repeat_completed',
+            'daily_successful_contacts' => $count,
+            'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_target_reached' => $reached,
+            'goal_just_met' => $count === INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_quota' => getDailyProgress($pdo, $username),
+        ]);
+    }
+
+    jsonResponse(['success' => false, 'error' => 'حالة التعيين لا تسمح بتسجيل «تم التواصل» من المتابعة.'], 400);
+}
+
+// ========== POST: من تبويب «تم التواصل» — تحويل إلى «لم يرد» (لا يُحتسب نحو الـ50) ==========
+elseif ($action === 'inactive_followup_to_no_answer') {
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $username = trim((string) ($input['username'] ?? ''));
+    $storeName = trim((string) ($input['store_name'] ?? ''));
+    $note = trim((string) ($input['note'] ?? ''));
+    if ($storeId <= 0 || $username === '') {
+        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    wf_ensure_call_logs_outcome($pdo);
+    $sid = (string) $storeId;
+    $upd = $pdo->prepare("
+        UPDATE store_assignments
+        SET workflow_status = 'no_answer', workflow_updated_at = NOW()
+        WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' AND workflow_status = 'completed'
+    ");
+    $upd->execute([$sid, $username]);
+    if ($upd->rowCount() === 0) {
+        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين بحالة «تم التواصل» لهذا المتجر أو تمت معالجته.'], 400);
+    }
+    $performedBy = trim((string) ($input['performed_by'] ?? $username));
+    $performedRole = trim((string) ($input['performed_role'] ?? 'inactive_manager'));
+    $pdo->prepare("
+        INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+        VALUES (?, ?, 'general', ?, 'no_answer', ?, ?)
+    ")->execute([$storeId, $storeName, $note !== '' ? $note : 'متابعة منجزة — تحويل إلى لم يرد', $performedBy, $performedRole]);
+    $pdo->prepare("
+        INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([
+        $storeId,
+        $storeName,
+        'متابعة غير نشط — تحويل إلى لم يرد',
+        'نقل من تبويب تم التواصل إلى لم يرد (بدون احتساب نحو الـ50).',
+        $username,
+        'inactive_manager',
+    ]);
+    jsonResponse(['success' => true]);
+}
+
+// ========== POST: تبويب «لم يرد» — تسجيل لم يرد إضافي (لا يُحتسب نحو الـ50) ==========
+elseif ($action === 'inactive_followup_no_answer_log') {
+    $storeId = (int) ($input['store_id'] ?? 0);
+    $username = trim((string) ($input['username'] ?? ''));
+    $storeName = trim((string) ($input['store_name'] ?? ''));
+    $note = trim((string) ($input['note'] ?? ''));
+    if ($storeId <= 0 || $username === '') {
+        jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    wf_ensure_call_logs_outcome($pdo);
+    $sid = (string) $storeId;
+    $chk = $pdo->prepare("SELECT workflow_status FROM store_assignments WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive' LIMIT 1");
+    $chk->execute([$sid, $username]);
+    $ws = (string) ($chk->fetchColumn() ?: '');
+    if ($ws !== 'no_answer') {
+        jsonResponse(['success' => false, 'error' => 'المتجر ليس في حالة «لم يرد» ضمن المتابعة.'], 400);
+    }
+    $pdo->prepare("UPDATE store_assignments SET workflow_updated_at = NOW() WHERE store_id = ? AND assigned_to = ? AND assignment_queue = 'inactive'")->execute([$sid, $username]);
+    $performedBy = trim((string) ($input['performed_by'] ?? $username));
+    $performedRole = trim((string) ($input['performed_role'] ?? 'inactive_manager'));
+    $pdo->prepare("
+        INSERT INTO call_logs (store_id, store_name, call_type, note, outcome, performed_by, performed_role)
+        VALUES (?, ?, 'general', ?, 'no_answer', ?, ?)
+    ")->execute([$storeId, $storeName, $note !== '' ? $note : 'متابعة منجزة — تسجيل لم يرد', $performedBy, $performedRole]);
+    $pdo->prepare("
+        INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([
+        $storeId,
+        $storeName,
+        'متابعة غير نشط — لم يرد (منجزة)',
+        'تسجيل لم يرد من قائمة المتابعة — بدون احتساب نحو الـ50.',
+        $username,
+        'inactive_manager',
+    ]);
+    jsonResponse(['success' => true]);
+}
+
 // ========== POST: بعد إكمال الاستبيان — إتمام المتجر + إحلال فوري ==========
 elseif ($action === 'release_after_survey') {
     $storeId = (int) ($input['store_id'] ?? 0);
