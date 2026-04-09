@@ -36,27 +36,12 @@ function rowToStore(row) {
   }
 }
 
-function callTypeForStore(store) {
-  const t = String(store?._last_call_type || '').trim()
-  if (t === 'rcall1' || t === 'rcall2' || t === 'rcall3') {
-    return t
-  }
-  if (t === 'inc_call1' || t === 'inc_call2' || t === 'inc_call3') {
-    return t
-  }
-  if (t === 'periodic_followup') {
-    return 'periodic_followup'
-  }
-  return 'general'
-}
-
 /**
- * تحت «تمت الاستعادة»: متاجر لها تعيين مهام يومية (طابور غير النشط) — تم التواصل / لم يرد.
- * الحصة اليومية تُحسب «تم التواصل» فقط (مثل مسؤول المتاجر النشطة).
+ * خانة «المتاجر غير النشطة المنجزة» — تحت عنوان «تمت الاستعادة» في المسار المخصص، أو ضمن «المهام».
  */
-export default function InactiveRestoredFollowupSection() {
+export default function InactiveRestoredFollowupSection({ underRestoredHeading = false } = {}) {
   const { user } = useAuth()
-  const { callLogs, reload: reloadStores } = useStores()
+  const { callLogs, reload: reloadStores, storeStates } = useStores()
 
   const [tab, setTab] = useState('contacted')
   const [loading, setLoading] = useState(true)
@@ -141,16 +126,18 @@ export default function InactiveRestoredFollowupSection() {
       <div className="rounded-2xl border border-teal-200/80 bg-gradient-to-l from-teal-50/90 to-white px-5 py-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
+            {underRestoredHeading && (
+              <p className="text-xs font-semibold text-teal-800/90 mb-1">تمت الاستعادة</p>
+            )}
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <CheckCircle2 size={22} className="text-teal-600 shrink-0" />
-              متابعة المهام بعد الاستعادة
+              المتاجر غير النشطة المنجزة
             </h2>
             <p className="text-slate-600 text-sm mt-1 leading-relaxed">
-              متاجر لها تعيين من «المهام اليومية» لطابور غير النشط بعد اكتمال الاستعادة — تبويب{' '}
+              تعيينات المهام اليومية لطابور غير النشط بعد اكتمال الاستعادة —{' '}
               <strong className="font-semibold text-teal-900">تم التواصل</strong> أو{' '}
-              <strong className="font-semibold text-amber-900">لم يرد</strong>. يُحتسب نحو الهدف اليومي (50){' '}
-              <span className="text-emerald-800 font-semibold">تم التواصل</span> فقط؛ «لم يرد» لا يُحتسب في الحصة
-              (نفس منطق مسؤول المتاجر النشطة).
+              <strong className="font-semibold text-amber-900">لم يرد</strong>. يُحتسب نحو الحصة «تم التواصل» فقط؛ «لم يرد»
+              هنا لا يُحتسب في الـ50.
             </p>
           </div>
           <button
@@ -307,7 +294,9 @@ export default function InactiveRestoredFollowupSection() {
                   </tr>
                 )}
                 {rows.map((s, i) => {
-                  const storeObj = rowToStore(s)
+                  const storeObj = { ...rowToStore(s) }
+                  const cat = storeStates[s.id]?.category
+                  if (cat) storeObj.category = cat
                   const parcels = totalShipments(storeObj)
                   const hasCalls = callLogs[s.id] && Object.keys(callLogs[s.id]).length > 0
                   return (
@@ -391,7 +380,8 @@ export default function InactiveRestoredFollowupSection() {
       {callStore && (
         <CallModal
           store={callStore}
-          callType={callTypeForStore(callStore)}
+          callType="general"
+          inactiveRestoredFollowup
           onClose={() => setCallStore(null)}
           onSaved={onSavedCall}
         />

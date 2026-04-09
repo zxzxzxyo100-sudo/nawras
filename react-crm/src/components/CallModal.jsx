@@ -165,6 +165,8 @@ export default function CallModal({
   taskCompletion = null,
   /** فُتح من صفحة المهام اليومية — يُستخدم مع مسؤول المتاجر لإظهار الاستبيان حتى خارج التجريبي */
   fromDailyTasks = false,
+  /** متابعة بعد الاستعادة — تسجيل مكالمة بسيط دون استبيان رضا/تهيئة يعطّل الحفظ؛ لا يُحدَّث طابور active/inactive من «لم يرد» إن كان التعيين منجزاً */
+  inactiveRestoredFollowup = false,
 }) {
   const { user } = useAuth()
   const { storeStates, surveyByStoreId, assignments, newMerchantOnboardingDoneIds } = useStores()
@@ -183,8 +185,9 @@ export default function CallModal({
 
   const dbCategory = storeStates[store.id]?.category || store.category || ''
   const inactiveFeedbackNeeded = useMemo(
-    () => callType === 'general' && isInactiveMerchantCategory(dbCategory),
-    [callType, dbCategory],
+    () =>
+      !inactiveRestoredFollowup && callType === 'general' && isInactiveMerchantCategory(dbCategory),
+    [inactiveRestoredFollowup, callType, dbCategory],
   )
 
   /**
@@ -199,6 +202,7 @@ export default function CallModal({
   )
 
   const simpleOnboardingFlow = useMemo(() => {
+    if (inactiveRestoredFollowup) return false
     if (inactiveFeedbackNeeded) return false
 
     if (needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)) {
@@ -224,6 +228,7 @@ export default function CallModal({
     store,
     newMerchantOnboardingDoneIds,
     inactiveFeedbackNeeded,
+    inactiveRestoredFollowup,
     fromDailyTasks,
     user?.role,
     dbCategory,
@@ -233,9 +238,10 @@ export default function CallModal({
   /** نسخة احتياطية إذا لم يُفعَّل المسار المبسّط — يجب أن تبقى متوافقة مع simpleOnboardingFlow للتهيئة */
   const onboardingNeeded = useMemo(
     () =>
-      needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)
+      !inactiveRestoredFollowup
+      && needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds)
       && ONBOARDING_CALL_TYPES.has(callType),
-    [callType, store, newMerchantOnboardingDoneIds, ONBOARDING_CALL_TYPES],
+    [inactiveRestoredFollowup, callType, store, newMerchantOnboardingDoneIds, ONBOARDING_CALL_TYPES],
   )
   /**
    * استبيان الرضا (٦ أسئلة): مرة واحدة لكل متجر في المسار العادي؛
@@ -244,6 +250,7 @@ export default function CallModal({
    */
   const surveyNeeded = useMemo(
     () => {
+      if (inactiveRestoredFollowup) return false
       if (callType !== 'general' || outcome !== 'answered' || inactiveFeedbackNeeded) {
         return false
       }
@@ -261,6 +268,7 @@ export default function CallModal({
       dbCategory,
       surveyByStoreId,
       inactiveFeedbackNeeded,
+      inactiveRestoredFollowup,
       outcome,
       fromDailyTasks,
       user?.role,
@@ -391,7 +399,8 @@ export default function CallModal({
       }
 
       if (
-        IS_STAGING_OR_DEV
+        !inactiveRestoredFollowup
+        && IS_STAGING_OR_DEV
         && taskCompletion?.inactiveRecovery
         && user?.role === 'inactive_manager'
         && user?.username
@@ -406,6 +415,36 @@ export default function CallModal({
         } catch { /* */ }
       }
 
+      onSaved?.()
+      setTimeout(onClose, 400)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'تعذّر تسجيل عدم الرد.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** متابعة بعد الاستعادة: تسجيل «لم يرد» في السجل فقط (التعيين قد يكون مُنجَزاً مسبقاً) */
+  async function inactiveRestoredQuickNoAnswer() {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        call_type: callType,
+        outcome: 'no_answer',
+        note: note.trim(),
+        performed_by: user?.fullname || user?.username || '',
+        performed_role: user?.role,
+        username: user?.username ?? '',
+        registration_date: store.registered_at || null,
+      }
+      if (callType === 'inc_call3') {
+        payload.has_shipped = storeHasShipped(store)
+      }
+      const res = await logCall(payload)
+      onCallSaved(res?.points_awarded ?? 0)
       onSaved?.()
       setTimeout(onClose, 400)
     } catch (e) {
@@ -519,6 +558,7 @@ export default function CallModal({
 
       if (
         outcome === 'no_answer'
+        && !inactiveRestoredFollowup
         && IS_STAGING_OR_DEV
         && taskCompletion?.inactiveRecovery
         && user?.role === 'inactive_manager'
@@ -823,37 +863,54 @@ export default function CallModal({
             </div>
           </div>
         ) : (
-          <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
-            <motion.button
-              type="button"
-              onClick={submitCall}
-              disabled={
-                saving
-                || (outcome === 'answered' && surveyNeeded && !allSurveyRated)
-                || (outcome === 'answered' && inactiveFeedbackNeeded && !inactiveFeedbackOk)
-                || (outcome === 'answered' && showOnboarding && !allOnboardingYesNo)
-              }
-              whileHover={{ scale: saving ? 1 : 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
-              style={{
-                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
-              }}
-            >
-              {saving
-                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
-                : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
-              }
-            </motion.button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
-            >
-              إلغاء
-            </button>
-          </div>
+          <>
+            {inactiveRestoredFollowup && (
+              <div className="shrink-0 border-t border-amber-200/80 bg-amber-50/70 px-5 py-3">
+                <p className="text-[11px] text-amber-950/90 text-center leading-relaxed mb-2">
+                  أو سجّل «لم يرد» مباشرة في سجل المكالمات (إن كان التعيين مُنجَزاً قد لا يُحدَّث الطابور).
+                </p>
+                <button
+                  type="button"
+                  onClick={inactiveRestoredQuickNoAnswer}
+                  disabled={saving}
+                  className="w-full py-2.5 font-black rounded-xl border-2 border-amber-500 bg-white text-amber-950 text-sm disabled:opacity-50 shadow-sm"
+                >
+                  {saving ? 'جارٍ التسجيل…' : 'لم يرد — تسجيل سريع'}
+                </button>
+              </div>
+            )}
+            <div className="flex flex-row-reverse gap-3 px-5 pb-5 items-stretch">
+              <motion.button
+                type="button"
+                onClick={submitCall}
+                disabled={
+                  saving
+                  || (outcome === 'answered' && surveyNeeded && !allSurveyRated)
+                  || (outcome === 'answered' && inactiveFeedbackNeeded && !inactiveFeedbackOk)
+                  || (outcome === 'answered' && showOnboarding && !allOnboardingYesNo)
+                }
+                whileHover={{ scale: saving ? 1 : 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex-1 py-3 font-black rounded-xl text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 min-h-[48px]"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  boxShadow: '0 6px 20px rgba(124,58,237,0.4)',
+                }}
+              >
+                {saving
+                  ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> جارٍ الحفظ...</>
+                  : <><Phone size={15} /> حفظ المكالمة{DISABLE_POINTS_AND_PERFORMANCE ? '' : ' 🪙'}</>
+                }
+              </motion.button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-medium transition-colors text-sm shrink-0"
+              >
+                إلغاء
+              </button>
+            </div>
+          </>
         )}
       </motion.div>
     </div>
