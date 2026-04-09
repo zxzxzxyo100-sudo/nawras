@@ -130,8 +130,8 @@ export const getSurveys = () =>
 export const saveSurvey = (data) =>
   http.post('/store-actions.php?action=save_survey', data).then(r => r.data)
 
-// ─── سير عمل المتاجر النشطة (طابور 50، عدم الرد) ───────────────────────────
-/** queue: 'active' | 'inactive' — طابور المسؤول النشط أو موظف الاستعادة (50 متجر). مع queue=active يمكن تمرير type=delayed لقائمة المتأخرات حسب مسار الاحتضان/التعيين (حتى 50). */
+// ─── سير عمل المتاجر (عدم الرد، استعادة، إلخ.) — active-workflow.php ────────
+/** queue: 'inactive' للاستعادة؛ يُستخدم من صفحات غير النشط */
 export const getMyWorkflow = (username, extra = {}) =>
   http
     .get('/active-workflow.php', { params: { action: 'get_my_workflow', username, ...extra } })
@@ -142,10 +142,6 @@ export const fillAllInactiveQueues = (data) =>
 
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
-
-/** متابعة دورية — تم التواصل: إكمال التعيين + سجل مكالمة + إحلال من المجمع */
-export const markActiveWorkflowContacted = (data) =>
-  http.post('/active-workflow.php?action=mark_active_contacted', data).then(r => r.data)
 
 /** اتصال ناجح (تم) — طابور استعادة غير النشط: حذف من الطابور + عدّ يومي + تعبئة */
 export const completeInactiveQueueSuccess = (data) =>
@@ -159,12 +155,6 @@ export const fetchNextInactiveMerchant = (username) =>
 
 export const releaseAfterSurvey = (data) =>
   http.post('/active-workflow.php?action=release_after_survey', data).then(r => r.data)
-
-export const fillAllActiveQueues = (data) =>
-  http.post('/active-workflow.php?action=fill_all_queues', data).then(r => r.data)
-
-export const listAllNoAnswerWorkflow = (userRole) =>
-  http.get('/active-workflow.php', { params: { action: 'list_all_no_answer', user_role: userRole } }).then(r => r.data)
 
 export const getAssignmentStatus = (storeId, username) =>
   http
