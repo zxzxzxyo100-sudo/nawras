@@ -31,7 +31,7 @@ function ensure_executive_private_tickets_table(PDO $pdo): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
-/** أعمدة تذاكر الانحراف (deviation_alert) والبيانات الوصفية */
+/** أعمدة اختيارية: نوع التذكرة، متجر، بيانات وصفية */
 function ensure_executive_private_tickets_extra_columns(PDO $pdo): void
 {
     $tryAlter = static function (PDO $pdo, string $sql): void {
@@ -83,6 +83,7 @@ if ($action === 'list') {
             "SELECT t.*, u.fullname AS assignee_fullname
              FROM executive_private_tickets t
              LEFT JOIN users u ON u.username = t.assignee_username
+             WHERE COALESCE(NULLIF(TRIM(t.ticket_type), ''), 'general') <> 'deviation_alert'
              ORDER BY (t.status = 'open') DESC, t.created_at DESC
              LIMIT 500"
         );
@@ -94,6 +95,7 @@ if ($action === 'list') {
          FROM executive_private_tickets t
          LEFT JOIN users u ON u.username = t.assignee_username
          WHERE t.assignee_username = ?
+           AND COALESCE(NULLIF(TRIM(t.ticket_type), ''), 'general') <> 'deviation_alert'
          ORDER BY (t.status = 'open') DESC, t.created_at DESC
          LIMIT 200"
     );
@@ -114,7 +116,7 @@ if ($action === 'create') {
     if ($ticketType === '') {
         $ticketType = 'general';
     }
-    $allowedTypes = ['general', 'deviation_alert'];
+    $allowedTypes = ['general'];
     if (!in_array($ticketType, $allowedTypes, true)) {
         jsonResponse(['success' => false, 'error' => 'نوع التذكرة غير صالح.'], 400);
     }
@@ -131,9 +133,6 @@ if ($action === 'create') {
         if ($metaJson === '') {
             $metaJson = null;
         }
-    }
-    if ($ticketType === 'deviation_alert') {
-        $mandatory = 1;
     }
     if ($title === '' || $body === '' || $assignee === '') {
         jsonResponse(['success' => false, 'error' => 'العنوان والنص والموظف المكلّف مطلوبة.'], 400);

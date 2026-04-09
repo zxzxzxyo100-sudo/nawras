@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Ticket, Loader2, CheckCircle2, AlertCircle, UserPlus } from 'lucide-react'
 import {
@@ -16,8 +15,6 @@ const fadeUp = {
 }
 
 export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) {
-  const location = useLocation()
-  const navigate = useNavigate()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -62,17 +59,6 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
   useEffect(() => {
     void refreshPrivateTicketsAlert()
   }, [reloadKey, refreshPrivateTicketsAlert])
-
-  const scrollTarget = location.state?.scrollToDeviationTicketId
-  useEffect(() => {
-    if (scrollTarget == null) return
-    const id = scrollTarget
-    const t = setTimeout(() => {
-      document.querySelector(`[data-ticket-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: {} })
-    }, 400)
-    return () => clearTimeout(t)
-  }, [scrollTarget, location.pathname, location.search, navigate])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -165,9 +151,8 @@ export default function ExecutivePrivateTicketsSection({ user, reloadKey = 0 }) 
             <div>
               <h2 className="text-lg font-black text-white tracking-tight">تذاكر خاصة</h2>
               <p className="text-violet-200/75 text-xs mt-1 max-w-xl leading-relaxed">
-                مهام يعيّنها المدير التنفيذي لموظف محدد؛ يشمل نوع{' '}
-                <span className="text-red-200 font-bold">«تذاكر الانحراف»</span> عند التعيين من «نشط يشحن» (إجبارية).
-                يمكن جعل المهام الأخرى <span className="text-amber-200 font-bold">إجبارية</span>.
+                مهام يعيّنها المدير التنفيذي لموظف محدد. يمكن جعل المهمة{' '}
+                <span className="text-amber-200 font-bold">إجبارية</span> على الموظف.
               </p>
             </div>
           </div>

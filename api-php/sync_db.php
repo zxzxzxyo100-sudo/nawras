@@ -4,8 +4,7 @@
  *
  * - لا يُدرج صفوف اختبار ولا متاجر وهمية.
  * - يستخدم CREATE IF NOT EXISTS و ALTER مع تجاهل الخطأ إن وُجد العمود.
- * - جدول تذاكر الانحراف في المنتج = executive_private_tickets (عمود ticket_type).
- *   يُنشأ عرض (VIEW) اختياري اسمه deviation_tickets للقراءة فقط.
+ * - جدول التذاكر الخاصة = executive_private_tickets (عمود ticket_type اختياري).
  *
  * التشغيل:
  *   HTTP:  GET /api-php/sync_db.php?token=YOUR_SECRET
@@ -93,7 +92,7 @@ function tryExec(PDO $pdo, string $sql, string $label, array &$steps): void
     }
 }
 
-// ── executive_private_tickets (تذاكر خاصة + انحراف) ─────────────────
+// ── executive_private_tickets (تذاكر خاصة) ───────────────────────────
 tryExec($pdo, "CREATE TABLE IF NOT EXISTS executive_private_tickets (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(500) NOT NULL,
@@ -113,17 +112,12 @@ tryExec($pdo, 'ALTER TABLE executive_private_tickets ADD COLUMN store_id INT NUL
 tryExec($pdo, 'ALTER TABLE executive_private_tickets ADD COLUMN meta_json TEXT NULL DEFAULT NULL AFTER store_id', 'ADD meta_json', $steps);
 tryExec($pdo, 'CREATE INDEX idx_assignee_type_open ON executive_private_tickets (assignee_username, status, ticket_type)', 'INDEX idx_assignee_type_open', $steps);
 
-// عرض قراءة فقط — لا يكرر البيانات
+// إزالة عرض قديم لتذاكر الانحراف (لم يعد مستخدماً)
 try {
     $pdo->exec('DROP VIEW IF EXISTS deviation_tickets');
+    $steps[] = ['ok' => true, 'step' => 'DROP VIEW deviation_tickets (if existed)'];
 } catch (Throwable $e) {
-}
-try {
-    $pdo->exec("CREATE VIEW deviation_tickets AS
-        SELECT * FROM executive_private_tickets WHERE ticket_type = 'deviation_alert'");
-    $steps[] = ['ok' => true, 'step' => 'CREATE VIEW deviation_tickets'];
-} catch (Throwable $e) {
-    $steps[] = ['ok' => false, 'step' => 'CREATE VIEW deviation_tickets', 'error' => $e->getMessage()];
+    $steps[] = ['ok' => false, 'step' => 'DROP VIEW deviation_tickets', 'error' => $e->getMessage()];
 }
 
 // ── store_states — أعمدة الاستعادة / المكالمات (بدون مسح) ───────────

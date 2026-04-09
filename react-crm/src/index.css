@@ -26,16 +26,4 @@
   .animate-private-ticket-frost {
     animation: private-ticket-frost-pulse 2.1s ease-in-out infinite;
   }
-
-  @keyframes deviation-border-pulse {
-    0%, 100% {
-      box-shadow: inset 0 0 0 3px rgba(220, 38, 38, 0.55), 0 0 0 0 rgba(220, 38, 38, 0.2);
-    }
-    50% {
-      box-shadow: inset 0 0 0 5px rgba(220, 38, 38, 0.9), 0 0 28px rgba(220, 38, 38, 0.35);
-    }
-  }
-  .animate-deviation-border {
-    animation: deviation-border-pulse 2s ease-in-out infinite;
-  }
 }
