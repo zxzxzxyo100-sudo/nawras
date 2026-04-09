@@ -10,7 +10,6 @@ import QuickVerification from './pages/QuickVerification'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
 import ActiveWorkflow from './pages/ActiveWorkflow'
-import ManagerAnalytics from './pages/ManagerAnalytics'
 import LogisticsAnalytics from './pages/LogisticsAnalytics'
 import FrozenStores from './pages/FrozenStores'
 import HotInactive from './pages/HotInactive'
@@ -118,10 +117,6 @@ function AppRoutes() {
           )}
         />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
-        <Route
-          path="/analytics/manager"
-          element={<PrivateRoute view="manager_analytics"><ManagerAnalytics /></PrivateRoute>}
-        />
         <Route
           path="/analytics/logistics"
           element={<PrivateRoute view="dashboard"><LogisticsAnalytics /></PrivateRoute>}

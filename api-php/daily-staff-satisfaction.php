@@ -1,6 +1,6 @@
 <?php
 /**
- * بورصة الرضا اليوم — مسار خفيف للداشبورد فقط (لا يُدمج مع manager-analytics.php).
+ * بورصة الرضا اليوم — مسار خفيف للداشبورد فقط.
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
