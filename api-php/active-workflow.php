@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/workflow-queue-lib.php';
+require_once __DIR__ . '/daily-quota-lib.php';
 
 /** عمود outcome في call_logs (قواعد قديمة) */
 function wf_ensure_call_logs_outcome(PDO $pdo) {
@@ -24,12 +25,27 @@ $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 ensure_workflow_schema($pdo);
 
+// ========== GET: حصة يومية (50 متجر) ==========
+if ($action === 'get_daily_quota') {
+    $username = trim((string) ($_GET['username'] ?? ''));
+    if ($username === '') {
+        jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400);
+    }
+    nawras_ensure_daily_quota_schema($pdo);
+    jsonResponse([
+        'success' => true,
+        'daily_quota' => getDailyProgress($pdo, $username),
+    ]);
+}
+
 // ========== GET: طابوري + عدم الرد ==========
 if ($action === 'get_my_workflow') {
     $username = trim((string) ($_GET['username'] ?? ''));
     if ($username === '') {
         jsonResponse(['success' => false, 'error' => 'username مطلوب'], 400);
     }
+    nawras_ensure_daily_quota_schema($pdo);
+    $dailyQuota = getDailyProgress($pdo, $username);
     $queue = trim((string) ($_GET['queue'] ?? 'active'));
     $listType = trim((string) ($_GET['type'] ?? ''));
     if ($queue === 'inactive') {
@@ -51,6 +67,10 @@ if ($action === 'get_my_workflow') {
                 $active[] = $r;
             }
         }
+        if ($dailyQuota['quota_reached']) {
+            $active = [];
+            $noAnswer = [];
+        }
         $dailySuccess = get_inactive_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
@@ -59,6 +79,7 @@ if ($action === 'get_my_workflow') {
             'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
             'daily_successful_contacts' => $dailySuccess,
             'daily_target_reached' => $dailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_quota' => $dailyQuota,
             'cooldown_days' => SURVEY_COOLDOWN_DAYS,
             'active_tasks' => $active,
             'no_answer_tasks' => $noAnswer,
@@ -75,6 +96,9 @@ if ($action === 'get_my_workflow') {
     if ($listType === 'delayed') {
         require_once __DIR__ . '/incubation-delay-lib.php';
         $delayed = wf_build_active_manager_delayed_task_list($pdo, $username);
+        if ($dailyQuota['quota_reached']) {
+            $delayed = [];
+        }
         $dailyActive = get_active_daily_success_count($pdo, $username);
         jsonResponse([
             'success' => true,
@@ -86,6 +110,7 @@ if ($action === 'get_my_workflow') {
             'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
             'daily_successful_contacts' => $dailyActive,
             'daily_target_reached' => $dailyActive >= ACTIVE_DAILY_SUCCESS_TARGET,
+            'daily_quota' => $dailyQuota,
             'cooldown_days' => SURVEY_COOLDOWN_DAYS,
         ]);
     }
@@ -131,6 +156,11 @@ if ($action === 'get_my_workflow') {
     $stNoAns->execute([$username]);
     $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
 
+    if ($dailyQuota['quota_reached']) {
+        $active = [];
+        $noAnswer = [];
+    }
+
     $stCompleted = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
         FROM store_assignments
@@ -168,6 +198,7 @@ if ($action === 'get_my_workflow') {
         'active_daily_target' => ACTIVE_DAILY_SUCCESS_TARGET,
         'daily_successful_contacts' => $dailyActive,
         'daily_target_reached' => $dailyActive >= ACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_quota' => $dailyQuota,
         'cooldown_days' => SURVEY_COOLDOWN_DAYS,
         'active_tasks' => $active,
         'no_answer_tasks' => $noAnswer,
@@ -191,6 +222,14 @@ elseif ($action === 'mark_no_answer') {
     }
     if ($storeId <= 0 || $username === '') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
+    }
+    nawras_ensure_daily_quota_schema($pdo);
+    if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
+        jsonResponse([
+            'success' => false,
+            'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+            'daily_quota' => getDailyProgress($pdo, $username),
+        ], 403);
     }
     $sid = (string) $storeId;
     $upd = $pdo->prepare("
@@ -232,6 +271,8 @@ elseif ($action === 'mark_no_answer') {
         workflow_mark_active_store_no_answer_unreachable($pdo, $storeId, $sn, $username);
     }
 
+    register_daily_store_processed($pdo, $username, $storeId, 'no_answer');
+
     $added = $queue === 'inactive'
         ? fill_inactive_slots_for_user($pdo, $username, $username, null)
         : fill_slots_for_user($pdo, $username, $username, null);
@@ -248,6 +289,7 @@ elseif ($action === 'mark_no_answer') {
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
         $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في خانة «لم يرد». التعيينات الإضافية تتم يدوياً من الإسناد.';
     }
+    $payload['daily_quota'] = getDailyProgress($pdo, $username);
     jsonResponse($payload);
 }
 
@@ -266,6 +308,14 @@ elseif ($action === 'complete_inactive_success') {
     if ($storeId <= 0 || $username === '') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
+    nawras_ensure_daily_quota_schema($pdo);
+    if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
+        jsonResponse([
+            'success' => false,
+            'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+            'daily_quota' => getDailyProgress($pdo, $username),
+        ], 403);
+    }
     ensure_inactive_daily_stats_schema($pdo);
     $sid = (string) $storeId;
     $upd = $pdo->prepare("
@@ -276,6 +326,7 @@ elseif ($action === 'complete_inactive_success') {
     if ($upd->rowCount() === 0) {
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين نشط لهذا المتجر في طابور الاستعادة.'], 400);
     }
+    register_daily_store_processed($pdo, $username, $storeId, 'recovery_success');
     increment_inactive_daily_success($pdo, $username);
     $filled = fill_inactive_slots_for_user($pdo, $username, $username, 1);
     $count = get_inactive_daily_success_count($pdo, $username);
@@ -298,6 +349,7 @@ elseif ($action === 'complete_inactive_success') {
         'inactive_daily_target' => INACTIVE_DAILY_SUCCESS_TARGET,
         'daily_target_reached' => $reached,
         'goal_just_met' => $count === INACTIVE_DAILY_SUCCESS_TARGET,
+        'daily_quota' => getDailyProgress($pdo, $username),
     ]);
 }
 

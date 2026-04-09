@@ -146,6 +146,28 @@ export default function HotInactive() {
     return dedupeById([...hot, ...cold, ...activeR, ...incR])
   }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab])
 
+  /** مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [] */
+  const managerBatchStores = useMemo(() => {
+    if (user?.role !== 'inactive_manager') return null
+    if (!inactiveWfSummary) return null
+    if (inactiveWfSummary.daily_quota?.quota_reached) return []
+    const wfIds = new Set(
+      [...(inactiveWfSummary.active_tasks || []), ...(inactiveWfSummary.no_answer_tasks || [])].map(t =>
+        Number(t.store_id),
+      ),
+    )
+    if (wfIds.size === 0) return filteredStores.slice(0, 8)
+    const scoped = filteredStores.filter(s => wfIds.has(Number(s.id)))
+    return scoped.length ? scoped.slice(0, 8) : filteredStores.slice(0, 8)
+  }, [user?.role, inactiveWfSummary, filteredStores])
+
+  const storesForTable = managerBatchStores === null ? filteredStores : managerBatchStores
+
+  const dq = inactiveWfSummary?.daily_quota
+  const quotaCount = dq?.count ?? inactiveWfSummary?.daily_successful_contacts ?? 0
+  const quotaLimit = dq?.limit ?? inactiveWfSummary?.inactive_daily_target ?? 50
+  const quotaReached = dq?.quota_reached ?? inactiveWfSummary?.daily_target_reached
+
   const userStats = useMemo(
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
     [filteredStores, storeStates, callLogs]
@@ -291,37 +313,46 @@ export default function HotInactive() {
       {user?.role === 'inactive_manager' && user?.username && (
         <InactiveGoalCelebration
           username={user.username}
-          successfulCount={inactiveWfSummary?.daily_successful_contacts ?? 0}
-          target={inactiveWfSummary?.inactive_daily_target ?? 50}
-          dailyTargetReached={inactiveWfSummary?.daily_target_reached}
+          successfulCount={quotaCount}
+          target={quotaLimit}
+          dailyTargetReached={quotaReached}
           burstNonce={0}
         />
       )}
       {user?.role === 'inactive_manager' && inactiveWfSummary && (
         <div
           className={`rounded-2xl border px-4 py-3 shadow-sm ${
-            inactiveWfSummary.daily_target_reached
+            quotaReached
               ? 'border-emerald-300 bg-emerald-50/95 text-emerald-950'
               : 'border-amber-200/90 bg-amber-50/90 text-amber-950'
           }`}
         >
           <p className="font-black text-sm flex flex-wrap items-center gap-2">
-            <span>اتصالات ناجحة اليوم:</span>
+            <span>معالَجات اليوم (استبيان / لم يرد / إكمال استعادة):</span>
             <InactiveGoalCounterBadge
-              successfulCount={inactiveWfSummary.daily_successful_contacts ?? 0}
-              target={inactiveWfSummary.inactive_daily_target ?? 50}
-              dailyTargetReached={inactiveWfSummary.daily_target_reached}
+              successfulCount={quotaCount}
+              target={quotaLimit}
+              dailyTargetReached={quotaReached}
             />
           </p>
-          {inactiveWfSummary.daily_target_reached ? (
+          {quotaReached ? (
             <p className="text-xs mt-1.5 text-emerald-800 leading-relaxed">
-              تم بلوغ الهدف اليومي — لن يُضاف متاجر جديدة للطابور حتى اليوم التالي (قائمة «لم يرد» منفصلة).
+              {dq?.message_ar || 'أكملت حصتك اليومية. لن تُعرض متاجر جديدة في الطابور حتى الغد.'}
             </p>
           ) : (
             <p className="text-xs mt-1 text-amber-900/85">
-              الهدف: 50 اتصالاً مُسجَّلاً كـ «تم» من المهام — «لم يرد» يستبدل المتجر دون أن يُحسب نجاحاً.
+              الحد الصارم: {quotaLimit} متجراً يومياً — يُحتسب كل متجر مرة واحدة (حفظ استبيان، أو «لم يرد» من الطابور، أو إكمال استعادة).
             </p>
           )}
+        </div>
+      )}
+
+      {user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached && (
+        <div className="rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-l from-emerald-50 to-white px-5 py-6 text-center shadow-md">
+          <p className="text-lg font-black text-emerald-900">{inactiveWfSummary.daily_quota.message_ar}</p>
+          <p className="text-sm text-emerald-800/90 mt-2" dir="ltr">
+            {inactiveWfSummary.daily_quota.message_en}
+          </p>
         </div>
       )}
 
@@ -381,6 +412,7 @@ export default function HotInactive() {
         </div>
       )}
 
+      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached) && (
       <InactiveRowColorToolbar
         activeColorKey={rowColorKey}
         onSelectColorKey={setRowColorKey}
@@ -388,10 +420,12 @@ export default function HotInactive() {
         onTogglePaintMode={() => setRowPaintMode(p => !p)}
         onClearAll={inactiveRowColors.clearAll}
       />
+      )}
 
+      {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_quota?.quota_reached) && (
       <StoreTable
         variant="elite"
-        stores={filteredStores}
+        stores={storesForTable}
         onSelectStore={setSelected}
         onRestoreStore={setSelected}
         renderIdBadge={s => recoveryIdBadge(s, storeStates)}
@@ -409,6 +443,7 @@ export default function HotInactive() {
               : 'لا توجد متاجر بحالة «قيد الاستعادة»'
         }
       />
+      )}
 
       {selected && (
         <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />

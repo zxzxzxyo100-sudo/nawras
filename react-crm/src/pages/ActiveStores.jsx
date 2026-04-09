@@ -8,15 +8,17 @@ import StoreDrawer from '../components/StoreDrawer'
 import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { assignStore, listUsers, markSurveyNoAnswer } from '../services/api'
+import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
 
 export default function ActiveStores() {
   const { activeSegment } = useParams()
-  const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta, surveyByStoreId } = useStores()
+  const { stores, assignments, loading, reload, storeStates, shipmentsRangeMeta, surveyByStoreId, lastLoaded } =
+    useStores()
   const { user } = useAuth()
+  const [activeWf, setActiveWf] = useState(null)
 
   function parseDbDate(v) {
     if (v == null || v === '') return null
@@ -96,6 +98,19 @@ export default function ActiveStores() {
       .then(res => setUsers((res.data || []).filter(u => u.role === 'active_manager')))
       .catch(() => {})
   }, [isExecutive])
+
+  useEffect(() => {
+    if (!isActiveManager || !user?.username) {
+      setActiveWf(null)
+      return
+    }
+    getMyWorkflow(user.username, { queue: 'active' })
+      .then(r => {
+        if (r?.success) setActiveWf(r)
+        else setActiveWf(null)
+      })
+      .catch(() => setActiveWf(null))
+  }, [isActiveManager, user?.username, lastLoaded])
 
   // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
@@ -307,13 +322,30 @@ export default function ActiveStores() {
     return active
   }, [active, assignments, assignFilter])
 
-  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
-    return <Navigate to="/active/pending" replace />
-  }
-
   const isPendingTab = activeSegment === 'pending'
   const isCompletedTab = activeSegment === 'completed'
   const isUnreachableTab = activeSegment === 'unreachable'
+
+  const pendingStoresForTable = useMemo(() => {
+    if (!isPendingTab || !isActiveManager || !user?.username) return null
+    if (!activeWf) return null
+    if (activeWf.daily_quota?.quota_reached) return []
+    const mine = filteredActive.filter(s => assignments[s.id]?.assigned_to === user.username)
+    const wfIds = new Set(
+      [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])].map(t => Number(t.store_id)),
+    )
+    if (wfIds.size === 0) return mine.slice(0, 8)
+    const scoped = mine.filter(s => wfIds.has(Number(s.id)))
+    const batch = scoped.length ? scoped : mine
+    return batch.slice(0, 8)
+  }, [isPendingTab, isActiveManager, user?.username, activeWf, filteredActive, assignments])
+
+  const pendingDisplayStores =
+    isPendingTab && isActiveManager
+      ? (pendingStoresForTable === null ? filteredActive : pendingStoresForTable)
+      : filteredActive
+
+  const activeDailyQuota = isActiveManager && isPendingTab ? activeWf?.daily_quota : null
 
   const selectedDbCategory = selected
     ? (storeStates[selected.id]?.category || selected.category || '')
@@ -321,6 +353,10 @@ export default function ActiveStores() {
   const selectedNeedsActiveSurvey =
     Boolean(selected)
     && needsActiveSatisfactionSurvey(selected.id, selectedDbCategory, surveyByStoreId)
+
+  if (!ACTIVE_SEGMENTS.has(activeSegment || '')) {
+    return <Navigate to="/active/pending" replace />
+  }
 
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
@@ -569,7 +605,21 @@ export default function ActiveStores() {
             <p className="text-[11px] text-emerald-800/80 mt-0.5">
               «تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» في المكالمة العامة، أو «لم يرد» من المتابعة الدورية، يُضاف إلى «لم يتم الوصول للمتجر». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المكالمة.
             </p>
+            {activeDailyQuota && !activeDailyQuota.quota_reached && (
+              <p className="text-[11px] font-semibold text-emerald-900 mt-2 tabular-nums">
+                الحصة اليومية: {activeDailyQuota.count} / {activeDailyQuota.limit} — تُعرض دفعة صغيرة من طابورك (حتى 8 متاجر).
+              </p>
+            )}
           </div>
+
+          {activeDailyQuota?.quota_reached && (
+            <div className="rounded-2xl border-2 border-emerald-400/80 bg-gradient-to-l from-emerald-50 to-white px-5 py-6 text-center shadow-md">
+              <p className="text-lg font-black text-emerald-900">{activeDailyQuota.message_ar}</p>
+              <p className="text-sm text-emerald-800/90 mt-2" dir="ltr">
+                {activeDailyQuota.message_en}
+              </p>
+            </div>
+          )}
 
           {selectedNeedsActiveSurvey && (
             <div className="rounded-2xl border border-violet-200 bg-gradient-to-l from-violet-50/95 to-white px-4 py-3 sm:py-4 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -598,9 +648,10 @@ export default function ActiveStores() {
             </div>
           )}
 
+          {!activeDailyQuota?.quota_reached && (
           <StoreTable
             variant="elite"
-            stores={filteredActive}
+            stores={pendingDisplayStores}
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={extraColumns}
@@ -628,6 +679,7 @@ export default function ActiveStores() {
             onEliteWorkflowNoAnswer={handleWorkflowNoAnswer}
             eliteWorkflowNoAnswerLoadingId={workflowNoAnswerLoading}
           />
+          )}
         </>
       )}
 
