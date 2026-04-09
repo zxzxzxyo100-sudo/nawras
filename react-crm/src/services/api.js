@@ -163,6 +163,10 @@ export const releaseAfterSurvey = (data) =>
 export const fillAllActiveQueues = (data) =>
   http.post('/active-workflow.php?action=fill_all_queues', data).then(r => r.data)
 
+/** حذف تعيينات المتابعة الدورية (نشطة + لم يتم الرد) ثم تعبئة الطابور من جديد — مسؤول النشط لنفسه أو التنفيذي للجميع */
+export const bulkClearActivePeriodicQueue = (data) =>
+  http.post('/active-workflow.php?action=bulk_clear_active_periodic', data).then(r => r.data)
+
 export const listAllNoAnswerWorkflow = (userRole) =>
   http.get('/active-workflow.php', { params: { action: 'list_all_no_answer', user_role: userRole } }).then(r => r.data)
 
