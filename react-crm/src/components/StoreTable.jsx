@@ -71,13 +71,18 @@ export default function StoreTable({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => (
-    listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS]
-  ))
+  const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => {
+    if (listPreset === 'incubating') return ['incubating']
+    /** «جديدة»: خانة واحدة فقط — المتجر الجديد يُصنَّف احتضانياً في الخادم ولا يُعرَض من ساخن/بارد */
+    if (listPreset === 'new48') return ['incubating']
+    return [...STORE_BUCKET_KEYS]
+  })
 
   useEffect(() => {
     if (!enableBucketFilter) return
-    setSelectedBucketKeys(listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+    if (listPreset === 'incubating') setSelectedBucketKeys(['incubating'])
+    else if (listPreset === 'new48') setSelectedBucketKeys(['incubating'])
+    else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
   }, [listPreset, enableBucketFilter])
 
   const filterPayload = useMemo(
@@ -90,7 +95,9 @@ export default function StoreTable({
       shipFrom,
       shipTo,
       ...(enableBucketFilter ? { bucketKeys: selectedBucketKeys } : {}),
-      ...(listPreset === 'new48' ? { registeredWithinHours: 48 } : {}),
+      ...(listPreset === 'new48'
+        ? { registeredWithinHours: 48, strictNewOnly: true }
+        : {}),
     }),
     [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, listPreset]
   )
@@ -119,9 +126,21 @@ export default function StoreTable({
     setShipFrom('')
     setShipTo('')
     if (enableBucketFilter) {
-      setSelectedBucketKeys(listPreset === 'incubating' ? ['incubating'] : [...STORE_BUCKET_KEYS])
+      if (listPreset === 'incubating' || listPreset === 'new48') setSelectedBucketKeys(['incubating'])
+      else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
     }
   }
+
+  const isBucketAtPresetDefault = useMemo(() => {
+    if (!enableBucketFilter) return true
+    if (listPreset === 'incubating' || listPreset === 'new48') {
+      return selectedBucketKeys.length === 1 && selectedBucketKeys[0] === 'incubating'
+    }
+    return (
+      selectedBucketKeys.length === STORE_BUCKET_KEYS.length
+      && STORE_BUCKET_KEYS.every(k => selectedBucketKeys.includes(k))
+    )
+  }, [enableBucketFilter, listPreset, selectedBucketKeys])
 
   const hasActiveFilters = useMemo(
     () =>
@@ -133,9 +152,9 @@ export default function StoreTable({
         || regTo
         || shipFrom
         || shipTo
-        || (enableBucketFilter && selectedBucketKeys.length < STORE_BUCKET_KEYS.length)
+        || (enableBucketFilter && !isBucketAtPresetDefault)
       ),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, isBucketAtPresetDefault]
   )
 
   // multi-select helpers

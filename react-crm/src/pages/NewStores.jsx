@@ -5,6 +5,7 @@ import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import { useStores } from '../contexts/StoresContext'
 import { storeBucketLabel } from '../utils/storeBuckets'
+import { isStoreStrictlyNew } from '../utils/storeFilters'
 import NewMerchantOnboardingModal from '../components/NewMerchantOnboardingModal'
 import { needsNewMerchantOnboardingSurvey } from '../constants/newMerchantOnboardingSurvey'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -28,11 +29,7 @@ export default function NewStores() {
   const filteredForCount = useMemo(() => {
     if (listPreset === 'incubating') return allStores.filter(s => s.bucket === 'incubating')
     if (listPreset === 'new48') {
-      return allStores.filter(s => {
-        if (!s.registered_at) return false
-        const h = (Date.now() - new Date(s.registered_at).getTime()) / 3600000
-        return h <= 48
-      })
+      return allStores.filter(s => isStoreStrictlyNew(s))
     }
     return allStores
   }, [allStores, listPreset])
@@ -58,7 +55,7 @@ export default function NewStores() {
     if (listPreset === 'new48') {
       return {
         title: 'جديدة',
-        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — مسجّل خلال آخر 48 ساعة`,
+        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — جديد فقط (48 ساعة ولم يشحن بعد)`,
       }
     }
     return {
@@ -73,7 +70,9 @@ export default function NewStores() {
       label: 'حالة المتجر',
       render: s => (
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/90 whitespace-nowrap">
-          {storeBucketLabel(s.bucket)}
+          {listPreset === 'new48'
+            ? (s.lifecycle_label_ar || 'متجر جديد')
+            : storeBucketLabel(s.bucket)}
         </span>
       ),
     },
