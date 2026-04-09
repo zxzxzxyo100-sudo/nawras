@@ -44,7 +44,7 @@ export default function StoreTable({
   onEliteNewMerchantOnboardingClick,
   /** فتح الاستعادة / التفاصيل (وضع elite) */
   onRestoreStore,
-  /** عدم رد — سير عمل الطابور (يُعرض بجانب الاتصال عندما تعيد الدالة true) */
+  /** عدم رد — سير عمل المتابعة (يُعرض بجانب الاتصال عندما تعيد الدالة true) */
   eliteWorkflowNoAnswer,
   onEliteWorkflowNoAnswer,
   eliteWorkflowNoAnswerLoadingId,
@@ -498,7 +498,7 @@ export default function StoreTable({
                             && typeof onEliteWorkflowNoAnswer === 'function' && (
                             <button
                               type="button"
-                              title="عدم الرد — يُنقل للمتابعة ويُستبدل في الطابور"
+                              title="عدم الرد — يُنقل للمتابعة وفق سير العمل"
                               disabled={eliteWorkflowNoAnswerLoadingId === store.id}
                               onClick={e => {
                                 e.stopPropagation()

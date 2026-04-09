@@ -9,7 +9,6 @@ import Dashboard from './pages/Dashboard'
 import QuickVerification from './pages/QuickVerification'
 import NewStores from './pages/NewStores'
 import ActiveStores from './pages/ActiveStores'
-import ActiveWorkflow from './pages/ActiveWorkflow'
 import LogisticsAnalytics from './pages/LogisticsAnalytics'
 import FrozenStores from './pages/FrozenStores'
 import HotInactive from './pages/HotInactive'
@@ -69,7 +68,7 @@ function AppRoutes() {
           path="/active/workflow"
           element={(
             <PrivateRoute view="active">
-              <ActiveWorkflow />
+              <Navigate to="/active/pending" replace />
             </PrivateRoute>
           )}
         />
