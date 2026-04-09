@@ -73,15 +73,10 @@ export function filterStoresByToolbar(stores, filters) {
     registeredWithinHours = null,
     /** لوحة «جديدة»: فقط متاجر جديدة حقيقية (ليست احتضان/ساخن/بارد) */
     strictNewOnly = false,
-    /**
-     * لوحة «تحت الاحتضان»: الخادم يضع lifecycle=new في خانة incubating — نُبقي «جديد 48س» في تبويب «جديدة» فقط.
-     */
-    excludeStrictNew = false,
   } = filters
 
   return stores.filter(s => {
     if (strictNewOnly && !isStoreStrictlyNew(s)) return false
-    if (excludeStrictNew && isStoreStrictlyNew(s)) return false
     if (registeredWithinHours != null && registeredWithinHours > 0) {
       if (!s.registered_at) return false
       const t = new Date(s.registered_at).getTime()

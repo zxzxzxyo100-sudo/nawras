@@ -38,7 +38,7 @@ const TABS = [
     label: 'المكالمة الأولى',
     icon:  Baby,
     color: 'blue',
-    desc:  'يظهر المتجر هنا في أول 48 ساعة من التسجيل ما دامت المكالمة الأولى غير مسجّلة. بعدها يُعرَض في «تأخير المكالمة».',
+    desc:  `يظهر المتجر هنا في أول 48 ساعة ما دامت المكالمة الأولى غير مسجّلة؛ بعدها يبقى في هذا التبويب ضمن «تأخير المكالمة» حتى يُسجَّل الاتصال — ثم ينتقل تلقائياً إلى «بين المكالمات» ثم مكالمة يوم ${ONBOARD_CYCLE_CALL2_DAY} (مع شحن مسجّل).`,
     badge: () => (
       <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">مطلوبة</span>
     ),
@@ -358,12 +358,27 @@ export default function IncubationPath() {
   const [selected, setSelected]   = useState(null)
   const [callStore, setCallStore] = useState(null)
 
-  const filteredPath = useMemo(() => ({
-    call_1: (incubationPath.call_1 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
-    call_2: (incubationPath.call_2 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
-    call_3: (incubationPath.call_3 || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
-    between_calls: (incubationPath.between_calls || []).filter(s => !isDoneIncubationPath(storeStates, s.id)),
-  }), [incubationPath, storeStates])
+  const filteredPath = useMemo(() => {
+    const notDone = s => !isDoneIncubationPath(storeStates, s.id)
+    /** call_delay من الخادم = تأخير المكالمة الأولى؛ دمجه هنا حتى لا يبقى المتجر خارج تبويب «المكالمة الأولى» بعد 48 ساعة */
+    const mergeFirstCallQueues = () => {
+      const seen = new Set()
+      const out = []
+      for (const s of [...(incubationPath.call_1 || []), ...(incubationPath.call_delay || [])]) {
+        const id = s?.id
+        if (id == null || seen.has(id)) continue
+        seen.add(id)
+        if (notDone(s)) out.push(s)
+      }
+      return out
+    }
+    return {
+      call_1: mergeFirstCallQueues(),
+      call_2: (incubationPath.call_2 || []).filter(notDone),
+      call_3: (incubationPath.call_3 || []).filter(notDone),
+      between_calls: (incubationPath.between_calls || []).filter(notDone),
+    }
+  }, [incubationPath, storeStates])
 
   const filteredCounts = useMemo(() => ({
     call_1: filteredPath.call_1.length,

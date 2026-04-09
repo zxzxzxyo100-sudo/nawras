@@ -27,9 +27,7 @@ export default function NewStores() {
   const [onboardingStore, setOnboardingStore] = useState(null)
 
   const filteredForCount = useMemo(() => {
-    if (listPreset === 'incubating') {
-      return allStores.filter(s => s.bucket === 'incubating' && !isStoreStrictlyNew(s))
-    }
+    if (listPreset === 'incubating') return allStores.filter(s => s.bucket === 'incubating')
     if (listPreset === 'new48') {
       return allStores.filter(s => isStoreStrictlyNew(s))
     }
@@ -51,7 +49,7 @@ export default function NewStores() {
     if (listPreset === 'incubating') {
       return {
         title: 'تحت الاحتضان',
-        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — مسار المكالمات (بدون «جديد 48 ساعة»)`,
+        subtitle: `${filteredForCount.length.toLocaleString('ar-SA')} متجر — خانة الاحتضان فقط`,
       }
     }
     if (listPreset === 'new48') {
