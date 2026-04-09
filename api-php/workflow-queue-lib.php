@@ -442,13 +442,41 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
 }
 
 /**
- * لا تُضاف متاجر تلقائياً من المجمع — القائمة = التعيينات الحالية للموظف فقط.
- * يُبقى تقليم المنجز القديم فقط.
+ * تعبئة طابور مسؤول النشط حتى ACTIVE_QUEUE_TARGET — من متاجر «نشط يشحن» غير المُعيَّنة في الطابور.
+ * يُستدعى بعد «لم يرد» (لا يُحتسب ضمن الـ50) أو بعد إكمال/إطلاق من الطابور لإحلال متجر آخر.
  */
 function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null) {
     ensure_workflow_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'active');
-    return 0;
+    require_once __DIR__ . '/daily-quota-lib.php';
+    nawras_ensure_daily_quota_schema($pdo);
+    if (getDailyProgress($pdo, $username)['quota_reached']) {
+        return 0;
+    }
+    $have = count_active_queue($pdo, $username);
+    $need = ACTIVE_QUEUE_TARGET - $have;
+    if ($need <= 0) {
+        return 0;
+    }
+    if ($maxToAdd !== null) {
+        $need = min($need, (int) $maxToAdd);
+    }
+    $added = 0;
+    while ($need > 0) {
+        $row = pick_next_pool_store_for_user($pdo, $username);
+        if (!$row || !isset($row['store_id'])) {
+            break;
+        }
+        $sid = (int) $row['store_id'];
+        if ($sid <= 0) {
+            break;
+        }
+        assign_store_to_user($pdo, $sid, (string) ($row['store_name'] ?? ''), $username, $assignedBy);
+        log_active_manager_pool_pick($pdo, $username, $sid);
+        $added++;
+        $need--;
+    }
+    return $added;
 }
 
 /**
