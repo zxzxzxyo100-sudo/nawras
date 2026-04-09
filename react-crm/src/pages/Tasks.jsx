@@ -14,6 +14,7 @@ import {
   getDailyTaskDismissals, markDailyTaskDone, logCall, markSurveyNoAnswer, getMyWorkflow,
   completeInactiveQueueSuccess,
   postMerchantOfficerAutomation,
+  bulkClearActivePeriodicQueue,
 } from '../services/api'
 import {
   generateIncubationOfficerStagingTasks,
@@ -384,15 +385,6 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
   }
   const skipExecMoDuplicates = userRole === 'executive'
 
-  /** كل التعيينات النشطة — سقف الـ 50 يُطبَّق فقط على تبويب «متابعة دورية» */
-  const amActiveIds = (() => {
-    if (userRole !== 'active_manager' || !assignments) return null
-    const active = Object.entries(assignments)
-      .filter(([, a]) => a?.assigned_to === username && a?.workflow_status === 'active' && a?.assignment_queue === 'active')
-      .map(([sid]) => sid)
-    return new Set(active)
-  })()
-
   allStores.forEach(store => {
     const log          = callLogs[store.id] || {}
     const dbCat        = storeStates[store.id]?.category || store.category
@@ -522,9 +514,14 @@ function generateTasks(allStores, callLogs, storeStates, userRole, username, ass
       }
     }
 
-    if (userRole === 'active_manager' && username && assignments && amActiveIds) {
+    if (userRole === 'active_manager' && username && assignments) {
       const asgn = assignments[String(store.id)] || assignments[store.id]
-      if (asgn?.assigned_to === username && (amActiveIds.has(String(store.id)) || asgn?.workflow_status !== 'active')) {
+      const ws = String(asgn?.workflow_status ?? 'active').trim()
+      const inMyActiveQueue =
+        asgn?.assigned_to === username
+        && asgn?.assignment_queue === 'active'
+        && (ws === 'active' || ws === 'no_answer' || ws === 'completed')
+      if (inMyActiveQueue) {
         /** «تم التواصل» = workflow مكتمل أو «تم الرد» اليوم من نفس الموظف (performed_by = اسم كامل أو يوزر) */
         const moContactedToday =
           asgn?.workflow_status === 'completed'
@@ -1067,6 +1064,8 @@ export default function Tasks() {
   const [noAnswerLoadingId, setNoAnswerLoadingId] = useState(null)
   /** إشعار بعد «لم يرد» أو بلوغ الهدف */
   const [toastMsg, setToastMsg] = useState('')
+  /** إعادة تهيئة طابور المتابعة الدورية (نشط + لم يتم الرد) */
+  const [resetPeriodicBusy, setResetPeriodicBusy] = useState(false)
   /** فتح استبيان تهيئة المتجر الجديد من «تم» أو من «اتصل» */
   const [pendingOnboardingTask, setPendingOnboardingTask] = useState(null)
   /** بعد حفظ الاستبيان: فتح نافذة ملاحظة المكالمة (احتضان) أو إخفاء مهمة التنفيذي */
@@ -1149,6 +1148,34 @@ export default function Tasks() {
   useEffect(() => {
     loadActiveWf()
   }, [loadActiveWf, lastLoaded])
+
+  const handleBulkResetActivePeriodic = useCallback(
+    async (allManagers) => {
+      if (!user?.username || resetPeriodicBusy) return
+      const msg = allManagers
+        ? 'تأكيد إعادة تهيئة طوابير «المتابعة الدورية» لجميع مسؤولي المتاجر النشطة؟ يُلغى كل تعيين «نشط» و«لم يتم الرد» ثم يُعبَّأ من المجمع من جديد.'
+        : 'تأكيد إعادة تهيئة طابور «المتابعة الدورية»؟ يُلغى كل تعيين «نشط» و«لم يتم الرد» الحالي ثم يُعبَّأ الطابور من جديد من المجمع (دون تسجيل «عدم رد» لكل متجر).'
+      if (!window.confirm(msg)) return
+      setDismissErr('')
+      setResetPeriodicBusy(true)
+      try {
+        const res = await bulkClearActivePeriodicQueue({
+          username: user.username,
+          user_role: user.role,
+          all_active_managers: Boolean(allManagers),
+        })
+        if (res?.message_ar) setToastMsg(res.message_ar)
+        await reload()
+        await loadActiveWf()
+        loadDismissals()
+      } catch (e) {
+        setDismissErr(e.response?.data?.error || 'تعذّر إعادة تهيئة الطابور.')
+      } finally {
+        setResetPeriodicBusy(false)
+      }
+    },
+    [user?.username, user?.role, resetPeriodicBusy, reload, loadActiveWf, loadDismissals],
+  )
 
   /** مسؤول المتاجر النشطة: تأخيرات المكالمات لمسؤول المتاجر فقط — لا يُعرَض التبويب هنا */
   useEffect(() => {
@@ -1940,19 +1967,48 @@ export default function Tasks() {
             )}
           </div>
 
-          {/* زر التحديث */}
-          <motion.button
-            onClick={() => {
-              reload()
-            }}
-            disabled={loading}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white border border-white/20 bg-white/10 hover:bg-white/15 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            تحديث
-          </motion.button>
+          <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+            {user?.role === 'active_manager' && (
+              <motion.button
+                type="button"
+                onClick={() => { void handleBulkResetActivePeriodic(false) }}
+                disabled={loading || resetPeriodicBusy}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="إزالة التعيينات الحالية من المتابعة الدورية وتعبئة قائمة جديدة من المجمع"
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-amber-50 border border-amber-300/40 bg-amber-950/40 hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+              >
+                <ClipboardList size={14} />
+                إعادة تهيئة الطابور
+              </motion.button>
+            )}
+            {user?.role === 'executive' && (
+              <motion.button
+                type="button"
+                onClick={() => { void handleBulkResetActivePeriodic(true) }}
+                disabled={loading || resetPeriodicBusy}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="إعادة تهيئة طوابير المتابعة الدورية لكل مسؤولي المتاجر النشطة"
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-rose-50 border border-rose-300/40 bg-rose-950/35 hover:bg-rose-900/45 transition-colors disabled:opacity-50"
+              >
+                <ClipboardList size={14} />
+                إعادة تهيئة طوابير النشطين
+              </motion.button>
+            )}
+            <motion.button
+              onClick={() => {
+                reload()
+              }}
+              disabled={loading}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white border border-white/20 bg-white/10 hover:bg-white/15 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              تحديث
+            </motion.button>
+          </div>
         </div>
       </motion.div>
 
