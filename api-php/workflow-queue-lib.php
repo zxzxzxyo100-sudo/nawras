@@ -303,8 +303,12 @@ function count_pending_active_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+/**
+ * عدد تعيينات طابور الاستعادة «قيد العمل»: نشط + لم يرد (نفس الصف يتحول — لا نضيف صفاً ثانياً عند التحويل).
+ * الهدف INACTIVE_QUEUE_TARGET يخص هذا المجموع حتى يبقى الطابور ~50 صفاً ويُستبدل فقط عند الإكمال (completed).
+ */
 function count_inactive_queue(PDO $pdo, $username) {
-    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'inactive'");
+    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status IN ('active','no_answer') AND assignment_queue = 'inactive'");
     $st->execute([$username]);
     return (int) $st->fetchColumn();
 }

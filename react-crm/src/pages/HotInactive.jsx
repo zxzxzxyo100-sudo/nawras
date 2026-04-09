@@ -197,9 +197,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
 
   /**
    * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
-   * صفحة المهام (recoveryTasksHotQueue): يُعرض فقط تعيين «active» — يختفي المتجر بعد «تم الرد» (completed)
-   * أو بعد «لم يرد» (no_answer) لأن «لم يرد» يُدار من قائمة المتابعة وليس من جدول المهام.
-   * عند فراغ الطابور لا نُرجع كل «ساخن» (ذلك كان يُبقي المتاجر ظاهرة بعد الإنجاز).
+   * صفحة المهام: نفس طابور الـ API — «نشط» + «لم يرد» (حتى ~{هدف 50} صفاً). عند «لم يرد» يبقى الصف
+   * بحالة no_answer ولا يُضاعف التعيين في الخادم؛ الإكمال إلى completed يحرّر فتحة ويُستبدل متجراً.
    */
   const managerBatchStores = useMemo(() => {
     if (user?.role !== 'inactive_manager') return null
@@ -210,7 +209,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     const activeList = inactiveWfSummary.active_tasks || []
     const noAnsList = inactiveWfSummary.no_answer_tasks || []
 
-    const queueRows = recoveryTasksHotQueue ? activeList : [...activeList, ...noAnsList]
+    const queueRows = [...activeList, ...noAnsList]
     const wfIds = new Set(queueRows.map(t => Number(t.store_id)))
 
     if (wfIds.size === 0) {
