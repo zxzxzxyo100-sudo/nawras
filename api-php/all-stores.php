@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/onboarding-config.php';
+require_once __DIR__ . '/store-lifecycle-lib.php';
 
 ini_set('memory_limit',      MEMORY_HEAVY);
 ini_set('max_execution_time', TIME_LONG);
@@ -234,6 +235,21 @@ function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasS
     }
 }
 
+/**
+ * تصنيف متجر (مسار احتضان / نشط يدوي) حسب آخر شحنة — يستبدل شرائح 14/60 يوماً.
+ *
+ * @param array<string,array|int> $result
+ * @param array<string,int>       $counts
+ */
+function nawras_route_new_loop_by_lifecycle(array &$s, int $now, bool $hasShipped, array &$result, array &$counts): void
+{
+    if (!$hasShipped) {
+        $s['_inc'] = $s['_inc'] ?? 'never_started';
+    }
+    $lc = nawras_apply_lifecycle_tags($s, $now);
+    nawras_push_lifecycle_bucket($s, $lc, $result, $counts, false);
+}
+
 $dbMap = [];
 if (!empty($new)) {
     try {
@@ -340,64 +356,16 @@ foreach ($new as $id => $s) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
-            ? strtotime($s['last_shipment_date']) : null;
-        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
-        if ($hasShipped) {
-            if ($daysShip <= 14) {
-                $s['_cat'] = 'active_shipping';
-                $result['active_shipping'][] = $s;
-                $counts['active_shipping']++;
-            } elseif ($daysShip <= 60) {
-                $s['_cat'] = 'hot_inactive';
-                $result['hot_inactive'][] = $s;
-                $counts['hot_inactive']++;
-            } else {
-                $s['_cat'] = 'cold_inactive';
-                $result['cold_inactive'][] = $s;
-                $counts['cold_inactive']++;
-            }
-        } else {
-            $s['_cat'] = 'cold_inactive';
-            $s['_inc'] = 'never_started';
-            $result['cold_inactive'][] = $s;
-            $counts['cold_inactive']++;
-        }
-        $counts['total_active']++;
-        $counts['total']++;
+        nawras_route_new_loop_by_lifecycle($s, $now, $hasShipped, $result, $counts);
         continue;
     }
 
-    // بعد المكالمة الثالثة — تصنيف حسب الشحن
+    // بعد المكالمة الثالثة — تصنيف حسب دورة الحياة (بدل 14/60 يوماً)
     if (!empty($inc3)) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        if ($hasShipped) {
-            $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
-                ? strtotime($s['last_shipment_date']) : null;
-            $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
-            if ($daysShip <= 14) {
-                $s['_cat'] = 'active_shipping';
-                $result['active_shipping'][] = $s;
-                $counts['active_shipping']++;
-            } elseif ($daysShip <= 60) {
-                $s['_cat'] = 'hot_inactive';
-                $result['hot_inactive'][] = $s;
-                $counts['hot_inactive']++;
-            } else {
-                $s['_cat'] = 'cold_inactive';
-                $result['cold_inactive'][] = $s;
-                $counts['cold_inactive']++;
-            }
-        } else {
-            $s['_cat'] = 'cold_inactive';
-            $s['_inc'] = 'never_started';
-            $result['cold_inactive'][] = $s;
-            $counts['cold_inactive']++;
-        }
-        $counts['total_active']++;
-        $counts['total']++;
+        nawras_route_new_loop_by_lifecycle($s, $now, $hasShipped, $result, $counts);
         continue;
     }
 
@@ -494,29 +462,12 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // ترحيل: شحن بعد 14 يوم من التسجيل
+    // ترحيل: شحن بعد 14 يوم من التسجيل — تصنيف دورة حياة
     if ($hasShipped && $regDays > 14) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
-            ? strtotime($s['last_shipment_date']) : null;
-        $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
-        if ($daysShip <= 14) {
-            $s['_cat'] = 'active_shipping';
-            $result['active_shipping'][] = $s;
-            $counts['active_shipping']++;
-        } elseif ($daysShip <= 60) {
-            $s['_cat'] = 'hot_inactive';
-            $result['hot_inactive'][] = $s;
-            $counts['hot_inactive']++;
-        } else {
-            $s['_cat'] = 'cold_inactive';
-            $result['cold_inactive'][] = $s;
-            $counts['cold_inactive']++;
-        }
-        $counts['total_active']++;
-        $counts['total']++;
+        nawras_route_new_loop_by_lifecycle($s, $now, true, $result, $counts);
         continue;
     }
 
@@ -534,14 +485,29 @@ foreach ($new as $id => $s) {
         continue;
     }
 
-    // بعد 48 ساعة بدون شحن وبدون مكالمة أولى → غير نشط بارد (لا يُعرَض في «تأخير المكالمة»)
+    // بعد 48 ساعة بدون شحن وبدون مكالمة أولى — إن كان لا يزال ضمن الاحتضان (<14 يوماً) نُبقي «تأخير المكالمة» بدل البارد
     if (!$inc1 && !$hasShipped && $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
         if (!empty($s['status']) && $s['status'] !== 'active') {
+            continue;
+        }
+        $lc48 = nawras_compute_lifecycle($s, $now);
+        if ($lc48 === 'incubating' || $lc48 === 'new') {
+            $s['_cat'] = 'incubating';
+            $s['_inc'] = 'call_1_delayed';
+            nawras_apply_lifecycle_tags($s, $now);
+            incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
+            $result['incubating'][] = $s;
+            $counts['incubating']++;
+            $counts['total']++;
+            $incubation_path['call_delay'][] = $s;
+            $incubation_counts['call_delay']++;
+            $incubation_counts['total']++;
             continue;
         }
         $s['_cat'] = 'cold_inactive';
         $s['_inc'] = 'never_started';
         $s['_never_started'] = true;
+        nawras_apply_lifecycle_tags($s, $now);
         $result['cold_inactive'][] = $s;
         $counts['cold_inactive']++;
         $counts['total_active']++;
@@ -640,31 +606,16 @@ if (!empty($syncMoNoShip48hIds)) {
     }
 }
 
-// ── تصنيف بقية المتاجر (من allStores) ───────────────────────────
+// ── تصنيف بقية المتاجر (من allStores) — دورة حياة حصرية ────────
 foreach ($allStores as $id => $s) {
-    if (isset($newIds[$id])) continue;                // تجنب تكرار المتاجر الجديدة
-    if (!empty($s['status']) && $s['status'] !== 'active') continue; // active فقط
-
-    $lastShip = (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد')
-        ? strtotime($s['last_shipment_date']) : null;
-    $daysShip = $lastShip ? ($now - $lastShip) / 86400 : PHP_INT_MAX;
-
-    if ($daysShip <= 14) {
-        $s['_cat'] = 'active_shipping';
-        $result['active_shipping'][] = $s;
-        $counts['active_shipping']++;
-    } elseif ($daysShip <= 60) {
-        $s['_cat'] = 'hot_inactive';
-        $result['hot_inactive'][] = $s;
-        $counts['hot_inactive']++;
-    } else {
-        $s['_cat'] = 'cold_inactive';
-        $result['cold_inactive'][] = $s;
-        $counts['cold_inactive']++;
+    if (isset($newIds[$id])) {
+        continue;
+    }
+    if (!empty($s['status']) && $s['status'] !== 'active') {
+        continue;
     }
 
-    $counts['total_active']++;
-    $counts['total']++;
+    nawras_classify_mature_store_row($s, $now, $result, $counts);
 }
 
 // فصل «المتاجر المنجزة» عن «نشط قيد المكالمة» (حسب store_states)
@@ -902,10 +853,36 @@ try {
 } catch (Throwable $e) {
 }
 
+/** @return array<string,int> */
+function nawras_aggregate_lifecycle_counts(array $result): array
+{
+    $keys = ['new', 'incubating', 'hot', 'active', 'at_risk', 'cold', 'inactive'];
+    $out = array_fill_keys($keys, 0);
+    foreach ($result as $rows) {
+        if (!is_array($rows)) {
+            continue;
+        }
+        foreach ($rows as $s) {
+            if (!is_array($s)) {
+                continue;
+            }
+            $lc = $s['lifecycle'] ?? '';
+            if ($lc !== '' && isset($out[$lc])) {
+                $out[$lc]++;
+            }
+        }
+    }
+
+    return $out;
+}
+
+$lifecycle_counts = nawras_aggregate_lifecycle_counts($result);
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
     'incubation_counts' => $incubation_counts,
+    'lifecycle_counts'  => $lifecycle_counts,
     'data'              => $result,
     'vip_merchants'     => $vip_merchants,
     'vip_merchants_count' => count($vip_merchants),
@@ -917,5 +894,6 @@ echo json_encode([
         'fetched_inactive'  => count($inactive),
         'vip_endpoint'      => 'vip-merchants.php',
         'generated_at'      => date('Y-m-d H:i:s'),
+        'lifecycle_counts'  => $lifecycle_counts,
     ],
 ], JSON_UNESCAPED_UNICODE);

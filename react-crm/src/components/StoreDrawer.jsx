@@ -27,6 +27,17 @@ const CATEGORY_LABELS = {
   recovered:  { label: 'تم الاستعادة', bg: 'bg-teal-100',  text: 'text-teal-700'  },
 }
 
+/** ألوان شارة دورة الحياة من الخادم (lifecycle / lifecycle_label_ar) */
+const LIFECYCLE_UI = {
+  new: { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800' },
+  incubating: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  hot: { bg: 'bg-amber-100', text: 'text-amber-900' },
+  active: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+  at_risk: { bg: 'bg-orange-50', text: 'text-orange-800' },
+  cold: { bg: 'bg-slate-200', text: 'text-slate-800' },
+  inactive: { bg: 'bg-red-100', text: 'text-red-700' },
+}
+
 export default function StoreDrawer({
   store,
   onClose,
@@ -62,8 +73,8 @@ export default function StoreDrawer({
   /** فئة السجل في DB — تُستخدم للإجراءات (تجميد، old_status) */
   const dbCategory = dbState?.category || store.category || 'incubating'
   /**
-   * خانة المتجر من all-stores.php: ≤14 يوماً منذ آخر شحن → نشط يشحن؛ حتى 60 يوم → ساخن؛ بعدها بارد.
-   * إن بقي السجل «نشط» في DB بعد تخريج قديم، نعرض خانة القائمة حتى لا يظهر «نشط» والجدول «غير نشط بارد».
+   * خانة المتجر من all-stores.php (_cat): تُربَط بدورة حياة حصرية في الخادم (نشط 7 أيام، بارد 15–30، إلخ).
+   * إن وُجد lifecycle_label_ar نعرضه كتسمية دقيقة مع الإبقاء على خانة الاستعادة من _cat.
    */
   const merchantListBucket = store.bucket || store._cat || ''
   const uiCategory = (() => {
@@ -79,11 +90,25 @@ export default function StoreDrawer({
     dbCategory === 'restoring' && dbState && isRecoveryCompletedByShipment(store, dbState)
       ? 'restored'
       : uiCategory
-  const catInfo =
+  const lifecycleKey = store.lifecycle && typeof store.lifecycle === 'string' ? store.lifecycle : ''
+  const lifecycleLabelAr =
+    store.lifecycle_label_ar && typeof store.lifecycle_label_ar === 'string'
+      ? store.lifecycle_label_ar.trim()
+      : ''
+  const baseCatInfo =
     CATEGORY_LABELS[displayCategory]
     || CATEGORY_LABELS[uiCategory]
     || CATEGORY_LABELS[dbCategory]
     || CATEGORY_LABELS.incubating
+  const lcUi = lifecycleKey ? LIFECYCLE_UI[lifecycleKey] : null
+  const catInfo =
+    lifecycleKey && lifecycleLabelAr && !['restoring', 'frozen', 'recovered'].includes(dbCategory)
+      ? {
+          label: lifecycleLabelAr,
+          bg: lcUi?.bg ?? baseCatInfo.bg,
+          text: lcUi?.text ?? baseCatInfo.text,
+        }
+      : baseCatInfo
 
   const merchantBucket = store._cat || store.bucket || ''
   const canStartRestore =
