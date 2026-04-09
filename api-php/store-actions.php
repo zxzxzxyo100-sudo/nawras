@@ -322,9 +322,11 @@ elseif ($action === 'log_call') {
         ->execute([$storeId, $storeName, $callType, $note, $outcome !== '' ? $outcome : null, $user, $userRole]);
 
     // —— طابور المتابعة النشطة: «تم الرد» يُكمّل التعيين فوراً (لا يبقى تحت «لم يتم الرد») ——
+    // يشمل general و periodic_followup (وسجلات أخرى قد تُحفظ بنوع المتابعة الدورية).
     $usernameForWorkflow = trim((string) ($input['username'] ?? ''));
+    $workflowAnsweredCallTypes = ['general', 'periodic_followup'];
     if (
-        $callType === 'general'
+        in_array($callType, $workflowAnsweredCallTypes, true)
         && $outcome === 'answered'
         && $usernameForWorkflow !== ''
         && ($userRole ?? '') === 'active_manager'
