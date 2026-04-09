@@ -92,9 +92,13 @@ function nawras_compute_lifecycle(array $s, int $now): string
 {
     $c = nawras_lifecycle_constants();
 
-    $regTs = !empty($s['registered_at']) ? strtotime((string) $s['registered_at']) : null;
-    $regHrs = $regTs ? ($now - $regTs) / 3600 : PHP_INT_MAX;
-    $regDays = $regTs ? ($now - $regTs) / 86400 : PHP_INT_MAX;
+    $regRaw = trim((string) ($s['registered_at'] ?? ''));
+    $regTs = $regRaw !== '' ? strtotime($regRaw) : null;
+    if ($regTs === false) {
+        $regTs = null;
+    }
+    $regHrs = $regTs !== null ? ($now - $regTs) / 3600 : PHP_INT_MAX;
+    $regDays = $regTs !== null ? ($now - $regTs) / 86400 : PHP_INT_MAX;
 
     $total = (int) ($s['total_shipments'] ?? 0);
     $lastTs = nawras_parse_shipment_date_ts($s['last_shipment_date'] ?? null);
