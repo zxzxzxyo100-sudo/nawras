@@ -1932,7 +1932,7 @@ export default function Tasks() {
             )}
             {user?.role === 'active_manager' && activeWf?.success && (
               <p className="text-cyan-100/95 text-sm mt-2">
-                طابور اليوم: حتى {activeWf.target ?? 50} متجراً بلا مكالمة اليوم — «عدم الرد» بعد «لم يرد» أو «مشغول» — «المتاجر المنجزة» فقط بعد «تم الرد» وحفظ استبيان الرضا. «كل المتاجر المعينة» تعرض كل حالات التعيين.
+                طابور اليوم: حتى {activeWf.target ?? 50} من تعييناتك بلا مكالمة اليوم — «لم يرد» بعد نتيجة لم يرد/مشغول — «المتاجر المنجزة» (إنتاجية اليوم) بعد «تم الرد» + حفظ استبيان الرضا. لا تُضاف متاجر تلقائياً؛ الإسناد يدوي من الإدارة.
               </p>
             )}
             {showColdInactiveTab && moTab === 'cold_verify' && (
@@ -1967,16 +1967,16 @@ export default function Tasks() {
             )}
             {user?.role === 'active_manager' && (
               <p className="text-cyan-100/85 text-xs mt-2 max-w-2xl leading-relaxed">
-                بمجرد تسجيل أي مكالمة للمتجر اليوم يختفي من «المتابعة الدورية» ويُستبدل بآخر في الأسفل ليبقى العدد 50. إن كانت النتيجة «لم يرد» أو «مشغول» يبقى في «عدم الرد» حتى «تم الرد» والاستبيان.
+                أي مكالمة اليوم تُخرج المتجر من «المتابعة الدورية»؛ يظهر التالي من تعييناتك التي بلا مكالمة اليوم (حتى 50). «لم يرد» أو «مشغول» → خانة «لم يرد»؛ «تم الرد» + استبيان → «المتاجر المنجزة».
               </p>
             )}
             {pendingTasks.length > 0 && user?.role === 'active_manager' && amWorkflowDerived && (
               <p className="text-white/40 text-sm mt-2">
                 متابعة دورية: {amWorkflowDerived.periodic.length.toLocaleString('ar-SA')}
                 {' — '}
-                عدم رد: {amWorkflowDerived.noAnswer.length.toLocaleString('ar-SA')}
+                لم يرد: {amWorkflowDerived.noAnswer.length.toLocaleString('ar-SA')}
                 {' — '}
-                منجز: {amWorkflowDerived.completed.length.toLocaleString('ar-SA')}
+                منجز اليوم: {amWorkflowDerived.completed.length.toLocaleString('ar-SA')}
                 {' — '}
                 المعيّنات: {amWorkflowDerived.all.length.toLocaleString('ar-SA')}
               </p>
@@ -2068,7 +2068,7 @@ export default function Tasks() {
                   : {}
               }
             >
-              عدم الرد
+              لم يرد
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   moTab === 'no_answer' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
@@ -2095,7 +2095,7 @@ export default function Tasks() {
                   : {}
               }
             >
-              المتاجر المنجزة
+              المتاجر المنجزة (اليوم)
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                   moTab === 'contacted' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
@@ -2659,7 +2659,7 @@ export default function Tasks() {
             <>
               <CheckCircle size={56} className="text-amber-400 mx-auto mb-4" />
               <p className="font-black text-slate-700 text-xl">لا توجد متاجر في «لم يتم الرد»</p>
-              <p className="text-slate-500 text-sm mt-2">عند الضغط على «عدم الرد» يُسجَّل عدم الرد ويظهر المتجر هنا</p>
+              <p className="text-slate-500 text-sm mt-2">سجّل مكالمة بنتيجة «لم يرد» أو «مشغول» اليوم ليظهر المتجر هنا</p>
             </>
           ) : isTaskTabUser && moTab === 'delayed_calls' ? (
             <>
