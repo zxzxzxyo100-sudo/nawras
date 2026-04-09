@@ -103,7 +103,10 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick,
 // ─── الداشبورد ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
+  const {
+    counts, stores, allStores, callLogs, loading, error, lastLoaded, reload,
+    assignments, storeStates,
+  } = useStores()
   const { user, can } = useAuth()
   const navigate = useNavigate()
 
@@ -227,6 +230,24 @@ export default function Dashboard() {
   const topEmployee = employeeData[0]?.name
   const showTopPerformerBadge = showExecutiveStaffLeaderboard && topEmployee && employeeData.length > 1
 
+  /** نشط يشحن المعيّنة لمسؤول المتاجر النشطة (نفس دمج القائمة كما في ActiveStores) */
+  const activeManagerAssignedList = useMemo(() => {
+    if (user?.role !== 'active_manager' || !user?.username) return []
+    const u = user.username
+    const base = stores.active_shipping || []
+    const fromInc = (stores.incubating || []).filter(s => {
+      const st = storeStates[s.id]
+      const c = st?.category
+      return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
+    })
+    const seen = new Set(base.map(s => s.id))
+    const active = [...base, ...fromInc.filter(s => !seen.has(s.id))]
+    return active.filter(s => {
+      const a = assignments[s.id]?.assigned_to
+      return a === u || a === String(u)
+    })
+  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, storeStates, assignments])
+
   // ── إحصائيات سريعة ─────────────────────────────────────────────
   const totalShipments  = allStores.reduce((s, x) => s + (parseInt(x.total_shipments) || 0), 0)
   const today           = new Date().toISOString().split('T')[0]
@@ -236,6 +257,24 @@ export default function Dashboard() {
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
   const showIncubationHero = can('new') || can('incubation')
+
+  /** مسؤول النشط: نفس دمج «قيد المكالمة» كما في ActiveStores — معيّنة له فقط */
+  const activeManagerPendingStores = useMemo(() => {
+    if (user?.role !== 'active_manager' || !user?.username) return []
+    const base = stores.active_shipping || []
+    const fromInc = (stores.incubating || []).filter(s => {
+      const st = storeStates[s.id]
+      const c = st?.category
+      return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
+    })
+    const seen = new Set(base.map(s => s.id))
+    const active = [...base, ...fromInc.filter(s => !seen.has(s.id))]
+    const u = user.username
+    return active.filter(s => {
+      const row = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
+      return row?.assigned_to === u
+    })
+  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, storeStates, assignments])
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -296,6 +335,69 @@ export default function Dashboard() {
           <NawrasTaglineStack compact className="pt-2" />
         </div>
       </motion.div>
+
+      {user?.role === 'active_manager' && (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.45, delay: 0.04 }}
+          className="rounded-2xl border border-emerald-200/80 bg-gradient-to-l from-emerald-50/95 to-white p-4 sm:p-5 shadow-md ring-1 ring-emerald-100/80"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/25">
+                <TrendingUp size={22} strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-emerald-950">متاجرك النشطة — قيد المكالمة</h2>
+                <p className="text-sm text-emerald-900/80 mt-0.5 leading-relaxed">
+                  <span className="tabular-nums font-bold">{activeManagerAssignedList.length.toLocaleString('ar-SA')}</span>
+                  {' '}متجر معيّن لك في «نشط يشحن». صفحة المهام للطابور والحصة اليومية؛ الجدول الكامل للتصفية والبحث.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Link
+                to="/tasks"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition-colors"
+              >
+                صفحة المهام
+                <ArrowUpRight size={16} />
+              </Link>
+              <Link
+                to="/active/pending"
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-emerald-600/40 bg-white px-4 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-50 transition-colors"
+              >
+                الجدول الكامل
+              </Link>
+            </div>
+          </div>
+          {activeManagerAssignedList.length > 0 ? (
+            <ul className="mt-4 max-h-72 overflow-y-auto divide-y divide-emerald-100 rounded-xl border border-emerald-100 bg-white/90">
+              {activeManagerAssignedList.slice(0, 20).map(s => (
+                <li
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
+                >
+                  <StoreNameWithId
+                    store={s}
+                    nameClassName="font-semibold text-slate-900"
+                    idClassName="text-xs font-mono text-slate-600"
+                  />
+                  <span dir="ltr" className="font-mono text-slate-600 text-xs shrink-0">
+                    {s.phone?.trim() ? s.phone : '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-emerald-800/75 leading-relaxed">
+              لا توجد متاجر نشطة معيّنة لك حالياً. عند تعيينك من المدير التنفيذي ستظهر هنا وفي «المهام».
+            </p>
+          )}
+        </motion.div>
+      )}
 
       {/* ══ Hero Stats ══════════════════════════════════════════════ */}
       <motion.div
