@@ -190,13 +190,19 @@ export function StoresProvider({ children }) {
       setCounts(apiResult.counts)
 
       // مسار الاحتضان: ثلاث مكالمات (call_1 / call_2 / call_3)
+      /** يُمرَّر لـ CallModal — استبيان التهيئة يعتمد على bucket === 'incubating' */
+      function tagIncubationPathStores(arr) {
+        return (arr || []).map(s =>
+          (s && typeof s === 'object' ? { ...s, bucket: 'incubating' } : s),
+        )
+      }
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
-        call_1: mergeShipmentsInRange(rawPath.call_1 ?? rawPath.new_48h ?? []),
-        call_delay: mergeShipmentsInRange(rawPath.call_delay ?? []),
-        call_2: mergeShipmentsInRange(rawPath.call_2 ?? rawPath.incubating ?? []),
-        call_3: mergeShipmentsInRange(rawPath.call_3 ?? []),
-        between_calls: mergeShipmentsInRange(rawPath.between ?? []),
+        call_1: tagIncubationPathStores(mergeShipmentsInRange(rawPath.call_1 ?? rawPath.new_48h ?? [])),
+        call_delay: tagIncubationPathStores(mergeShipmentsInRange(rawPath.call_delay ?? [])),
+        call_2: tagIncubationPathStores(mergeShipmentsInRange(rawPath.call_2 ?? rawPath.incubating ?? [])),
+        call_3: tagIncubationPathStores(mergeShipmentsInRange(rawPath.call_3 ?? [])),
+        between_calls: tagIncubationPathStores(mergeShipmentsInRange(rawPath.between ?? [])),
       }
 
       setIncubationPath(mergedPath)
