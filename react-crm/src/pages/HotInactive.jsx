@@ -76,8 +76,9 @@ function aggregateUserStats(stores, storeStates, callLogs) {
   return Object.values(map).sort((a, b) => b.storeCount - a.storeCount)
 }
 
-export default function HotInactive() {
-  const { recoverySegment } = useParams()
+export default function HotInactive({ embeddedRecoverySegment } = {}) {
+  const { recoverySegment: recoverySegmentParam } = useParams()
+  const recoverySegment = embeddedRecoverySegment ?? recoverySegmentParam
   const { user } = useAuth()
   const { stores, counts, callLogs, storeStates, loading, reload, lastLoaded } = useStores()
   const [inactiveWfSummary, setInactiveWfSummary] = useState(null)
@@ -105,10 +106,6 @@ export default function HotInactive() {
     },
     [inactiveRowColors, rowColorKey]
   )
-
-  if (!SEGMENTS.has(recoverySegment || '')) {
-    return <Navigate to="/hot-inactive/all" replace />
-  }
 
   const isAllTab = recoverySegment === 'all'
   const isRestoredTab = recoverySegment === 'restored'
@@ -172,6 +169,10 @@ export default function HotInactive() {
     () => aggregateUserStats(filteredStores, storeStates, callLogs),
     [filteredStores, storeStates, callLogs]
   )
+
+  if (!embeddedRecoverySegment && !SEGMENTS.has(recoverySegment || '')) {
+    return <Navigate to="/hot-inactive/all" replace />
+  }
 
   const bucketColumn = isRecoveryTab
     ? [{

@@ -339,21 +339,23 @@ function isDoneIncubationPath(storeStates, storeId) {
   return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable' || c === 'frozen' || c === 'inactive'
 }
 
-export default function IncubationPath() {
-  const { tabKey } = useParams()
+export default function IncubationPath({ embeddedTabKey } = {}) {
+  const { tabKey: paramTab } = useParams()
   const navigate = useNavigate()
   const {
     incubationPath, callLogs, storeStates,
     loading, error, reload,
   } = useStores()
 
-  const activeTab = ROUTE_TAB[tabKey] ?? 'call_1'
+  const routeTabKey = embeddedTabKey ?? paramTab
+  const activeTab = ROUTE_TAB[routeTabKey] ?? 'call_1'
 
   useEffect(() => {
-    if (!tabKey || !ROUTE_TAB[tabKey]) {
+    if (embeddedTabKey) return
+    if (!paramTab || !ROUTE_TAB[paramTab]) {
       navigate('/incubation/call-1', { replace: true })
     }
-  }, [tabKey, navigate])
+  }, [embeddedTabKey, paramTab, navigate])
 
   const [selected, setSelected]   = useState(null)
   const [callStore, setCallStore] = useState(null)

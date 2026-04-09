@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   Users, LogOut, Baby, X, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock, BadgeCheck, Package,
+  ChevronDown, Circle, Layers, Lock, BadgeCheck, Package, ClipboardList,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
@@ -13,6 +13,7 @@ import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
+  { to: '/tasks',         label: 'المهام',            icon: ClipboardList,   view: 'tasks'        },
   { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
@@ -400,7 +401,7 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', '/quick-verification'] },
+  { label: 'الرئيسية',  keys: ['/', '/tasks', '/quick-verification'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
@@ -414,7 +415,7 @@ const NAV_GROUPS = [
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
-      { label: 'الرئيسية', keys: ['/'] },
+      { label: 'الرئيسية', keys: ['/', '/tasks'] },
       ...(DISABLE_POINTS_AND_PERFORMANCE
         ? []
         : [{ label: 'الإدارة', keys: ['/performance'] }]),
