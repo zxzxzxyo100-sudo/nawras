@@ -621,12 +621,21 @@ elseif ($action === 'save_survey') {
         if ($storeId <= 0) {
             jsonResponse(['success' => false, 'error' => 'معرّف المتجر غير صالح.'], 400);
         }
+        require_once __DIR__ . '/daily-quota-lib.php';
+        $submittedUser = trim((string) ($input['username'] ?? ''));
+        $quotaUser = $submittedUser !== '' ? $submittedUser : trim((string) ($input['user'] ?? ''));
+        if ($quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
+            jsonResponse([
+                'success' => false,
+                'error' => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+                'daily_quota' => getDailyProgress($pdo, $quotaUser),
+            ], 403);
+        }
         try {
             $pdo->exec('ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL AFTER performed_by');
         } catch (Throwable $e) {
         }
         $neutral = 3;
-        $submittedUser = trim((string) ($input['username'] ?? ''));
         $pdo->prepare("INSERT INTO surveys (store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns, suggestions, performed_by, submitted_username, survey_kind)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'inactive_feedback')")
             ->execute([
@@ -639,7 +648,10 @@ elseif ($action === 'save_survey') {
         $pdo->prepare("INSERT INTO audit_logs (store_id, store_name, action_type, action_detail, performed_by, performed_role)
             VALUES (?, ?, 'ملاحظة متجر غير نشط', ?, ?, ?)")
             ->execute([$storeId, $input['store_name'] ?? '', $detail, $input['user'] ?? '', $input['user_role'] ?? '']);
-        jsonResponse(['success' => true]);
+        if ($quotaUser !== '') {
+            register_daily_store_processed($pdo, $quotaUser, $storeId, 'survey');
+        }
+        jsonResponse(['success' => true, 'daily_quota' => $quotaUser !== '' ? getDailyProgress($pdo, $quotaUser) : null]);
     }
 
     $answers = $input['answers'] ?? null;
@@ -665,6 +677,15 @@ elseif ($action === 'save_survey') {
     } catch (Throwable $e) {
     }
     $submittedUser = trim((string) ($input['username'] ?? ''));
+    require_once __DIR__ . '/daily-quota-lib.php';
+    $quotaUser = $submittedUser !== '' ? $submittedUser : trim((string) ($input['user'] ?? ''));
+    if ($quotaUser !== '' && nawras_daily_quota_blocks_new_store($pdo, $quotaUser, $storeId)) {
+        jsonResponse([
+            'success' => false,
+            'error' => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
+            'daily_quota' => getDailyProgress($pdo, $quotaUser),
+        ], 403);
+    }
 
     ensure_surveys_satisfaction_columns($pdo);
 
@@ -704,7 +725,10 @@ elseif ($action === 'save_survey') {
             );
         }
 
-        jsonResponse(['success' => true]);
+        if ($quotaUser !== '') {
+            register_daily_store_processed($pdo, $quotaUser, $storeId, 'survey');
+        }
+        jsonResponse(['success' => true, 'daily_quota' => $quotaUser !== '' ? getDailyProgress($pdo, $quotaUser) : null]);
     }
 
     if ($surveyKind !== 'active_csat') {
@@ -744,7 +768,10 @@ elseif ($action === 'save_survey') {
         );
     }
 
-    jsonResponse(['success' => true]);
+    if ($quotaUser !== '') {
+        register_daily_store_processed($pdo, $quotaUser, $storeId, 'survey');
+    }
+    jsonResponse(['success' => true, 'daily_quota' => $quotaUser !== '' ? getDailyProgress($pdo, $quotaUser) : null]);
 }
 
 // ========== GET SURVEYS (optimized) ==========

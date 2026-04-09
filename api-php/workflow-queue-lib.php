@@ -415,7 +415,9 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
     ensure_workflow_schema($pdo);
     ensure_inactive_daily_stats_schema($pdo);
     cleanup_completed_assignments($pdo, $username, 'inactive');
-    if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
+    require_once __DIR__ . '/daily-quota-lib.php';
+    nawras_ensure_daily_quota_schema($pdo);
+    if (getDailyProgress($pdo, $username)['quota_reached']) {
         return 0;
     }
     $have = count_inactive_queue($pdo, $username);

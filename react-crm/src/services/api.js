@@ -137,6 +137,12 @@ export const getMyWorkflow = (username, extra = {}) =>
     .get('/active-workflow.php', { params: { action: 'get_my_workflow', username, ...extra } })
     .then(r => r.data)
 
+/** حصة يومية صارمة (50 متجر) — يمكن استدعاؤها منفصلاً أو عبر getMyWorkflow.daily_quota */
+export const getDailyQuota = username =>
+  http
+    .get('/active-workflow.php', { params: { action: 'get_daily_quota', username } })
+    .then(r => r.data)
+
 export const fillAllInactiveQueues = (data) =>
   http.post('/active-workflow.php?action=fill_all_inactive_queues', data).then(r => r.data)
 
