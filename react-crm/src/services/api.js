@@ -157,6 +157,18 @@ export const markSurveyNoAnswer = (data) =>
 export const completeInactiveQueueSuccess = (data) =>
   http.post('/active-workflow.php?action=complete_inactive_success', data).then(r => r.data)
 
+/** متابعة «المتاجر غير النشطة المنجزة» بعد مكالمة + استبيان (تم التواصل) — يحدّث الطابور والعدّ */
+export const postInactiveFollowupSuccess = (data) =>
+  http.post('/active-workflow.php?action=inactive_followup_success', data).then(r => r.data)
+
+/** من تبويب تم التواصل — تحويل إلى لم يرد (لا يُحتسب نحو الـ50) */
+export const postInactiveFollowupToNoAnswer = (data) =>
+  http.post('/active-workflow.php?action=inactive_followup_to_no_answer', data).then(r => r.data)
+
+/** من تبويب لم يرد — تسجيل لم يرد إضافي (لا يُحتسب نحو الـ50) */
+export const postInactiveFollowupNoAnswerLog = (data) =>
+  http.post('/active-workflow.php?action=inactive_followup_no_answer_log', data).then(r => r.data)
+
 /** تعبئة متجر واحد من المجمع (يُحترم هدف 50 نجاحاً يومياً) */
 export const fetchNextInactiveMerchant = (username) =>
   http

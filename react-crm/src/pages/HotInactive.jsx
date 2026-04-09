@@ -424,8 +424,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           </p>
         ) : (
           <p className="text-xs mt-1 text-amber-900/85">
-            {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» فقط تبويب «لم يرد» في متابعة المهام بعد الاستعادة لا يُحتسب في الـ
-            {quotaLimit}.
+            {quotaLimit} متجراً يومياً — يُحتسب نحو الحصة «تم التواصل» (مكالمة + استبيان) فقط؛ «لم يرد» في قائمة المتابعة المنجزة لا يُحتسب
+            في الـ{quotaLimit}.
           </p>
         )}
       </div>
@@ -443,10 +443,15 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
 
   return (
     <div className="space-y-5" dir="rtl">
+      {user?.role === 'inactive_manager' && (
+        <InactiveRestoredFollowupSection
+          underRestoredHeading={isRestoredTab}
+          onFollowupGoalBurst={() => setGoalBurstNonce(n => n + 1)}
+        />
+      )}
       {restoredInactiveFirst ? (
         <>
           {titleRow}
-          <InactiveRestoredFollowupSection underRestoredHeading />
           {inactiveCelebrationBlock}
           {inactiveQuotaBanner}
           {inactiveQuotaReachedBanner}

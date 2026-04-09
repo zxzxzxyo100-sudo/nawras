@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import ActiveStores from './ActiveStores'
 import HotInactive from './HotInactive'
+import InactiveRestoredFollowupSection from '../components/InactiveRestoredFollowupSection'
 import IncubationPath from './IncubationPath'
 import FrozenStores from './FrozenStores'
 
@@ -25,7 +26,7 @@ function TasksIntro({ title, children }) {
       </h1>
       <p className="text-slate-600 text-sm mt-1 leading-relaxed">{title}</p>
       {children}
-    </div>
+        </div>
   )
 }
 
@@ -45,9 +46,9 @@ function ActiveManagerTasksView() {
       <TasksIntro title="جميع خانات «نشط يشحن» والمجمدة في مكان واحد: اختر التبويب أدناه. في «قيد المكالمة» يُعرض طابورك كاملاً؛ الحصة اليومية (50) تخصّ هذا المسار عند تعيينك." />
       <div className="flex flex-wrap gap-2 rounded-2xl border border-violet-200/70 bg-white/70 p-2 shadow-sm ring-1 ring-violet-100/80">
         {ACTIVE_MANAGER_TASK_TABS.map(({ id, label, Icon }) => (
-          <button
+            <button
             key={id}
-            type="button"
+              type="button"
             onClick={() => setTab(id)}
             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold transition-all ${
               tab === id
@@ -57,9 +58,9 @@ function ActiveManagerTasksView() {
           >
             <Icon size={16} className="shrink-0 opacity-90" />
             {label}
-          </button>
+            </button>
         ))}
-      </div>
+          </div>
       {tab === 'frozen' ? (
         <FrozenStores embedded />
       ) : (
@@ -81,20 +82,21 @@ export default function Tasks() {
   }
 
   if (role === 'inactive_manager') {
-    return (
+  return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
         <TasksIntro title="متاجر «غير نشط ساخن» التي لم تُنقل بعد إلى «قيد الاستعادة». هدف المهمة: متابعة المتجر وتحويل حالته إلى جاري الاستعادة؛ الطابور والحصة اليومية (50) كما في بقية النظام." />
+        <InactiveRestoredFollowupSection />
         <HotInactive embeddedRecoverySegment="all" recoveryTasksHotQueue />
-      </div>
+        </div>
     )
   }
 
   if (role === 'incubation_manager') {
-    return (
+                    return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
         <TasksIntro title="مكالمات دورة الاحتضان — للتنقّل بين المراحل استخدم أيضاً «مسار الاحتضان» في القائمة." />
         <IncubationPath embeddedTabKey="call-1" />
-      </div>
+            </div>
     )
   }
 

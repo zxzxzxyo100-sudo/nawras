@@ -10,6 +10,9 @@ import {
   markDailyTaskDone,
   completeInactiveQueueSuccess,
   releaseAfterSurvey,
+  postInactiveFollowupSuccess,
+  postInactiveFollowupToNoAnswer,
+  postInactiveFollowupNoAnswerLog,
 } from '../services/api'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import StoreNameWithId         from './StoreNameWithId'
@@ -167,6 +170,8 @@ export default function CallModal({
   fromDailyTasks = false,
   /** متابعة بعد الاستعادة — تسجيل مكالمة بسيط دون استبيان رضا/تهيئة يعطّل الحفظ؛ لا يُحدَّث طابور active/inactive من «لم يرد» إن كان التعيين منجزاً */
   inactiveRestoredFollowup = false,
+  /** بعد بلوغ 50 من مسار المتابعة المنفصل */
+  onInactiveFollowupGoalBurst = null,
 }) {
   const { user } = useAuth()
   const { storeStates, surveyByStoreId, assignments, newMerchantOnboardingDoneIds } = useStores()
@@ -424,17 +429,53 @@ export default function CallModal({
     }
   }
 
-  /** متابعة بعد الاستعادة: تسجيل «لم يرد» في السجل فقط (التعيين قد يكون مُنجَزاً مسبقاً) */
+  /** متابعة المنجزة: «لم يرد» يحدّث التعيين + السجل + audit (أو تسجيل إضافي في تبويب لم يرد) */
   async function inactiveRestoredQuickNoAnswer() {
     setSaving(true)
     setError('')
     try {
+      const ws = store?.assignment_workflow_status
+      const noteText = note.trim()
+      if (
+        inactiveRestoredFollowup
+        && user?.role === 'inactive_manager'
+        && user?.username
+      ) {
+        if (ws === 'completed') {
+          await postInactiveFollowupToNoAnswer({
+            store_id: store.id,
+            store_name: store.name || '',
+            username: user.username,
+            note: noteText,
+            performed_by: user?.fullname || user?.username || '',
+            performed_role: user?.role || 'inactive_manager',
+          })
+          onCallSaved(0)
+          onSaved?.()
+          setTimeout(onClose, 400)
+          return
+        }
+        if (ws === 'no_answer') {
+          await postInactiveFollowupNoAnswerLog({
+            store_id: store.id,
+            store_name: store.name || '',
+            username: user.username,
+            note: noteText,
+            performed_by: user?.fullname || user?.username || '',
+            performed_role: user?.role || 'inactive_manager',
+          })
+          onCallSaved(0)
+          onSaved?.()
+          setTimeout(onClose, 400)
+          return
+        }
+      }
       const payload = {
         store_id: store.id,
         store_name: store.name,
         call_type: callType,
         outcome: 'no_answer',
-        note: note.trim(),
+        note: noteText,
         performed_by: user?.fullname || user?.username || '',
         performed_role: user?.role,
         username: user?.username ?? '',
@@ -574,7 +615,28 @@ export default function CallModal({
         } catch { /* */ }
       }
 
-      if (taskCompletion && user?.username && outcome === 'answered') {
+      if (
+        inactiveRestoredFollowup
+        && user?.role === 'inactive_manager'
+        && user?.username
+        && outcome === 'answered'
+      ) {
+        try {
+          const ir = await postInactiveFollowupSuccess({
+            store_id: store.id,
+            store_name: store.name || '',
+            username: user.username,
+          })
+          if (ir?.goal_just_met) {
+            onInactiveFollowupGoalBurst?.()
+          }
+        } catch (e) {
+          const msg = e?.response?.data?.error || e?.message || 'تعذّر مزامنة إتمام المتابعة مع السجل.'
+          setError(msg)
+          setSaving(false)
+          return
+        }
+      } else if (taskCompletion && user?.username && outcome === 'answered') {
         const shouldSyncWorkflow =
           IS_STAGING_OR_DEV
           || (user?.role === 'active_manager' && taskCompletion.releaseActiveWorkflow)
@@ -867,7 +929,7 @@ export default function CallModal({
             {inactiveRestoredFollowup && (
               <div className="shrink-0 border-t border-amber-200/80 bg-amber-50/70 px-5 py-3">
                 <p className="text-[11px] text-amber-950/90 text-center leading-relaxed mb-2">
-                  أو سجّل «لم يرد» مباشرة في سجل المكالمات (إن كان التعيين مُنجَزاً قد لا يُحدَّث الطابور).
+                  أو سجّل «لم يرد» — يُحدَّث التعيين وسجل المكالمات والمراجعة (لا يُحتسب نحو الـ50).
                 </p>
                 <button
                   type="button"

@@ -2,7 +2,12 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { CheckCircle2, RefreshCw, Phone, Search, CheckCircle, PhoneOff, Filter } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getInactiveRestoredFollowupStores, getMyWorkflow } from '../services/api'
+import {
+  getInactiveRestoredFollowupStores,
+  getMyWorkflow,
+  postInactiveFollowupToNoAnswer,
+  postInactiveFollowupNoAnswerLog,
+} from '../services/api'
 import StoreDrawer from './StoreDrawer'
 import CallModal from './CallModal'
 import StoreNameWithId from './StoreNameWithId'
@@ -23,6 +28,13 @@ function ymdInput(d) {
 }
 
 function rowToStore(row) {
+  const assignmentWorkflowStatus =
+    row.assignment_workflow_status
+    || (row.followup_status === 'contacted'
+      ? 'completed'
+      : row.followup_status === 'no_answer'
+        ? 'no_answer'
+        : '')
   return {
     id: row.id,
     name: row.name,
@@ -33,6 +45,7 @@ function rowToStore(row) {
     _cycle_day: row._cycle_day,
     _days_since_reg: row._days_since_reg,
     _last_call_type: row.last_call_type,
+    assignment_workflow_status: assignmentWorkflowStatus,
   }
 }
 
@@ -63,6 +76,7 @@ function mapWorkflowFollowupRow(r, storeStates, allStores) {
     assigned_to: r.assigned_to || '',
     assigned_at: r.assigned_at,
     workflow_updated_at: r.workflow_updated_at,
+    assignment_workflow_status: ws,
     followup_status: ws === 'completed' ? 'contacted' : 'no_answer',
     last_call_type: null,
     last_call_stage_label: ws === 'completed' ? 'تم التواصل (مهمة يومية)' : 'لم يرد (مهمة يومية)',
@@ -96,7 +110,10 @@ function applyClientFilters(rows, q, regFrom, regTo) {
 /**
  * خانة «المتاجر غير النشطة المنجزة» — تحميل من get_my_workflow (طابور inactive) حتى يعمل بدون ملف PHP إضافي.
  */
-export default function InactiveRestoredFollowupSection({ underRestoredHeading = false } = {}) {
+export default function InactiveRestoredFollowupSection({
+  underRestoredHeading = false,
+  onFollowupGoalBurst = null,
+} = {}) {
   const { user } = useAuth()
   const { callLogs, reload: reloadStores, storeStates, allStores, lastLoaded } = useStores()
 
@@ -113,6 +130,7 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
 
   const [selected, setSelected] = useState(null)
   const [callStore, setCallStore] = useState(null)
+  const [followupActionId, setFollowupActionId] = useState(null)
 
   const contacted = useMemo(
     () => applyClientFilters(contactedAll, qApplied, regFrom, regTo),
@@ -200,6 +218,51 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
     load()
   }
 
+  async function handleQuickToNoAnswer(s, e) {
+    e.stopPropagation()
+    if (!user?.username) return
+    if (!window.confirm('تحويل المتجر إلى تبويب «لم يرد»؟ لا يُحتسب نحو حصة الـ50.')) return
+    setFollowupActionId(s.id)
+    setError(null)
+    try {
+      await postInactiveFollowupToNoAnswer({
+        store_id: s.id,
+        store_name: s.name || '',
+        username: user.username,
+        performed_by: user?.fullname || user.username,
+        performed_role: user?.role || 'inactive_manager',
+      })
+      onSavedCall()
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'تعذّر التحويل'
+      setError(msg)
+    } finally {
+      setFollowupActionId(null)
+    }
+  }
+
+  async function handleQuickNoAnswerLog(s, e) {
+    e.stopPropagation()
+    if (!user?.username) return
+    setFollowupActionId(s.id)
+    setError(null)
+    try {
+      await postInactiveFollowupNoAnswerLog({
+        store_id: s.id,
+        store_name: s.name || '',
+        username: user.username,
+        performed_by: user?.fullname || user.username,
+        performed_role: user?.role || 'inactive_manager',
+      })
+      onSavedCall()
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'تعذّر التسجيل'
+      setError(msg)
+    } finally {
+      setFollowupActionId(null)
+    }
+  }
+
   return (
     <div className="space-y-4" dir="rtl">
       <div className="rounded-2xl border border-teal-200/80 bg-gradient-to-l from-teal-50/90 to-white px-5 py-4 shadow-sm">
@@ -213,10 +276,10 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
               المتاجر غير النشطة المنجزة
             </h2>
             <p className="text-slate-600 text-sm mt-1 leading-relaxed">
-              تعيينات المهام اليومية لطابور غير النشط بعد اكتمال الاستعادة —{' '}
-              <strong className="font-semibold text-teal-900">تم التواصل</strong> أو{' '}
-              <strong className="font-semibold text-amber-900">لم يرد</strong>. يُحتسب نحو الحصة «تم التواصل» فقط؛ «لم يرد»
-              هنا لا يُحتسب في الـ50. البيانات تُجلب من طابورك (نفس «المهام»).
+              تعيينات طابور غير النشط المكتملة:{' '}
+              <strong className="font-semibold text-teal-900">تم التواصل</strong> (بعد مكالمة واستبيان يُحتسب نحو الـ50) أو{' '}
+              <strong className="font-semibold text-amber-900">لم يرد</strong> (لا يُحتسب نحو الـ50). يُسجَّل كل إجراء في سجل
+              المكالمات والمراجعة لتطابق العرض.
             </p>
           </div>
           <button
@@ -362,12 +425,13 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
                   <th className="px-5 py-3.5 font-semibold whitespace-nowrap">آخر تحديث</th>
                   <th className="px-5 py-3.5 font-semibold">الطلبيات</th>
                   <th className="px-5 py-3.5 font-semibold">التواصل</th>
+                  <th className="px-5 py-3.5 font-semibold whitespace-nowrap">إجراء سريع</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center text-slate-500">
+                    <td colSpan={10} className="px-5 py-12 text-center text-slate-500">
                       لا توجد متاجر في هذا التبويب — إن لم تُكمل أي مهمة يومية بعد، ستبقى القائمة فارغة حتى يُسجَّل «تم
                       التواصل» أو «لم يرد» على التعيين.
                     </td>
@@ -440,6 +504,31 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
                           {hasCalls ? 'متابعة' : 'تواصل'}
                         </button>
                       </td>
+                      <td className="px-5 py-4 text-slate-700" onClick={e => e.stopPropagation()}>
+                        {user?.role === 'inactive_manager' && tab === 'contacted' && (
+                          <button
+                            type="button"
+                            disabled={followupActionId === s.id}
+                            onClick={e => handleQuickToNoAnswer(s, e)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+                          >
+                            <PhoneOff size={12} />
+                            إلى لم يرد
+                          </button>
+                        )}
+                        {user?.role === 'inactive_manager' && tab === 'no_answer' && (
+                          <button
+                            type="button"
+                            disabled={followupActionId === s.id}
+                            onClick={e => handleQuickNoAnswerLog(s, e)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800 hover:bg-slate-100 disabled:opacity-50"
+                          >
+                            <PhoneOff size={12} />
+                            تسجيل لم يرد
+                          </button>
+                        )}
+                        {user?.role !== 'inactive_manager' && <span className="text-xs text-slate-400">—</span>}
+                      </td>
                     </tr>
                   )
                 })}
@@ -462,6 +551,7 @@ export default function InactiveRestoredFollowupSection({ underRestoredHeading =
           store={callStore}
           callType="general"
           inactiveRestoredFollowup
+          onInactiveFollowupGoalBurst={onFollowupGoalBurst || undefined}
           onClose={() => setCallStore(null)}
           onSaved={onSavedCall}
         />
