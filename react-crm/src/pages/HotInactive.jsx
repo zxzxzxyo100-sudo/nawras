@@ -76,7 +76,7 @@ function aggregateUserStats(stores, storeStates, callLogs) {
   return Object.values(map).sort((a, b) => b.storeCount - a.storeCount)
 }
 
-export default function HotInactive({ embeddedRecoverySegment } = {}) {
+export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQueue } = {}) {
   const { recoverySegment: recoverySegmentParam } = useParams()
   const recoverySegment = embeddedRecoverySegment ?? recoverySegmentParam
   const { user } = useAuth()
@@ -121,6 +121,16 @@ export default function HotInactive({ embeddedRecoverySegment } = {}) {
     const matchRestoring = s => isStillRestoringStore(s, storeStates[s.id])
 
     if (isAllTab) {
+      /** صفحة المهام: طابور «ساخن» قبل بدء الاستعادة — الإنجاز = نقل المتجر إلى «قيد الاستعادة» */
+      if (recoveryTasksHotQueue) {
+        return hotInactive.filter(s => {
+          const st = storeStates[s.id]
+          const cat = st?.category
+          if (cat === 'restoring') return false
+          if (isRestoredCategory(cat) || isRecoveryCompletedByShipment(s, st)) return false
+          return true
+        })
+      }
       return hotInactive.filter(() => true)
     }
     if (isRestoredTab) {
@@ -141,7 +151,7 @@ export default function HotInactive({ embeddedRecoverySegment } = {}) {
     const activeR = activeShipping.filter(matchRestoring)
     const incR = incubating.filter(matchRestoring)
     return dedupeById([...hot, ...cold, ...activeR, ...incR])
-  }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab])
+  }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
   /** مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [] */
   const managerBatchStores = useMemo(() => {
