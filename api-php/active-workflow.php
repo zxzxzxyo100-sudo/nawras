@@ -224,13 +224,7 @@ elseif ($action === 'mark_no_answer') {
         jsonResponse(['success' => false, 'error' => 'store_id و username مطلوبان'], 400);
     }
     nawras_ensure_daily_quota_schema($pdo);
-    if (nawras_daily_quota_blocks_new_store($pdo, $username, $storeId)) {
-        jsonResponse([
-            'success' => false,
-            'error'   => 'تم بلوغ الحد اليومي (50 متجراً معالَجاً).',
-            'daily_quota' => getDailyProgress($pdo, $username),
-        ], 403);
-    }
+    /** «لم يرد» لا يُحتسب ضمن حصة الـ50 — لا نمنع التسجيل عند بلوغ الحد */
     $sid = (string) $storeId;
     $upd = $pdo->prepare("
         UPDATE store_assignments
@@ -271,7 +265,7 @@ elseif ($action === 'mark_no_answer') {
         workflow_mark_active_store_no_answer_unreachable($pdo, $storeId, $sn, $username);
     }
 
-    register_daily_store_processed($pdo, $username, $storeId, 'no_answer');
+    /** لا تسجيل في employee_daily_processed_stores لـ«لم يرد» — الحصة للاستبيان/الإكمال فقط */
 
     $added = $queue === 'inactive'
         ? fill_inactive_slots_for_user($pdo, $username, $username, null)
@@ -281,13 +275,25 @@ elseif ($action === 'mark_no_answer') {
         $payload['daily_successful_contacts'] = get_inactive_daily_success_count($pdo, $username);
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= INACTIVE_DAILY_SUCCESS_TARGET;
         if ($added > 0) {
-            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد إلى قائمتك.';
+            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». تمت إضافة متجر جديد من المجمع. «لم يرد» لا يُحتسب ضمن حصة الـ50.';
+        } else {
+            $payload['notify_ar'] = 'تم نقل المتجر إلى «لم يرد». لا يُحتسب ضمن حصة الـ50. '
+                . (getDailyProgress($pdo, $username)['quota_reached']
+                    ? 'تعذّر إضافة بديل (الحصة مكتملة أو لا يوجد متجر في طابور الاستعادة).'
+                    : 'لم يُعثَر على متجر بديل في المجمع.');
         }
     } elseif ($queue === 'active') {
         $payload['daily_successful_contacts'] = get_active_daily_success_count($pdo, $username);
         $payload['active_daily_target'] = ACTIVE_DAILY_SUCCESS_TARGET;
         $payload['daily_target_reached'] = $payload['daily_successful_contacts'] >= ACTIVE_DAILY_SUCCESS_TARGET;
-        $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في خانة «لم يرد». التعيينات الإضافية تتم يدوياً من الإسناد.';
+        if ($added > 0) {
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد». تمت إضافة متجر جديد إلى متابعتك من المتاجر غير المعيّنة (لا يُحتسب «لم يرد» ضمن حصة الـ50).';
+        } else {
+            $payload['notify_ar'] = 'تم تسجيل «لم يرد» — يظهر المتجر في خانة «لم يرد». لا يُحتسب ضمن حصة الـ50. '
+                . (getDailyProgress($pdo, $username)['quota_reached']
+                    ? 'تعذّر إضافة بديل تلقائياً (الحصة اليومية مكتملة أو لا يوجد متجر متاح في المجمع).'
+                    : 'لم يُعثَر على متجر نشط آخر غير معيّن لإضافته.');
+        }
     }
     $payload['daily_quota'] = getDailyProgress($pdo, $username);
     jsonResponse($payload);
