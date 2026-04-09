@@ -5,12 +5,12 @@ const AuthContext = createContext(null)
 
 export const ROLES = {
   /** مسار الاحتضان (incubation): التنفيذي + مسؤول المتاجر الجديدة */
-  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'tasks', 'users', 'vip_merchants', 'manager_analytics'] },
-  /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم + المهام اليومية — التحقيق السريع للتنفيذي فقط */
-  active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks'] },
-  inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks'] },
-  /** موظف مبيعات / احتضان: متاجر جديدة + مسار الاحتضان + مهام — دون التحقيق السريع */
-  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation', 'tasks'] },
+  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'users', 'vip_merchants', 'manager_analytics'] },
+  /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم — التحقيق السريع للتنفيذي فقط */
+  active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active'] },
+  inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive'] },
+  /** موظف مبيعات / احتضان: متاجر جديدة + مسار الاحتضان — دون التحقيق السريع */
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation'] },
 }
 
 export function AuthProvider({ children }) {

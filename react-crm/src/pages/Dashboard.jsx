@@ -9,22 +9,13 @@ import {
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
-  Award, Activity, ArrowUpRight, Baby, ClipboardList,
+  Award, Activity, ArrowUpRight, Baby,
   BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2, BadgeCheck,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse, getDailyTaskDismissals } from '../services/api'
-import {
-  getBizDateKeyAt9am,
-  getDailyColdBatchStores,
-  buildColdVerificationTasks,
-  getDailyActiveManagerColdBatchStores,
-  buildActiveManagerColdVerificationTasks,
-  COLD_INACTIVE_DAILY_LIMIT,
-  ACTIVE_MANAGER_COLD_VERIFY_LIMIT,
-} from '../utils/coldVerificationDaily'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -112,7 +103,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick,
 // ─── الداشبورد ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { counts, stores, allStores, callLogs, storeStates, loading, error, lastLoaded, reload } = useStores()
+  const { counts, stores, allStores, callLogs, loading, error, lastLoaded, reload } = useStores()
   const { user, can } = useAuth()
   const navigate = useNavigate()
 
@@ -120,24 +111,6 @@ export default function Dashboard() {
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
-  const [dashDismissals, setDashDismissals] = useState(() => new Set())
-  const [dashNowTick, setDashNowTick] = useState(() => Date.now())
-
-  useEffect(() => {
-    const id = setInterval(() => setDashNowTick(Date.now()), 60 * 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    const u = user?.username
-    if (!u) return
-    getDailyTaskDismissals(u)
-      .then(r => {
-        if (r?.success && Array.isArray(r.keys)) setDashDismissals(new Set(r.keys))
-      })
-      .catch(() => {})
-  }, [user?.username, lastLoaded])
-
   const loadFreezeQvPending = useCallback(async () => {
     if (user?.role !== 'executive') {
       setFreezeQvPending(null)
@@ -191,13 +164,6 @@ export default function Dashboard() {
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
-    if (user?.username) {
-      getDailyTaskDismissals(user.username)
-        .then(r => {
-          if (r?.success && Array.isArray(r.keys)) setDashDismissals(new Set(r.keys))
-        })
-        .catch(() => {})
-    }
     if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
@@ -270,46 +236,6 @@ export default function Dashboard() {
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
   const showIncubationHero = can('new') || can('incubation')
-
-  const dashBizDateKey = useMemo(() => getBizDateKeyAt9am(new Date(dashNowTick)), [dashNowTick])
-
-  const amColdVerifyAlert = useMemo(() => {
-    if (user?.role !== 'active_manager' || !user?.username) return null
-    const picked = getDailyActiveManagerColdBatchStores(
-      allStores,
-      storeStates,
-      dashBizDateKey,
-      user.username,
-      ACTIVE_MANAGER_COLD_VERIFY_LIMIT,
-    )
-    const tasks = buildActiveManagerColdVerificationTasks(picked, dashBizDateKey)
-    const pending = tasks.filter(t => !dashDismissals.has(t.id)).length
-    const pool = allStores.filter(s => {
-      const cat = storeStates[s.id]?.category || s.category || ''
-      return cat === 'cold_inactive'
-    }).length
-    const hour = new Date(dashNowTick).getHours()
-    return { pending, pool, beforeNine: hour < 9 }
-  }, [user?.role, user?.username, allStores, storeStates, dashBizDateKey, dashDismissals, dashNowTick])
-
-  const coldVerifyAlert = useMemo(() => {
-    if (user?.role !== 'incubation_manager' || !user?.username) return null
-    const picked = getDailyColdBatchStores(
-      allStores,
-      storeStates,
-      dashBizDateKey,
-      user.username,
-      COLD_INACTIVE_DAILY_LIMIT,
-    )
-    const tasks = buildColdVerificationTasks(picked, dashBizDateKey)
-    const pending = tasks.filter(t => !dashDismissals.has(t.id)).length
-    const pool = allStores.filter(s => {
-      const cat = storeStates[s.id]?.category || s.category || ''
-      return cat === 'cold_inactive'
-    }).length
-    const hour = new Date(dashNowTick).getHours()
-    return { pending, pool, beforeNine: hour < 9 }
-  }, [user?.role, user?.username, allStores, storeStates, dashBizDateKey, dashDismissals, dashNowTick])
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -419,100 +345,6 @@ export default function Dashboard() {
           ))}
         </div>
       </motion.div>
-
-      {user?.role === 'active_manager' && amColdVerifyAlert ? (
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="rounded-2xl border border-cyan-300/80 bg-gradient-to-br from-sky-50 via-white to-cyan-50/80 p-4 shadow-sm lg:p-5"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-600/10 text-cyan-800 ring-1 ring-cyan-500/25">
-                <Snowflake size={22} strokeWidth={2.2} aria-hidden />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-xs font-black uppercase tracking-wider text-cyan-900/90">تحقيق بارد — مسؤول المتاجر النشطة</p>
-                <p className="text-sm font-bold text-slate-900">
-                  من «غير نشط بارد» — دفعة ثابتة {ACTIVE_MANAGER_COLD_VERIFY_LIMIT} متجراً (لا استبدال اليوم) — 9:00 ص
-                </p>
-                {amColdVerifyAlert.beforeNine ? (
-                  <p className="text-sm text-amber-800 font-medium leading-relaxed">
-                    قبل 9:00 ص: تُفعَّل الدفعة رسمياً بعد التاسعة. يُعرض آخر شحنة في المهام.
-                  </p>
-                ) : amColdVerifyAlert.pending > 0 ? (
-                  <p className="text-sm text-cyan-950 font-semibold leading-relaxed">
-                    متبقٍ للتحقق اليوم:{' '}
-                    <span className="tabular-nums font-black">{amColdVerifyAlert.pending.toLocaleString('ar-SA')}</span>
-                    {' / '}
-                    {ACTIVE_MANAGER_COLD_VERIFY_LIMIT.toLocaleString('ar-SA')}
-                  </p>
-                ) : amColdVerifyAlert.pool > 0 ? (
-                  <p className="text-sm text-slate-600 leading-relaxed">لا مهام متبقية في الدفعة اليوم — أو لا يوجد بارد مؤهل.</p>
-                ) : (
-                  <p className="text-sm text-slate-500">لا توجد متاجر «غير نشط بارد» في النظام.</p>
-                )}
-              </div>
-            </div>
-            <Link
-              to="/tasks"
-              state={{ openTasksTab: 'am_cold_verify' }}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-black text-white shadow-md shadow-cyan-600/25 transition hover:bg-cyan-700"
-            >
-              المهام — تحقيق بارد
-              <ArrowUpRight size={16} />
-            </Link>
-          </div>
-        </motion.div>
-      ) : null}
-
-      {user?.role === 'incubation_manager' && coldVerifyAlert ? (
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          animate="visible"
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="rounded-2xl border border-cyan-200/90 bg-gradient-to-br from-cyan-50/90 via-white to-slate-50/80 p-4 shadow-sm lg:p-5"
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 flex-1 items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-800 ring-1 ring-cyan-400/30">
-                <Snowflake size={20} aria-hidden />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-xs font-black uppercase tracking-wider text-cyan-900/90">تحقيق بارد — مسؤول المتاجر الجديدة</p>
-                <p className="text-sm font-bold text-slate-900">حتى {COLD_INACTIVE_DAILY_LIMIT} متجراً يومياً — 9:00 ص</p>
-                {coldVerifyAlert.beforeNine ? (
-                  <p className="text-sm text-amber-800 font-medium leading-relaxed">
-                    قبل 9:00 ص: انتظر بداية يوم العمل للدفعة الباردة.
-                  </p>
-                ) : coldVerifyAlert.pending > 0 ? (
-                  <p className="text-sm text-cyan-950 font-semibold leading-relaxed">
-                    لديك{' '}
-                    <span className="tabular-nums font-black">{coldVerifyAlert.pending.toLocaleString('ar-SA')}</span>
-                    {' '}
-                    متجراً بانتظار التحقق في دفعة «غير نشط بارد».
-                  </p>
-                ) : coldVerifyAlert.pool > 0 ? (
-                  <p className="text-sm text-slate-600">لا يتبقى متاجر في دفعة البارد اليوم.</p>
-                ) : (
-                  <p className="text-sm text-slate-500">لا توجد متاجر «باردة» في النظام.</p>
-                )}
-              </div>
-            </div>
-            <Link
-              to="/tasks"
-              state={{ openTasksTab: 'cold_verify' }}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-cyan-600 bg-white px-4 py-2.5 text-sm font-black text-cyan-900 shadow-sm transition hover:bg-cyan-50"
-            >
-              تبويب البارد
-              <ArrowUpRight size={16} />
-            </Link>
-          </div>
-        </motion.div>
-      ) : null}
 
       {user?.role === 'executive' && can('quick_verification') ? (
         <motion.div
@@ -625,17 +457,6 @@ export default function Dashboard() {
             gradient="linear-gradient(135deg, #4c1d95, #6d28d9, #8b5cf6)"
             glow="#8b5cf655"
             onClick={() => navigate('/cold-inactive')}
-          />
-        )}
-        {can('tasks') && (can('active') || can('new')) && (
-          <StoreTypeCard
-            title="المهام اليومية"
-            count="مهام"
-            sub="متابعة المسند إليك من صفحة المهام"
-            icon={ClipboardList}
-            gradient="linear-gradient(135deg, #3730a3, #4f46e5)"
-            glow="#4f46e555"
-            onClick={() => navigate('/tasks')}
           />
         )}
       </motion.div>
