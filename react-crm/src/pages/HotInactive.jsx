@@ -443,7 +443,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
 
   return (
     <div className="space-y-5" dir="rtl">
-      {user?.role === 'inactive_manager' && (
+      {user?.role === 'inactive_manager' && !recoveryTasksHotQueue && (
         <InactiveRestoredFollowupSection
           underRestoredHeading={isRestoredTab}
           onFollowupGoalBurst={() => setGoalBurstNonce(n => n + 1)}
