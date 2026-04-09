@@ -33,6 +33,25 @@ export function dateOnlyFromStoreField(val) {
 }
 
 /**
+ * متجر «جديد» حصراً لقائمة /new?view=new48:
+ * - إن وُجد lifecycle من الخادم: يُقبل فقط lifecycle === 'new'.
+ * - وإلا (استجابات قديمة): تسجيل خلال آخر 48 ساعة ولم يشحن بعد.
+ */
+export function isStoreStrictlyNew(s, nowMs = Date.now()) {
+  if (s.lifecycle === 'new') return true
+  if (s.lifecycle && s.lifecycle !== 'new') return false
+  if (!s.registered_at) return false
+  const t = new Date(s.registered_at).getTime()
+  if (Number.isNaN(t)) return false
+  const hours = (nowMs - t) / 3600000
+  if (hours > 48) return false
+  const hasShipped =
+    Number(s.total_shipments) > 0
+    || (s.last_shipment_date && String(s.last_shipment_date) !== 'لا يوجد')
+  return !hasShipped
+}
+
+/**
  * تصفية موحّدة: اسم، رقم/معرّف المتجر، نطاق تاريخ التسجيل، نطاق تاريخ آخر شحنة
  */
 export function filterStoresByToolbar(stores, filters) {
@@ -52,9 +71,12 @@ export function filterStoresByToolbar(stores, filters) {
     bucketKeys = null,
     /** إن وُجد رقم > 0: يبقى المتجر إن كان تسجيله خلال آخر N ساعة */
     registeredWithinHours = null,
+    /** لوحة «جديدة»: فقط متاجر جديدة حقيقية (ليست احتضان/ساخن/بارد) */
+    strictNewOnly = false,
   } = filters
 
   return stores.filter(s => {
+    if (strictNewOnly && !isStoreStrictlyNew(s)) return false
     if (registeredWithinHours != null && registeredWithinHours > 0) {
       if (!s.registered_at) return false
       const t = new Date(s.registered_at).getTime()
