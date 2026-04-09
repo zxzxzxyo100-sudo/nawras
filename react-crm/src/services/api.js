@@ -244,6 +244,12 @@ export const getInactiveRecoveryDailyStatus = () =>
     .get('/inactive-daily-status.php', { params: { user_role: 'executive' } })
     .then(r => r.data)
 
+/** أداء الفريق — أهداف اليوم حسب الدور (نشط / استعادة / احتضان) */
+export const getExecutiveStaffGoals = () =>
+  http
+    .get('/executive-staff-goals.php', { params: { user_role: 'executive' } })
+    .then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http

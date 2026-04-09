@@ -19,6 +19,7 @@ import IncubationNewCompleted from './pages/IncubationNewCompleted'
 import Users from './pages/Users'
 import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
+import ExecutiveStaffPerformance from './pages/ExecutiveStaffPerformance'
 import Tasks from './pages/Tasks'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
@@ -124,6 +125,10 @@ function AppRoutes() {
                 : <MyPerformance />}
             </PrivateRoute>
           )}
+        />
+        <Route
+          path="/staff-performance"
+          element={<PrivateRoute view="staff_performance"><ExecutiveStaffPerformance /></PrivateRoute>}
         />
         <Route path="/users"        element={<PrivateRoute view="users"><Users /></PrivateRoute>} />
         <Route

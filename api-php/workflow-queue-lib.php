@@ -259,13 +259,14 @@ function log_active_manager_pool_pick(PDO $pdo, $username, $storeId) {
  * متجر من مجمع «النشط» — بدون تبريد استبيان 30 يوماً ولا تدوير أمس؛ فقط غير معيّن حالياً في الطابور.
  */
 function pick_next_pool_store_for_user(PDO $pdo, $_username = '') {
+    /** أي صف في طابور «active» يمنع سحب المتجر مجدداً — بما فيه «منجز» حتى يُزال الصف (تنظيف شهري) ولا يُكرَّر في المهام. */
     $sql = "
         SELECT ss.store_id, ss.store_name
         FROM store_states ss
         WHERE " . active_pipeline_where_sql() . "
         AND CAST(ss.store_id AS CHAR) NOT IN (
             SELECT store_id FROM store_assignments
-            WHERE assignment_queue = 'active' AND workflow_status IN ('active','no_answer')
+            WHERE assignment_queue = 'active'
         )
         ORDER BY ss.store_id ASC
         LIMIT 1
