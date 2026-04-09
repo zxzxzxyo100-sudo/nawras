@@ -163,9 +163,9 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         Number(t.store_id),
       ),
     )
-    if (wfIds.size === 0) return filteredStores.slice(0, 8)
+    if (wfIds.size === 0) return filteredStores
     const scoped = filteredStores.filter(s => wfIds.has(Number(s.id)))
-    return scoped.length ? scoped.slice(0, 8) : filteredStores.slice(0, 8)
+    return scoped.length ? scoped : filteredStores
   }, [user?.role, inactiveWfSummary, filteredStores])
 
   const storesForTable = managerBatchStores === null ? filteredStores : managerBatchStores
