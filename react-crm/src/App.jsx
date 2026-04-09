@@ -18,7 +18,6 @@ import IncubationPath from './pages/IncubationPath'
 import IncubationCallDelay from './pages/IncubationCallDelay'
 import IncubationNewCompleted from './pages/IncubationNewCompleted'
 import Users from './pages/Users'
-import Kanban from './pages/Kanban'
 import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
@@ -120,14 +119,6 @@ function AppRoutes() {
         <Route
           path="/analytics/logistics"
           element={<PrivateRoute view="dashboard"><LogisticsAnalytics /></PrivateRoute>}
-        />
-        <Route
-          path="/kanban"
-          element={(
-            <PrivateRoute view="dashboard">
-              <Kanban />
-            </PrivateRoute>
-          )}
         />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

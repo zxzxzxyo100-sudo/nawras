@@ -2,7 +2,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
-  Users, LogOut, Baby, X, Kanban, BarChart2, Crown,
+  Users, LogOut, Baby, X, BarChart2, Crown,
   ChevronDown, Circle, Layers, Lock, BadgeCheck, Package,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
@@ -14,7 +14,6 @@ import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
-  { to: '/kanban',        label: 'Kanban',             icon: Kanban,          view: 'dashboard'    },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
@@ -404,7 +403,7 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', '/quick-verification', '/kanban'] },
+  { label: 'الرئيسية',  keys: ['/', '/quick-verification'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
