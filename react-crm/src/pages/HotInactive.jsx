@@ -535,7 +535,30 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       )}
 
       {selected && (
-        <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />
+        <StoreDrawer
+          store={selected}
+          onClose={() => setSelected(null)}
+          qvNeedsFreezeSource="inactive"
+          taskCompletion={
+            user?.role === 'inactive_manager'
+              ? {
+                  inactiveRecovery: true,
+                  onInactiveGoalBurst: () => setGoalBurstNonce(n => n + 1),
+                }
+              : null
+          }
+          fromDailyTasks={Boolean(recoveryTasksHotQueue && user?.role === 'inactive_manager')}
+          extraOnSaved={async () => {
+            if (user?.role === 'inactive_manager' && user?.username) {
+              try {
+                const r = await getMyWorkflow(user.username, { queue: 'inactive' })
+                if (r?.success) setInactiveWfSummary(r)
+              } catch {
+                /* ignore */
+              }
+            }
+          }}
+        />
       )}
 
       {callModalStore && (

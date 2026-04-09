@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, X, Search, Zap } from 'lucide-react'
 import { useStores }  from '../contexts/StoresContext'
 import { usePoints }  from '../contexts/PointsContext'
+import { useAuth } from '../contexts/AuthContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import CallModal      from './CallModal'
 import StoreNameWithId from './StoreNameWithId'
@@ -22,6 +23,7 @@ const CAT_COLORS = {
 }
 
 export default function FloatingCallBar() {
+  const { user } = useAuth()
   const { allStores, reload } = useStores()
   const { todayCalls, goalPct } = usePoints()
 
@@ -259,6 +261,11 @@ export default function FloatingCallBar() {
           store={selected}
           onClose={() => { setShowModal(false); setSelected(null) }}
           onSaved={reload}
+          taskCompletion={
+            user?.role === 'inactive_manager'
+              ? { inactiveRecovery: true }
+              : null
+          }
         />
       )}
     </>
