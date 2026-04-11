@@ -175,13 +175,19 @@ export default function TeamPerformanceStatistics() {
               >
                 الشهر الحالي
               </button>
-              <Link
-                to="/staff-performance/conversion-report"
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
-              >
-                <FileSpreadsheet size={14} />
-                تقرير نسبة التحويل
-              </Link>
+            <Link
+              to="/staff-performance/conversion-report"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              <FileSpreadsheet size={14} />
+              تقرير نسبة التحويل
+            </Link>
+            <Link
+              to="/staff-performance/satisfaction-report"
+              className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-100"
+            >
+              تقرير معدل الرضا
+            </Link>
               <button
                 type="button"
                 onClick={() => fetchStats(dateFrom, dateTo)}
