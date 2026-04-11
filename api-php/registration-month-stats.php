@@ -13,6 +13,9 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
+/** تقرير تفصيلي: ?detail=1 — قائمة المتاجر المسجّلة في الشهر مع حقول الشحن */
+$detail = isset($_GET['detail']) && ($_GET['detail'] === '1' || $_GET['detail'] === 'true');
+
 $tz = new DateTimeZone('Asia/Riyadh');
 $now = new DateTimeImmutable('now', $tz);
 $monthStart = $now->modify('first day of this month')->setTime(0, 0, 0);
@@ -62,6 +65,7 @@ if (!is_array($list)) {
 $registered = 0;
 $shipped = 0;
 $cacheStale = false;
+$reportRows = [];
 foreach ($list as $probe) {
     if (is_array($probe) && !array_key_exists('registered_at', $probe)) {
         $cacheStale = true;
@@ -86,24 +90,56 @@ if (!$cacheStale) {
             continue;
         }
         $registered++;
-        if (registration_month_row_has_shipped($row)) {
+        $byDate = registration_month_row_has_shipped($row);
+        if ($byDate) {
             $shipped++;
         }
+        if ($detail) {
+            $sid = $row['id'] ?? null;
+            $reportRows[] = [
+                'store_id'             => $sid,
+                'name'                 => isset($row['name']) ? (string) $row['name'] : '',
+                'phone'                => isset($row['phone']) ? (string) $row['phone'] : '',
+                'registered_at'        => $regRaw,
+                'last_shipment_date'   => trim((string) ($row['last_shipment_date'] ?? '')),
+                'total_shipments'      => (int) ($row['total_shipments'] ?? 0),
+                'shipped_by_last_date' => $byDate,
+            ];
+        }
     }
+}
+
+if ($detail && !$cacheStale) {
+    usort($reportRows, static function (array $a, array $b): int {
+        $ta = strtotime((string) ($a['registered_at'] ?? '')) ?: 0;
+        $tb = strtotime((string) ($b['registered_at'] ?? '')) ?: 0;
+
+        return $tb <=> $ta;
+    });
 }
 
 $pct = (!$cacheStale && $registered > 0)
     ? (int) round(100 * $shipped / $registered)
     : null;
 
-echo json_encode([
+$out = [
     'success'                  => true,
     'registered_this_month'    => $registered,
     'shipped_among_registered' => $shipped,
     'conversion_percent'       => $pct,
     'month_label'              => $monthStart->format('Y-m'),
+    'month_title_ar'           => $monthStart->format('Y') . '/' . $monthStart->format('m'),
     'cache_stale'              => $cacheStale,
     'hint'                     => $cacheStale
         ? 'حدّث الذاكرة بتشغيل all-stores.php (نسخة البحث القديمة لا تتضمّن تواريخ التسجيل).'
         : null,
-], JSON_UNESCAPED_UNICODE);
+    'rule'                     => 'شحن = تاريخ آخر شحنة صالح (لا يُكفي إجمالي الطرود بدون تاريخ)',
+    'generated_at'             => date('c'),
+];
+
+if ($detail) {
+    $out['report_rows'] = $cacheStale ? [] : $reportRows;
+    $out['report_row_count'] = count($out['report_rows']);
+}
+
+echo json_encode($out, JSON_UNESCAPED_UNICODE);
