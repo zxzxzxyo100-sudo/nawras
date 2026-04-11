@@ -3,7 +3,7 @@
  * أهداف اليوم لكل موظف تشغيلي — للمدير التنفيذي فقط.
  * نشط: تعيينات مكتملة اليوم (تم التواصل + استبيان) / 50
  * استعادة: اتصالات ناجحة مسجّلة في inactive_manager_daily_stats / 50
- * احتضان: مكالمات مسار الاحتضان (inc_call1–3 و day0/3/10) المسجّلة اليوم (توقيت الرياض) / 50
+ * احتضان: مكالمات المسار (inc_call1–3 و day0/3/10) + مكالمة «عامة» من الواجهة (call_type=general و performed_role=incubation_manager) / اليوم
  */
 declare(strict_types=1);
 
@@ -92,7 +92,8 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $entry['target'] = $targetInc;
         /**
          * اليوم فقط — DATE(created_at)=CURDATE() مع جلسة +03:00 (الرياض).
-         * الأنواع: inc_call1–3 + day0/day3/day10 (مسار قديم).
+         * مسار الاحتضان من «مسار الاحتضان»: inc_call1–3 + day0/3/10.
+         * من نافذة المتجر/كل المتاجر يُحفظ غالباً general + performed_role=incubation_manager — تُحسب أيضاً.
          * مطابقة المنفّذ: username / fullname مع TRIM و LOWER للاتينية.
          */
         $unTrim = trim($un);
@@ -102,9 +103,15 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $c = $pdo->prepare("
             SELECT COUNT(*) FROM call_logs
             WHERE DATE(created_at) = CURDATE()
-            AND call_type IN (
-                'inc_call1', 'inc_call2', 'inc_call3',
-                'day0', 'day3', 'day10'
+            AND (
+                call_type IN (
+                    'inc_call1', 'inc_call2', 'inc_call3',
+                    'day0', 'day3', 'day10'
+                )
+                OR (
+                    TRIM(call_type) = 'general'
+                    AND TRIM(COALESCE(performed_role, '')) = 'incubation_manager'
+                )
             )
             AND (
                 TRIM(performed_by) = ?
@@ -140,5 +147,5 @@ echo json_encode([
         'inactive_daily' => $targetInactive,
         'incubation_daily' => $targetInc,
     ],
-    'note_ar' => 'النشط والاستعادة: الهدف اليومي حسب الطابور. الاحتضان: مكالمات المسار (1–3 و day0/3/10) المسجّلة اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
+    'note_ar' => 'النشط والاستعادة: الهدف اليومي حسب الطابور. الاحتضان: مكالمات المسار (1–3 و day0/3/10) أو مكالمة عامة (general) عندما يكون الدور مسؤول احتضان — اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
 ], JSON_UNESCAPED_UNICODE);
