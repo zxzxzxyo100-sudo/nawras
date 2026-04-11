@@ -1,7 +1,11 @@
 <?php
 /**
- * إحصاء: متاجر سُجّلت في الشهر التقويمي الحالي، وكم منها شحنت، ونسبة التحويل.
- * المصدر: cache/stores_search_lite.json (يُحدَّث عند تشغيل all-stores.php؛ يجب أن تتضمّن الصفوف registered_at وحقول الشحن).
+ * إحصاء: متاجر سُجّلت في الشهر التقويمي الحالي، وكم منها «شحنت»، ونسبة التحويل.
+ *
+ * «شحن» هنا يعتمد على تاريخ آخر شحنة فقط — لا يُكفي إجمالي الطرود بدون تاريخ
+ * (قد يشمل هدايا أو طلبات لم تصل بعد لشركة الشحن).
+ *
+ * المصدر: cache/stores_search_lite.json (يُحدَّث عند تشغيل all-stores.php).
  */
 require_once __DIR__ . '/config.php';
 
@@ -17,16 +21,19 @@ $startTs = $monthStart->getTimestamp();
 $endTs = $monthEnd->getTimestamp();
 
 /**
+ * شحن فعلي = تاريخ آخر شحنة معروف وصالح (لا يُعتمد على إجمالي الطرود وحده).
+ *
  * @param array<string,mixed> $row
  */
 function registration_month_row_has_shipped(array $row): bool
 {
-    if ((int) ($row['total_shipments'] ?? 0) > 0) {
-        return true;
-    }
     $lsd = trim((string) ($row['last_shipment_date'] ?? ''));
+    if ($lsd === '' || $lsd === 'لا يوجد') {
+        return false;
+    }
+    $ts = strtotime($lsd);
 
-    return $lsd !== '' && $lsd !== 'لا يوجد';
+    return $ts !== false && $ts > 0;
 }
 
 $path = __DIR__ . '/cache/stores_search_lite.json';

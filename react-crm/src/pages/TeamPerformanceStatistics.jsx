@@ -185,8 +185,9 @@ export default function TeamPerformanceStatistics() {
           </div>
 
           <p className="text-[11px] text-slate-500 mt-4 leading-relaxed border-t border-violet-100/80 pt-4">
-            يُحتسب «شحن» إذا وُجدت شحنات (عدد الشحنات أكبر من صفر) أو تاريخ شحن فعلي في بيانات المتجر. الشهر
-            حسب توقيت الرياض. المصدر: ذاكرة all-stores (يُنصح بتحديثها دورياً).
+            يُحتسب «شحن» فقط عند وجود <span className="font-semibold text-slate-700">تاريخ آخر شحنة</span> صالح في
+            بيانات المتجر — لا يُكفي إجمالي الطرود بدون تاريخ (قد يشمل هدايا أو طلبات لم تُسَلَّم للشركة بعد). الشهر
+            حسب توقيت الرياض. المصدر: ذاكرة all-stores.
           </p>
         </div>
       </motion.div>
