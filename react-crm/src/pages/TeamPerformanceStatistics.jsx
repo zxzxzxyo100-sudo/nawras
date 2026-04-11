@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BarChart3, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'
+import { BarChart3, CalendarRange, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import { getRegistrationMonthStats } from '../services/api'
+import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 /** تسميات مراحل المسار (_inc) — مطابقة لمنطق all-stores.php */
 const INC_STAGE_LABELS_AR = {
@@ -28,11 +29,21 @@ export default function TeamPerformanceStatistics() {
     hint: null,
   })
   const [loading, setLoading] = useState(true)
+  const initRange = defaultCalendarMonthYmd()
+  const [dateFrom, setDateFrom] = useState(initRange.from)
+  const [dateTo, setDateTo] = useState(initRange.to)
+  const [rangeError, setRangeError] = useState(null)
 
-  const load = useCallback(async () => {
+  const fetchStats = useCallback(async (from, to) => {
+    setRangeError(null)
+    if (!isValidYmdRange(from, to)) {
+      setRangeError('حدّد تاريخاً من وإلى بصيغة صحيحة، بحيث يكون «من» قبل أو يساوي «إلى».')
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const r = await getRegistrationMonthStats()
+      const r = await getRegistrationMonthStats({ from, to })
       if (r?.success) {
         setStats({
           registered_this_month:
@@ -70,8 +81,21 @@ export default function TeamPerformanceStatistics() {
   }, [])
 
   useEffect(() => {
-    if (user?.role === 'executive') load()
-  }, [user?.role, load])
+    if (user?.role !== 'executive') return
+    const { from, to } = defaultCalendarMonthYmd()
+    setDateFrom(from)
+    setDateTo(to)
+    fetchStats(from, to)
+  }, [user?.role, fetchStats])
+
+  const applyRange = () => fetchStats(dateFrom, dateTo)
+
+  const setThisCalendarMonth = () => {
+    const { from, to } = defaultCalendarMonthYmd()
+    setDateFrom(from)
+    setDateTo(to)
+    fetchStats(from, to)
+  }
 
   if (user?.role !== 'executive') {
     return null
@@ -108,28 +132,66 @@ export default function TeamPerformanceStatistics() {
               <h1 className="text-xl font-black text-slate-900">الإحصائيات</h1>
               <p className="text-sm text-slate-600 mt-0.5">
                 ضمن <span className="font-semibold">أداء الفريق</span>
-                {' — '}عدد المتاجر <span className="font-semibold text-slate-800">المسجّلة هذا الشهر</span>
-                {' '}ومنها من <span className="font-semibold text-slate-800">شحن</span>، ونسبة التحويل (شحن ÷ مسجّل).
+                {' — '}عدد المتاجر <span className="font-semibold text-slate-800">المسجّلة في الفترة المختارة</span>
+                {' '}ومنها من <span className="font-semibold text-slate-800">شحن</span>، ونسبة التحويل (شحن ÷ مسجّل). الفترة
+                بتوقيت الرياض على الخادم.
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/staff-performance/conversion-report"
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
-            >
-              <FileSpreadsheet size={14} />
-              تقرير نسبة التحويل
-            </Link>
-            <button
-              type="button"
-              onClick={() => load()}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              تحديث
-            </button>
+          <div className="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto min-w-[min(100%,280px)]">
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                <CalendarRange size={14} />
+                من
+              </span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 tabular-nums"
+              />
+              <span className="text-xs font-semibold text-slate-500">إلى</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 tabular-nums"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={applyRange}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50"
+              >
+                تطبيق الفترة
+              </button>
+              <button
+                type="button"
+                onClick={setThisCalendarMonth}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+              >
+                الشهر الحالي
+              </button>
+              <Link
+                to="/staff-performance/conversion-report"
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+              >
+                <FileSpreadsheet size={14} />
+                تقرير نسبة التحويل
+              </Link>
+              <button
+                type="button"
+                onClick={() => fetchStats(dateFrom, dateTo)}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                تحديث
+              </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -140,6 +202,9 @@ export default function TeamPerformanceStatistics() {
         transition={{ delay: 0.05 }}
         className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm"
       >
+        {rangeError && (
+          <p className="text-sm text-red-800 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">{rangeError}</p>
+        )}
         {stats.cache_stale && (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
             {stats.hint ||
@@ -150,7 +215,7 @@ export default function TeamPerformanceStatistics() {
         <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/90 via-white to-emerald-50/40 p-5 lg:p-6">
           <div className="flex flex-wrap items-center gap-2 text-violet-800 mb-4">
             <Store size={20} />
-            <span className="text-sm font-black">تسجيلات الشهر ونسبة الشحن</span>
+            <span className="text-sm font-black">التسجيلات ونسبة الشحن</span>
             {stats.month_label && (
               <span className="text-xs font-semibold text-slate-500 mr-1">({stats.month_label})</span>
             )}
@@ -160,7 +225,7 @@ export default function TeamPerformanceStatistics() {
             <div className="rounded-xl border border-violet-100 bg-white/80 p-4">
               <div className="flex items-center gap-2 text-slate-600 mb-1">
                 <Store size={16} />
-                <span className="text-xs font-bold">سُجّل هذا الشهر</span>
+                <span className="text-xs font-bold">سُجّل في الفترة</span>
               </div>
               <p className="text-3xl font-black tabular-nums text-slate-900">
                 {loading ? '…' : showNumbers ? Number(reg).toLocaleString('ar-SA') : '—'}
@@ -189,15 +254,15 @@ export default function TeamPerformanceStatistics() {
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
                 {showNumbers && reg > 0
                   ? `مثال المعنى: ${Number(reg).toLocaleString('ar-SA')} مسجّل، ${Number(ship).toLocaleString('ar-SA')} شحن ≈ ${Number(pct).toLocaleString('ar-SA')}%.`
-                  : 'عند عدم وجود تسجيلات في الشهر لا تُعرض نسبة.'}
+                  : 'عند عدم وجود تسجيلات في الفترة لا تُعرض نسبة.'}
               </p>
             </div>
           </div>
 
           <p className="text-[11px] text-slate-500 mt-4 leading-relaxed border-t border-violet-100/80 pt-4">
             يُحتسب «شحن» فقط عند وجود <span className="font-semibold text-slate-700">تاريخ آخر شحنة</span> صالح في
-            بيانات المتجر — لا يُكفي إجمالي الطرود بدون تاريخ (قد يشمل هدايا أو طلبات لم تُسَلَّم للشركة بعد). الشهر
-            حسب توقيت الرياض. المصدر: ذاكرة all-stores.
+            بيانات المتجر — لا يُكفي إجمالي الطرود بدون تاريخ (قد يشمل هدايا أو طلبات لم تُسَلَّم للشركة بعد). حدود
+            الفترة (من/إلى) بتوقيت الرياض. المصدر: ذاكرة all-stores.
           </p>
         </div>
       </motion.div>
