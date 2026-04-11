@@ -375,6 +375,11 @@ elseif ($action === 'log_call') {
                     ->execute([$sid]);
             }
         }
+        // من النافذة/لوحة المتجر (ليس مسار «متابعة دورية + استبيان لاحق»): يُحدَّث store_states أعلاه
+        // لكن بدون هذا يبقى تعيين الطابور workflow_status = active فيظهر المتجر في «قيد المكالمة» بصفحة المهام رغم «المنجزة».
+        if ($oc === 'answered' && !$deferAmQueueComplete && $usernameForWorkflow !== '') {
+            workflow_try_complete_active_assignment_on_answered($pdo, $sid, (string) $storeName, $usernameForWorkflow);
+        }
     }
 
     // —— مسار الاحتضان: ثلاث مكالمات (بعد كل مكالمة 3 أيام للتالية؛ الثالثة تخرج نشط/غير نشط حسب الشحن) ——
