@@ -13,6 +13,23 @@ function csvEscape(s) {
   return t
 }
 
+/** عرض تاريخ/وقت مقروء (ISO أو نص الخادم) */
+function formatDisplayDateTime(raw) {
+  if (raw == null || raw === '' || raw === 'لا يوجد') return null
+  const t = new Date(raw)
+  if (!Number.isNaN(t.getTime())) {
+    return t.toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })
+  }
+  return String(raw)
+}
+
+/** إجمالي الطرود من ذاكرة البحث — للعرض فقط */
+function formatParcelTotal(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('ar-SA')
+}
+
 export default function ConversionRateReport() {
   const { user } = useAuth()
   const [data, setData] = useState(null)
@@ -202,7 +219,9 @@ export default function ConversionRateReport() {
                   <th className="px-3 py-2.5 whitespace-nowrap">الهاتف</th>
                   <th className="px-3 py-2.5 whitespace-nowrap">تاريخ التسجيل</th>
                   <th className="px-3 py-2.5 whitespace-nowrap">آخر شحنة</th>
-                  <th className="px-3 py-2.5 whitespace-nowrap">إجمالي طرود</th>
+                  <th className="px-3 py-2.5 whitespace-nowrap min-w-[5.5rem]" title="مرجعي من API — لا يُدخل في نسبة التحويل">
+                    إجمالي طرود <span className="text-slate-400 font-normal">(مرجعي)</span>
+                  </th>
                   <th className="px-3 py-2.5 whitespace-nowrap">شحن (تاريخ)</th>
                 </tr>
               </thead>
@@ -217,13 +236,21 @@ export default function ConversionRateReport() {
                       {r.name || '—'}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-600 whitespace-nowrap">{r.phone || '—'}</td>
-                    <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">{r.registered_at || '—'}</td>
+                    <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap" title={r.registered_at || ''}>
+                      {formatDisplayDateTime(r.registered_at) ?? (r.registered_at || '—')}
+                    </td>
                     <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
                       {r.last_shipment_date && r.last_shipment_date !== 'لا يوجد'
-                        ? r.last_shipment_date
+                        ? (
+                            <span title={r.last_shipment_date}>
+                              {formatDisplayDateTime(r.last_shipment_date) ?? r.last_shipment_date}
+                            </span>
+                          )
                         : <span className="text-red-600">لا يوجد</span>}
                     </td>
-                    <td className="px-3 py-2 tabular-nums">{Number(r.total_shipments ?? 0).toLocaleString('ar-SA')}</td>
+                    <td className="px-3 py-2 tabular-nums text-slate-800 font-medium min-w-[4rem] text-center">
+                      {formatParcelTotal(r.total_shipments)}
+                    </td>
                     <td className="px-3 py-2">
                       {r.shipped_by_last_date ? (
                         <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">نعم</span>
@@ -238,6 +265,10 @@ export default function ConversionRateReport() {
           </div>
         )}
 
+        <p className="text-[11px] text-slate-500 mt-3 leading-relaxed border-t border-slate-100 pt-3">
+          عمود «إجمالي طرود» يعرض رقماً مرجعياً من بيانات المتجر؛ نسبة التحويل تعتمد فقط على عمود «شحن (تاريخ)»
+          بوجود تاريخ آخر شحنة صالح، بغض النظر عن عدد الطرود المعروض.
+        </p>
         <p className="text-[11px] text-slate-400 mt-4 print:hidden">
           <Link to="/staff-performance/stats" className="inline-flex items-center gap-1 text-violet-600 font-semibold hover:underline">
             <ArrowRight size={12} className="rotate-180" />
