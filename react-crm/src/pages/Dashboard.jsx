@@ -243,7 +243,8 @@ export default function Dashboard() {
     if (user?.role !== 'active_manager' || !user?.username) return []
     const u = user.username
     const base = stores.active_shipping || []
-    const fromInc = (stores.incubating || []).filter(s => {
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => {
       const st = storeStates[s.id]
       const c = st?.category
       return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
@@ -254,7 +255,7 @@ export default function Dashboard() {
       const a = assignments[s.id]?.assigned_to
       return a === u || a === String(u)
     })
-  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, storeStates, assignments])
+  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, stores.new_registered, storeStates, assignments])
 
   // ── إحصائيات سريعة ─────────────────────────────────────────────
   const totalShipments  = allStores.reduce((s, x) => s + (parseInt(x.total_shipments) || 0), 0)
@@ -262,14 +263,15 @@ export default function Dashboard() {
   const calledToday     = Object.values(callLogs).filter(log =>
     Object.values(log || {}).some(e => e?.date?.startsWith(today))
   ).length
-  const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
+  const pendingNewCalls = [...(stores.incubating || []), ...(stores.new_registered || [])].filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
 
   /** مسؤول النشط: نفس دمج «قيد المكالمة» كما في ActiveStores — معيّنة له فقط */
   const activeManagerPendingStores = useMemo(() => {
     if (user?.role !== 'active_manager' || !user?.username) return []
     const base = stores.active_shipping || []
-    const fromInc = (stores.incubating || []).filter(s => {
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => {
       const st = storeStates[s.id]
       const c = st?.category
       return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
@@ -281,7 +283,7 @@ export default function Dashboard() {
       const row = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
       return row?.assigned_to === u
     })
-  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, storeStates, assignments])
+  }, [user?.role, user?.username, stores.active_shipping, stores.incubating, stores.new_registered, storeStates, assignments])
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -836,7 +838,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div>
-              {[...(stores.incubating || [])].sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0)).slice(0, 5).map((s, i) => {
+              {[...(stores.new_registered || []), ...(stores.incubating || [])].sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0)).slice(0, 5).map((s, i) => {
                 const hours = s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 3600000) : null
                 return (
                   <div key={s.id} className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer ${i !== 4 ? 'border-b border-slate-50' : ''}`}>

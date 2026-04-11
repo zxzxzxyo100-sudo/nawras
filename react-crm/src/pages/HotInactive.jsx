@@ -157,6 +157,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const coldInactive = stores.cold_inactive || []
   const activeShipping = stores.active_shipping || []
   const incubating = stores.incubating || []
+  const newRegistered = stores.new_registered || []
 
   const filteredStores = useMemo(() => {
     const matchRestored = s => isRestoredForRecoveryLists(s, storeStates[s.id])
@@ -184,6 +185,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       const afterRecovery = [
         ...activeShipping.filter(matchRestored),
         ...incubating.filter(matchRestored),
+        ...newRegistered.filter(matchRestored),
       ]
       return dedupeById([...inactiveRows, ...afterRecovery])
     }
@@ -191,9 +193,9 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     const hot = hotInactive.filter(matchRestoring)
     const cold = coldInactive.filter(matchRestoring)
     const activeR = activeShipping.filter(matchRestoring)
-    const incR = incubating.filter(matchRestoring)
+    const incR = [...incubating.filter(matchRestoring), ...newRegistered.filter(matchRestoring)]
     return dedupeById([...hot, ...cold, ...activeR, ...incR])
-  }, [hotInactive, coldInactive, activeShipping, incubating, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
+  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
   /**
    * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
@@ -262,6 +264,9 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           }
           if (activeShipping.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 font-medium">نشط يشحن (بعد الاستعادة)</span>
+          }
+          if (newRegistered.some(x => x.id === s.id)) {
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 font-medium">جديد — بانتظار شحنة</span>
           }
           if (incubating.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-900 font-medium">مسار الاحتضان</span>

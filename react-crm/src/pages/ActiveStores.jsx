@@ -74,32 +74,35 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   /** نشط قيد المكالمة — ليس «منجز» */
   const active = useMemo(() => {
     const base = stores.active_shipping || []
-    const fromInc = (stores.incubating || []).filter(s => {
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => {
       const st = storeStates[s.id]
       const c = st?.category
       return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls'
     })
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
-  }, [stores.active_shipping, stores.incubating, storeStates])
+  }, [stores.active_shipping, stores.incubating, stores.new_registered, storeStates])
 
   /** منجز — يُعاد تلقائياً إلى قيد المكالمة بعد 30 يوماً من آخر مكالمة */
   const completed = useMemo(() => {
     const base = stores.completed_merchants || []
-    const fromInc = (stores.incubating || []).filter(s => {
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => {
       const c = storeStates[s.id]?.category
       return c === 'completed' || c === 'contacted'
     })
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
-  }, [stores.completed_merchants, stores.incubating, storeStates])
+  }, [stores.completed_merchants, stores.incubating, stores.new_registered, storeStates])
 
   const unreachable = useMemo(() => {
     const base = stores.unreachable_merchants || []
-    const fromInc = (stores.incubating || []).filter(s => storeStates[s.id]?.category === 'unreachable')
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => storeStates[s.id]?.category === 'unreachable')
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
-  }, [stores.unreachable_merchants, stores.incubating, storeStates])
+  }, [stores.unreachable_merchants, stores.incubating, stores.new_registered, storeStates])
 
   useEffect(() => {
     if (!isExecutive) return
@@ -411,7 +414,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                 {unreachable.length} متجر — من مكالمة عامة («لم يرد»/«مشغول») أو زر «لم يرد» في المتابعة الدورية؛ يُنقل للمنجزة عند «تم الرد»
               </span>
             )}
-            {isPendingTab && (stores.incubating || []).some(s => {
+            {isPendingTab && [...(stores.incubating || []), ...(stores.new_registered || [])].some(s => {
               const c = storeStates[s.id]?.category
               return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable'
             }) && (
