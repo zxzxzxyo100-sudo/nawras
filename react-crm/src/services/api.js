@@ -110,6 +110,10 @@ export const getAllRecoveryCalls = () =>
 export const getAuditLog = (storeId) =>
   http.get(`/store-actions.php?action=get_audit_log&store_id=${storeId}`).then(r => r.data)
 
+/** انتقال جديد → تحت الاحتضان خلال الشهر الحالي (لوحة التحكم) */
+export const getNewToIncubatingMonthCount = () =>
+  http.get('/store-actions.php?action=count_new_to_incubating_month').then(r => r.data)
+
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
   http.post('/store-actions.php?action=reset_category', {

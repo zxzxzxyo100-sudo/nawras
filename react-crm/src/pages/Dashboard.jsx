@@ -15,7 +15,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse, getNewToIncubatingMonthCount } from '../services/api'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -114,6 +114,9 @@ export default function Dashboard() {
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
+  /** انتقال «جديد» → «تحت الاحتضان» هذا الشهر (من الخادم) */
+  const [newToIncubatingMonth, setNewToIncubatingMonth] = useState(null)
+  const [newToIncubatingAudit, setNewToIncubatingAudit] = useState(null)
   const loadFreezeQvPending = useCallback(async () => {
     if (user?.role !== 'executive') {
       setFreezeQvPending(null)
@@ -164,9 +167,36 @@ export default function Dashboard() {
     void loadFreezeQvPending()
   }, [loadFreezeQvPending, lastLoaded])
 
+  const showIncubationHero = can('new') || can('incubation')
+  const loadNewToIncubatingMonth = useCallback(async () => {
+    if (!showIncubationHero) {
+      setNewToIncubatingMonth(null)
+      setNewToIncubatingAudit(null)
+      return
+    }
+    try {
+      const r = await getNewToIncubatingMonthCount()
+      if (r?.success) {
+        setNewToIncubatingMonth(typeof r.count === 'number' ? r.count : 0)
+        setNewToIncubatingAudit(typeof r.count_from_audit_logs === 'number' ? r.count_from_audit_logs : null)
+      } else {
+        setNewToIncubatingMonth(0)
+        setNewToIncubatingAudit(null)
+      }
+    } catch {
+      setNewToIncubatingMonth(0)
+      setNewToIncubatingAudit(null)
+    }
+  }, [showIncubationHero])
+
+  useEffect(() => {
+    void loadNewToIncubatingMonth()
+  }, [loadNewToIncubatingMonth, lastLoaded])
+
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
+    void loadNewToIncubatingMonth()
     if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
@@ -256,7 +286,6 @@ export default function Dashboard() {
   ).length
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
-  const showIncubationHero = can('new') || can('incubation')
 
   /** مسؤول النشط: نفس دمج «قيد المكالمة» كما في ActiveStores — معيّنة له فقط */
   const activeManagerPendingStores = useMemo(() => {
@@ -419,13 +448,23 @@ export default function Dashboard() {
           <SeagullMark size={70} opacity={0.035} />
         </div>
 
-        <div className={`relative grid grid-cols-2 gap-6 ${showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        <div className={`relative grid grid-cols-2 gap-6 ${showIncubationHero ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-3'}`}>
           {[
             { label: 'إجمالي المتاجر',  value: (counts.total || 0).toLocaleString('ar-SA'), icon: Package,  sub: `${activeRate}% نسبة النشاط` },
             { label: 'إجمالي الطرود',    value: totalShipments.toLocaleString('ar-SA'),       icon: TrendingUp, sub: 'كل المتاجر' },
             { label: 'مكالمات اليوم',    value: calledToday,                                  icon: Phone,   sub: 'تواصل مباشر' },
             ...(showIncubationHero
-              ? [{ label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' }]
+              ? [
+                  { label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' },
+                  {
+                    label: 'جديد → احتضان (الشهر)',
+                    value: newToIncubatingMonth == null ? '—' : Number(newToIncubatingMonth).toLocaleString('ar-SA'),
+                    icon: ArrowLeftRight,
+                    sub: (newToIncubatingAudit != null && newToIncubatingAudit > 0)
+                      ? `من سجل التدقيق: ${Number(newToIncubatingAudit).toLocaleString('ar-SA')}`
+                      : 'بعد 48 ساعة من التسجيل',
+                  },
+                ]
               : []),
           ].map((s, i) => (
             <motion.div

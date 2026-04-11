@@ -1218,4 +1218,45 @@ elseif ($action === 'award_bonus') {
     jsonResponse(['success' => true, 'points_awarded' => $pts, 'ad_title' => $adTitle]);
 }
 
+// ========== إحصاء انتقال «جديد» → «تحت الاحتضان» خلال الشهر الحالي (لوحة التحكم) ==========
+elseif ($action === 'count_new_to_incubating_month') {
+    ensure_incubation_call_columns($pdo);
+    $monthStart = "DATE_FORMAT(CURDATE(), '%Y-%m-01 00:00:00')";
+    $nextMonthStart = "DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01 00:00:00')";
+
+    $audit = 0;
+    try {
+        $st = $pdo->query(
+            "SELECT COUNT(DISTINCT store_id) FROM audit_logs
+             WHERE old_status = 'new'
+               AND new_status = 'incubating'
+               AND created_at >= $monthStart
+               AND created_at < $nextMonthStart"
+        );
+        $audit = (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+    }
+
+    $proxy = 0;
+    try {
+        $st = $pdo->query(
+            "SELECT COUNT(*) FROM store_states
+             WHERE category = 'incubating'
+               AND registration_date IS NOT NULL
+               AND DATE_ADD(registration_date, INTERVAL 48 HOUR) >= $monthStart
+               AND DATE_ADD(registration_date, INTERVAL 48 HOUR) < $nextMonthStart"
+        );
+        $proxy = (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+    }
+
+    jsonResponse([
+        'success' => true,
+        /** العدد المعروض: تقريب من نهاية نافذة 48 ساعة (متجر جديد) ضمن الشهر */
+        'count' => $proxy,
+        /** إن وُجدت صفوف في audit_logs لنفس الانتقال */
+        'count_from_audit_logs' => $audit,
+    ]);
+}
+
 else { jsonResponse(['error' => 'Unknown action'], 400); }
