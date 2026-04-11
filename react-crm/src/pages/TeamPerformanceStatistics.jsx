@@ -1,48 +1,55 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import {
-  BarChart3, ArrowLeftRight, Activity, Snowflake, RefreshCw,
-} from 'lucide-react'
+import { BarChart3, Package, RefreshCw, Store } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getDashboardTransitionStats } from '../services/api'
+import { getRegistrationMonthStats } from '../services/api'
 
 export default function TeamPerformanceStatistics() {
   const { user } = useAuth()
-  const [transitionStats, setTransitionStats] = useState({
-    newToIncubating: null,
-    auditNewToInc: null,
-    incubatingToActive: null,
-    frozen: null,
+  const [stats, setStats] = useState({
+    registered_this_month: null,
+    shipped_among_registered: null,
+    conversion_percent: null,
+    month_label: null,
+    cache_stale: null,
+    hint: null,
   })
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await getDashboardTransitionStats()
+      const r = await getRegistrationMonthStats()
       if (r?.success) {
-        setTransitionStats({
-          newToIncubating: typeof r.count === 'number' ? r.count : 0,
-          auditNewToInc: typeof r.count_from_audit_logs === 'number' ? r.count_from_audit_logs : null,
-          incubatingToActive: typeof r.incubating_to_active_pending_month === 'number'
-            ? r.incubating_to_active_pending_month
-            : null,
-          frozen: typeof r.frozen_month === 'number' ? r.frozen_month : null,
+        setStats({
+          registered_this_month:
+            typeof r.registered_this_month === 'number' ? r.registered_this_month : null,
+          shipped_among_registered:
+            typeof r.shipped_among_registered === 'number' ? r.shipped_among_registered : null,
+          conversion_percent:
+            typeof r.conversion_percent === 'number' ? r.conversion_percent : null,
+          month_label: typeof r.month_label === 'string' ? r.month_label : null,
+          cache_stale: typeof r.cache_stale === 'boolean' ? r.cache_stale : null,
+          hint: typeof r.hint === 'string' ? r.hint : null,
         })
       } else {
-        setTransitionStats({
-          newToIncubating: 0,
-          auditNewToInc: null,
-          incubatingToActive: null,
-          frozen: null,
+        setStats({
+          registered_this_month: 0,
+          shipped_among_registered: 0,
+          conversion_percent: null,
+          month_label: null,
+          cache_stale: true,
+          hint: typeof r?.hint === 'string' ? r.hint : null,
         })
       }
     } catch {
-      setTransitionStats({
-        newToIncubating: 0,
-        auditNewToInc: null,
-        incubatingToActive: null,
-        frozen: null,
+      setStats({
+        registered_this_month: null,
+        shipped_among_registered: null,
+        conversion_percent: null,
+        month_label: null,
+        cache_stale: null,
+        hint: null,
       })
     } finally {
       setLoading(false)
@@ -57,12 +64,10 @@ export default function TeamPerformanceStatistics() {
     return null
   }
 
-  const nInc = transitionStats.newToIncubating
-  const nAct = transitionStats.incubatingToActive
-  const combinedNewIncActive =
-    (typeof nInc === 'number' ? nInc : 0) + (typeof nAct === 'number' ? nAct : 0)
-  const showCombined =
-    transitionStats.newToIncubating != null || transitionStats.incubatingToActive != null
+  const reg = stats.registered_this_month
+  const ship = stats.shipped_among_registered
+  const pct = stats.conversion_percent
+  const showNumbers = reg != null && ship != null
 
   return (
     <div className="space-y-5 pb-8" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
@@ -80,8 +85,8 @@ export default function TeamPerformanceStatistics() {
               <h1 className="text-xl font-black text-slate-900">الإحصائيات</h1>
               <p className="text-sm text-slate-600 mt-0.5">
                 ضمن <span className="font-semibold">أداء الفريق</span>
-                {' — '}مسار <span className="font-semibold text-slate-800">جديد → تحت الاحتضان → النشط</span>
-                {' '}خلال الشهر الحالي (تقريب دخول الاحتضان وتخريج إلى نشط قيد المكالمة من السجل).
+                {' — '}عدد المتاجر <span className="font-semibold text-slate-800">المسجّلة هذا الشهر</span>
+                {' '}ومنها من <span className="font-semibold text-slate-800">شحن</span>، ونسبة التحويل (شحن ÷ مسجّل).
               </p>
             </div>
           </div>
@@ -103,56 +108,64 @@ export default function TeamPerformanceStatistics() {
         transition={{ delay: 0.05 }}
         className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/90 via-white to-emerald-50/40 p-4 lg:col-span-2">
-            <div className="flex items-center gap-2 text-violet-800 mb-2">
-              <ArrowLeftRight size={18} />
-              <span className="text-sm font-black">جديد → تحت الاحتضان + النشط</span>
-            </div>
-            <p className="text-4xl font-black tabular-nums text-slate-900 leading-tight">
-              {!showCombined ? '…' : Number(combinedNewIncActive).toLocaleString('ar-SA')}
-            </p>
-            <p className="text-xs font-semibold text-slate-600 mt-2">المجموع (الشهر الحالي)</p>
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-violet-100/80 pt-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-xs text-slate-600">دخول تحت الاحتضان (48 ساعة)</span>
-                <span className="text-lg font-bold tabular-nums text-violet-700">
-                  {nInc == null ? '—' : Number(nInc).toLocaleString('ar-SA')}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-xs text-slate-600">إلى النشط — قيد المكالمة</span>
-                <span className="text-lg font-bold tabular-nums text-emerald-700">
-                  {nAct == null ? '—' : Number(nAct).toLocaleString('ar-SA')}
-                </span>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
-              الأول تقريب من التسجيل؛ الثاني من سجل التدقيق عند التخريج من الاحتضان إلى نشط قيد المكالمة.
-            </p>
+        {stats.cache_stale && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+            {stats.hint ||
+              'البيانات من ذاكرة البحث؛ شغّل all-stores.php مرة لتحديث الحقول (تاريخ التسجيل والشحن).'}
+          </p>
+        )}
+
+        <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/90 via-white to-emerald-50/40 p-5 lg:p-6">
+          <div className="flex flex-wrap items-center gap-2 text-violet-800 mb-4">
+            <Store size={20} />
+            <span className="text-sm font-black">تسجيلات الشهر ونسبة الشحن</span>
+            {stats.month_label && (
+              <span className="text-xs font-semibold text-slate-500 mr-1">({stats.month_label})</span>
+            )}
           </div>
-          <div className="flex flex-col gap-4">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4 flex-1">
-              <div className="flex items-center gap-2 text-slate-600 mb-2">
-                <Activity size={18} />
-                <span className="text-xs font-bold">جديد → احتضان (سجل التدقيق)</span>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-violet-100 bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-slate-600 mb-1">
+                <Store size={16} />
+                <span className="text-xs font-bold">سُجّل هذا الشهر</span>
               </div>
               <p className="text-3xl font-black tabular-nums text-slate-900">
-                {transitionStats.auditNewToInc == null ? '—' : Number(transitionStats.auditNewToInc).toLocaleString('ar-SA')}
+                {loading ? '…' : showNumbers ? Number(reg).toLocaleString('ar-SA') : '—'}
               </p>
-              <p className="text-xs text-slate-500 mt-1.5">عند تسجيل الانتقال صراحة في السجل</p>
             </div>
-            <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4 flex-1">
-              <div className="flex items-center gap-2 text-amber-900 mb-2">
-                <Snowflake size={18} />
-                <span className="text-xs font-bold">انتقال إلى تجميد</span>
+            <div className="rounded-xl border border-emerald-100 bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-slate-600 mb-1">
+                <Package size={16} />
+                <span className="text-xs font-bold">منهم شحن</span>
               </div>
-              <p className="text-3xl font-black tabular-nums text-slate-900">
-                {transitionStats.frozen == null ? '—' : Number(transitionStats.frozen).toLocaleString('ar-SA')}
+              <p className="text-3xl font-black tabular-nums text-emerald-800">
+                {loading ? '…' : showNumbers ? Number(ship).toLocaleString('ar-SA') : '—'}
               </p>
-              <p className="text-xs text-slate-500 mt-1.5">متاجر جرى تجميدها خلال الشهر (سجل التدقيق)</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:col-span-1">
+              <p className="text-xs font-bold text-slate-600 mb-1">نسبة التحويل</p>
+              <p className="text-4xl font-black tabular-nums text-violet-700 leading-tight">
+                {loading
+                  ? '…'
+                  : showNumbers && pct != null
+                    ? `${Number(pct).toLocaleString('ar-SA')}%`
+                    : showNumbers && reg === 0
+                      ? '—'
+                      : '—'}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                {showNumbers && reg > 0
+                  ? `مثال المعنى: ${Number(reg).toLocaleString('ar-SA')} مسجّل، ${Number(ship).toLocaleString('ar-SA')} شحن ≈ ${Number(pct).toLocaleString('ar-SA')}%.`
+                  : 'عند عدم وجود تسجيلات في الشهر لا تُعرض نسبة.'}
+              </p>
             </div>
           </div>
+
+          <p className="text-[11px] text-slate-500 mt-4 leading-relaxed border-t border-violet-100/80 pt-4">
+            يُحتسب «شحن» إذا وُجدت شحنات (عدد الشحنات أكبر من صفر) أو تاريخ شحن فعلي في بيانات المتجر. الشهر
+            حسب توقيت الرياض. المصدر: ذاكرة all-stores (يُنصح بتحديثها دورياً).
+          </p>
         </div>
       </motion.div>
     </div>

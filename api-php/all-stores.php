@@ -795,6 +795,10 @@ function nawras_lite_store_row($s, $fallbackId = null) {
         'id'    => $id,
         'name'  => isset($s['name']) ? (string) $s['name'] : '',
         'phone' => isset($s['phone']) ? (string) $s['phone'] : '',
+        /** لـ registration-month-stats.php — بحث autocomplete يتجاهل الحقول الإضافية */
+        'registered_at'       => isset($s['registered_at']) ? (string) $s['registered_at'] : '',
+        'total_shipments'     => (int) ($s['total_shipments'] ?? 0),
+        'last_shipment_date'  => isset($s['last_shipment_date']) ? (string) $s['last_shipment_date'] : '',
     ];
 }
 $search_lite_map = [];
