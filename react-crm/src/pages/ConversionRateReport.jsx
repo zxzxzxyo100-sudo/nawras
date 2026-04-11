@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ArrowRight, BarChart3, Download, FileSpreadsheet, Printer, RefreshCw,
+  ArrowRight, BarChart3, CalendarRange, Download, FileSpreadsheet, Printer, RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getRegistrationMonthStats } from '../services/api'
+import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 function csvEscape(s) {
   const t = String(s ?? '')
@@ -35,12 +36,20 @@ export default function ConversionRateReport() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const initRange = defaultCalendarMonthYmd()
+  const [dateFrom, setDateFrom] = useState(initRange.from)
+  const [dateTo, setDateTo] = useState(initRange.to)
 
-  const load = useCallback(async () => {
+  const fetchReport = useCallback(async (from, to) => {
     setLoading(true)
     setError(null)
+    if (!isValidYmdRange(from, to)) {
+      setError('حدّد تاريخاً من وإلى بشكل صحيح (من ≤ إلى).')
+      setLoading(false)
+      return
+    }
     try {
-      const r = await getRegistrationMonthStats({ detail: true })
+      const r = await getRegistrationMonthStats({ detail: true, from, to })
       if (r?.success) {
         setData(r)
       } else {
@@ -56,8 +65,12 @@ export default function ConversionRateReport() {
   }, [])
 
   useEffect(() => {
-    if (user?.role === 'executive') load()
-  }, [user?.role, load])
+    if (user?.role !== 'executive') return
+    const { from, to } = defaultCalendarMonthYmd()
+    setDateFrom(from)
+    setDateTo(to)
+    fetchReport(from, to)
+  }, [user?.role, fetchReport])
 
   const rows = useMemo(() => (Array.isArray(data?.report_rows) ? data.report_rows : []), [data])
 
@@ -88,7 +101,8 @@ export default function ConversionRateReport() {
     const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `تقرير-نسبة-التحويل-${data.month_label || 'month'}.csv`
+    const safeLabel = (data.month_label || 'period').replace(/[/\\?%*:|"<>]/g, '-')
+    a.download = `تقرير-نسبة-التحويل-${safeLabel}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }
@@ -121,8 +135,8 @@ export default function ConversionRateReport() {
             <div>
               <h1 className="text-xl font-black text-slate-900">تقرير نسبة التحويل</h1>
               <p className="text-sm text-slate-600 mt-0.5">
-                متاجر سُجّلت خلال الشهر <span className="font-semibold text-slate-800">{monthLabel}</span>
-                {' — '}الشحن يُحسب بـ <span className="font-semibold">تاريخ آخر شحنة</span> فقط.
+                متاجر سُجّلت خلال الفترة <span className="font-semibold text-slate-800">{monthLabel}</span>
+                {' — '}الشحن يُحسب بـ <span className="font-semibold">تاريخ آخر شحنة</span> فقط (توقيت الرياض).
               </p>
               {data?.generated_at && (
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -131,7 +145,46 @@ export default function ConversionRateReport() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 print:hidden">
+          <div className="flex flex-col gap-2 print:hidden w-full max-w-xl">
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                <CalendarRange size={14} />
+                من
+              </span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 tabular-nums"
+              />
+              <span className="text-xs font-semibold text-slate-500">إلى</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 tabular-nums"
+              />
+              <button
+                type="button"
+                onClick={() => fetchReport(dateFrom, dateTo)}
+                className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
+              >
+                تطبيق
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const { from, to } = defaultCalendarMonthYmd()
+                  setDateFrom(from)
+                  setDateTo(to)
+                  fetchReport(from, to)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs font-semibold text-violet-900"
+              >
+                الشهر الحالي
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end">
             <Link
               to="/staff-performance/stats"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -141,7 +194,7 @@ export default function ConversionRateReport() {
             </Link>
             <button
               type="button"
-              onClick={() => load()}
+              onClick={() => fetchReport(dateFrom, dateTo)}
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -165,6 +218,7 @@ export default function ConversionRateReport() {
               <Printer size={14} />
               طباعة
             </button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -182,7 +236,7 @@ export default function ConversionRateReport() {
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm print:shadow-none">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
-            <p className="text-xs font-bold text-slate-600 mb-1">مسجّلون هذا الشهر</p>
+            <p className="text-xs font-bold text-slate-600 mb-1">مسجّلون في الفترة</p>
             <p className="text-2xl font-black tabular-nums text-slate-900">
               {loading ? '…' : typeof reg === 'number' ? reg.toLocaleString('ar-SA') : '—'}
             </p>
@@ -208,7 +262,7 @@ export default function ConversionRateReport() {
         {loading ? (
           <p className="text-slate-500 text-sm">جارٍ تحميل التفاصيل…</p>
         ) : rows.length === 0 ? (
-          <p className="text-slate-500 text-sm">لا توجد صفوف في التقرير لهذا الشهر أو الذاكرة قديمة.</p>
+          <p className="text-slate-500 text-sm">لا توجد صفوف في التقرير لهذه الفترة أو الذاكرة قديمة.</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-100 -mx-1 print:overflow-visible">
             <table className="w-full text-sm text-right min-w-[720px]">

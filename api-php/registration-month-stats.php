@@ -1,11 +1,13 @@
 <?php
 /**
- * إحصاء: متاجر سُجّلت في الشهر التقويمي الحالي، وكم منها «شحنت»، ونسبة التحويل.
+ * إحصاء: متاجر سُجّلت ضمن فترة (الشهر الحالي بتوقيت الرياض، أو من—إلى ?from=&to=)، وكم منها «شحنت»، ونسبة التحويل.
  *
  * «شحن» هنا يعتمد على تاريخ آخر شحنة فقط — لا يُكفي إجمالي الطرود بدون تاريخ
  * (قد يشمل هدايا أو طلبات لم تصل بعد لشركة الشحن).
  *
  * المصدر: cache/stores_search_lite.json (يُحدَّث عند تشغيل all-stores.php).
+ *
+ * فلترة التاريخ: ?from=YYYY-MM-DD&to=YYYY-MM-DD (شامل ليوم النهاية) بتوقيت الرياض.
  */
 require_once __DIR__ . '/config.php';
 
@@ -13,15 +15,63 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-/** تقرير تفصيلي: ?detail=1 — قائمة المتاجر المسجّلة في الشهر مع حقول الشحن */
+/** تقرير تفصيلي: ?detail=1 — قائمة المتاجر المسجّلة في الفترة مع حقول الشحن */
 $detail = isset($_GET['detail']) && ($_GET['detail'] === '1' || $_GET['detail'] === 'true');
 
 $tz = new DateTimeZone('Asia/Riyadh');
-$now = new DateTimeImmutable('now', $tz);
-$monthStart = $now->modify('first day of this month')->setTime(0, 0, 0);
-$monthEnd = $now->modify('first day of next month')->setTime(0, 0, 0);
-$startTs = $monthStart->getTimestamp();
-$endTs = $monthEnd->getTimestamp();
+$fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
+$toParam = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
+
+if ($fromParam !== '' xor $toParam !== '') {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error'   => 'date_params_incomplete',
+        'hint'    => 'مرّر من وإلى معاً بصيغة YYYY-MM-DD، أو اتركهما فارغين للشهر الحالي.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($fromParam !== '' && $toParam !== '') {
+    $fromD = DateTimeImmutable::createFromFormat('!Y-m-d', $fromParam, $tz);
+    $toD = DateTimeImmutable::createFromFormat('!Y-m-d', $toParam, $tz);
+    if ($fromD === false || $toD === false) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'invalid_date_params',
+            'hint'    => 'صيغة التاريخ: YYYY-MM-DD',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($fromD > $toD) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'invalid_range',
+            'hint'    => 'تاريخ البداية يجب أن يكون قبل أو يساوي تاريخ النهاية.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $monthStart = $fromD->setTime(0, 0, 0);
+    $monthEnd = $toD->modify('+1 day')->setTime(0, 0, 0);
+    $startTs = $monthStart->getTimestamp();
+    $endTs = $monthEnd->getTimestamp();
+    $rangeFromStr = $fromD->format('Y-m-d');
+    $rangeToStr = $toD->format('Y-m-d');
+    $monthLabel = $rangeFromStr . ' — ' . $rangeToStr;
+    $periodKind = 'range';
+} else {
+    $now = new DateTimeImmutable('now', $tz);
+    $monthStart = $now->modify('first day of this month')->setTime(0, 0, 0);
+    $monthEnd = $now->modify('first day of next month')->setTime(0, 0, 0);
+    $startTs = $monthStart->getTimestamp();
+    $endTs = $monthEnd->getTimestamp();
+    $rangeFromStr = $monthStart->format('Y-m-d');
+    $rangeToStr = $monthEnd->modify('-1 day')->format('Y-m-d');
+    $monthLabel = $monthStart->format('Y-m');
+    $periodKind = 'month';
+}
 
 /**
  * شحن فعلي = تاريخ آخر شحنة معروف وصالح (لا يُعتمد على إجمالي الطرود وحده).
@@ -48,7 +98,10 @@ if (!is_readable($path)) {
         'registered_this_month'   => 0,
         'shipped_among_registered'=> 0,
         'conversion_percent'      => null,
-        'month_label'             => $monthStart->format('Y-m'),
+        'month_label'             => $monthLabel,
+        'range_from'              => $rangeFromStr,
+        'range_to'                => $rangeToStr,
+        'period_kind'             => $periodKind,
         'cache_stale'             => true,
     ], JSON_UNESCAPED_UNICODE);
     exit;
@@ -127,8 +180,13 @@ $out = [
     'registered_this_month'    => $registered,
     'shipped_among_registered' => $shipped,
     'conversion_percent'       => $pct,
-    'month_label'              => $monthStart->format('Y-m'),
-    'month_title_ar'           => $monthStart->format('Y') . '/' . $monthStart->format('m'),
+    'month_label'              => $monthLabel,
+    'month_title_ar'           => $periodKind === 'month'
+        ? $monthStart->format('Y') . '/' . $monthStart->format('m')
+        : ($rangeFromStr . ' — ' . $rangeToStr),
+    'range_from'               => $rangeFromStr,
+    'range_to'                 => $rangeToStr,
+    'period_kind'              => $periodKind,
     'cache_stale'              => $cacheStale,
     'hint'                     => $cacheStale
         ? 'حدّث الذاكرة بتشغيل all-stores.php (نسخة البحث القديمة لا تتضمّن تواريخ التسجيل).'
