@@ -338,22 +338,36 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const isCompletedTab = activeSegment === 'completed'
   const isUnreachableTab = activeSegment === 'unreachable'
 
+  /**
+   * طابور المسؤول النشط: تعيين نشط فقط، والحالة ليست «منجز» — حتى تختفي المهمة من «المهام» بعد الإكمال.
+   */
+  const workflowPendingForUser = useMemo(() => {
+    if (!isActiveManager || !user?.username) return []
+    return filteredActive.filter(s => {
+      const a = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
+      if (!a || a.assigned_to !== user.username) return false
+      if ((a.assignment_queue || 'active') !== 'active') return false
+      const ws = a.workflow_status ?? 'active'
+      return ws === 'active' || ws === 'no_answer'
+    })
+  }, [isActiveManager, user?.username, filteredActive, assignments])
+
   const pendingStoresForTable = useMemo(() => {
     if (!isPendingTab || !isActiveManager || !user?.username) return null
-    if (!activeWf) return null
+    const base = workflowPendingForUser
+    if (!activeWf) return base
     if (activeWf.daily_quota?.quota_reached) return []
-    const mine = filteredActive.filter(s => assignments[s.id]?.assigned_to === user.username)
     const wfIds = new Set(
       [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])].map(t => Number(t.store_id)),
     )
-    if (wfIds.size === 0) return mine
-    const scoped = mine.filter(s => wfIds.has(Number(s.id)))
-    return scoped.length ? scoped : mine
-  }, [isPendingTab, isActiveManager, user?.username, activeWf, filteredActive, assignments])
+    if (wfIds.size === 0) return base
+    const scoped = base.filter(s => wfIds.has(Number(s.id)))
+    return scoped
+  }, [isPendingTab, isActiveManager, user?.username, activeWf, workflowPendingForUser])
 
   const pendingDisplayStores =
     isPendingTab && isActiveManager
-      ? (pendingStoresForTable === null ? filteredActive : pendingStoresForTable)
+      ? (pendingStoresForTable ?? [])
       : filteredActive
 
   const activeDailyQuota = isActiveManager && isPendingTab ? activeWf?.daily_quota : null
@@ -378,7 +392,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             {isPendingTab && (
               <>
                 <TrendingUp size={22} className="text-green-600" />
-                نشط يشحن — قيد المكالمة
+                نشط يشحن — قيد المتابعة
               </>
             )}
             {isCompletedTab && (
@@ -611,14 +625,17 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-l from-emerald-50/90 to-white px-4 py-3 shadow-sm">
             <h2 className="text-sm font-bold text-emerald-900 flex items-center gap-2">
               <TrendingUp size={17} className="text-emerald-600 shrink-0" />
-              المتاجر النشطة — قيد المكالمة
+              {fromDailyTasks ? 'مهامك — غير المنجزة فقط' : 'المتاجر النشطة — قيد المتابعة'}
             </h2>
             <p className="text-[11px] text-emerald-800/80 mt-0.5">
-              «تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» في المكالمة العامة، أو «لم يرد» من المتابعة الدورية، يُضاف إلى «لم يتم الوصول للمتجر». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المكالمة.
+              {fromDailyTasks
+                ? 'ما يظهر هنا معيّن لك ولم تُكمّل بعد (استبيان + تم الرد). عند الإكمال يُزال من القائمة. لم يتم الوصول يظهر في تبويبه.'
+                : '«تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المتابعة.'}
             </p>
             {activeDailyQuota && !activeDailyQuota.quota_reached && (
               <p className="text-[11px] font-semibold text-emerald-900 mt-2 tabular-nums">
-                الحصة اليومية: {activeDailyQuota.count} / {activeDailyQuota.limit} — يُعرض طابورك كاملاً (المتاجر المعيّنة لك ضمن المتابعة الدورية).
+                الحصة اليومية: {activeDailyQuota.count} / {activeDailyQuota.limit}
+                {fromDailyTasks ? ' — الطابور يطابق المهام غير المنجزة.' : ' — يُعرض طابورك (المتابعة الدورية).'}
               </p>
             )}
           </div>
@@ -666,7 +683,11 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={extraColumns}
-            emptyMsg="لا توجد متاجر ضمن قيد المكالمة"
+            emptyMsg={
+              fromDailyTasks && isActiveManager
+                ? 'لا توجد مهام معلّقة — ما عُيّن لك إما مُنجز أو غير موجود في الطابور.'
+                : 'لا توجد متاجر ضمن قيد المتابعة'
+            }
             parcelsColumnSub={
               shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
                 ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`

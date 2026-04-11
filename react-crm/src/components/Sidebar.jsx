@@ -14,7 +14,7 @@ import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 const NAV_ALL = [
   { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
   { to: '/tasks',         label: 'المهام',            icon: ClipboardList,   view: 'tasks'        },
-  { to: '/active/pending', label: 'قيد المكالمة',     icon: TrendingUp,      view: 'active'       },
+  { to: '/active/pending', label: 'قيد المتابعة',     icon: TrendingUp,      view: 'active'       },
   { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
@@ -32,7 +32,7 @@ const STORES_SUB = [
 
 /** نشط يشحن — قيد المكالمة / المنجزة (مثل مسار الاحتضان) */
 const ACTIVE_SUB = [
-  { to: '/active/pending', label: 'قيد المكالمة', kind: 'pending' },
+  { to: '/active/pending', label: 'قيد المتابعة', kind: 'pending' },
   { to: '/active/completed', label: 'المتاجر المنجزة', kind: 'completed' },
   { to: '/active/unreachable', label: 'لم يتم الوصول للمتجر', kind: 'unreachable' },
 ]

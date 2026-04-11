@@ -36,7 +36,7 @@ function TasksIntro({ title, children }) {
 
 /** تبويبات مسار «نشط يشحن» + المجمدة — مطابقة للقائمة الجانبية */
 const ACTIVE_MANAGER_TASK_TABS = [
-  { id: 'pending', label: 'قيد المكالمة', Icon: TrendingUp },
+  { id: 'pending', label: 'قيد المتابعة', Icon: TrendingUp },
   { id: 'completed', label: 'المتاجر المنجزة', Icon: BadgeCheck },
   { id: 'unreachable', label: 'لم يتم الوصول', Icon: PhoneOff },
   { id: 'frozen', label: 'المجمدة', Icon: Lock },
@@ -83,7 +83,7 @@ function ActiveManagerTasksView() {
 
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
-      <TasksIntro title="جميع خانات «نشط يشحن» والمجمدة في مكان واحد: اختر التبويب أدناه. في «قيد المكالمة» يُعرض طابورك كاملاً؛ الحصة اليومية (50) تخصّ هذا المسار عند تعيينك." />
+      <TasksIntro title="تبويبات نشط يشحن والمجمدة أدناه. في «قيد المتابعة» يظهر فقط ما عُيّن لك ولم يُنجَز بعد (بعد الإكمال يختفي من القائمة). الحصة اليومية (50) لهذا المسار." />
       <div className="flex flex-wrap gap-2 rounded-2xl border border-violet-200/70 bg-white/70 p-2 shadow-sm ring-1 ring-violet-100/80">
         {ACTIVE_MANAGER_TASK_TABS.map(({ id, label, Icon }) => (
             <button
