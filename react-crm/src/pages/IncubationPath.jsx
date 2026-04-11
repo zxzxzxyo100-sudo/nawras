@@ -395,12 +395,15 @@ function pendingCall1(storeStates, callLogs, s) {
 
 function pendingCall2(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
+  if (!hasFirstIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   if (hasSecondIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   return true
 }
 
+/** المكالمة الثالثة لا تُعرض كمهمة قبل إكمال مسار المكالمة الثانية (يُدمَج الفائت من call_3 في تبويب الم2) */
 function pendingCall3(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
+  if (!hasSecondIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   if (hasThirdIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   return true
 }
@@ -452,9 +455,29 @@ export default function IncubationPath({ embeddedTabKey } = {}) {
       }
       return out
     }
+    /** الخادم يضع أحياناً متجراً في call_3 رغم عدم تسجيل الم2 (شحن + م1) — المهمة الفعلية هي المكالمة الثانية */
+    const mergeSecondCallQueues = () => {
+      const seen = new Set()
+      const out = []
+      const needSecond = s =>
+        s
+        && (s._missed_c2_window
+          || !hasSecondIncubationMilestoneDone(storeStates, callLogs, s.id))
+      const pool = [
+        ...(incubationPath.call_2 || []),
+        ...(incubationPath.call_3 || []).filter(needSecond),
+      ]
+      for (const s of pool) {
+        const id = s?.id
+        if (id == null || seen.has(id)) continue
+        seen.add(id)
+        if (pendingCall2(storeStates, callLogs, s)) out.push(s)
+      }
+      return out
+    }
     return {
       call_1: mergeFirstCallQueues(),
-      call_2: (incubationPath.call_2 || []).filter(s => pendingCall2(storeStates, callLogs, s)),
+      call_2: mergeSecondCallQueues(),
       call_3: (incubationPath.call_3 || []).filter(s => pendingCall3(storeStates, callLogs, s)),
       between_calls: (incubationPath.between_calls || []).filter(s => pendingBetweenCalls(storeStates, callLogs, s)),
     }
