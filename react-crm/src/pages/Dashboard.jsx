@@ -13,7 +13,7 @@ import {
   BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2, BadgeCheck,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, ROLES } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
@@ -110,12 +110,19 @@ export default function Dashboard() {
   const { user, can } = useAuth()
   const navigate = useNavigate()
 
+  /** مطابق لـ can('users') — بدون وضع can في تبعيات useCallback (يُعاد إنشاؤه أحياناً) */
+  const isExecutive = useMemo(() => {
+    if (!user?.role) return false
+    const r = String(user.role).trim().toLowerCase()
+    return ROLES[r]?.views?.includes('users') ?? false
+  }, [user?.role])
+
   const [staffMissions, setStaffMissions] = useState(null)
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
   const loadFreezeQvPending = useCallback(async () => {
-    if (user?.role !== 'executive') {
+    if (!isExecutive) {
       setFreezeQvPending(null)
       return
     }
@@ -134,10 +141,10 @@ export default function Dashboard() {
     } catch {
       setFreezeQvPending(null)
     }
-  }, [user?.role, user?.username])
+  }, [isExecutive, user?.username])
 
   const loadStaffSatisfaction = useCallback(async () => {
-    if (user?.role !== 'executive' || IS_STAGING_OR_DEV) return
+    if (!isExecutive || IS_STAGING_OR_DEV) return
     setMissionsLoading(true)
     setMissionsErr('')
     try {
@@ -154,7 +161,7 @@ export default function Dashboard() {
     } finally {
       setMissionsLoading(false)
     }
-  }, [user?.role])
+  }, [isExecutive])
 
   useEffect(() => {
     loadStaffSatisfaction()
@@ -164,10 +171,11 @@ export default function Dashboard() {
     void loadFreezeQvPending()
   }, [loadFreezeQvPending, lastLoaded])
 
+  const showIncubationHero = can('new') || can('incubation') || isExecutive
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
-    if (user?.role === 'executive' && !IS_STAGING_OR_DEV) {
+    if (isExecutive && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
   }
@@ -256,7 +264,6 @@ export default function Dashboard() {
   ).length
   const pendingNewCalls = (stores.incubating || []).filter(s => !callLogs[s.id]?.day0).length
   const activeRate      = counts.total ? Math.round(((counts.active_shipping || 0) / counts.total) * 100) : 0
-  const showIncubationHero = can('new') || can('incubation')
 
   /** مسؤول النشط: نفس دمج «قيد المكالمة» كما في ActiveStores — معيّنة له فقط */
   const activeManagerPendingStores = useMemo(() => {
@@ -321,7 +328,7 @@ export default function Dashboard() {
             <NawrasTaglineStack className="hidden max-w-[220px] sm:block md:max-w-[260px]" />
             <motion.button
               onClick={handleDashboardRefresh}
-              disabled={loading || (user?.role === 'executive' && missionsLoading)}
+              disabled={loading || (isExecutive && missionsLoading)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
               className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
@@ -419,7 +426,11 @@ export default function Dashboard() {
           <SeagullMark size={70} opacity={0.035} />
         </div>
 
-        <div className={`relative grid grid-cols-2 gap-6 ${showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        <div
+          className={`relative grid grid-cols-2 gap-6 ${
+            showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+          }`}
+        >
           {[
             { label: 'إجمالي المتاجر',  value: (counts.total || 0).toLocaleString('ar-SA'), icon: Package,  sub: `${activeRate}% نسبة النشاط` },
             { label: 'إجمالي الطرود',    value: totalShipments.toLocaleString('ar-SA'),       icon: TrendingUp, sub: 'كل المتاجر' },
@@ -448,7 +459,7 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {user?.role === 'executive' && can('quick_verification') ? (
+      {isExecutive && can('quick_verification') ? (
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -570,7 +581,7 @@ export default function Dashboard() {
       />
 
       {/* ══ بورصة رضا الموظفين — التجريبي يخفي هذا القسم (انظر IS_STAGING_OR_DEV) ══ */}
-      {user?.role === 'executive' && !IS_STAGING_OR_DEV && (
+      {isExecutive && !IS_STAGING_OR_DEV && (
         <motion.div
           variants={fadeUp}
           initial="hidden"

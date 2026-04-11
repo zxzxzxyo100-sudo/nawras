@@ -19,7 +19,6 @@ const NAV_ALL = [
   { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
-  { to: '/staff-performance', label: 'أداء الفريق',   icon: Users,           view: 'staff_performance' },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
   { to: '/analytics/logistics', label: 'تحليلات اللوجستيات', icon: Package,   view: 'dashboard' },
 ]
@@ -408,10 +407,84 @@ const NAV_GROUPS = [
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/users', '/staff-performance']
-      : ['/performance', '/users', '/staff-performance'],
+      ? ['/users', '__staff_performance_group__']
+      : ['/performance', '/users', '__staff_performance_group__'],
   },
 ]
+
+/** أداء الفريق — أهداف اليوم + الإحصائيات */
+const STAFF_PERFORMANCE_SUB = [
+  { to: '/staff-performance', label: 'أهداف اليوم', kind: 'goals' },
+  { to: '/staff-performance/stats', label: 'الإحصائيات', kind: 'stats' },
+]
+
+function staffPerfSubActive(kind, pathname) {
+  if (kind === 'goals') {
+    return pathname === '/staff-performance' || pathname === '/staff-performance/'
+  }
+  if (kind === 'stats') return pathname.startsWith('/staff-performance/stats')
+  return false
+}
+
+function StaffPerformanceNavGroup({ can, onClose }) {
+  const location = useLocation()
+  const pathname = location.pathname
+  const isSection = pathname.startsWith('/staff-performance')
+  const [open, setOpen] = useState(isSection)
+
+  useEffect(() => {
+    if (isSection) setOpen(true)
+  }, [isSection])
+
+  if (!can('staff_performance')) return null
+
+  return (
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
+          isSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+        }`}
+        style={isSection ? {
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
+          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
+        } : {}}
+      >
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+        }`}>
+          <Users size={14} className={isSection ? 'text-white' : 'text-white/50'} />
+        </div>
+        <span className="flex-1 truncate">أداء الفريق</span>
+        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-0.5">
+          {STAFF_PERFORMANCE_SUB.map(sub => {
+            const active = staffPerfSubActive(sub.kind, pathname)
+            return (
+              <NavLink
+                key={sub.kind}
+                to={sub.to}
+                end={sub.kind === 'goals'}
+                onClick={() => { if (onClose) onClose() }}
+                className={
+                  `flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold transition-colors ${
+                    active ? 'text-amber-300 bg-white/10' : 'text-white/35 hover:text-white/70 hover:bg-white/5'
+                  }`
+                }
+              >
+                <Circle size={6} className={active ? 'text-amber-400 fill-amber-400' : 'text-white/20'} />
+                <span>{sub.label}</span>
+              </NavLink>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** مسؤول المتاجر النشطة: لوحة جانبية مبسّطة — لوحة التحكم + أدائي (إن وُجد) */
 function navGroupsForUser(role) {
@@ -540,6 +613,79 @@ export default function Sidebar({ isOpen, onClose }) {
                 </p>
                 <div className="space-y-0.5">
                   {blocks}
+                </div>
+              </div>
+            )
+          }
+
+          if (group.keys.some(k => k === '__staff_performance_group__')) {
+            const ordered = []
+            for (const key of group.keys) {
+              if (key === '__staff_performance_group__') {
+                if (can('staff_performance')) ordered.push({ kind: 'staff_perf' })
+                continue
+              }
+              const navItem = NAV.find(n => n.to === key)
+              if (navItem && can(navItem.view)) ordered.push({ kind: 'link', item: navItem })
+            }
+            if (ordered.length === 0) return null
+            return (
+              <div key={group.label} className="mb-5">
+                <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {ordered.map(entry => {
+                    if (entry.kind === 'staff_perf') {
+                      return <StaffPerformanceNavGroup key="staff-performance" can={can} onClose={onClose} />
+                    }
+                    const item = entry.item
+                    const frostDash = item.to === '/' && privateTicketNavAlert
+                    return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/'}
+                    onClick={handleNav}
+                    className={({ isActive }) => {
+                      const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group'
+                      if (frostDash) {
+                        if (isActive) {
+                          return `${base} text-cyan-50 border border-white/30 bg-white/[0.14] backdrop-blur-md shadow-[0_0_26px_rgba(200,245,255,0.22)] ring-1 ring-cyan-100/35`
+                        }
+                        return `${base} text-cyan-100/95 border border-white/22 bg-white/[0.08] backdrop-blur-sm shadow-[0_0_20px_rgba(220,250,255,0.14)] ring-1 ring-white/15 hover:bg-white/[0.12]`
+                      }
+                      return `${base} ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`
+                    }}
+                    style={({ isActive }) => {
+                      if (frostDash) return {}
+                      return isActive
+                        ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                        : {}
+                    }}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
+                          frostDash
+                            ? isActive
+                              ? 'bg-cyan-400/25 shadow-[0_0_14px_rgba(200,255,255,0.35)] border border-white/20'
+                              : 'bg-white/15 border border-white/15'
+                            : isActive
+                              ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                              : 'bg-white/5 group-hover:bg-white/10'
+                        }`}>
+                          <item.icon size={14} className={frostDash ? 'text-cyan-100' : (isActive ? 'text-white' : 'text-white/50')} />
+                        </div>
+                        <span className="truncate">{item.label}</span>
+                        {isActive && (
+                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-violet-400'}`} />
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                    )
+                  })}
                 </div>
               </div>
             )

@@ -22,7 +22,8 @@ export function AuthProvider({ children }) {
     if (saved) {
       try {
         const u = JSON.parse(saved)
-        const role = typeof u?.role === 'string' ? u.role.trim() : u?.role
+        const roleRaw = typeof u?.role === 'string' ? u.role.trim() : u?.role
+        const role = typeof roleRaw === 'string' ? roleRaw.toLowerCase() : roleRaw
         if (u && role && ROLES[role]) setUser({ ...u, role })
       } catch { /* ignore */ }
     }
@@ -34,7 +35,8 @@ export function AuthProvider({ children }) {
       const res = await apiLogin(username, password)
       if (!res?.success) throw new Error(res?.error || 'بيانات غير صحيحة')
       const ru = res.user
-      const role = typeof ru?.role === 'string' ? ru.role.trim() : ru?.role
+      const roleRaw = typeof ru?.role === 'string' ? ru.role.trim() : ru?.role
+      const role = typeof roleRaw === 'string' ? roleRaw.toLowerCase() : roleRaw
       const normalized = ru && role ? { ...ru, role } : ru
       localStorage.setItem('nawras_session', JSON.stringify(normalized))
       setUser(normalized)
@@ -52,7 +54,8 @@ export function AuthProvider({ children }) {
 
   function can(view) {
     if (!user) return false
-    return ROLES[user.role]?.views.includes(view) ?? false
+    const r = typeof user.role === 'string' ? user.role.trim().toLowerCase() : user.role
+    return ROLES[r]?.views.includes(view) ?? false
   }
 
   return (
