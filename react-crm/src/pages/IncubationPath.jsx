@@ -330,13 +330,74 @@ function IncTable({ stores, tab, callLogs, onSelect, onCall, betweenMode = false
 // ═══════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ═══════════════════════════════════════════════════════════════════
+function stateFor(storeStates, storeId) {
+  if (storeId == null) return null
+  return storeStates?.[storeId] ?? storeStates?.[String(storeId)] ?? storeStates?.[Number(storeId)] ?? null
+}
+
+function logsFor(callLogs, storeId) {
+  if (storeId == null) return null
+  return callLogs?.[storeId] ?? callLogs?.[String(storeId)] ?? callLogs?.[Number(storeId)] ?? null
+}
+
+/** مكالمة مسار الاحتضان n مسجّلة في الحالة أو في سجل المكالمات */
+function hasIncCallStageDone(storeStates, callLogs, storeId, n) {
+  const st = stateFor(storeStates, storeId)
+  const atKey = `inc_call${n}_at`
+  if (st?.[atKey]) return true
+  return Boolean(logsFor(callLogs, storeId)?.[`inc_call${n}`])
+}
+
+/** مكالمة عامة بنتيجة ناجحة من النافذة — تُستبعد من «المكالمة الأولى» حتى لا يبقى المتجر بعد «تم التواصل» */
+function hasAnsweredGeneralCall(callLogs, storeId) {
+  const logs = logsFor(callLogs, storeId)
+  if (!logs) return false
+  if (logs.general_answered) return true
+  const g = logs.general
+  if (!g) return false
+  const o = String(g.outcome ?? '')
+  return o === 'answered' || o === 'callback'
+}
+
 /** يُستبعد من مسار الاحتضان بعد إكمال المكالمة الثالثة أو التخريج */
 function isDoneIncubationPath(storeStates, storeId) {
-  const st = storeStates?.[storeId]
+  const st = stateFor(storeStates, storeId)
   if (!st) return false
   if (st.inc_call3_at) return true
   const c = st.category
   return c === 'active' || c === 'active_shipping' || c === 'active_pending_calls' || c === 'completed' || c === 'unreachable' || c === 'frozen' || c === 'inactive'
+}
+
+function pendingCall1(storeStates, callLogs, s) {
+  if (isDoneIncubationPath(storeStates, s.id)) return false
+  if (hasIncCallStageDone(storeStates, callLogs, s.id, 1)) return false
+  if (hasAnsweredGeneralCall(callLogs, s.id)) return false
+  return true
+}
+
+function pendingCall2(storeStates, callLogs, s) {
+  if (isDoneIncubationPath(storeStates, s.id)) return false
+  if (hasIncCallStageDone(storeStates, callLogs, s.id, 2)) return false
+  return true
+}
+
+function pendingCall3(storeStates, callLogs, s) {
+  if (isDoneIncubationPath(storeStates, s.id)) return false
+  if (hasIncCallStageDone(storeStates, callLogs, s.id, 3)) return false
+  return true
+}
+
+/** بين المكالمات: يبقى ظاهراً حتى تُسجَّل المكالمة التالية في المسار */
+function pendingBetweenCalls(storeStates, callLogs, s) {
+  if (isDoneIncubationPath(storeStates, s.id)) return false
+  const id = s.id
+  const c1 = hasIncCallStageDone(storeStates, callLogs, id, 1)
+  const c2 = hasIncCallStageDone(storeStates, callLogs, id, 2)
+  const c3 = hasIncCallStageDone(storeStates, callLogs, id, 3)
+  if (c1 && !c2) return !c2
+  if (c1 && c2 && !c3) return !c3
+  if (!c1 && !c2) return true
+  return false
 }
 
 export default function IncubationPath({ embeddedTabKey } = {}) {
@@ -361,7 +422,6 @@ export default function IncubationPath({ embeddedTabKey } = {}) {
   const [callStore, setCallStore] = useState(null)
 
   const filteredPath = useMemo(() => {
-    const notDone = s => !isDoneIncubationPath(storeStates, s.id)
     /** call_delay من الخادم = تأخير المكالمة الأولى؛ دمجه هنا حتى لا يبقى المتجر خارج تبويب «المكالمة الأولى» بعد 48 ساعة */
     const mergeFirstCallQueues = () => {
       const seen = new Set()
@@ -370,17 +430,17 @@ export default function IncubationPath({ embeddedTabKey } = {}) {
         const id = s?.id
         if (id == null || seen.has(id)) continue
         seen.add(id)
-        if (notDone(s)) out.push(s)
+        if (pendingCall1(storeStates, callLogs, s)) out.push(s)
       }
       return out
     }
     return {
       call_1: mergeFirstCallQueues(),
-      call_2: (incubationPath.call_2 || []).filter(notDone),
-      call_3: (incubationPath.call_3 || []).filter(notDone),
-      between_calls: (incubationPath.between_calls || []).filter(notDone),
+      call_2: (incubationPath.call_2 || []).filter(s => pendingCall2(storeStates, callLogs, s)),
+      call_3: (incubationPath.call_3 || []).filter(s => pendingCall3(storeStates, callLogs, s)),
+      between_calls: (incubationPath.between_calls || []).filter(s => pendingBetweenCalls(storeStates, callLogs, s)),
     }
-  }, [incubationPath, storeStates])
+  }, [incubationPath, storeStates, callLogs])
 
   const filteredCounts = useMemo(() => ({
     call_1: filteredPath.call_1.length,
