@@ -65,7 +65,7 @@ export default function ExecutiveStaffPerformance() {
             <div>
               <h1 className="text-xl font-black text-slate-900">أداء الفريق — أهداف اليوم</h1>
               <p className="text-sm text-slate-600 mt-0.5">
-                حسب طبيعة عمل كل موظف: نشط (منجز يومي)، استعادة (تم التواصل)، احتضان (مكالمات المسار).
+                حسب طبيعة عمل كل موظف: نشط (منجز يومي)، استعادة (تم التواصل)، احتضان (إجمالي تراكمي لمكالمات المسار 1–3).
               </p>
               {note && <p className="text-xs text-slate-500 mt-2 max-w-3xl leading-relaxed">{note}</p>}
             </div>
@@ -91,7 +91,7 @@ export default function ExecutiveStaffPerformance() {
             استعادة: {targets.inactive_daily} / يوم
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1">
-            احتضان: {targets.incubation_daily} / يوم (مؤشر مكالمات)
+            احتضان: إجمالي تراكمي مقابل هدف {targets.incubation_daily}
           </span>
         </div>
       )}
@@ -130,7 +130,8 @@ export default function ExecutiveStaffPerformance() {
                   <td className="px-4 py-3 text-slate-600 text-xs">
                     {row.metric_key === 'active_completed_today' && 'متاجر منجزة (متابعة دورية) اليوم'}
                     {row.metric_key === 'inactive_success_today' && 'اتصالات ناجحة (تم التواصل) اليوم'}
-                    {row.metric_key === 'incubation_calls_today' && 'مكالمات احتضان (1–3) اليوم'}
+                    {(row.metric_key === 'incubation_calls_total' || row.metric_key === 'incubation_calls_today') &&
+                      'إجمالي مكالمات احتضان (1–3) — تراكمي'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="h-2.5 w-full max-w-[200px] rounded-full bg-slate-100 overflow-hidden mr-auto">
