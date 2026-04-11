@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
-  BarChart3, ArrowLeftRight, Activity, TrendingUp, Snowflake, RefreshCw,
+  BarChart3, ArrowLeftRight, Activity, Snowflake, RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getDashboardTransitionStats } from '../services/api'
@@ -57,6 +57,13 @@ export default function TeamPerformanceStatistics() {
     return null
   }
 
+  const nInc = transitionStats.newToIncubating
+  const nAct = transitionStats.incubatingToActive
+  const combinedNewIncActive =
+    (typeof nInc === 'number' ? nInc : 0) + (typeof nAct === 'number' ? nAct : 0)
+  const showCombined =
+    transitionStats.newToIncubating != null || transitionStats.incubatingToActive != null
+
   return (
     <div className="space-y-5 pb-8" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
       <motion.div
@@ -73,7 +80,8 @@ export default function TeamPerformanceStatistics() {
               <h1 className="text-xl font-black text-slate-900">الإحصائيات</h1>
               <p className="text-sm text-slate-600 mt-0.5">
                 ضمن <span className="font-semibold">أداء الفريق</span>
-                {' — '}معدّلات انتقال حالة المتاجر خلال الشهر الحالي (سجل النظام والتسجيلات المحلية).
+                {' — '}مسار <span className="font-semibold text-slate-800">جديد → تحت الاحتضان → النشط</span>
+                {' '}خلال الشهر الحالي (تقريب دخول الاحتضان وتخريج إلى نشط قيد المكالمة من السجل).
               </p>
             </div>
           </div>
@@ -95,48 +103,55 @@ export default function TeamPerformanceStatistics() {
         transition={{ delay: 0.05 }}
         className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-white p-4">
-            <div className="flex items-center gap-2 text-violet-700 mb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/90 via-white to-emerald-50/40 p-4 lg:col-span-2">
+            <div className="flex items-center gap-2 text-violet-800 mb-2">
               <ArrowLeftRight size={18} />
-              <span className="text-xs font-bold">جديد → تحت الاحتضان</span>
+              <span className="text-sm font-black">جديد → تحت الاحتضان + النشط</span>
             </div>
-            <p className="text-3xl font-black tabular-nums text-slate-900">
-              {transitionStats.newToIncubating == null ? '…' : Number(transitionStats.newToIncubating).toLocaleString('ar-SA')}
+            <p className="text-4xl font-black tabular-nums text-slate-900 leading-tight">
+              {!showCombined ? '…' : Number(combinedNewIncActive).toLocaleString('ar-SA')}
             </p>
-            <p className="text-xs text-slate-500 mt-1.5 leading-snug">
-              تقريب: نهاية نافذة 48 ساعة بعد التسجيل ضمن الشهر
+            <p className="text-xs font-semibold text-slate-600 mt-2">المجموع (الشهر الحالي)</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-violet-100/80 pt-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-xs text-slate-600">دخول تحت الاحتضان (48 ساعة)</span>
+                <span className="text-lg font-bold tabular-nums text-violet-700">
+                  {nInc == null ? '—' : Number(nInc).toLocaleString('ar-SA')}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-xs text-slate-600">إلى النشط — قيد المكالمة</span>
+                <span className="text-lg font-bold tabular-nums text-emerald-700">
+                  {nAct == null ? '—' : Number(nAct).toLocaleString('ar-SA')}
+                </span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
+              الأول تقريب من التسجيل؛ الثاني من سجل التدقيق عند التخريج من الاحتضان إلى نشط قيد المكالمة.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
-            <div className="flex items-center gap-2 text-slate-600 mb-2">
-              <Activity size={18} />
-              <span className="text-xs font-bold">جديد → احتضان (سجل التدقيق)</span>
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4 flex-1">
+              <div className="flex items-center gap-2 text-slate-600 mb-2">
+                <Activity size={18} />
+                <span className="text-xs font-bold">جديد → احتضان (سجل التدقيق)</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.auditNewToInc == null ? '—' : Number(transitionStats.auditNewToInc).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">عند تسجيل الانتقال صراحة في السجل</p>
             </div>
-            <p className="text-3xl font-black tabular-nums text-slate-900">
-              {transitionStats.auditNewToInc == null ? '—' : Number(transitionStats.auditNewToInc).toLocaleString('ar-SA')}
-            </p>
-            <p className="text-xs text-slate-500 mt-1.5">عند تسجيل الانتقال صراحة في السجل</p>
-          </div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
-            <div className="flex items-center gap-2 text-emerald-800 mb-2">
-              <TrendingUp size={18} />
-              <span className="text-xs font-bold">احتضان → نشط قيد المكالمة</span>
+            <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4 flex-1">
+              <div className="flex items-center gap-2 text-amber-900 mb-2">
+                <Snowflake size={18} />
+                <span className="text-xs font-bold">انتقال إلى تجميد</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.frozen == null ? '—' : Number(transitionStats.frozen).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">متاجر جرى تجميدها خلال الشهر (سجل التدقيق)</p>
             </div>
-            <p className="text-3xl font-black tabular-nums text-slate-900">
-              {transitionStats.incubatingToActive == null ? '—' : Number(transitionStats.incubatingToActive).toLocaleString('ar-SA')}
-            </p>
-            <p className="text-xs text-slate-500 mt-1.5">تخريج مسجّل في السجل خلال الشهر</p>
-          </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
-            <div className="flex items-center gap-2 text-amber-900 mb-2">
-              <Snowflake size={18} />
-              <span className="text-xs font-bold">انتقال إلى تجميد</span>
-            </div>
-            <p className="text-3xl font-black tabular-nums text-slate-900">
-              {transitionStats.frozen == null ? '—' : Number(transitionStats.frozen).toLocaleString('ar-SA')}
-            </p>
-            <p className="text-xs text-slate-500 mt-1.5">متاجر جرى تجميدها خلال الشهر (سجل التدقيق)</p>
           </div>
         </div>
       </motion.div>
