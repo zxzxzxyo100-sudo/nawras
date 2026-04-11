@@ -132,6 +132,17 @@ export const getRegistrationMonthStats = (opts = {}) => {
   return http.get('/registration-month-stats.php', { params }).then(r => r.data)
 }
 
+/**
+ * مكالمات + استبيانات رضا ضمن فترة (قاعدة البيانات). من/إلى YYYY-MM-DD أو الشهر الحالي.
+ */
+export const getSatisfactionStats = (opts = {}) => {
+  const params = {}
+  if (opts.detail) params.detail = 1
+  if (opts.from) params.from = opts.from
+  if (opts.to) params.to = opts.to
+  return http.get('/satisfaction-stats.php', { params }).then(r => r.data)
+}
+
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
   http.post('/store-actions.php?action=reset_category', {

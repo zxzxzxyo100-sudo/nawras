@@ -417,6 +417,7 @@ const STAFF_PERFORMANCE_SUB = [
   { to: '/staff-performance', label: 'أهداف اليوم', kind: 'goals' },
   { to: '/staff-performance/stats', label: 'الإحصائيات', kind: 'stats' },
   { to: '/staff-performance/conversion-report', label: 'تقرير نسبة التحويل', kind: 'conversion' },
+  { to: '/staff-performance/satisfaction-report', label: 'تقرير معدل الرضا', kind: 'satisfaction' },
 ]
 
 function staffPerfSubActive(kind, pathname) {
@@ -425,6 +426,7 @@ function staffPerfSubActive(kind, pathname) {
   }
   if (kind === 'stats') return pathname.startsWith('/staff-performance/stats')
   if (kind === 'conversion') return pathname.startsWith('/staff-performance/conversion-report')
+  if (kind === 'satisfaction') return pathname.startsWith('/staff-performance/satisfaction-report')
   return false
 }
 

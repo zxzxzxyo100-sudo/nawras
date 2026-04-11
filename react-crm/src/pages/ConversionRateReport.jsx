@@ -323,10 +323,14 @@ export default function ConversionRateReport() {
           عمود «إجمالي طرود» يعرض رقماً مرجعياً من بيانات المتجر؛ نسبة التحويل تعتمد فقط على عمود «شحن (تاريخ)»
           بوجود تاريخ آخر شحنة صالح، بغض النظر عن عدد الطرود المعروض.
         </p>
-        <p className="text-[11px] text-slate-400 mt-4 print:hidden">
+        <p className="text-[11px] text-slate-400 mt-4 print:hidden flex flex-wrap gap-x-4 gap-y-2">
           <Link to="/staff-performance/stats" className="inline-flex items-center gap-1 text-violet-600 font-semibold hover:underline">
             <ArrowRight size={12} className="rotate-180" />
             العودة إلى ملخص الإحصائيات
+          </Link>
+          <Link to="/staff-performance/satisfaction-report" className="inline-flex items-center gap-1 text-rose-600 font-semibold hover:underline">
+            <ArrowRight size={12} className="rotate-180" />
+            تقرير معدل الرضا
           </Link>
         </p>
       </div>
