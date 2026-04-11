@@ -8,7 +8,6 @@ declare(strict_types=1);
  *
  * CASE
  *   WHEN TIMESTAMPDIFF(HOUR, registered_at, NOW()) <= 48
- *        AND COALESCE(total_shipments,0) = 0
  *        AND (last_shipment_date IS NULL OR last_shipment_date IN ('','لا يوجد'))
  *     THEN 'new'
  *   WHEN TIMESTAMPDIFF(DAY, registered_at, NOW()) < 14 THEN 'incubating'
@@ -51,6 +50,15 @@ function nawras_parse_shipment_date_ts($raw): ?int
     $t = strtotime((string) $raw);
 
     return $t !== false ? $t : null;
+}
+
+/**
+ * شحنة «فعلية» للتصنيف — يوجد تاريخ آخر شحنة صالح.
+ * لا يُكفي COALESCE(total_shipments) بدون تاريخ (قد يعكس هدايا أو طلبات لم تُسَلَّم لشركة الشحن).
+ */
+function nawras_has_real_shipment(array $s): bool
+{
+    return nawras_parse_shipment_date_ts($s['last_shipment_date'] ?? null) !== null;
 }
 
 /** أول شحنة معروفة من واجهة Nawris أو حقول إضافية */
@@ -102,7 +110,7 @@ function nawras_compute_lifecycle(array $s, int $now): string
 
     $total = (int) ($s['total_shipments'] ?? 0);
     $lastTs = nawras_parse_shipment_date_ts($s['last_shipment_date'] ?? null);
-    $hasShipped = $total > 0 || $lastTs !== null;
+    $hasShipped = nawras_has_real_shipment($s);
 
     $daysSinceLast = $lastTs !== null ? ($now - $lastTs) / 86400 : null;
 
