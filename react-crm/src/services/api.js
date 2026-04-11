@@ -110,13 +110,17 @@ export const getAllRecoveryCalls = () =>
 export const getAuditLog = (storeId) =>
   http.get(`/store-actions.php?action=get_audit_log&store_id=${storeId}`).then(r => r.data)
 
-/** إحصائيات انتقال الحالة — الشهر الحالي (قسم الإحصائيات في لوحة التحكم) */
+/** إحصائيات انتقال الحالة — الشهر الحالي */
 export const getDashboardTransitionStats = () =>
   http.get('/store-actions.php?action=get_dashboard_transition_stats').then(r => r.data)
 
 /** @deprecated استخدم getDashboardTransitionStats */
 export const getNewToIncubatingMonthCount = () =>
   http.get('/store-actions.php?action=count_new_to_incubating_month').then(r => r.data)
+
+/** متاجر سُجّلت هذا الشهر + منها شحنت + نسبة التحويل (من ذاكرة all-stores) */
+export const getRegistrationMonthStats = () =>
+  http.get('/registration-month-stats.php').then(r => r.data)
 
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
