@@ -365,19 +365,23 @@ foreach ($new as $id => $s) {
         }
     }
 
-    // بارد من قاعدة البيانات (مثلاً no_ship_after_48h)
+    // بارد من قاعدة البيانات (مثلاً no_ship_after_48h) — فقط إن كان التصنيف الحالي يبرّر «بارد»
+    // (قد يبقى cold_inactive في DB بعد أول شحنة أو ضمن نافذة الاحتضان؛ لا نُجبر القائمة الباردة)
     if ($db && $dbCat === 'cold_inactive') {
         if (!empty($s['status']) && $s['status'] !== 'active') {
             continue;
         }
-        $s['_cat'] = 'cold_inactive';
-        $s['_inc'] = 'never_started';
-        $s['_never_started'] = true;
-        $result['cold_inactive'][] = $s;
-        $counts['cold_inactive']++;
-        $counts['total_active']++;
-        $counts['total']++;
-        continue;
+        if (nawras_compute_lifecycle($s, $now) === 'inactive') {
+            $s['_cat'] = 'cold_inactive';
+            $s['_inc'] = 'never_started';
+            $s['_never_started'] = true;
+            $result['cold_inactive'][] = $s;
+            $counts['cold_inactive']++;
+            $counts['total_active']++;
+            $counts['total']++;
+            continue;
+        }
+        // تجاهل تصنيف DB القديم — نُكمِل مسار الاحتضان / دورة الحياة أدناه
     }
 
     // منجز / تم التواصل من المتابعة الدورية أو الواجهة — إخراج من مسار الاحتضان ونقل لقائمة المنجزين
