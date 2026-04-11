@@ -6,6 +6,10 @@ import {
   BadgeCheck,
   PhoneOff,
   Lock,
+  Baby,
+  Clock,
+  PhoneCall,
+  Layers,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import ActiveStores from './ActiveStores'
@@ -37,6 +41,42 @@ const ACTIVE_MANAGER_TASK_TABS = [
   { id: 'unreachable', label: 'لم يتم الوصول', Icon: PhoneOff },
   { id: 'frozen', label: 'المجمدة', Icon: Lock },
 ]
+
+/** مسار الاحتضان — نفس مفاتيح IncubationPath embeddedTabKey */
+const INCUBATION_TASK_TABS = [
+  { id: 'call-1', label: 'المكالمة الأولى', Icon: Baby },
+  { id: 'call-2', label: 'المكالمة الثانية', Icon: Clock },
+  { id: 'call-3', label: 'المكالمة الثالثة', Icon: PhoneCall },
+  { id: 'between-calls', label: 'بين المكالمات', Icon: Layers },
+]
+
+function IncubationManagerTasksView() {
+  const [tab, setTab] = useState('call-1')
+
+  return (
+    <div className="space-y-4 lg:space-y-5" dir="rtl">
+      <TasksIntro title="كل مراحل مسار الاحتضان هنا: المكالمة الأولى والثانية والثالثة، وبين المكالمات. يظهر إنجاز مسؤول الاحتضان في «أهداف الفريق» كإجمالي تراكمي لكل تلك المكالمات المسجّلة في النظام." />
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-violet-200/70 bg-white/70 p-2 shadow-sm ring-1 ring-violet-100/80">
+        {INCUBATION_TASK_TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              tab === id
+                ? 'bg-violet-600 text-white shadow-md shadow-violet-500/25'
+                : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-violet-50/90 hover:border-violet-200'
+            }`}
+          >
+            <Icon size={16} className="shrink-0 opacity-90" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <IncubationPath embeddedTabKey={tab} />
+    </div>
+  )
+}
 
 function ActiveManagerTasksView() {
   const [tab, setTab] = useState('pending')
@@ -92,12 +132,7 @@ export default function Tasks() {
   }
 
   if (role === 'incubation_manager') {
-                    return (
-      <div className="space-y-4 lg:space-y-5" dir="rtl">
-        <TasksIntro title="مكالمات دورة الاحتضان — للتنقّل بين المراحل استخدم أيضاً «مسار الاحتضان» في القائمة." />
-        <IncubationPath embeddedTabKey="call-1" />
-            </div>
-    )
+    return <IncubationManagerTasksView />
   }
 
   return <Navigate to="/" replace />
