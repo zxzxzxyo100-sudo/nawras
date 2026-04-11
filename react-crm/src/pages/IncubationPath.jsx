@@ -348,15 +348,34 @@ function hasIncCallStageDone(storeStates, callLogs, storeId, n) {
   return Boolean(logsFor(callLogs, storeId)?.[`inc_call${n}`])
 }
 
-/** مكالمة عامة بنتيجة ناجحة من النافذة — تُستبعد من «المكالمة الأولى» حتى لا يبقى المتجر بعد «تم التواصل» */
-function hasAnsweredGeneralCall(callLogs, storeId) {
+/**
+ * إكمال «التواصل الأول» لمسار الاحتضان (يتوافق مع مسؤول الاحتضان يستخدم «عامة» بدل inc_call1):
+ * - inc_call1 في الحالة أو السجل
+ * - general_answered أو آخر general بنتيجة ناجحة (ومنها الفارغ كقديم بلا عمود outcome)
+ * - مكالمة ترحيبية day0 (مسار قديم)
+ */
+function hasFirstIncubationMilestoneDone(storeStates, callLogs, storeId) {
+  if (hasIncCallStageDone(storeStates, callLogs, storeId, 1)) return true
   const logs = logsFor(callLogs, storeId)
   if (!logs) return false
   if (logs.general_answered) return true
+  if (logs.day0) return true
   const g = logs.general
-  if (!g) return false
-  const o = String(g.outcome ?? '')
-  return o === 'answered' || o === 'callback'
+  if (g) {
+    const o = String(g.outcome ?? '')
+    if (o === 'answered' || o === 'callback' || o === '') return true
+  }
+  return false
+}
+
+function hasSecondIncubationMilestoneDone(storeStates, callLogs, storeId) {
+  if (hasIncCallStageDone(storeStates, callLogs, storeId, 2)) return true
+  return Boolean(logsFor(callLogs, storeId)?.day3)
+}
+
+function hasThirdIncubationMilestoneDone(storeStates, callLogs, storeId) {
+  if (hasIncCallStageDone(storeStates, callLogs, storeId, 3)) return true
+  return Boolean(logsFor(callLogs, storeId)?.day10)
 }
 
 /** يُستبعد من مسار الاحتضان بعد إكمال المكالمة الثالثة أو التخريج */
@@ -370,20 +389,19 @@ function isDoneIncubationPath(storeStates, storeId) {
 
 function pendingCall1(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
-  if (hasIncCallStageDone(storeStates, callLogs, s.id, 1)) return false
-  if (hasAnsweredGeneralCall(callLogs, s.id)) return false
+  if (hasFirstIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   return true
 }
 
 function pendingCall2(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
-  if (hasIncCallStageDone(storeStates, callLogs, s.id, 2)) return false
+  if (hasSecondIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   return true
 }
 
 function pendingCall3(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
-  if (hasIncCallStageDone(storeStates, callLogs, s.id, 3)) return false
+  if (hasThirdIncubationMilestoneDone(storeStates, callLogs, s.id)) return false
   return true
 }
 
@@ -391,9 +409,9 @@ function pendingCall3(storeStates, callLogs, s) {
 function pendingBetweenCalls(storeStates, callLogs, s) {
   if (isDoneIncubationPath(storeStates, s.id)) return false
   const id = s.id
-  const c1 = hasIncCallStageDone(storeStates, callLogs, id, 1)
-  const c2 = hasIncCallStageDone(storeStates, callLogs, id, 2)
-  const c3 = hasIncCallStageDone(storeStates, callLogs, id, 3)
+  const c1 = hasFirstIncubationMilestoneDone(storeStates, callLogs, id)
+  const c2 = hasSecondIncubationMilestoneDone(storeStates, callLogs, id)
+  const c3 = hasThirdIncubationMilestoneDone(storeStates, callLogs, id)
   if (c1 && !c2) return !c2
   if (c1 && c2 && !c3) return !c3
   if (!c1 && !c2) return true
