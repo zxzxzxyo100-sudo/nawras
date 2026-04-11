@@ -45,6 +45,8 @@ export function StoresProvider({ children }) {
   const [error, setError]                 = useState(null)
   /** نطاق الطرود: التواريخ المعادة من orders-summary.php (واجهة Nawرس عبر الخادم) */
   const [shipmentsRangeMeta, setShipmentsRangeMeta] = useState({ from: null, to: null })
+  /** بيانات وصفية من all-stores.php (inc_stage_counts، onboarding_bucket_split، …) */
+  const [storesMeta, setStoresMeta] = useState(null)
   /** كبار التجار: من vip-merchants.php (orders-summary كامل الصفحات) */
   const [vipMerchants, setVipMerchants] = useState([])
 
@@ -72,6 +74,8 @@ export function StoresProvider({ children }) {
         getOrdersSummaryRange(rangeFrom, rangeTo).catch(() => ({ success: false, data: [] })),
       ])
       if (!apiResult.success) throw new Error('فشل جلب البيانات')
+
+      setStoresMeta(apiResult.meta && typeof apiResult.meta === 'object' ? apiResult.meta : null)
 
       const rangeMap = {}
       let resolvedFrom = rangeFrom
@@ -225,6 +229,7 @@ export function StoresProvider({ children }) {
       setLastLoaded(new Date())
     } catch (err) {
       setError(err.message)
+      setStoresMeta(null)
     } finally {
       setLoading(false)
     }
@@ -253,6 +258,7 @@ export function StoresProvider({ children }) {
       incubationPath, incubationCounts,
       storeStates, assignments, callLogs, surveyByStoreId, newMerchantOnboardingDoneIds, recoveryCalls,
       shipmentsRangeMeta,
+      storesMeta,
       loading, error, lastLoaded, reload: load,
     }}>
       {children}

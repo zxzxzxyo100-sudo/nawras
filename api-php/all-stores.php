@@ -889,6 +889,35 @@ function nawras_aggregate_lifecycle_counts(array $result): array
 
 $lifecycle_counts = nawras_aggregate_lifecycle_counts($result);
 
+/**
+ * عدّ متاجر مسار التهيئة حسب حقل _inc (مكالمة أولى، تأخير، …) — incubating + new_registered فقط.
+ *
+ * @return array<string,int>
+ */
+function nawras_aggregate_inc_stage_counts(array $result): array
+{
+    $out = [];
+    foreach (['incubating', 'new_registered'] as $bucket) {
+        foreach ($result[$bucket] ?? [] as $s) {
+            if (!is_array($s)) {
+                continue;
+            }
+            $inc = isset($s['_inc']) && trim((string) $s['_inc']) !== ''
+                ? trim((string) $s['_inc'])
+                : '_unknown';
+            if (!isset($out[$inc])) {
+                $out[$inc] = 0;
+            }
+            $out[$inc]++;
+        }
+    }
+    ksort($out, SORT_STRING);
+
+    return $out;
+}
+
+$inc_stage_counts = nawras_aggregate_inc_stage_counts($result);
+
 echo json_encode([
     'success'           => true,
     'counts'            => $counts,
@@ -906,5 +935,12 @@ echo json_encode([
         'vip_endpoint'      => 'vip-merchants.php',
         'generated_at'      => date('Y-m-d H:i:s'),
         'lifecycle_counts'  => $lifecycle_counts,
+        /** توزيع مراحل المكالمات ضمن incubating + new_registered */
+        'inc_stage_counts'  => $inc_stage_counts,
+        /** فصل واجهة المسار: قبل أول شحنة مقابل تحت الاحتضان بعد شحنة */
+        'onboarding_bucket_split' => [
+            'new_registered' => (int) ($counts['new_registered'] ?? 0),
+            'incubating'     => (int) ($counts['incubating'] ?? 0),
+        ],
     ],
 ], JSON_UNESCAPED_UNICODE);
