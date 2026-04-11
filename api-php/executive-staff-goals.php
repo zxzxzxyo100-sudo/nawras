@@ -25,6 +25,13 @@ $pdo = getDB();
 ensure_workflow_schema($pdo);
 ensure_inactive_daily_stats_schema($pdo);
 
+/** يوم العمل «اليوم» بتوقيت الرياض — يتوافق مع CURDATE() بعد ضبط الجلسة */
+try {
+    $pdo->exec("SET time_zone = '+03:00'");
+} catch (Throwable $e) {
+    // إن لم يُسمح بضبط المنطقة الزمنية نعتمد توقيت الخادم
+}
+
 $targetActive = (int) ACTIVE_DAILY_SUCCESS_TARGET;
 $targetInactive = (int) INACTIVE_DAILY_SUCCESS_TARGET;
 $targetInc = 50;
@@ -83,13 +90,26 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $entry['role_label_ar'] = 'مسؤول المتاجر (احتضان)';
         $entry['metric_key'] = 'incubation_calls_today';
         $entry['target'] = $targetInc;
+        /**
+         * مسار الاحتضان الحالي: inc_call1–3.
+         * مسار قديم في الخادم لا يزال يسجّل: day0 / day3 / day10 (انظر log_call في store-actions.php).
+         * performed_by يُحفظ من الواجهة كـ fullname أو username — نطابق الاثنين مع TRIM.
+         */
+        $unTrim = trim($un);
+        $fnTrim = trim($fn);
         $c = $pdo->prepare("
             SELECT COUNT(*) FROM call_logs
             WHERE DATE(created_at) = CURDATE()
-            AND call_type IN ('inc_call1','inc_call2','inc_call3')
-            AND (performed_by = ? OR performed_by = ?)
+            AND call_type IN (
+                'inc_call1', 'inc_call2', 'inc_call3',
+                'day0', 'day3', 'day10'
+            )
+            AND (
+                TRIM(performed_by) = ?
+                OR ( ? <> '' AND TRIM(performed_by) = ? )
+            )
         ");
-        $c->execute([$un, $fn]);
+        $c->execute([$unTrim, $fnTrim, $fnTrim]);
         $n = (int) $c->fetchColumn();
         $entry['done_today'] = $n;
     }
@@ -109,5 +129,5 @@ echo json_encode([
         'inactive_daily' => $targetInactive,
         'incubation_daily' => $targetInc,
     ],
-    'note_ar' => 'النشط والاستعادة: الهدف اليومي 50 حسب طبيعة كل طابور. الاحتضان: عدد مكالمات المسار (inc_call1–3) المسجّلة اليوم.',
+    'note_ar' => 'النشط والاستعادة: الهدف اليومي 50 حسب طبيعة كل طابور. الاحتضان: مكالمات المسار (inc_call1–3 و day0/day3/day10) المسجّلة اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
 ], JSON_UNESCAPED_UNICODE);
