@@ -1218,13 +1218,13 @@ elseif ($action === 'award_bonus') {
     jsonResponse(['success' => true, 'points_awarded' => $pts, 'ad_title' => $adTitle]);
 }
 
-// ========== إحصاء انتقال «جديد» → «تحت الاحتضان» خلال الشهر الحالي (لوحة التحكم) ==========
-elseif ($action === 'count_new_to_incubating_month') {
+// ========== إحصاءات انتقال الحالة — الشهر الحالي (لوحة التحكم → قسم الإحصائيات) ==========
+elseif ($action === 'count_new_to_incubating_month' || $action === 'get_dashboard_transition_stats') {
     ensure_incubation_call_columns($pdo);
     $monthStart = "DATE_FORMAT(CURDATE(), '%Y-%m-01 00:00:00')";
     $nextMonthStart = "DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01 00:00:00')";
 
-    $audit = 0;
+    $auditNewToInc = 0;
     try {
         $st = $pdo->query(
             "SELECT COUNT(DISTINCT store_id) FROM audit_logs
@@ -1233,11 +1233,11 @@ elseif ($action === 'count_new_to_incubating_month') {
                AND created_at >= $monthStart
                AND created_at < $nextMonthStart"
         );
-        $audit = (int) $st->fetchColumn();
+        $auditNewToInc = (int) $st->fetchColumn();
     } catch (Throwable $e) {
     }
 
-    $proxy = 0;
+    $proxyNewToInc = 0;
     try {
         $st = $pdo->query(
             "SELECT COUNT(*) FROM store_states
@@ -1246,16 +1246,43 @@ elseif ($action === 'count_new_to_incubating_month') {
                AND DATE_ADD(registration_date, INTERVAL 48 HOUR) >= $monthStart
                AND DATE_ADD(registration_date, INTERVAL 48 HOUR) < $nextMonthStart"
         );
-        $proxy = (int) $st->fetchColumn();
+        $proxyNewToInc = (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+    }
+
+    /** تخريج من الاحتضان إلى «نشط قيد المكالمة» — من سجل التدقيق */
+    $incubatingToActive = 0;
+    try {
+        $st = $pdo->query(
+            "SELECT COUNT(DISTINCT store_id) FROM audit_logs
+             WHERE old_status = 'incubating'
+               AND new_status = 'active_pending_calls'
+               AND created_at >= $monthStart
+               AND created_at < $nextMonthStart"
+        );
+        $incubatingToActive = (int) $st->fetchColumn();
+    } catch (Throwable $e) {
+    }
+
+    /** تجميد — من سجل التدقيق */
+    $toFrozen = 0;
+    try {
+        $st = $pdo->query(
+            "SELECT COUNT(DISTINCT store_id) FROM audit_logs
+             WHERE new_status = 'frozen'
+               AND created_at >= $monthStart
+               AND created_at < $nextMonthStart"
+        );
+        $toFrozen = (int) $st->fetchColumn();
     } catch (Throwable $e) {
     }
 
     jsonResponse([
         'success' => true,
-        /** العدد المعروض: تقريب من نهاية نافذة 48 ساعة (متجر جديد) ضمن الشهر */
-        'count' => $proxy,
-        /** إن وُجدت صفوف في audit_logs لنفس الانتقال */
-        'count_from_audit_logs' => $audit,
+        'count' => $proxyNewToInc,
+        'count_from_audit_logs' => $auditNewToInc,
+        'incubating_to_active_pending_month' => $incubatingToActive,
+        'frozen_month' => $toFrozen,
     ]);
 }
 

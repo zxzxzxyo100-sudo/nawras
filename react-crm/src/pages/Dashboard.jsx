@@ -15,7 +15,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse, getNewToIncubatingMonthCount } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse, getDashboardTransitionStats } from '../services/api'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -121,9 +121,13 @@ export default function Dashboard() {
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
-  /** انتقال «جديد» → «تحت الاحتضان» هذا الشهر (من الخادم) */
-  const [newToIncubatingMonth, setNewToIncubatingMonth] = useState(null)
-  const [newToIncubatingAudit, setNewToIncubatingAudit] = useState(null)
+  /** قسم الإحصائيات: انتقالات الحالة خلال الشهر (من الخادم) */
+  const [transitionStats, setTransitionStats] = useState({
+    newToIncubating: null,
+    auditNewToInc: null,
+    incubatingToActive: null,
+    frozen: null,
+  })
   const loadFreezeQvPending = useCallback(async () => {
     if (!isExecutive) {
       setFreezeQvPending(null)
@@ -175,35 +179,44 @@ export default function Dashboard() {
   }, [loadFreezeQvPending, lastLoaded])
 
   const showIncubationHero = can('new') || can('incubation') || isExecutive
-  const loadNewToIncubatingMonth = useCallback(async () => {
-    if (!showIncubationHero) {
-      setNewToIncubatingMonth(null)
-      setNewToIncubatingAudit(null)
-      return
-    }
+  const loadTransitionStats = useCallback(async () => {
     try {
-      const r = await getNewToIncubatingMonthCount()
+      const r = await getDashboardTransitionStats()
       if (r?.success) {
-        setNewToIncubatingMonth(typeof r.count === 'number' ? r.count : 0)
-        setNewToIncubatingAudit(typeof r.count_from_audit_logs === 'number' ? r.count_from_audit_logs : null)
+        setTransitionStats({
+          newToIncubating: typeof r.count === 'number' ? r.count : 0,
+          auditNewToInc: typeof r.count_from_audit_logs === 'number' ? r.count_from_audit_logs : null,
+          incubatingToActive: typeof r.incubating_to_active_pending_month === 'number'
+            ? r.incubating_to_active_pending_month
+            : null,
+          frozen: typeof r.frozen_month === 'number' ? r.frozen_month : null,
+        })
       } else {
-        setNewToIncubatingMonth(0)
-        setNewToIncubatingAudit(null)
+        setTransitionStats({
+          newToIncubating: 0,
+          auditNewToInc: null,
+          incubatingToActive: null,
+          frozen: null,
+        })
       }
     } catch {
-      setNewToIncubatingMonth(0)
-      setNewToIncubatingAudit(null)
+      setTransitionStats({
+        newToIncubating: 0,
+        auditNewToInc: null,
+        incubatingToActive: null,
+        frozen: null,
+      })
     }
-  }, [showIncubationHero])
+  }, [])
 
   useEffect(() => {
-    void loadNewToIncubatingMonth()
-  }, [loadNewToIncubatingMonth, lastLoaded])
+    void loadTransitionStats()
+  }, [loadTransitionStats, lastLoaded])
 
   function handleDashboardRefresh() {
     reload()
     void loadFreezeQvPending()
-    void loadNewToIncubatingMonth()
+    void loadTransitionStats()
     if (isExecutive && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
     }
@@ -457,7 +470,7 @@ export default function Dashboard() {
 
         <div
           className={`relative grid grid-cols-2 gap-6 ${
-            showIncubationHero ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-3'
+            showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
           }`}
         >
           {[
@@ -465,17 +478,7 @@ export default function Dashboard() {
             { label: 'إجمالي الطرود',    value: totalShipments.toLocaleString('ar-SA'),       icon: TrendingUp, sub: 'كل المتاجر' },
             { label: 'مكالمات اليوم',    value: calledToday,                                  icon: Phone,   sub: 'تواصل مباشر' },
             ...(showIncubationHero
-              ? [
-                  { label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' },
-                  {
-                    label: 'جديد → احتضان (الشهر)',
-                    value: newToIncubatingMonth == null ? '—' : Number(newToIncubatingMonth).toLocaleString('ar-SA'),
-                    icon: ArrowLeftRight,
-                    sub: (newToIncubatingAudit != null && newToIncubatingAudit > 0)
-                      ? `من سجل التدقيق: ${Number(newToIncubatingAudit).toLocaleString('ar-SA')}`
-                      : 'بعد 48 ساعة من التسجيل',
-                  },
-                ]
+              ? [{ label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' }]
               : []),
           ].map((s, i) => (
             <motion.div
@@ -850,6 +853,76 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* ══ الإحصائيات — انتقالات الحالة (تحت مخططات الأداء) ═══════════════════════ */}
+      {user && (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.45, delay: 0.42 }}
+          className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm"
+        >
+          <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <BarChart3 size={22} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900">الإحصائيات</h2>
+                <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">
+                  معدّلات انتقال الحالة خلال <span className="font-semibold text-slate-700">الشهر الحالي</span>
+                  {' — '}من جديد إلى احتضان، ثم تخريج إلى نشط، وتجميد عند الحاجة (بناءً على سجل التدقيق والتسجيلات المحلية).
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="rounded-xl border border-violet-100 bg-gradient-to-br from-violet-50/80 to-white p-4">
+              <div className="flex items-center gap-2 text-violet-700 mb-2">
+                <ArrowLeftRight size={18} />
+                <span className="text-xs font-bold">جديد → تحت الاحتضان</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.newToIncubating == null ? '…' : Number(transitionStats.newToIncubating).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5 leading-snug">
+                تقريب: نهاية نافذة 48 ساعة بعد التسجيل ضمن الشهر
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
+              <div className="flex items-center gap-2 text-slate-600 mb-2">
+                <Activity size={18} />
+                <span className="text-xs font-bold">جديد → احتضان (سجل التدقيق)</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.auditNewToInc == null ? '—' : Number(transitionStats.auditNewToInc).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">عند تسجيل الانتقال صراحة في السجل</p>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
+              <div className="flex items-center gap-2 text-emerald-800 mb-2">
+                <TrendingUp size={18} />
+                <span className="text-xs font-bold">احتضان → نشط قيد المكالمة</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.incubatingToActive == null ? '—' : Number(transitionStats.incubatingToActive).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">تخريج مسجّل في السجل خلال الشهر</p>
+            </div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
+              <div className="flex items-center gap-2 text-amber-900 mb-2">
+                <Snowflake size={18} />
+                <span className="text-xs font-bold">انتقال إلى تجميد</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {transitionStats.frozen == null ? '—' : Number(transitionStats.frozen).toLocaleString('ar-SA')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1.5">متاجر جرى تجميدها خلال الشهر (سجل التدقيق)</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ══ Recent + Quick Stats ════════════════════════════════════ */}
       <motion.div
