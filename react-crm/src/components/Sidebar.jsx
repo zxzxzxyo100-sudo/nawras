@@ -416,6 +416,7 @@ const NAV_GROUPS = [
 const STAFF_PERFORMANCE_SUB = [
   { to: '/staff-performance', label: 'أهداف اليوم', kind: 'goals' },
   { to: '/staff-performance/stats', label: 'الإحصائيات', kind: 'stats' },
+  { to: '/staff-performance/conversion-report', label: 'تقرير نسبة التحويل', kind: 'conversion' },
 ]
 
 function staffPerfSubActive(kind, pathname) {
@@ -423,6 +424,7 @@ function staffPerfSubActive(kind, pathname) {
     return pathname === '/staff-performance' || pathname === '/staff-performance/'
   }
   if (kind === 'stats') return pathname.startsWith('/staff-performance/stats')
+  if (kind === 'conversion') return pathname.startsWith('/staff-performance/conversion-report')
   return false
 }
 

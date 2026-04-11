@@ -21,6 +21,7 @@ import VipMerchants from './pages/VipMerchants'
 import MyPerformance from './pages/MyPerformance'
 import ExecutiveStaffPerformance from './pages/ExecutiveStaffPerformance'
 import TeamPerformanceStatistics from './pages/TeamPerformanceStatistics'
+import ConversionRateReport from './pages/ConversionRateReport'
 import Tasks from './pages/Tasks'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
@@ -130,6 +131,10 @@ function AppRoutes() {
         <Route
           path="/staff-performance/stats"
           element={<PrivateRoute view="staff_performance"><TeamPerformanceStatistics /></PrivateRoute>}
+        />
+        <Route
+          path="/staff-performance/conversion-report"
+          element={<PrivateRoute view="staff_performance"><ConversionRateReport /></PrivateRoute>}
         />
         <Route
           path="/staff-performance"

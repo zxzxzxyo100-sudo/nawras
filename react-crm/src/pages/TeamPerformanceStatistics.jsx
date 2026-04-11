@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BarChart3, ListTree, Package, RefreshCw, Store } from 'lucide-react'
+import { BarChart3, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
 import { getRegistrationMonthStats } from '../services/api'
@@ -112,15 +113,24 @@ export default function TeamPerformanceStatistics() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => load()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            تحديث
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/staff-performance/conversion-report"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              <FileSpreadsheet size={14} />
+              تقرير نسبة التحويل
+            </Link>
+            <button
+              type="button"
+              onClick={() => load()}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              تحديث
+            </button>
+          </div>
         </div>
       </motion.div>
 

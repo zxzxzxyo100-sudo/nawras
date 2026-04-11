@@ -118,9 +118,16 @@ export const getDashboardTransitionStats = () =>
 export const getNewToIncubatingMonthCount = () =>
   http.get('/store-actions.php?action=count_new_to_incubating_month').then(r => r.data)
 
-/** متاجر سُجّلت هذا الشهر + منها شحنت + نسبة التحويل (من ذاكرة all-stores) */
-export const getRegistrationMonthStats = () =>
-  http.get('/registration-month-stats.php').then(r => r.data)
+/**
+ * متاجر سُجّلت هذا الشهر + منها شحنت + نسبة التحويل (من ذاكرة all-stores).
+ * @param {{ detail?: boolean }} [opts] — detail=true يعيد report_rows (قائمة المتاجر في الشهر)
+ */
+export const getRegistrationMonthStats = (opts = {}) =>
+  http
+    .get('/registration-month-stats.php', {
+      params: opts.detail ? { detail: 1 } : undefined,
+    })
+    .then(r => r.data)
 
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
