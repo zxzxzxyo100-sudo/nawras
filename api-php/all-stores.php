@@ -124,6 +124,8 @@ foreach ($inactive as $id => $s) {
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [
     'incubating'            => [],
+    /** مسجّل ولم يشحن بعد — لا يُعرَض كـ«تحت الاحتضان» حتى أول شحنة (مع الإبقاء على مسار المكالمات) */
+    'new_registered'        => [],
     'active_shipping'       => [],
     'completed_merchants'   => [],
     'unreachable_merchants' => [],
@@ -133,6 +135,7 @@ $result = [
 ];
 $counts = [
     'incubating'            => 0,
+    'new_registered'        => 0,
     'active_shipping'       => 0,
     'completed_merchants'   => 0,
     'unreachable_merchants' => 0,
@@ -235,6 +238,36 @@ function incubation_fill_between_meta(&$s, $cycleDay, $inc1, $inc2, $inc3, $hasS
         $s['_next_window_hint'] = 'خانة المكالمة الثالثة (يوم ' . $c3d . ' من 14)';
         $s['_inc_stage_key'] = $cd < $c3d ? 'wait_c3' : 'late_c3';
         $s['_delay_days'] = $cd > $c3d ? max(0, $cd - $c3d) : 0;
+    }
+}
+
+/**
+ * «تحت الاحتضان» في الواجهة بعد أول شحنة فقط؛ قبلها تُسجَّل في new_registered مع الإبقاء على مسار المكالمات.
+ *
+ * @param 'call_1'|'call_delay'|'call_2'|'call_3'|'between' $pathKey
+ */
+function nawras_push_incubation_list(
+    array &$s,
+    bool $hasShipped,
+    array &$result,
+    array &$counts,
+    string $pathKey,
+    array &$incubation_path
+): void {
+    if (!$hasShipped) {
+        $s['_cat'] = 'new_pre_ship';
+        $s['lifecycle'] = 'new';
+        $s['lifecycle_label_ar'] = 'جديد — بانتظار أول شحنة';
+        $result['new_registered'][] = $s;
+        $counts['new_registered']++;
+    } else {
+        $s['_cat'] = 'incubating';
+        $result['incubating'][] = $s;
+        $counts['incubating']++;
+    }
+    $counts['total']++;
+    if (isset($incubation_path[$pathKey])) {
+        $incubation_path[$pathKey][] = $s;
     }
 }
 
@@ -410,19 +443,13 @@ foreach ($new as $id => $s) {
         }
     }
     if ($qualifiesCall3) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_3';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
         $s['_missed_c2_window'] = $missedSecondCall;
         if ($missedSecondCall) {
             $s['_inc_phase'] = 'المكالمة الثالثة — لم تُسجَّل المكالمة الثانية بعد';
         }
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['call_3'][] = $s;
-        $incubation_counts['call_3']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'call_3', $incubation_path);
         continue;
     }
 
@@ -447,15 +474,9 @@ foreach ($new as $id => $s) {
 
     // المكالمة الثانية — من يوم 3 حتى قبل يوم 10 (يوم 10+ يُعرَض في المكالمة الثالثة حتى لو لم تُسجَّل م2)
     if ($inc1 && !$inc2 && $cycleDay >= $c2d && $cycleDay < $c3d && $hasShipped) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_2';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['call_2'][] = $s;
-        $incubation_counts['call_2']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, true, $result, $counts, 'call_2', $incubation_path);
         continue;
     }
 
@@ -487,15 +508,9 @@ foreach ($new as $id => $s) {
 
     // المكالمة الأولى — خلال 48 ساعة من التسجيل فقط
     if (!$inc1 && $regHrs < NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_1';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['call_1'][] = $s;
-        $incubation_counts['call_1']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'call_1', $incubation_path);
         continue;
     }
 
@@ -506,16 +521,10 @@ foreach ($new as $id => $s) {
         }
         $lc48 = nawras_compute_lifecycle($s, $now);
         if ($lc48 === 'incubating' || $lc48 === 'new') {
-            $s['_cat'] = 'incubating';
             $s['_inc'] = 'call_1_delayed';
             nawras_apply_lifecycle_tags($s, $now);
             incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-            $result['incubating'][] = $s;
-            $counts['incubating']++;
-            $counts['total']++;
-            $incubation_path['call_delay'][] = $s;
-            $incubation_counts['call_delay']++;
-            $incubation_counts['total']++;
+            nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'call_delay', $incubation_path);
             continue;
         }
         $s['_cat'] = 'cold_inactive';
@@ -535,43 +544,25 @@ foreach ($new as $id => $s) {
 
     // تأخّر المكالمة الأولى — مرّت 48 ساعة، يوجد شحن، دون تسجيل المكالمة الأولى
     if (!$inc1 && $regHrs >= NAWRAS_ONBOARD_FIRST_CALL_HOURS) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'call_1_delayed';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['call_delay'][] = $s;
-        $incubation_counts['call_delay']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'call_delay', $incubation_path);
         continue;
     }
 
     // بين المكالمة 1 و 2 — قبل يوم 3 (م1 مسجّلة)
     if ($inc1 && !$inc2 && $cycleDay < $c2d) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'between_calls';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['between'][] = $s;
-        $incubation_counts['between']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'between', $incubation_path);
         continue;
     }
 
     // بين المكالمة 2 و 3 — قبل يوم 10
     if ($inc2 && !$inc3 && $cycleDay < $c3d) {
-        $s['_cat'] = 'incubating';
         $s['_inc'] = 'between_calls';
         incubation_fill_between_meta($s, $cycleDay, $inc1, $inc2, $inc3, $hasShipped, $regHrs);
-        $result['incubating'][] = $s;
-        $counts['incubating']++;
-        $counts['total']++;
-        $incubation_path['between'][] = $s;
-        $incubation_counts['between']++;
-        $incubation_counts['total']++;
+        nawras_push_incubation_list($s, $hasShipped, $result, $counts, 'between', $incubation_path);
         continue;
     }
 }
@@ -734,6 +725,7 @@ try {
         nawras_filter_out_store_id($result['hot_inactive'], $fid);
         nawras_filter_out_store_id($result['cold_inactive'], $fid);
         nawras_filter_out_store_id($result['incubating'], $fid);
+        nawras_filter_out_store_id($result['new_registered'], $fid);
         nawras_filter_out_store_id($incubation_path['call_1'], $fid);
         nawras_filter_out_store_id($incubation_path['call_delay'], $fid);
         nawras_filter_out_store_id($incubation_path['call_2'], $fid);
@@ -765,6 +757,7 @@ try {
     $counts['hot_inactive'] = count($result['hot_inactive']);
     $counts['cold_inactive'] = count($result['cold_inactive']);
     $counts['incubating'] = count($result['incubating']);
+    $counts['new_registered'] = count($result['new_registered']);
     $incubation_counts['call_1'] = count($incubation_path['call_1']);
     $incubation_counts['call_delay'] = count($incubation_path['call_delay']);
     $incubation_counts['call_2'] = count($incubation_path['call_2']);

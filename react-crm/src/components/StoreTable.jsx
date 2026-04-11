@@ -73,15 +73,15 @@ export default function StoreTable({
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => {
     if (listPreset === 'incubating') return ['incubating']
-    /** «جديدة»: خانة واحدة فقط — المتجر الجديد يُصنَّف احتضانياً في الخادم ولا يُعرَض من ساخن/بارد */
-    if (listPreset === 'new48') return ['incubating']
+    /** «جديدة» 48 ساعة: جديد قبل الشحن + احتضان بعد أول شحنة ضمن الفلتر */
+    if (listPreset === 'new48') return ['new_registered', 'incubating']
     return [...STORE_BUCKET_KEYS]
   })
 
   useEffect(() => {
     if (!enableBucketFilter) return
     if (listPreset === 'incubating') setSelectedBucketKeys(['incubating'])
-    else if (listPreset === 'new48') setSelectedBucketKeys(['incubating'])
+    else if (listPreset === 'new48') setSelectedBucketKeys(['new_registered', 'incubating'])
     else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
   }, [listPreset, enableBucketFilter])
 
@@ -126,15 +126,21 @@ export default function StoreTable({
     setShipFrom('')
     setShipTo('')
     if (enableBucketFilter) {
-      if (listPreset === 'incubating' || listPreset === 'new48') setSelectedBucketKeys(['incubating'])
+      if (listPreset === 'incubating') setSelectedBucketKeys(['incubating'])
+      else if (listPreset === 'new48') setSelectedBucketKeys(['new_registered', 'incubating'])
       else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
     }
   }
 
   const isBucketAtPresetDefault = useMemo(() => {
     if (!enableBucketFilter) return true
-    if (listPreset === 'incubating' || listPreset === 'new48') {
+    if (listPreset === 'incubating') {
       return selectedBucketKeys.length === 1 && selectedBucketKeys[0] === 'incubating'
+    }
+    if (listPreset === 'new48') {
+      return selectedBucketKeys.length === 2
+        && selectedBucketKeys.includes('new_registered')
+        && selectedBucketKeys.includes('incubating')
     }
     return (
       selectedBucketKeys.length === STORE_BUCKET_KEYS.length

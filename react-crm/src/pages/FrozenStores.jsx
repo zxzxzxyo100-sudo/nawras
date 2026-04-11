@@ -17,10 +17,11 @@ export default function FrozenStores({ embedded = false } = {}) {
 
   const frozenList = useMemo(() => {
     const base = stores.frozen_merchants || []
-    const fromInc = (stores.incubating || []).filter(s => storeStates[s.id]?.category === 'frozen')
+    const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
+    const fromInc = incPool.filter(s => storeStates[s.id]?.category === 'frozen')
     const seen = new Set(base.map(s => s.id))
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
-  }, [stores.frozen_merchants, stores.incubating, storeStates])
+  }, [stores.frozen_merchants, stores.incubating, stores.new_registered, storeStates])
 
   useEffect(() => {
     if (!isExecutive) return

@@ -12,6 +12,8 @@ import {
 } from '../constants/storeCategories'
 
 const CATEGORY_LABELS = {
+  new_registered: { label: 'جديد — بانتظار أول شحنة', bg: 'bg-sky-100', text: 'text-sky-800' },
+  new_pre_ship: { label: 'جديد — بانتظار أول شحنة', bg: 'bg-sky-100', text: 'text-sky-800' },
   incubating: { label: 'تحت الاحتضان', bg: 'bg-purple-100', text: 'text-purple-700' },
   active:     { label: 'نشط',         bg: 'bg-green-100',  text: 'text-green-700'  },
   active_shipping: { label: 'نشط يشحن', bg: 'bg-emerald-100', text: 'text-emerald-800' },
@@ -117,6 +119,7 @@ export default function StoreDrawer({
       return merchantListBucket
     }
     if (merchantListBucket === 'active_shipping') return 'active_shipping'
+    if (merchantListBucket === 'new_registered' || merchantListBucket === 'new_pre_ship') return 'new_registered'
     if (merchantListBucket === 'incubating') return 'incubating'
     return dbCategory
   })()

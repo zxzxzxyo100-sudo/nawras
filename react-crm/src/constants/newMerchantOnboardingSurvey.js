@@ -78,7 +78,7 @@ export function buildOnboardingYesNoForApi(yesNo3) {
 }
 
 export function needsNewMerchantOnboardingSurvey(store, newMerchantOnboardingDoneIds) {
-  if (!store || store.bucket !== 'incubating') return false
+  if (!store || (store.bucket !== 'incubating' && store.bucket !== 'new_registered')) return false
   const sid = store.id
   if (sid == null) return false
   if (!newMerchantOnboardingDoneIds) return true

@@ -14,6 +14,7 @@ export function StoresProvider({ children }) {
 
   const [stores, setStores] = useState({
     incubating:            [],
+    new_registered:        [],
     active_shipping:        [],
     completed_merchants:    [],
     unreachable_merchants:  [],
@@ -28,7 +29,7 @@ export function StoresProvider({ children }) {
     call_1: 0, call_delay: 0, call_2: 0, call_3: 0, between_calls: 0, total: 0,
   })
   const [counts, setCounts]               = useState({
-    incubating: 0, active_shipping: 0, completed_merchants: 0, unreachable_merchants: 0, frozen_merchants: 0,
+    incubating: 0, new_registered: 0, active_shipping: 0, completed_merchants: 0, unreachable_merchants: 0, frozen_merchants: 0,
     hot_inactive: 0, cold_inactive: 0, total_active: 0, total: 0,
   })
   const [storeStates, setStoreStates]     = useState({})
@@ -127,6 +128,7 @@ export function StoresProvider({ children }) {
         } else {
           const buckets = [
             ...(apiResult.data?.incubating || []),
+            ...(apiResult.data?.new_registered || []),
             ...(apiResult.data?.active_shipping || []),
             ...(apiResult.data?.completed_merchants || []),
             ...(apiResult.data?.unreachable_merchants || []),
@@ -180,6 +182,7 @@ export function StoresProvider({ children }) {
       setRecoveryCalls(rcallsRes.data || {})
       setStores({
         incubating:            mergeShipmentsInRange(apiResult.data.incubating),
+        new_registered:        mergeShipmentsInRange(apiResult.data.new_registered || []),
         active_shipping:       mergeShipmentsInRange(apiResult.data.active_shipping),
         completed_merchants:     mergeShipmentsInRange(apiResult.data.completed_merchants || []),
         unreachable_merchants: mergeShipmentsInRange(apiResult.data.unreachable_merchants || []),
@@ -190,11 +193,13 @@ export function StoresProvider({ children }) {
       setCounts(apiResult.counts)
 
       // مسار الاحتضان: ثلاث مكالمات (call_1 / call_2 / call_3)
-      /** يُمرَّر لـ CallModal — استبيان التهيئة يعتمد على bucket === 'incubating' */
+      /** يُمرَّر لـ CallModal — استبيان التهيئة يشمل incubating و new_registered */
       function tagIncubationPathStores(arr) {
-        return (arr || []).map(s =>
-          (s && typeof s === 'object' ? { ...s, bucket: 'incubating' } : s),
-        )
+        return (arr || []).map(s => {
+          if (!s || typeof s !== 'object') return s
+          const b = s._cat === 'new_pre_ship' || s.bucket === 'new_registered' ? 'new_registered' : 'incubating'
+          return { ...s, bucket: b }
+        })
       }
       const rawPath = apiResult.incubation_path || {}
       const mergedPath = {
@@ -231,6 +236,7 @@ export function StoresProvider({ children }) {
 
   // قائمة مسطّحة بكل المتاجر مع الفئة + خانة التقسيم (للتصفية في صفحة «المتاجر»)
   const allStores = [
+    ...stores.new_registered.map(s =>  ({ ...s, bucket: 'new_registered',  category: storeStates[s.id]?.category || 'new_registered'  })),
     ...stores.incubating.map(s =>      ({ ...s, bucket: 'incubating',      category: storeStates[s.id]?.category || 'incubating'      })),
     ...stores.active_shipping.map(s => ({ ...s, bucket: 'active_shipping', category: storeStates[s.id]?.category || 'active_shipping' })),
     ...stores.completed_merchants.map(s => ({ ...s, bucket: 'completed_merchants', category: storeStates[s.id]?.category || 'completed' })),
