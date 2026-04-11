@@ -322,8 +322,8 @@ foreach ($new as $id => $s) {
     $regHrs = $regTs !== null ? ($now - $regTs) / 3600 : PHP_INT_MAX;
     $regDays = $regTs !== null ? ($now - $regTs) / 86400 : PHP_INT_MAX;
 
-    $hasShipped = (intval($s['total_shipments'] ?? 0) > 0)
-               || (!empty($s['last_shipment_date']) && $s['last_shipment_date'] !== 'لا يوجد');
+    /** يتوافق مع nawras_compute_lifecycle وتقرير نسبة التحويل — تاريخ آخر شحنة فقط */
+    $hasShipped = nawras_has_real_shipment($s);
 
     $s['_hours'] = round($regHrs, 1);
     $s['_days']  = round($regDays, 1);
