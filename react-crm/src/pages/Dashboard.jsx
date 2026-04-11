@@ -175,8 +175,6 @@ export default function Dashboard() {
   }, [loadFreezeQvPending, lastLoaded])
 
   const showIncubationHero = can('new') || can('incubation') || isExecutive
-  /** الخانة الخامسة في الشريط البنفسجي: لمسار الاحتضان دون التنفيذي (يملك بطاقة خاصة) */
-  const showNewToIncubatingInHero = showIncubationHero && !isExecutive
   const loadNewToIncubatingMonth = useCallback(async () => {
     if (!showIncubationHero) {
       setNewToIncubatingMonth(null)
@@ -374,42 +372,6 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {isExecutive && (
-        <div
-          className="rounded-2xl border border-violet-200/90 bg-gradient-to-l from-violet-50/95 via-white to-slate-50/80 p-4 sm:p-5 shadow-md ring-1 ring-violet-100/80"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-600/25">
-                <ArrowLeftRight size={22} strokeWidth={2.2} />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-base font-black text-slate-900 leading-snug">
-                  انتقال «جديد» → «تحت الاحتضان» — هذا الشهر
-                </h2>
-                <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                  عدد المتاجر التي تجاوزت نافذة الـ 48 ساعة بعد التسجيل ضمن الشهر الحالي (مسار الاحتضان في قاعدة البيانات).
-                </p>
-                {newToIncubatingAudit != null && newToIncubatingAudit > 0 ? (
-                  <p className="text-xs font-semibold text-violet-700 mt-2">
-                    مسجّل في سجل التدقيق: {Number(newToIncubatingAudit).toLocaleString('ar-SA')}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="shrink-0 text-center sm:text-left">
-              <p
-                className="text-4xl font-black tabular-nums text-violet-700 leading-none"
-                aria-live="polite"
-              >
-                {newToIncubatingMonth == null ? '…' : Number(newToIncubatingMonth).toLocaleString('ar-SA')}
-              </p>
-              <p className="text-xs text-slate-500 mt-1.5">متجر</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {user?.role === 'active_manager' && (
         <motion.div
           variants={fadeUp}
@@ -495,11 +457,7 @@ export default function Dashboard() {
 
         <div
           className={`relative grid grid-cols-2 gap-6 ${
-            showIncubationHero
-              ? showNewToIncubatingInHero
-                ? 'lg:grid-cols-3 xl:grid-cols-5'
-                : 'lg:grid-cols-4'
-              : 'lg:grid-cols-3'
+            showIncubationHero ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-3'
           }`}
         >
           {[
@@ -509,16 +467,14 @@ export default function Dashboard() {
             ...(showIncubationHero
               ? [
                   { label: 'تحتاج تواصل', value: pendingNewCalls, icon: Store, sub: 'متاجر جديدة' },
-                  ...(showNewToIncubatingInHero
-                    ? [{
-                        label: 'جديد → احتضان (الشهر)',
-                        value: newToIncubatingMonth == null ? '—' : Number(newToIncubatingMonth).toLocaleString('ar-SA'),
-                        icon: ArrowLeftRight,
-                        sub: (newToIncubatingAudit != null && newToIncubatingAudit > 0)
-                          ? `من سجل التدقيق: ${Number(newToIncubatingAudit).toLocaleString('ar-SA')}`
-                          : 'بعد 48 ساعة من التسجيل',
-                      }]
-                    : []),
+                  {
+                    label: 'جديد → احتضان (الشهر)',
+                    value: newToIncubatingMonth == null ? '—' : Number(newToIncubatingMonth).toLocaleString('ar-SA'),
+                    icon: ArrowLeftRight,
+                    sub: (newToIncubatingAudit != null && newToIncubatingAudit > 0)
+                      ? `من سجل التدقيق: ${Number(newToIncubatingAudit).toLocaleString('ar-SA')}`
+                      : 'بعد 48 ساعة من التسجيل',
+                  },
                 ]
               : []),
           ].map((s, i) => (
