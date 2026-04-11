@@ -3,7 +3,7 @@
  * أهداف اليوم لكل موظف تشغيلي — للمدير التنفيذي فقط.
  * نشط: تعيينات مكتملة اليوم (تم التواصل + استبيان) / 50
  * استعادة: اتصالات ناجحة مسجّلة في inactive_manager_daily_stats / 50
- * احتضان: إجمالي مكالمات مسار الاحتضان (inc_call1–3 و day0/3/10) — تراكمي لكل السجل / 50
+ * احتضان: مكالمات مسار الاحتضان (inc_call1–3 و day0/3/10) المسجّلة اليوم (توقيت الرياض) / 50
  */
 declare(strict_types=1);
 
@@ -88,10 +88,10 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $entry['done_today'] = $n;
     } else {
         $entry['role_label_ar'] = 'مسؤول المتاجر (احتضان)';
-        $entry['metric_key'] = 'incubation_calls_total';
+        $entry['metric_key'] = 'incubation_calls_today';
         $entry['target'] = $targetInc;
         /**
-         * تراكمي: كل مكالمات مسار الاحتضان (ليس اليوم فقط) حتى يعكس الإنجاز الفعلي.
+         * اليوم فقط — DATE(created_at)=CURDATE() مع جلسة +03:00 (الرياض).
          * الأنواع: inc_call1–3 + day0/day3/day10 (مسار قديم).
          * مطابقة المنفّذ: username / fullname مع TRIM و LOWER للاتينية.
          */
@@ -101,7 +101,8 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $fnLower = $fnTrim !== '' ? mb_strtolower($fnTrim, 'UTF-8') : '';
         $c = $pdo->prepare("
             SELECT COUNT(*) FROM call_logs
-            WHERE call_type IN (
+            WHERE DATE(created_at) = CURDATE()
+            AND call_type IN (
                 'inc_call1', 'inc_call2', 'inc_call3',
                 'day0', 'day3', 'day10'
             )
@@ -139,5 +140,5 @@ echo json_encode([
         'inactive_daily' => $targetInactive,
         'incubation_daily' => $targetInc,
     ],
-    'note_ar' => 'النشط والاستعادة: الهدف اليومي حسب الطابور. الاحتضان: إجمالي تراكمي لمكالمات المسار (الأولى/الثانية/الثالثة و day0/3/10) في السجل — ليس «اليوم» فقط؛ الهدف 50 كمرجع أداء.',
+    'note_ar' => 'النشط والاستعادة: الهدف اليومي حسب الطابور. الاحتضان: مكالمات المسار (1–3 و day0/3/10) المسجّلة اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
 ], JSON_UNESCAPED_UNICODE);

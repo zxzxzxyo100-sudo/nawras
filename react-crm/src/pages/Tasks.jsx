@@ -55,7 +55,7 @@ function IncubationManagerTasksView() {
 
   return (
     <div className="space-y-4 lg:space-y-5" dir="rtl">
-      <TasksIntro title="كل مراحل مسار الاحتضان هنا: المكالمة الأولى والثانية والثالثة، وبين المكالمات. يظهر إنجاز مسؤول الاحتضان في «أهداف الفريق» كإجمالي تراكمي لكل تلك المكالمات المسجّلة في النظام." />
+      <TasksIntro title="كل مراحل مسار الاحتضان هنا: المكالمة الأولى والثانية والثالثة، وبين المكالمات. يُحسب إنجاز اليوم في «أهداف الفريق» من مكالمات المسار (1–3) المسجّلة اليوم فقط." />
       <div className="flex flex-wrap gap-2 rounded-2xl border border-violet-200/70 bg-white/70 p-2 shadow-sm ring-1 ring-violet-100/80">
         {INCUBATION_TASK_TABS.map(({ id, label, Icon }) => (
           <button
