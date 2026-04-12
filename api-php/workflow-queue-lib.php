@@ -17,6 +17,14 @@ if (!defined('INACTIVE_QUEUE_TARGET')) {
 if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
     define('INACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
+/** أقصى صفوف في طابور «نشط» لكل موظف (نشط + لم يرد) — أعلى من 50 لأن جزءاً يكون بانتظار الاستبيان بعد المكالمة */
+if (!defined('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER')) {
+    define('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER', 120);
+}
+/** أقصى عدد صفوف تعيين (نشط + لم يرد) لمسؤول واحد — أعلى من 50 حتى يمكن وجود متاجر «بانتظار استبيان بعد مكالمة» مع 50 «بلا مكالمة اليوم» */
+if (!defined('ACTIVE_ASSIGNMENTS_MAX_TOTAL')) {
+    define('ACTIVE_ASSIGNMENTS_MAX_TOTAL', 120);
+}
 if (!defined('SURVEY_COOLDOWN_DAYS')) {
     define('SURVEY_COOLDOWN_DAYS', 30);
 }
@@ -304,6 +312,18 @@ function count_pending_active_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+/** إجمالي صفوف طابور المتابعة الدورية (نشط + لم يرد) — لضبط سقف التعبئة */
+function count_total_active_workflow_assignments(PDO $pdo, $username) {
+    $st = $pdo->prepare("
+        SELECT COUNT(*) FROM store_assignments
+        WHERE assigned_to = ?
+        AND assignment_queue = 'active'
+        AND workflow_status IN ('active', 'no_answer')
+    ");
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
 /**
  * عدد تعيينات «نشط» فقط — عند «لم يرد» ينقص العدد فيُستدعى fill لإضافة متجر ساخن جديد (صف لم يرد يبقى في المتابعة وليس في جدول المهام).
  */
@@ -466,8 +486,19 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     if (getDailyProgress($pdo, $username)['quota_reached']) {
         return 0;
     }
-    $have = count_active_queue($pdo, $username);
-    $need = ACTIVE_QUEUE_TARGET - $have;
+    /**
+     * كان العدّ يعتمد على كل التعيينات بحالة «active» فيُعتبر الطابور ممتلئاً (50)
+     * بينما الواجهة تعرض فقط «بلا مكالمة اليوم» — فيبقى صف واحد ظاهراً.
+     * نعبّئ حتى ACTIVE_QUEUE_TARGET صفاً تحتاج أول مكالمة اليوم، مع سقف إجمالي للصفوف.
+     */
+    $pending = count_pending_active_queue($pdo, $username);
+    $totalRows = count_total_active_workflow_assignments($pdo, $username);
+    $need = ACTIVE_QUEUE_TARGET - $pending;
+    if ($need <= 0) {
+        return 0;
+    }
+    $room = max(0, (int) MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER - $totalRows);
+    $need = min($need, $room);
     if ($need <= 0) {
         return 0;
     }
