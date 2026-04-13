@@ -18,7 +18,7 @@ import {
   isStillRestoringStore,
   isRecoveryCompletedByShipment,
 } from '../constants/storeCategories'
-import { parcelsInRangeDisplay } from '../utils/storeFields'
+import { inactiveRecoveryQueueMetric, parcelsInRangeDisplay } from '../utils/storeFields'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
@@ -241,7 +241,9 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       if (s) ordered.push(s)
     }
     if (ordered.length > 0) {
-      return sortInactiveRecoveryTasksByParcels(ordered)
+      const sorted = sortInactiveRecoveryTasksByParcels(ordered)
+      /** طابور المهام: لا يُعرض إلا متاجر عددها المعتمد > 5 (مطابقة الخادم) */
+      return sorted.filter(s => inactiveRecoveryQueueMetric(s) > INACTIVE_TASK_PARCEL_PRIORITY_MIN)
     }
     return recoveryTasksHotQueue ? [] : filteredStores
   }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
