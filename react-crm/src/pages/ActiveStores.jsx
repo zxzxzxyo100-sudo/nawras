@@ -378,14 +378,20 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         out.push(existing)
       } else {
         const nm = (t.store_name && String(t.store_name).trim()) ? t.store_name : `متجر #${id}`
+        const phone = t.phone != null && String(t.phone).trim() ? String(t.phone).trim() : ''
+        const regAt = t.registered_at != null && String(t.registered_at).trim() ? String(t.registered_at).trim() : null
+        const lastShip =
+          t.last_shipment_date != null && String(t.last_shipment_date).trim()
+            ? String(t.last_shipment_date).trim()
+            : null
         out.push({
           id,
           name: nm,
-          phone: '',
-          registered_at: null,
-          last_shipment_date: null,
-          total_shipments: 0,
-          shipments_in_range: 0,
+          phone,
+          registered_at: regAt,
+          last_shipment_date: lastShip,
+          total_shipments: Number(t.total_shipments) || 0,
+          shipments_in_range: Number(t.shipments_in_range) || 0,
           _workflowQueueOnly: true,
         })
       }
