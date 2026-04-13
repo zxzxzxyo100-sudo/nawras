@@ -121,6 +121,12 @@ if ($action === 'get_my_workflow') {
         }
         $active = wf_enrich_workflow_tasks_from_lite($active);
         $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
+        $active = array_values(array_filter($active, static function (array $r): bool {
+            return wf_inactive_queue_parcel_eligible($r);
+        }));
+        $noAnswer = array_values(array_filter($noAnswer, static function (array $r): bool {
+            return wf_inactive_queue_parcel_eligible($r);
+        }));
         $active = wf_sort_inactive_manager_task_rows($active);
         $noAnswer = wf_sort_inactive_manager_task_rows($noAnswer);
         $inactiveDailySuccess = get_inactive_daily_success_count($pdo, $username);
