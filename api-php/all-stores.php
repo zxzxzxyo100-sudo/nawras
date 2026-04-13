@@ -834,9 +834,10 @@ foreach ($result['hot_inactive'] ?? [] as $s) {
         continue;
     }
     $inactiveRecoveryPool[] = [
-        'store_id'   => $s['id'],
-        'store_name' => isset($s['name']) ? (string) $s['name'] : '',
-        'bucket'     => 'hot_inactive',
+        'store_id'        => $s['id'],
+        'store_name'      => isset($s['name']) ? (string) $s['name'] : '',
+        'bucket'          => 'hot_inactive',
+        'total_shipments' => (int) ($s['total_shipments'] ?? 0),
     ];
 }
 foreach ($result['cold_inactive'] ?? [] as $s) {
@@ -844,9 +845,10 @@ foreach ($result['cold_inactive'] ?? [] as $s) {
         continue;
     }
     $inactiveRecoveryPool[] = [
-        'store_id'   => $s['id'],
-        'store_name' => isset($s['name']) ? (string) $s['name'] : '',
-        'bucket'     => 'cold_inactive',
+        'store_id'        => $s['id'],
+        'store_name'      => isset($s['name']) ? (string) $s['name'] : '',
+        'bucket'          => 'cold_inactive',
+        'total_shipments' => (int) ($s['total_shipments'] ?? 0),
     ];
 }
 @file_put_contents(

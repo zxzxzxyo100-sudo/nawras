@@ -17,6 +17,10 @@ if (!defined('INACTIVE_QUEUE_TARGET')) {
 if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
     define('INACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
+/** أولوية طابور الاستعادة: متاجر بإجمالي شحنات أعلى من هذا الرقم تُعيَّن وتُعرَض أولاً */
+if (!defined('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS')) {
+    define('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS', 5);
+}
 /** أقصى صفوف في طابور «نشط» لكل موظف (نشط + لم يرد) — أعلى من 50 لأن جزءاً يكون بانتظار الاستبيان بعد المكالمة */
 if (!defined('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER')) {
     define('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER', 120);
@@ -378,6 +382,93 @@ function inactive_hot_pipeline_where_sql() {
 }
 
 /**
+ * خريطة store_id => إجمالي الشحنات من stores_search_lite.json (يُحدَّث مع all-stores.php).
+ *
+ * @return array<string,int>
+ */
+function wf_lite_total_shipments_map(): array {
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    $path = __DIR__ . '/cache/stores_search_lite.json';
+    if (is_readable($path)) {
+        $list = json_decode((string) file_get_contents($path), true);
+        if (is_array($list)) {
+            foreach ($list as $row) {
+                if (!is_array($row) || !isset($row['id'])) {
+                    continue;
+                }
+                $id = (string) (int) $row['id'];
+                if ($id === '0') {
+                    continue;
+                }
+                $map[$id] = (int) ($row['total_shipments'] ?? 0);
+            }
+        }
+    }
+
+    return $map;
+}
+
+/**
+ * ترتيب مرشحي الاستعادة: أولاً total_shipments > الحد (الأعلى شحناتاً)، ثم البقية حسب store_id.
+ *
+ * @param list<array{store_id:mixed,store_name?:string,total_shipments?:int,...}> $rows
+ */
+function wf_sort_inactive_recovery_candidates(array &$rows): void {
+    $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
+    usort($rows, static function (array $a, array $b) use ($min): int {
+        $sa = (int) ($a['total_shipments'] ?? 0);
+        $sb = (int) ($b['total_shipments'] ?? 0);
+        $pa = $sa > $min ? 1 : 0;
+        $pb = $sb > $min ? 1 : 0;
+        if ($pb !== $pa) {
+            return $pb <=> $pa;
+        }
+        if ($sb !== $sa) {
+            return $sb <=> $sa;
+        }
+        $ida = (string) ($a['store_id'] ?? '');
+        $idb = (string) ($b['store_id'] ?? '');
+
+        return strcmp($ida, $idb);
+    });
+}
+
+/**
+ * ترتيب صفوف مهام مسؤول الاستعادة المعروضة: نفس أولوية الشحنات، ثم assigned_at.
+ *
+ * @param list<array<string,mixed>> $rows
+ * @return list<array<string,mixed>>
+ */
+function wf_sort_inactive_manager_task_rows(array $rows): array {
+    $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
+    usort($rows, static function (array $a, array $b) use ($min): int {
+        $sa = (int) ($a['total_shipments'] ?? 0);
+        $sb = (int) ($b['total_shipments'] ?? 0);
+        $pa = $sa > $min ? 1 : 0;
+        $pb = $sb > $min ? 1 : 0;
+        if ($pb !== $pa) {
+            return $pb <=> $pa;
+        }
+        if ($sb !== $sa) {
+            return $sb <=> $sa;
+        }
+        $ta = strtotime((string) ($a['assigned_at'] ?? '')) ?: 0;
+        $tb = strtotime((string) ($b['assigned_at'] ?? '')) ?: 0;
+        if ($ta !== $tb) {
+            return $ta <=> $tb;
+        }
+
+        return strcmp((string) ($a['store_id'] ?? ''), (string) ($b['store_id'] ?? ''));
+    });
+
+    return $rows;
+}
+
+/**
  * نفس مصدر الواجهة: ملف يُحدَّث عند كل تشغيل لـ all-stores.php
  * (تصنيف ساخن/بارد يُحسب من API وليس مخزّناً في store_states لكل متجر).
  */
@@ -394,6 +485,8 @@ function pick_next_inactive_pool_store(PDO $pdo) {
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $assigned[(string) ($row['store_id'] ?? '')] = true;
             }
+            $liteShip = wf_lite_total_shipments_map();
+            $candidates = [];
             foreach ($stores as $row) {
                 $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
                 $bucket = (string) ($row['bucket'] ?? '');
@@ -403,14 +496,28 @@ function pick_next_inactive_pool_store(PDO $pdo) {
                 if ($sid === '' || isset($assigned[$sid])) {
                     continue;
                 }
-                return [
-                    'store_id'   => $row['store_id'],
-                    'store_name' => $row['store_name'] ?? '',
+                $sidNorm = (string) (int) preg_replace('/\D+/', '', $sid);
+                $ts = isset($row['total_shipments']) ? (int) $row['total_shipments'] : (int) ($liteShip[$sidNorm] ?? 0);
+                $candidates[] = [
+                    'store_id'         => $row['store_id'],
+                    'store_name'       => $row['store_name'] ?? '',
+                    'total_shipments'  => $ts,
                 ];
             }
+            if ($candidates !== []) {
+                wf_sort_inactive_recovery_candidates($candidates);
+                $first = $candidates[0];
+
+                return [
+                    'store_id'   => $first['store_id'],
+                    'store_name' => $first['store_name'] ?? '',
+                ];
+            }
+
             return null;
         }
     }
+
     return pick_next_inactive_pool_store_from_store_states($pdo);
 }
 
@@ -424,10 +531,29 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
             SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
         )
         ORDER BY ss.store_id ASC
-        LIMIT 1
     ";
     $stmt = $pdo->query($sql);
-    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($rows === []) {
+        return null;
+    }
+    $liteShip = wf_lite_total_shipments_map();
+    $candidates = [];
+    foreach ($rows as $r) {
+        $sidNorm = (string) (int) preg_replace('/\D+/', '', (string) ($r['store_id'] ?? ''));
+        $candidates[] = [
+            'store_id'        => $r['store_id'],
+            'store_name'      => $r['store_name'] ?? '',
+            'total_shipments' => (int) ($liteShip[$sidNorm] ?? 0),
+        ];
+    }
+    wf_sort_inactive_recovery_candidates($candidates);
+    $first = $candidates[0];
+
+    return [
+        'store_id'   => $first['store_id'],
+        'store_name' => $first['store_name'] ?? '',
+    ];
 }
 
 function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username, $assignedBy) {
