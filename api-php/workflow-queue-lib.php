@@ -17,7 +17,7 @@ if (!defined('INACTIVE_QUEUE_TARGET')) {
 if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
     define('INACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
-/** أولوية طابور الاستعادة: متاجر بإجمالي شحنات أعلى من هذا الرقم تُعيَّن وتُعرَض أولاً */
+/** أولوية طابور الاستعادة: متاجر بعدد طرود/طلبات (في نطاق orders-summary عند توفره، وإلا إجمالي الشحنات من all-stores) أعلى من هذا الرقم تُعيَّن وتُعرَض أولاً */
 if (!defined('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS')) {
     define('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS', 5);
 }
@@ -413,15 +413,61 @@ function wf_lite_total_shipments_map(): array {
 }
 
 /**
- * ترتيب مرشحي الاستعادة: أولاً total_shipments > الحد (الأعلى شحناتاً)، ثم البقية حسب store_id.
+ * خريطة store_id => عدد الطرود ضمن آخر نطاق جُلب بـ orders-summary.php (يُحدَّث عند فتح التطبيق / جلب النطاق).
+ *
+ * @return array<string,int>
+ */
+function wf_orders_range_shipments_map(): array {
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    $path = __DIR__ . '/cache/orders_range_shipments.json';
+    if (!is_readable($path)) {
+        return $map;
+    }
+    $j = json_decode((string) file_get_contents($path), true);
+    if (!is_array($j) || !isset($j['counts']) || !is_array($j['counts'])) {
+        return $map;
+    }
+    foreach ($j['counts'] as $k => $v) {
+        $id = (string) (int) $k;
+        if ($id === '0') {
+            continue;
+        }
+        $map[$id] = (int) $v;
+    }
+
+    return $map;
+}
+
+/**
+ * عدد الطرود/الطلبات لأولوية الاستعادة: نطاق orders-summary إن وُجد المفتاح، وإلا total_shipments من الصف (lite/المجمع).
+ */
+function wf_inactive_priority_parcel_count(array $row): int {
+    $sidNorm = (string) (int) preg_replace('/\D+/', '', (string) ($row['store_id'] ?? ''));
+    if ($sidNorm === '0') {
+        return (int) ($row['total_shipments'] ?? 0);
+    }
+    $rangeMap = wf_orders_range_shipments_map();
+    if (array_key_exists($sidNorm, $rangeMap)) {
+        return (int) $rangeMap[$sidNorm];
+    }
+
+    return (int) ($row['total_shipments'] ?? 0);
+}
+
+/**
+ * ترتيب مرشحي الاستعادة: أولاً عدد الطرود المعتمد > الحد (الأعلى أولاً)، ثم store_id.
  *
  * @param list<array{store_id:mixed,store_name?:string,total_shipments?:int,...}> $rows
  */
 function wf_sort_inactive_recovery_candidates(array &$rows): void {
     $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
     usort($rows, static function (array $a, array $b) use ($min): int {
-        $sa = (int) ($a['total_shipments'] ?? 0);
-        $sb = (int) ($b['total_shipments'] ?? 0);
+        $sa = wf_inactive_priority_parcel_count($a);
+        $sb = wf_inactive_priority_parcel_count($b);
         $pa = $sa > $min ? 1 : 0;
         $pb = $sb > $min ? 1 : 0;
         if ($pb !== $pa) {
@@ -438,7 +484,7 @@ function wf_sort_inactive_recovery_candidates(array &$rows): void {
 }
 
 /**
- * ترتيب صفوف مهام مسؤول الاستعادة المعروضة: نفس أولوية الشحنات، ثم assigned_at.
+ * ترتيب صفوف مهام مسؤول الاستعادة المعروضة: نفس أولوية الطرود، ثم assigned_at.
  *
  * @param list<array<string,mixed>> $rows
  * @return list<array<string,mixed>>
@@ -446,8 +492,8 @@ function wf_sort_inactive_recovery_candidates(array &$rows): void {
 function wf_sort_inactive_manager_task_rows(array $rows): array {
     $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
     usort($rows, static function (array $a, array $b) use ($min): int {
-        $sa = (int) ($a['total_shipments'] ?? 0);
-        $sb = (int) ($b['total_shipments'] ?? 0);
+        $sa = wf_inactive_priority_parcel_count($a);
+        $sb = wf_inactive_priority_parcel_count($b);
         $pa = $sa > $min ? 1 : 0;
         $pb = $sb > $min ? 1 : 0;
         if ($pb !== $pa) {

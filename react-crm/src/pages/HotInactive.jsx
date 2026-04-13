@@ -18,8 +18,24 @@ import {
   isStillRestoringStore,
   isRecoveryCompletedByShipment,
 } from '../constants/storeCategories'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
+
+/** مطابقة الخادم: أولوية لمتاجر «الطرود» في الجدول فوق 5 */
+const INACTIVE_TASK_PARCEL_PRIORITY_MIN = 5
+
+function sortInactiveRecoveryTasksByParcels(stores) {
+  return [...stores].sort((a, b) => {
+    const pa = parcelsInRangeDisplay(a)
+    const pb = parcelsInRangeDisplay(b)
+    const ha = pa > INACTIVE_TASK_PARCEL_PRIORITY_MIN ? 1 : 0
+    const hb = pb > INACTIVE_TASK_PARCEL_PRIORITY_MIN ? 1 : 0
+    if (hb !== ha) return hb - ha
+    if (pb !== pa) return pb - pa
+    return Number(a.id) - Number(b.id)
+  })
+}
 
 function dedupeById(list) {
   const seen = new Set()
@@ -216,8 +232,17 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     if (wfIds.size === 0) {
       return recoveryTasksHotQueue ? [] : filteredStores
     }
-    const scoped = filteredStores.filter(s => wfIds.has(Number(s.id)))
-    if (scoped.length > 0) return scoped
+    /** ترتيب طابور الـ API ثم فرز حسب طرود النطاق (>5) — لا نعتمد ترتيب filteredStores لأنه يُلغي الأولوية */
+    const byId = new Map(filteredStores.map(s => [Number(s.id), s]))
+    const ordered = []
+    for (const t of queueRows) {
+      const id = Number(t.store_id)
+      const s = byId.get(id)
+      if (s) ordered.push(s)
+    }
+    if (ordered.length > 0) {
+      return sortInactiveRecoveryTasksByParcels(ordered)
+    }
     return recoveryTasksHotQueue ? [] : filteredStores
   }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
 
