@@ -121,6 +121,8 @@ if ($action === 'get_my_workflow') {
         }
         $active = wf_enrich_workflow_tasks_from_lite($active);
         $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
+        $active = wf_sort_inactive_manager_task_rows($active);
+        $noAnswer = wf_sort_inactive_manager_task_rows($noAnswer);
         $inactiveDailySuccess = get_inactive_daily_success_count($pdo, $username);
         /** إخفاء الطابور عند 50 «تم التواصل» يومياً — لا يعتمد على حصة الـ50 معالجة العامة. */
         if ($inactiveDailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET) {
