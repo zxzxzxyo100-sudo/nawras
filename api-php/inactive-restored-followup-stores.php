@@ -69,6 +69,7 @@ function irfs_resolve_merchant(PDO $pdo, array $merchants, int $mid, $fallbackSt
             'id'                 => $mid,
             'name'               => (string) ($row['store_name'] ?? $fallbackStoreName ?? ''),
             'registered_at'      => $regAt,
+            'phone'              => '',
             'total_shipments'    => 0,
             'last_shipment_date' => null,
             'status'             => null,
@@ -82,6 +83,7 @@ function irfs_resolve_merchant(PDO $pdo, array $merchants, int $mid, $fallbackSt
             'id'                 => $mid,
             'name'               => (string) ($arow['store_name'] ?? $fallbackStoreName ?? ''),
             'registered_at'      => '',
+            'phone'              => '',
             'total_shipments'    => 0,
             'last_shipment_date' => null,
             'status'             => null,
@@ -226,6 +228,7 @@ function irfs_try_build_row(
         'id'                     => $mid,
         'name'                   => (string) ($m['name'] ?? $meta['store_name'] ?? ''),
         'registered_at'          => $regAt,
+        'phone'                  => isset($m['phone']) ? (string) $m['phone'] : '',
         '_cycle_day'             => $cycleDay,
         '_days_since_reg'        => round($daysReg, 2),
         'assigned_to'            => (string) ($meta['assigned_to'] ?? ''),
@@ -551,6 +554,31 @@ try {
             }
         }
     } catch (Throwable $e2) {
+    }
+}
+
+$phoneLiteMap = [];
+$pLite = __DIR__ . '/cache/stores_search_lite.json';
+if (is_readable($pLite)) {
+    $decodedLite = json_decode((string) file_get_contents($pLite), true);
+    if (is_array($decodedLite)) {
+        foreach ($decodedLite as $liteRow) {
+            if (is_array($liteRow) && isset($liteRow['id'])) {
+                $phoneLiteMap[(string) $liteRow['id']] = isset($liteRow['phone']) ? (string) $liteRow['phone'] : '';
+            }
+        }
+    }
+}
+foreach ($contacted as $i => $it) {
+    $sid = (string) ($it['id'] ?? '');
+    if ($sid !== '' && trim((string) ($it['phone'] ?? '')) === '' && isset($phoneLiteMap[$sid])) {
+        $contacted[$i]['phone'] = $phoneLiteMap[$sid];
+    }
+}
+foreach ($noAnswer as $i => $it) {
+    $sid = (string) ($it['id'] ?? '');
+    if ($sid !== '' && trim((string) ($it['phone'] ?? '')) === '' && isset($phoneLiteMap[$sid])) {
+        $noAnswer[$i]['phone'] = $phoneLiteMap[$sid];
     }
 }
 

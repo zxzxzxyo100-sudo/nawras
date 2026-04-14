@@ -154,6 +154,8 @@ if ($action === 'get_my_workflow') {
                 $inactive_followup_no_answer[] = $fr;
             }
         }
+        $inactive_followup_contacted = wf_enrich_workflow_tasks_from_lite($inactive_followup_contacted);
+        $inactive_followup_no_answer = wf_enrich_workflow_tasks_from_lite($inactive_followup_no_answer);
         jsonResponse([
             'success' => true,
             'queue' => 'inactive',

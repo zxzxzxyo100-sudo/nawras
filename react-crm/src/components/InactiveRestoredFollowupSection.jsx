@@ -38,6 +38,7 @@ function rowToStore(row) {
   return {
     id: row.id,
     name: row.name,
+    phone: row.phone || '',
     registered_at: row.registered_at,
     total_shipments: row.total_shipments,
     last_shipment_date: row.last_shipment_date,
@@ -70,6 +71,7 @@ function mapWorkflowFollowupRow(r, storeStates, allStores) {
   return {
     id: sid,
     name,
+    phone: (fromList?.phone || r.phone || '').trim() || '',
     registered_at,
     _cycle_day: cycle,
     _days_since_reg: Math.round(daysReg * 100) / 100,
@@ -88,12 +90,17 @@ function mapWorkflowFollowupRow(r, storeStates, allStores) {
 }
 
 function applyClientFilters(rows, q, regFrom, regTo) {
-  const needle = q.trim().toLowerCase()
+  const trimmed = q.trim()
+  const needle = trimmed.toLowerCase()
+  const needleDigits = trimmed.replace(/\D/g, '')
   return rows.filter(row => {
-    if (needle) {
+    if (needle || needleDigits) {
       const name = (row.name || '').toLowerCase()
       const idStr = String(row.id)
-      if (!name.includes(needle) && !idStr.includes(needle)) return false
+      const phoneDigits = String(row.phone || '').replace(/\D/g, '')
+      const phoneMatch =
+        needleDigits.length > 0 && phoneDigits.includes(needleDigits)
+      if (!name.includes(needle) && !idStr.includes(needle) && !phoneMatch) return false
     }
     if (regFrom && row.registered_at) {
       const d = String(row.registered_at).slice(0, 10)
@@ -419,6 +426,9 @@ export default function InactiveRestoredFollowupSection({
               <thead>
                 <tr className="bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200 text-right">
                   <th className="px-5 py-3.5 font-semibold">المتجر</th>
+                  {tab === 'no_answer' && (
+                    <th className="px-5 py-3.5 font-semibold whitespace-nowrap">الهاتف</th>
+                  )}
                   <th className="px-5 py-3.5 font-semibold whitespace-nowrap">يوم المتابعة</th>
                   <th className="px-5 py-3.5 font-semibold">مرحلة المكالمة</th>
                   <th className="px-5 py-3.5 font-semibold">أيام منذ التسجيل</th>
@@ -433,7 +443,7 @@ export default function InactiveRestoredFollowupSection({
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-5 py-12 text-center text-slate-500">
+                    <td colSpan={tab === 'no_answer' ? 11 : 10} className="px-5 py-12 text-center text-slate-500">
                       لا توجد متاجر في هذا التبويب — إن لم تُكمل أي مهمة يومية بعد، ستبقى القائمة فارغة حتى يُسجَّل «تم
                       التواصل» أو «لم يرد» على التعيين.
                     </td>
@@ -458,6 +468,11 @@ export default function InactiveRestoredFollowupSection({
                           idClassName="text-xs font-mono text-slate-600 font-semibold"
                         />
                       </td>
+                      {tab === 'no_answer' && (
+                        <td className="px-5 py-4 text-slate-700 text-xs font-mono whitespace-nowrap" dir="ltr">
+                          {s.phone || '—'}
+                        </td>
+                      )}
                       <td className="px-5 py-4 text-slate-800 tabular-nums font-medium">
                         {s._cycle_day != null ? s._cycle_day : '—'}
                       </td>
