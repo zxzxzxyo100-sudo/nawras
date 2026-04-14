@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle } from 'lucide-react'
+import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle, RefreshCw } from 'lucide-react'
 import { setStoreStatus, getAuditLog, postQuickVerificationSubmitNeedsFreeze, getStoreCallLogsRaw } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
@@ -51,6 +51,8 @@ export default function StoreDrawer({
   extraOnSaved = null,
   /** نوع المكالمة لـ log_call (مثلاً inc_call1 لمسار الاحتضان) */
   callType = 'general',
+  /** تبويب «تمت الاستعادة — المنجزة» في غير النشطة: السماح بإرجاع المتجر إلى «جاري الاستعادة» */
+  reopenRecoveryFromRestored = false,
   /** عند فتح الدرج من «المهام اليومية» + اتصال — يُفتح استبيان/تسجيل المكالمة مباشرة */
   autoOpenCallModal = false,
   /** نافذة التسجيل فُتحت من صفحة المهام اليومية — تمرير إلى CallModal لواجهة الاستبيان المفرَضة */
@@ -62,7 +64,7 @@ export default function StoreDrawer({
   const { callLogs, storeStates, reload, lastLoaded } = useStores()
   const [showCallModal, setShowCallModal]   = useState(false)
   /** لوحة يدوية: تجميد | رفع تجميد | بدء استعادة فقط */
-  const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | null
+  const [manualPanel, setManualPanel]       = useState(null) // 'freeze' | 'unfreeze' | 'restore' | 'reopen_recovery' | null
   const [freezeReason, setFreezeReason]     = useState('')
   const [needsFreezeQvReason, setNeedsFreezeQvReason] = useState('')
   const [reason, setReason]                 = useState('')
@@ -153,6 +155,18 @@ export default function StoreDrawer({
     && dbCategory !== 'frozen'
     && !isRestoredForRecoveryLists(store, dbState)
     && dbCategory !== 'restoring'
+
+  const reopenRecoveryRolesOk =
+    user?.role === 'inactive_manager' || user?.role === 'executive'
+  const canReopenRecoveryToProgress =
+    reopenRecoveryFromRestored
+    && reopenRecoveryRolesOk
+    && dbCategory !== 'frozen'
+    && (
+      dbCategory === 'restored'
+      || dbCategory === 'recovered'
+      || (dbCategory === 'restoring' && isRecoveryCompletedByShipment(store, dbState))
+    )
 
   function closeManualPanel() {
     setManualPanel(null)
@@ -284,6 +298,33 @@ export default function StoreDrawer({
     setSaving(false)
   }
 
+  async function submitReopenRecovery() {
+    setActionError('')
+    setSaving(true)
+    try {
+      const payload = {
+        store_id: store.id,
+        store_name: store.name,
+        category: 'restoring',
+        state_reason: reason.trim() || 'إعادة فتح الاستعادة إلى جاري الاستعادة',
+        old_status: dbCategory,
+        merchant_bucket: merchantBucket || 'hot_inactive',
+        user: user?.fullname,
+        user_role: user?.role,
+        username: user?.username,
+      }
+      if (dbCategory === 'restoring') {
+        payload.reset_recovery_window = true
+      }
+      await setStoreStatus(payload)
+      reload()
+      closeManualPanel()
+    } catch (e) {
+      setActionError(e.response?.data?.error || 'تعذّر إرجاع المتجر إلى جاري الاستعادة.')
+    }
+    setSaving(false)
+  }
+
   const CALL_TYPE_LABEL_AR = {
     general: 'مكالمة عامة',
     periodic_followup: 'متابعة دورية',
@@ -372,6 +413,16 @@ export default function StoreDrawer({
                 بدء الاستعادة
               </button>
             )}
+            {canReopenRecoveryToProgress && (
+              <button
+                type="button"
+                onClick={() => { setActionError(''); setReason(''); setManualPanel('reopen_recovery') }}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600/90 hover:bg-teal-600 text-white text-sm font-medium rounded-xl transition-colors"
+              >
+                <RefreshCw size={14} />
+                إرجاع إلى جاري الاستعادة
+              </button>
+            )}
             {showNeedsFreezeQvButton ? (
               <button
                 type="button"
@@ -451,6 +502,21 @@ export default function StoreDrawer({
                 />
               </>
             )}
+            {manualPanel === 'reopen_recovery' && (
+              <>
+                <p className="text-sm font-medium text-amber-900 mb-1">إرجاع إلى جاري الاستعادة</p>
+                <p className="text-[11px] text-amber-800 mb-2 leading-relaxed">
+                  يُعاد المتجر إلى قائمة «جاري الاستعادة» ويُحدَّث تاريخ بدء النافذة. يُنصح عند الحاجة لمتابعة إضافية بعد اكتمال الاستعادة السابقة.
+                </p>
+                <input
+                  type="text"
+                  placeholder="ملاحظة (اختياري)"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mb-2"
+                />
+              </>
+            )}
             {actionError && (
               <p className="text-xs text-red-600 mb-2">{actionError}</p>
             )}
@@ -464,7 +530,9 @@ export default function StoreDrawer({
                       ? submitFreeze
                       : manualPanel === 'unfreeze'
                         ? submitUnfreeze
-                        : submitRestore
+                        : manualPanel === 'reopen_recovery'
+                          ? submitReopenRecovery
+                          : submitRestore
                 }
                 disabled={saving}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-sm font-medium rounded-xl transition-colors"

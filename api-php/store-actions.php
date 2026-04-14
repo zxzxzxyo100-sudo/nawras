@@ -212,8 +212,20 @@ elseif ($action === 'set_status') {
             $err = 'رفع التجميد مسموح فقط عندما تكون الحالة «مجمد». باقي الانتقالات تتم آلياً (مكالمات، شحن، قواعد النظام).';
         }
     } elseif ($category === 'restoring') {
-        if (in_array($currentCat, ['restoring', 'restored', 'recovered'], true)) {
-            $err = 'حالة الاستعادة محددة مسبقاً أو اكتملت.';
+        $resetRecoveryWindow = !empty($input['reset_recovery_window']);
+        $reopenRoles = ['inactive_manager', 'executive'];
+        if (in_array($currentCat, ['restored', 'recovered'], true)) {
+            /** إرجاع متجر «تمت الاستعادة — المنجزة» إلى جاري الاستعادة */
+            if (!in_array($userRole, $reopenRoles, true)) {
+                $err = 'إعادة فتح الاستعادة مسموحة لمسؤول الاستعادة أو المدير التنفيذي فقط.';
+            }
+        } elseif ($currentCat === 'restoring') {
+            /** ما زال restoring في DB لكن اكتُمل شحنياً — إعادة ضبط تاريخ بدء النافذة */
+            if ($resetRecoveryWindow && in_array($userRole, $reopenRoles, true)) {
+                // مسموح
+            } else {
+                $err = 'المتجر قيد الاستعادة بالفعل.';
+            }
         } elseif (!in_array($merchantBucket, ['hot_inactive', 'cold_inactive'], true)) {
             $err = 'بدء الاستعادة يُسمح فقط لمتجر مُصنَّف غير نشط ساخن أو غير نشط بارد.';
         }
@@ -260,7 +272,14 @@ elseif ($action === 'set_status') {
     } elseif ($category === 'frozen') {
         $actionName = 'تجميد المتجر';
     } elseif ($category === 'restoring') {
-        $actionName = 'بدء استعادة';
+        $resetRecoveryWindow = !empty($input['reset_recovery_window']);
+        if (in_array($currentCat, ['restored', 'recovered'], true)) {
+            $actionName = 'إعادة فتح الاستعادة';
+        } elseif ($resetRecoveryWindow && $currentCat === 'restoring') {
+            $actionName = 'تمديد نافذة الاستعادة';
+        } else {
+            $actionName = 'بدء استعادة';
+        }
     } else {
         $actionName = 'تغيير حالة';
     }
