@@ -147,7 +147,8 @@ try {
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
         WHERE DATE(s.created_at) = CURDATE()
-        AND COALESCE(s.survey_kind, '') = 'active_csat'
+        /* سجلات قديمة بلا survey_kind تُعدّ CSAT نشط — مطابقة satisfaction-stats.php */
+        AND COALESCE(NULLIF(TRIM(s.survey_kind), ''), 'active_csat') = 'active_csat'
         ORDER BY s.created_at DESC
     ");
     while ($r = $stA->fetch(PDO::FETCH_ASSOC)) {
