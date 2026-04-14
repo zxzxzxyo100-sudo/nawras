@@ -722,7 +722,60 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
             '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
         ]);
     };
-    $resolveShipments = static function (array $s, int $sid) use ($allStores, $new, $inactive): ?int {
+    $shipmentsById = [];
+    $collectShipments = static function (array $pool) use (&$shipmentsById): void {
+        foreach ($pool as $k => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $sid = (int) ($row['id'] ?? $row['store_id'] ?? $k ?? 0);
+            if ($sid <= 0) {
+                continue;
+            }
+            $v = $row['total_shipments'] ?? null;
+            if ($v === null || $v === '') {
+                continue;
+            }
+            if (is_numeric($v)) {
+                $n = (int) $v;
+            } elseif (is_string($v)) {
+                $t = trim($v);
+                $t = strtr($t, [
+                    '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+                    '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+                    '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+                    '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+                ]);
+                $t = str_replace([',', ' '], '', $t);
+                if (preg_match('/^\d+$/', $t) !== 1) {
+                    continue;
+                }
+                $n = (int) $t;
+            } else {
+                continue;
+            }
+            if (!isset($shipmentsById[$sid]) || $n > $shipmentsById[$sid]) {
+                $shipmentsById[$sid] = $n;
+            }
+        }
+    };
+    $collectShipments($allStores);
+    $collectShipments($new);
+    $collectShipments($inactive);
+    try {
+        $litePath = __DIR__ . '/cache/stores_search_lite.json';
+        if (is_file($litePath)) {
+            $liteRaw = file_get_contents($litePath);
+            $lite = json_decode((string) $liteRaw, true);
+            if (is_array($lite)) {
+                $collectShipments($lite);
+            }
+        }
+    } catch (Throwable $e) {
+        // تجاهل — تكفي البيانات الحية
+    }
+
+    $resolveShipments = static function (array $s, int $sid) use ($allStores, $new, $inactive, $shipmentsById): ?int {
         $parseTotalShipments = static function ($v) use ($normalizeDigits): ?int {
             if ($v === null) {
                 return null;
@@ -754,9 +807,12 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
         }
         $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
         if (is_array($src) && array_key_exists('total_shipments', $src)) {
-            return $parseTotalShipments($src['total_shipments']);
+            $n = $parseTotalShipments($src['total_shipments']);
+            if ($n !== null) {
+                return $n;
+            }
         }
-        return null;
+        return isset($shipmentsById[$sid]) ? (int) $shipmentsById[$sid] : null;
     };
     $bucketById = [];
     foreach (['hot_inactive', 'cold_inactive'] as $bucket) {
@@ -796,17 +852,17 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
                     continue;
                 }
                 $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
-                if (!is_array($src)) {
-                    continue;
-                }
-                $shipments = $resolveShipments($src, $sid);
+                $shipments = $resolveShipments(is_array($src) ? $src : [], $sid);
                 if ($shipments === null || $shipments < $maxExclusive) {
                     continue;
                 }
-                $lc = nawras_compute_lifecycle($src, time());
-                $fallbackBucket = nawras_lifecycle_legacy_bucket($lc);
-                if (!in_array($fallbackBucket, ['hot_inactive', 'cold_inactive'], true)) {
-                    $fallbackBucket = $bucketById[$sid] ?? 'hot_inactive';
+                $fallbackBucket = $bucketById[$sid] ?? 'hot_inactive';
+                if (is_array($src)) {
+                    $lc = nawras_compute_lifecycle($src, time());
+                    $b = nawras_lifecycle_legacy_bucket($lc);
+                    if (in_array($b, ['hot_inactive', 'cold_inactive'], true)) {
+                        $fallbackBucket = $b;
+                    }
                 }
                 $stUnfreeze->execute([$fallbackBucket, $sid]);
             }
