@@ -75,6 +75,23 @@ function fetchShipmentMap(string $url, int $maxPages, array $targetIds): array {
     return $shipMap;
 }
 
+function nawrasParseDateInfo($value): array {
+    $raw = trim((string) $value);
+    if ($raw === '') {
+        return ['ts' => null, 'day' => null, 'has_time' => false];
+    }
+    $norm = str_replace('/', '-', $raw);
+    $hasTime = (bool) preg_match('/(?:T|\s)\d{1,2}:\d{2}/', $norm);
+    $head = strlen($norm) >= 10 ? substr($norm, 0, 10) : $norm;
+    $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $head) ? $head : null;
+    $tsInput = $hasTime ? str_replace(' ', 'T', $norm) : ($head . ' 12:00:00');
+    $ts = strtotime($tsInput);
+    if ($day === null && $ts !== false) {
+        $day = date('Y-m-d', $ts);
+    }
+    return ['ts' => $ts === false ? null : $ts, 'day' => $day, 'has_time' => $hasTime];
+}
+
 /* نطاق واسع مثل all-stores.php — نافذة 30 يوماً كانت تفوت متاجر قديمة في /customers/new */
 $sinceWide = '2020-01-01';
 $targetIds  = array_keys($storeMap);
@@ -109,10 +126,21 @@ foreach ($storeMap as $sid => $storeInfo) {
     $lastShipDate = $shipmentMap[$sid] ?? null;
     if (!$lastShipDate) continue;
 
-    // مقارنة باليوم: طلبية نفس يوم «بدء الاستعادة» تُعتبر لاحقة منطقياً (كانت > توقيت تفوتها)
-    $shipDay    = date('Y-m-d', strtotime($lastShipDate));
-    $restoreDay = date('Y-m-d', strtotime($restoreDate));
-    if ($shipDay >= $restoreDay) {
+    $shipInfo = nawrasParseDateInfo($lastShipDate);
+    $restoreInfo = nawrasParseDateInfo($restoreDate);
+    if (!$shipInfo['day'] || !$restoreInfo['day']) {
+        continue;
+    }
+    $isRecovered = false;
+    if ($shipInfo['has_time'] && $restoreInfo['has_time'] && $shipInfo['ts'] !== null && $restoreInfo['ts'] !== null) {
+        $isRecovered = ($shipInfo['ts'] >= $restoreInfo['ts']);
+    } elseif (!$shipInfo['has_time'] && $restoreInfo['has_time']) {
+        // إذا تاريخ الشحنة بدون وقت: نفس اليوم لا يُغلق نافذة الاستعادة مباشرة بعد إعادة البدء.
+        $isRecovered = ($shipInfo['day'] > $restoreInfo['day']);
+    } else {
+        $isRecovered = ($shipInfo['day'] >= $restoreInfo['day']);
+    }
+    if ($isRecovered) {
         $pdo->prepare("UPDATE store_states SET category = 'recovered', updated_by = 'System / API' WHERE store_id = ?")
             ->execute([$sid]);
 
