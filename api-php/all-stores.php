@@ -707,11 +707,96 @@ function nawras_filter_out_store_id(array &$stores, $id) {
     }));
 }
 
+/**
+ * غير نشط ساخن / بارد: إجمالي شحنات المنصة (total_shipments) أقل من 5 → تجميد تلقائي في store_states
+ * وإزالة المتجر من hot_inactive و cold_inactive في نفس الاستجابة.
+ * لا يُجمَّد متجر في مسار استعادة نشط (restoring / restored / recovered) أو مجمّد مسبقاً.
+ */
+function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, array $allStores, array $new, array $inactive): void {
+    $maxExclusive = 5;
+    $candidates = [];
+    foreach (['hot_inactive', 'cold_inactive'] as $bucket) {
+        foreach ($result[$bucket] ?? [] as $s) {
+            if (!is_array($s)) {
+                continue;
+            }
+            if (!empty($s['status']) && $s['status'] !== 'active') {
+                continue;
+            }
+            $sid = (int) ($s['id'] ?? 0);
+            if ($sid <= 0) {
+                continue;
+            }
+            if ((int) ($s['total_shipments'] ?? 0) >= $maxExclusive) {
+                continue;
+            }
+            $candidates[$sid] = $s;
+        }
+    }
+    if ($candidates === []) {
+        return;
+    }
+    $ids = array_keys($candidates);
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    $skip = [];
+    try {
+        $chk = $pdoDb->prepare("SELECT store_id, category FROM store_states WHERE store_id IN ($ph)");
+        $chk->execute($ids);
+        while ($r = $chk->fetch(PDO::FETCH_ASSOC)) {
+            $cat = trim((string) ($r['category'] ?? ''));
+            if (in_array($cat, ['restoring', 'restored', 'recovered', 'frozen'], true)) {
+                $skip[(int) $r['store_id']] = true;
+            }
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+    try {
+        $pdoDb->exec('ALTER TABLE store_states ADD COLUMN freeze_reason TEXT NULL');
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdoDb->exec('ALTER TABLE store_states ADD COLUMN state_reason VARCHAR(100) NULL DEFAULT NULL');
+    } catch (Throwable $e) {
+    }
+    $freezeReason = 'تجميد تلقائي: أقل من 5 طلبات شحن (إجمالي المنصة).';
+    $stateReason = 'auto_total_shipments_lt5';
+    $stIns = $pdoDb->prepare(
+        'INSERT INTO store_states (store_id, store_name, category, state_reason, freeze_reason, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE category = VALUES(category), state_reason = VALUES(state_reason),
+         freeze_reason = VALUES(freeze_reason), updated_by = VALUES(updated_by), store_name = COALESCE(NULLIF(VALUES(store_name), \'\'), store_name)'
+    );
+    foreach ($candidates as $sid => $s) {
+        if (!empty($skip[$sid])) {
+            continue;
+        }
+        $name = trim((string) ($s['name'] ?? ''));
+        if ($name === '') {
+            $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
+            if (is_array($src)) {
+                $name = trim((string) ($src['name'] ?? ''));
+            }
+        }
+        if ($name === '') {
+            $name = (string) $sid;
+        }
+        try {
+            $stIns->execute([$sid, $name, 'frozen', $stateReason, $freezeReason, 'system']);
+        } catch (Throwable $e) {
+            continue;
+        }
+        nawras_filter_out_store_id($result['hot_inactive'], $sid);
+        nawras_filter_out_store_id($result['cold_inactive'], $sid);
+    }
+}
+
 try {
     if (!isset($pdoDb)) {
         require_once __DIR__ . '/db.php';
         $pdoDb = getDB();
     }
+    nawras_auto_freeze_inactive_low_orders($pdoDb, $result, $allStores, $new, $inactive);
     $stFrozen = $pdoDb->query("SELECT store_id, freeze_reason, updated_by FROM store_states WHERE category = 'frozen'");
     $frozenRows = $stFrozen ? $stFrozen->fetchAll(PDO::FETCH_ASSOC) : [];
     $frozenById = [];
