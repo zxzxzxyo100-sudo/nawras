@@ -289,6 +289,18 @@ export const getExecutiveStaffGoals = (opts = {}) =>
     })
     .then(r => r.data)
 
+/** تقرير الاستعادة — للمدير التنفيذي (من/إلى + عدد بدأ الاستعادة + عدد تم الاستعادة + النسبة) */
+export const getRecoveryReport = (opts = {}) =>
+  http
+    .get('/recovery-report.php', {
+      params: {
+        user_role: 'executive',
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+      },
+    })
+    .then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http

@@ -188,6 +188,12 @@ export default function TeamPerformanceStatistics() {
             >
               تقرير معدل الرضا
             </Link>
+            <Link
+              to="/staff-performance/recovery-report"
+              className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-2 text-sm font-semibold text-teal-900 hover:bg-teal-100"
+            >
+              تقرير الاستعادة
+            </Link>
               <button
                 type="button"
                 onClick={() => fetchStats(dateFrom, dateTo)}

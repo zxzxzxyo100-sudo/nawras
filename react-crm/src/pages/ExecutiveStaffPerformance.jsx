@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BarChart2, RefreshCw, Target, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -134,6 +135,14 @@ export default function ExecutiveStaffPerformance() {
           <p className="text-xs text-emerald-800 mt-1">
             {recoveryStats.restored_count || 0} مستعادة من أصل {recoveryStats.restoring_started_count || 0} بدأت الاستعادة في الفترة المحددة.
           </p>
+          <div className="mt-2">
+            <Link
+              to="/staff-performance/recovery-report"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-50"
+            >
+              فتح تقرير الاستعادة
+            </Link>
+          </div>
         </div>
       )}
 
