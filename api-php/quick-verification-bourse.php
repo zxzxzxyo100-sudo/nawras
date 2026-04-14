@@ -30,6 +30,16 @@ if ($userRole !== 'executive' && $requestUsername === '') {
 
 $pdo = getDB();
 
+/**
+ * توحيد "اليوم" وفق توقيت العمل (بغداد) بدل CURDATE() الخاص بسيرفر/DB
+ * حتى لا تضيع سجلات تم تسجيلها اليوم محلياً.
+ */
+$appTz = new DateTimeZone('Asia/Baghdad');
+$todayStartDt = new DateTimeImmutable('today', $appTz);
+$tomorrowStartDt = $todayStartDt->modify('+1 day');
+$todayStart = $todayStartDt->format('Y-m-d H:i:s');
+$tomorrowStart = $tomorrowStartDt->format('Y-m-d H:i:s');
+
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_resolutions (
         survey_id INT NOT NULL PRIMARY KEY,
@@ -61,7 +71,7 @@ $rows = [];
 $activeCsatRows = [];
 
 try {
-    $st = $pdo->query("
+    $st = $pdo->prepare("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           COALESCE(ss.category, '') AS store_category,
           s.q1_delivery, s.q2_collection, s.q3_support,
@@ -73,10 +83,12 @@ try {
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
-        WHERE DATE(s.created_at) = CURDATE()
+        WHERE s.created_at >= ?
+        AND s.created_at < ?
         AND COALESCE(s.survey_kind, '') = 'new_merchant_onboarding'
         ORDER BY s.created_at DESC
     ");
+    $st->execute([$todayStart, $tomorrowStart]);
     while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
         $q = [(int) ($r['q1_delivery'] ?? 0), (int) ($r['q2_collection'] ?? 0), (int) ($r['q3_support'] ?? 0)];
         $answers = [];
@@ -134,7 +146,7 @@ try {
         ];
     }
 
-    $stA = $pdo->query("
+    $stA = $pdo->prepare("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           COALESCE(ss.category, '') AS store_category,
           s.q1_delivery, s.q2_collection, s.q3_support, s.q4_app, s.q5_payments, s.q6_returns,
@@ -146,10 +158,13 @@ try {
         FROM surveys s
         LEFT JOIN store_states ss ON ss.store_id = s.store_id
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
-        WHERE DATE(s.created_at) = CURDATE()
-        AND COALESCE(s.survey_kind, '') = 'active_csat'
+        WHERE s.created_at >= ?
+        AND s.created_at < ?
+        /* سجلات قديمة بلا survey_kind تُعدّ CSAT نشط — مطابقة satisfaction-stats.php */
+        AND COALESCE(NULLIF(TRIM(s.survey_kind), ''), 'active_csat') = 'active_csat'
         ORDER BY s.created_at DESC
     ");
+    $stA->execute([$todayStart, $tomorrowStart]);
     while ($r = $stA->fetch(PDO::FETCH_ASSOC)) {
         $qs = [
             (int) ($r['q1_delivery'] ?? 0),
@@ -370,14 +385,16 @@ if ($userRole === 'executive') {
             $pdo->exec('ALTER TABLE quick_verification_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
         } catch (Throwable $e) {
         }
-        $stF = $pdo->query("
+        $stF = $pdo->prepare("
             SELECT a.id, a.store_id, a.store_name, a.freeze_reason, a.frozen_by, a.frozen_by_username, a.created_at,
               qfr.resolved_at AS qv_resolved_at, qfr.resolved_by AS qv_resolved_by, qfr.executive_notes AS qv_executive_notes
             FROM qv_freeze_alerts a
             LEFT JOIN quick_verification_freeze_resolutions qfr ON qfr.freeze_alert_id = a.id
-            WHERE DATE(a.created_at) = CURDATE()
+            WHERE a.created_at >= ?
+            AND a.created_at < ?
             ORDER BY a.created_at DESC
         ");
+        $stF->execute([$todayStart, $tomorrowStart]);
         if ($stF) {
             while ($fr = $stF->fetch(PDO::FETCH_ASSOC)) {
                 $qvAt = $fr['qv_resolved_at'] ?? null;
@@ -434,15 +451,17 @@ try {
         $pdo->exec('ALTER TABLE quick_verification_needs_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
     } catch (Throwable $e) {
     }
-    $stN = $pdo->query("
+    $stN = $pdo->prepare("
         SELECT r.id, r.store_id, r.store_name, r.reason, r.source,
           r.requested_by_username, r.requested_by_fullname, r.created_at,
           res.resolved_at AS qv_resolved_at, res.resolved_by AS qv_resolved_by, res.executive_notes AS qv_executive_notes
         FROM qv_needs_freeze_requests r
         LEFT JOIN quick_verification_needs_freeze_resolutions res ON res.needs_freeze_id = r.id
-        WHERE DATE(r.created_at) = CURDATE()
+        WHERE r.created_at >= ?
+        AND r.created_at < ?
         ORDER BY r.created_at DESC
     ");
+    $stN->execute([$todayStart, $tomorrowStart]);
     if ($stN) {
         while ($nr = $stN->fetch(PDO::FETCH_ASSOC)) {
             $qvAt = $nr['qv_resolved_at'] ?? null;

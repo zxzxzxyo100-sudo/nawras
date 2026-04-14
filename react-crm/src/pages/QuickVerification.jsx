@@ -57,7 +57,8 @@ function satisfactionPercent(row) {
 /** رأس تنفيذي — تدرج عميق، شبكة خفيفة، مؤشرات زجاجية */
 function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
   const n = Math.min(100, Math.max(0, Number(globalSat) || 0))
-  const sat = loading ? null : n === 100 ? '100' : String(n).padStart(2, '0')
+  /** بدون padStart: كان 1% يُعرض كصندوقين «0» و«1» فيُقرأ خطأً كـ 001% */
+  const sat = loading ? null : String(n)
   return (
     <header
       className="relative isolate w-full overflow-hidden rounded-b-[1.35rem] border border-white/15 border-t-0 shadow-[0_8px_0_0_rgba(167,139,250,0.12),0_28px_80px_-28px_rgba(15,23,42,0.75),inset_0_1px_0_rgba(255,255,255,0.18)] ring-1 ring-violet-300/25 ring-offset-0 backdrop-blur-2xl sm:rounded-b-[1.75rem]"
