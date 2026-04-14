@@ -958,7 +958,7 @@ try {
         require_once __DIR__ . '/db.php';
         $pdoDb = getDB();
     }
-    nawras_auto_freeze_inactive_low_orders($pdoDb, $result, $allStores, $new, $inactive);
+    // تم إيقاف التجميد التلقائي نهائياً بناءً على طلب التشغيل.
     $stFrozen = $pdoDb->query("SELECT store_id, freeze_reason, state_reason, updated_by FROM store_states WHERE category = 'frozen'");
     $frozenRows = $stFrozen ? $stFrozen->fetchAll(PDO::FETCH_ASSOC) : [];
     $frozenById = [];
@@ -969,37 +969,10 @@ try {
         }
         $frozenById[$fid] = $fr;
     }
-    $normalizeDigitsFrozen = static function (string $s): string {
-        return strtr($s, [
-            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
-            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
-            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
-            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
-        ]);
-    };
-    $parseShipmentsFrozen = static function ($v) use ($normalizeDigitsFrozen): ?int {
-        if ($v === null || $v === '') {
-            return null;
-        }
-        if (is_int($v)) {
-            return $v >= 0 ? $v : null;
-        }
-        if (is_float($v)) {
-            return $v >= 0 ? (int) floor($v) : null;
-        }
-        if (is_string($v)) {
-            $t = trim($normalizeDigitsFrozen($v));
-            $t = str_replace([',', ' '], '', $t);
-            if (preg_match('/^\d+$/', $t) === 1) {
-                return (int) $t;
-            }
-        }
-        return null;
-    };
     if (!empty($frozenById)) {
-        $stAutoUnfreeze = $pdoDb->prepare(
+        $stAutoRollback = $pdoDb->prepare(
             "UPDATE store_states
-             SET category = ?, state_reason = 'auto_unfrozen_total_shipments_ge5', freeze_reason = '', updated_by = 'system'
+             SET category = ?, state_reason = 'auto_freeze_disabled_restore', freeze_reason = '', updated_by = 'system'
              WHERE store_id = ? AND category = 'frozen'"
         );
         foreach ($frozenById as $fid => $fr) {
@@ -1013,24 +986,19 @@ try {
                 continue;
             }
             $src = $allStores[$fid] ?? $new[$fid] ?? $inactive[$fid] ?? null;
-            if (!is_array($src)) {
-                continue;
-            }
-            $shipments = $parseShipmentsFrozen($src['total_shipments'] ?? null);
-            if ($shipments === null || $shipments < 5) {
-                continue;
-            }
             $bucket = 'hot_inactive';
             try {
-                $lc = nawras_compute_lifecycle($src, $now);
-                $b = nawras_lifecycle_legacy_bucket($lc);
-                if (in_array($b, ['hot_inactive', 'cold_inactive'], true)) {
-                    $bucket = $b;
+                if (is_array($src)) {
+                    $lc = nawras_compute_lifecycle($src, $now);
+                    $b = nawras_lifecycle_legacy_bucket($lc);
+                    if (in_array($b, ['hot_inactive', 'cold_inactive'], true)) {
+                        $bucket = $b;
+                    }
                 }
             } catch (Throwable $e) {
             }
             try {
-                $stAutoUnfreeze->execute([$bucket, $fid]);
+                $stAutoRollback->execute([$bucket, $fid]);
                 unset($frozenById[$fid]);
             } catch (Throwable $e) {
                 // إن فشل التحديث نبقي المتجر مجمداً كما هو
