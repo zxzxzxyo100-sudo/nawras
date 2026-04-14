@@ -213,11 +213,29 @@ elseif ($action === 'set_status') {
         }
     } elseif ($category === 'restoring') {
         $resetRecoveryWindow = !empty($input['reset_recovery_window']);
+        $reopenInactiveFollowup = !empty($input['reopen_from_inactive_followup']);
         $reopenRoles = ['inactive_manager', 'executive'];
         if (in_array($currentCat, ['restored', 'recovered'], true)) {
             /** إرجاع متجر «تمت الاستعادة — المنجزة» إلى جاري الاستعادة */
             if (!in_array($userRole, $reopenRoles, true)) {
                 $err = 'إعادة فتح الاستعادة مسموحة لمسؤول الاستعادة أو المدير التنفيذي فقط.';
+            }
+        } elseif ($reopenInactiveFollowup && in_array($userRole, $reopenRoles, true)) {
+            /** متجر ظهر في «المتاجر غير النشطة المنجزة» بعد إكمال تعيين الطابور دون أن تكون فئة store_states بعد restored */
+            if ($currentCat === 'restoring') {
+                $err = 'المتجر قيد الاستعادة بالفعل.';
+            } else {
+                ensure_store_assignments_workflow($pdo);
+                $chk = $pdo->prepare("
+                SELECT 1 FROM store_assignments
+                WHERE store_id = ? AND assignment_queue = 'inactive'
+                AND workflow_status IN ('completed','no_answer')
+                LIMIT 1
+            ");
+                $chk->execute([$storeId]);
+                if (!$chk->fetchColumn()) {
+                    $err = 'لا يوجد تعيين متابعة غير نشط منجز لهذا المتجر يسمح بإعادة فتح الاستعادة.';
+                }
             }
         } elseif ($currentCat === 'restoring') {
             /** ما زال restoring في DB لكن اكتُمل شحنياً — إعادة ضبط تاريخ بدء النافذة */
@@ -273,10 +291,13 @@ elseif ($action === 'set_status') {
         $actionName = 'تجميد المتجر';
     } elseif ($category === 'restoring') {
         $resetRecoveryWindow = !empty($input['reset_recovery_window']);
+        $reopenInactiveFollowup = !empty($input['reopen_from_inactive_followup']);
         if (in_array($currentCat, ['restored', 'recovered'], true)) {
             $actionName = 'إعادة فتح الاستعادة';
         } elseif ($resetRecoveryWindow && $currentCat === 'restoring') {
             $actionName = 'تمديد نافذة الاستعادة';
+        } elseif ($reopenInactiveFollowup) {
+            $actionName = 'إعادة فتح الاستعادة (متابعة منجزة)';
         } else {
             $actionName = 'بدء استعادة';
         }

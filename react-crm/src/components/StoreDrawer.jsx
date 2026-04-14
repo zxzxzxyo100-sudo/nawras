@@ -158,14 +158,15 @@ export default function StoreDrawer({
 
   const reopenRecoveryRolesOk =
     user?.role === 'inactive_manager' || user?.role === 'executive'
+  const assignmentWf = String(store.assignment_workflow_status || '').trim()
   const canReopenRecoveryToProgress =
     reopenRecoveryFromRestored
     && reopenRecoveryRolesOk
     && dbCategory !== 'frozen'
     && (
-      dbCategory === 'restored'
-      || dbCategory === 'recovered'
-      || (dbCategory === 'restoring' && isRecoveryCompletedByShipment(store, dbState))
+      isRestoredForRecoveryLists(store, dbState)
+      || assignmentWf === 'completed'
+      || assignmentWf === 'no_answer'
     )
 
   function closeManualPanel() {
@@ -313,8 +314,10 @@ export default function StoreDrawer({
         user_role: user?.role,
         username: user?.username,
       }
-      if (dbCategory === 'restoring') {
+      if (dbCategory === 'restoring' && dbState && isRecoveryCompletedByShipment(store, dbState)) {
         payload.reset_recovery_window = true
+      } else if (!['restored', 'recovered'].includes(dbCategory)) {
+        payload.reopen_from_inactive_followup = true
       }
       await setStoreStatus(payload)
       reload()
