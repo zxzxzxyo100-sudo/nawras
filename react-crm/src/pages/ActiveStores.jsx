@@ -352,17 +352,51 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     })
   }, [isActiveManager, user?.username, filteredActive, assignments])
 
+  /**
+   * كان العرض: base.filter(id => في الطابور) — فيضيع أي متجر معيّن في الطابور لكنه غير موجود
+   * في active_shipping (تصنيف all-stores مختلف أو تأخر التحديث). نبني الصفوف من مهام الـ API
+   * وندمج البيانات الكاملة من القائمة المحلية عند وجودها.
+   */
   const pendingStoresForTable = useMemo(() => {
     if (!isPendingTab || !isActiveManager || !user?.username) return null
     const base = workflowPendingForUser
     if (!activeWf) return base
     if (activeWf.daily_quota?.quota_reached) return []
-    const wfIds = new Set(
-      [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])].map(t => Number(t.store_id)),
-    )
-    if (wfIds.size === 0) return base
-    const scoped = base.filter(s => wfIds.has(Number(s.id)))
-    return scoped
+    const tasks = [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])]
+    if (tasks.length === 0) return base
+
+    const byId = new Map(base.map(s => [Number(s.id), s]))
+    const out = []
+    const seen = new Set()
+    for (const t of tasks) {
+      const id = Number(t.store_id)
+      if (!Number.isFinite(id) || id <= 0) continue
+      if (seen.has(id)) continue
+      seen.add(id)
+      const existing = byId.get(id)
+      if (existing) {
+        out.push(existing)
+      } else {
+        const nm = (t.store_name && String(t.store_name).trim()) ? t.store_name : `متجر #${id}`
+        const phone = t.phone != null && String(t.phone).trim() ? String(t.phone).trim() : ''
+        const regAt = t.registered_at != null && String(t.registered_at).trim() ? String(t.registered_at).trim() : null
+        const lastShip =
+          t.last_shipment_date != null && String(t.last_shipment_date).trim()
+            ? String(t.last_shipment_date).trim()
+            : null
+        out.push({
+          id,
+          name: nm,
+          phone,
+          registered_at: regAt,
+          last_shipment_date: lastShip,
+          total_shipments: Number(t.total_shipments) || 0,
+          shipments_in_range: Number(t.shipments_in_range) || 0,
+          _workflowQueueOnly: true,
+        })
+      }
+    }
+    return out
   }, [isPendingTab, isActiveManager, user?.username, activeWf, workflowPendingForUser])
 
   const pendingDisplayStores =

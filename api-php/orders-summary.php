@@ -78,6 +78,28 @@ do {
 $allData      = array_values($storeMap);
 $totalShips   = array_sum(array_column($allData, 'total_shipments'));
 
+/** خريطة خفيفة لطابور الاستعادة: عدد الطرود/الطلبات ضمن نفس نطاق from/to (مثل عمود «الطرود» في المهام) */
+$cacheDir = __DIR__ . '/cache';
+if (!is_dir($cacheDir)) {
+    @mkdir($cacheDir, 0755, true);
+}
+$rangeCounts = [];
+foreach ($storeMap as $sid => $st) {
+    if (!is_array($st)) {
+        continue;
+    }
+    $rangeCounts[(string) (int) $sid] = (int) ($st['total_shipments'] ?? 0);
+}
+@file_put_contents(
+    $cacheDir . '/orders_range_shipments.json',
+    json_encode([
+        'updated_at' => date('c'),
+        'from'       => $from,
+        'to'         => $to,
+        'counts'     => $rangeCounts,
+    ], JSON_UNESCAPED_UNICODE)
+);
+
 echo json_encode([
     'success'          => true,
     'data'             => $allData,

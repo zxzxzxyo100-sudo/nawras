@@ -19,6 +19,58 @@ function wf_ensure_call_logs_outcome(PDO $pdo) {
     $done = true;
 }
 
+/**
+ * يدمج هاتف/تسجيل/شحن من cache/stores_search_lite.json (يُحدَّث عند تشغيل all-stores.php)
+ * حتى لا تظهر مهام الطابور بصفوف فارغة عندما لا يكون المتجر ضمن active_shipping في الواجهة.
+ *
+ * @param list<array<string,mixed>> $tasks
+ * @return list<array<string,mixed>>
+ */
+function wf_enrich_workflow_tasks_from_lite(array $tasks): array {
+    static $liteById = null;
+    if ($liteById === null) {
+        $liteById = [];
+        $path = __DIR__ . '/cache/stores_search_lite.json';
+        if (is_readable($path)) {
+            $raw = file_get_contents($path);
+            $list = json_decode($raw !== false ? $raw : '', true);
+            if (is_array($list)) {
+                foreach ($list as $row) {
+                    if (!is_array($row) || !isset($row['id'])) {
+                        continue;
+                    }
+                    $id = (string) (int) $row['id'];
+                    if ($id === '0') {
+                        continue;
+                    }
+                    $liteById[$id] = $row;
+                }
+            }
+        }
+    }
+    if ($liteById === []) {
+        return $tasks;
+    }
+    foreach ($tasks as &$t) {
+        if (!is_array($t)) {
+            continue;
+        }
+        $rawSid = $t['store_id'] ?? '';
+        $sid = (string) (int) preg_replace('/\D+/', '', (string) $rawSid);
+        if ($sid === '0' || $sid === '' || !isset($liteById[$sid])) {
+            continue;
+        }
+        $L = $liteById[$sid];
+        $t['phone'] = isset($L['phone']) ? (string) $L['phone'] : '';
+        $t['registered_at'] = isset($L['registered_at']) ? (string) $L['registered_at'] : '';
+        $t['last_shipment_date'] = isset($L['last_shipment_date']) ? (string) $L['last_shipment_date'] : '';
+        $t['total_shipments'] = (int) ($L['total_shipments'] ?? 0);
+    }
+    unset($t);
+
+    return $tasks;
+}
+
 $pdo = getDB();
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
@@ -67,6 +119,16 @@ if ($action === 'get_my_workflow') {
                 $active[] = $r;
             }
         }
+        $active = wf_enrich_workflow_tasks_from_lite($active);
+        $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
+        $active = array_values(array_filter($active, static function (array $r): bool {
+            return wf_inactive_queue_parcel_eligible($r);
+        }));
+        $noAnswer = array_values(array_filter($noAnswer, static function (array $r): bool {
+            return wf_inactive_queue_parcel_eligible($r);
+        }));
+        $active = wf_sort_inactive_manager_task_rows($active);
+        $noAnswer = wf_sort_inactive_manager_task_rows($noAnswer);
         $inactiveDailySuccess = get_inactive_daily_success_count($pdo, $username);
         /** إخفاء الطابور عند 50 «تم التواصل» يومياً — لا يعتمد على حصة الـ50 معالجة العامة. */
         if ($inactiveDailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET) {
@@ -120,6 +182,7 @@ if ($action === 'get_my_workflow') {
     if ($listType === 'delayed') {
         require_once __DIR__ . '/incubation-delay-lib.php';
         $delayed = wf_build_active_manager_delayed_task_list($pdo, $username);
+        $delayed = wf_enrich_workflow_tasks_from_lite($delayed);
         if ($dailyQuota['quota_reached']) {
             $delayed = [];
         }
@@ -179,6 +242,9 @@ if ($action === 'get_my_workflow') {
     ");
     $stNoAns->execute([$username]);
     $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
+
+    $active = wf_enrich_workflow_tasks_from_lite($active);
+    $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
 
     if ($dailyQuota['quota_reached']) {
         $active = [];

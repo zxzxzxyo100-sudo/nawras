@@ -1,7 +1,7 @@
 <?php
 /**
  * أهداف اليوم لكل موظف تشغيلي — للمدير التنفيذي فقط.
- * نشط: تعيينات مكتملة اليوم (تم التواصل + استبيان) / 50
+ * نشط: نفس عدّاد الحصة اليومية (employee_daily_processed_stores) — يتوافق مع «الحصة 1/50» في المهام
  * استعادة: اتصالات ناجحة مسجّلة في inactive_manager_daily_stats / 50
  * احتضان: مكالمات المسار (inc_call1–3 و day0/3/10) + مكالمة «عامة» من الواجهة (call_type=general و performed_role=incubation_manager) / اليوم
  */
@@ -10,6 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/workflow-queue-lib.php';
+require_once __DIR__ . '/daily-quota-lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -67,17 +68,10 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
     if ($role === 'active_manager') {
         $entry['role_label_ar'] = 'مسؤول المتاجر النشطة';
         $entry['metric_key'] = 'active_completed_today';
-        $entry['target'] = $targetActive;
-        $c = $pdo->prepare("
-            SELECT COUNT(*) FROM store_assignments
-            WHERE assigned_to = ?
-            AND assignment_queue = 'active'
-            AND workflow_status = 'completed'
-            AND DATE(COALESCE(workflow_updated_at, assigned_at)) = CURDATE()
-        ");
-        $c->execute([$un]);
-        $n = (int) $c->fetchColumn();
-        $entry['done_today'] = $n;
+        nawras_ensure_daily_quota_schema($pdo);
+        $dq = getDailyProgress($pdo, $un);
+        $entry['done_today'] = (int) ($dq['count'] ?? 0);
+        $entry['target'] = (int) ($dq['limit'] ?? $targetActive);
     } elseif ($role === 'inactive_manager') {
         $entry['role_label_ar'] = 'مسؤول الاستعادة';
         $entry['metric_key'] = 'inactive_success_today';
@@ -147,5 +141,5 @@ echo json_encode([
         'inactive_daily' => $targetInactive,
         'incubation_daily' => $targetInc,
     ],
-    'note_ar' => 'النشط والاستعادة: الهدف اليومي حسب الطابور. الاحتضان: مكالمات المسار (1–3 و day0/3/10) أو مكالمة عامة (general) عندما يكون الدور مسؤول احتضان — اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
+    'note_ar' => 'النشط: نفس عدّاد الحصة اليومية في المهام (متاجر مُعالَجة اليوم). الاستعادة: اتصالات ناجحة مسجّلة اليوم. الاحتضان: مكالمات المسار (1–3 و day0/3/10) أو مكالمة عامة (general) عندما يكون الدور مسؤول احتضان — اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
 ], JSON_UNESCAPED_UNICODE);
