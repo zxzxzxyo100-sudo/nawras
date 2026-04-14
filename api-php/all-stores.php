@@ -714,8 +714,16 @@ function nawras_filter_out_store_id(array &$stores, $id) {
  */
 function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, array $allStores, array $new, array $inactive): void {
     $maxExclusive = 5;
+    $normalizeDigits = static function (string $s): string {
+        return strtr($s, [
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        ]);
+    };
     $resolveShipments = static function (array $s, int $sid) use ($allStores, $new, $inactive): ?int {
-        $parseTotalShipments = static function ($v): ?int {
+        $parseTotalShipments = static function ($v) use ($normalizeDigits): ?int {
             if ($v === null) {
                 return null;
             }
@@ -730,6 +738,8 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
                 if ($t === '') {
                     return null;
                 }
+                $t = $normalizeDigits($t);
+                $t = str_replace([',', ' '], '', $t);
                 // اعتماد مباشر لحقل total_shipments فقط كرقم طرود.
                 if (preg_match('/^\d+$/', $t) === 1) {
                     return (int) $t;
@@ -766,7 +776,6 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
             SELECT store_id
             FROM store_states
             WHERE category = 'frozen'
-              AND updated_by = 'system'
               AND (
                     state_reason = 'auto_total_shipments_lt5'
                     OR state_reason = 'auto_total_shipments_lt5_or_unknown'
@@ -779,7 +788,7 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
             $stUnfreeze = $pdoDb->prepare(
                 "UPDATE store_states
                  SET category = ?, state_reason = 'auto_unfrozen_total_shipments_ge5', freeze_reason = '', updated_by = 'system'
-                 WHERE store_id = ? AND category = 'frozen' AND updated_by = 'system'"
+                 WHERE store_id = ? AND category = 'frozen'"
             );
             foreach ($prevAutoRows as $r) {
                 $sid = (int) ($r['store_id'] ?? 0);
