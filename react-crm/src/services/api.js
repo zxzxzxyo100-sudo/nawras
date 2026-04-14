@@ -278,9 +278,15 @@ export const getInactiveRecoveryDailyStatus = () =>
     .then(r => r.data)
 
 /** أداء الفريق — أهداف اليوم حسب الدور (نشط / استعادة / احتضان) */
-export const getExecutiveStaffGoals = () =>
+export const getExecutiveStaffGoals = (opts = {}) =>
   http
-    .get('/executive-staff-goals.php', { params: { user_role: 'executive' } })
+    .get('/executive-staff-goals.php', {
+      params: {
+        user_role: 'executive',
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+      },
+    })
     .then(r => r.data)
 
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
