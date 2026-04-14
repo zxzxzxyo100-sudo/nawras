@@ -714,6 +714,31 @@ function nawras_filter_out_store_id(array &$stores, $id) {
  */
 function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, array $allStores, array $new, array $inactive): void {
     $maxExclusive = 5;
+    $resolveShipments = static function (array $s, int $sid) use ($allStores, $new, $inactive): ?int {
+        $vals = [];
+        if (array_key_exists('total_shipments', $s)) {
+            $vals[] = $s['total_shipments'];
+        }
+        $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
+        if (is_array($src) && array_key_exists('total_shipments', $src)) {
+            $vals[] = $src['total_shipments'];
+        }
+        foreach ($vals as $v) {
+            if ($v === null || $v === '') {
+                continue;
+            }
+            if (is_numeric($v)) {
+                return (int) $v;
+            }
+            if (is_string($v)) {
+                $clean = preg_replace('/[^\d]/', '', $v);
+                if ($clean !== null && $clean !== '') {
+                    return (int) $clean;
+                }
+            }
+        }
+        return null;
+    };
     $candidates = [];
     foreach (['hot_inactive', 'cold_inactive'] as $bucket) {
         foreach ($result[$bucket] ?? [] as $s) {
@@ -727,7 +752,12 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
             if ($sid <= 0) {
                 continue;
             }
-            if ((int) ($s['total_shipments'] ?? 0) >= $maxExclusive) {
+            $shipments = $resolveShipments($s, $sid);
+            /** لا نجمّد تلقائياً عند غياب رقم موثوق لإجمالي الشحنات. */
+            if ($shipments === null) {
+                continue;
+            }
+            if ($shipments >= $maxExclusive) {
                 continue;
             }
             $candidates[$sid] = $s;
