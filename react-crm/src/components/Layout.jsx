@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
@@ -19,6 +19,15 @@ function LayoutInner() {
   const { pathname } = useLocation()
   /** التحقيق السريع: عرض كامل ملتصق بحواف منطقة المحتوى (دون p-4 الافتراضية) */
   const isQuickVerification = pathname === '/quick-verification'
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [sidebarOpen])
 
   return (
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
@@ -142,7 +151,7 @@ function LayoutInner() {
       </div>
 
       {/* زر الاتصال العائم — للموظفين فقط */}
-      {FLOATING_CALL_ROLES.includes(user?.role) && <FloatingCallBar />}
+      {FLOATING_CALL_ROLES.includes(user?.role) && !sidebarOpen && <FloatingCallBar />}
     </div>
   )
 }
