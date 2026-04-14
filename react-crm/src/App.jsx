@@ -23,6 +23,7 @@ import ExecutiveStaffPerformance from './pages/ExecutiveStaffPerformance'
 import TeamPerformanceStatistics from './pages/TeamPerformanceStatistics'
 import ConversionRateReport from './pages/ConversionRateReport'
 import SatisfactionReport from './pages/SatisfactionReport'
+import RecoveryReport from './pages/RecoveryReport'
 import Tasks from './pages/Tasks'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
@@ -140,6 +141,10 @@ function AppRoutes() {
         <Route
           path="/staff-performance/satisfaction-report"
           element={<PrivateRoute view="staff_performance"><SatisfactionReport /></PrivateRoute>}
+        />
+        <Route
+          path="/staff-performance/recovery-report"
+          element={<PrivateRoute view="staff_performance"><RecoveryReport /></PrivateRoute>}
         />
         <Route
           path="/staff-performance"

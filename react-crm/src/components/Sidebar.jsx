@@ -416,6 +416,7 @@ const NAV_GROUPS = [
 const STAFF_PERFORMANCE_SUB = [
   { to: '/staff-performance', label: 'أهداف اليوم', kind: 'goals' },
   { to: '/staff-performance/stats', label: 'الإحصائيات', kind: 'stats' },
+  { to: '/staff-performance/recovery-report', label: 'تقرير الاستعادة', kind: 'recovery' },
   { to: '/staff-performance/conversion-report', label: 'تقرير نسبة التحويل', kind: 'conversion' },
   { to: '/staff-performance/satisfaction-report', label: 'تقرير معدل الرضا', kind: 'satisfaction' },
 ]
@@ -425,6 +426,7 @@ function staffPerfSubActive(kind, pathname) {
     return pathname === '/staff-performance' || pathname === '/staff-performance/'
   }
   if (kind === 'stats') return pathname.startsWith('/staff-performance/stats')
+  if (kind === 'recovery') return pathname.startsWith('/staff-performance/recovery-report')
   if (kind === 'conversion') return pathname.startsWith('/staff-performance/conversion-report')
   if (kind === 'satisfaction') return pathname.startsWith('/staff-performance/satisfaction-report')
   return false
