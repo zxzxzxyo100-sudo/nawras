@@ -518,7 +518,7 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={`
-        fixed right-0 top-0 h-full w-60 flex flex-col z-40
+        fixed right-0 top-0 h-full w-[82vw] max-w-[320px] lg:w-60 flex flex-col z-40
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         lg:translate-x-0
@@ -527,7 +527,7 @@ export default function Sidebar({ isOpen, onClose }) {
     >
       <NawrasHeroImageLayer opacity={0.1} footerCropPct={16} className="mix-blend-soft-light" />
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0d0520]/94 via-[#120828]/92 to-[#0a0318]/96"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0d0520]/98 via-[#120828]/97 to-[#0a0318]/98 lg:from-[#0d0520]/94 lg:via-[#120828]/92 lg:to-[#0a0318]/96"
         aria-hidden
       />
       {/* ── Logo ─────────────────────────────── */}
