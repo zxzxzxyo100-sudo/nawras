@@ -176,6 +176,38 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const newRegistered = stores.new_registered || []
   const completedMerchants = stores.completed_merchants || []
   const unreachableMerchants = stores.unreachable_merchants || []
+  const recoveryStateOnlyStores = useMemo(() => {
+    const sourceBuckets = [
+      ...hotInactive,
+      ...coldInactive,
+      ...activeShipping,
+      ...incubating,
+      ...newRegistered,
+      ...completedMerchants,
+      ...unreachableMerchants,
+    ]
+    const seen = new Set(sourceBuckets.map(s => Number(s.id)))
+    const out = []
+    for (const [sidRaw, st] of Object.entries(storeStates || {})) {
+      const sid = Number(sidRaw)
+      if (!Number.isFinite(sid) || sid <= 0 || seen.has(sid)) continue
+      const cat = String(st?.category || '').trim()
+      if (!['restoring', 'restored', 'recovered'].includes(cat)) continue
+      const asg = assignments?.[sid] || assignments?.[String(sid)] || {}
+      const name = String(st?.store_name || asg?.store_name || '').trim()
+      out.push({
+        id: sid,
+        name: name || `#${sid}`,
+        phone: '',
+        total_shipments: 0,
+        last_shipment_date: 'لا يوجد',
+        registered_at: '',
+        _cat: 'recovery_state_only',
+        bucket: 'recovery_state_only',
+      })
+    }
+    return out
+  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, completedMerchants, unreachableMerchants, storeStates, assignments])
 
   const filteredStores = useMemo(() => {
     const matchRestored = s => isRestoredForRecoveryLists(s, storeStates[s.id])
@@ -206,6 +238,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         ...newRegistered.filter(matchRestored),
         ...completedMerchants.filter(matchRestored),
         ...unreachableMerchants.filter(matchRestored),
+        ...recoveryStateOnlyStores.filter(matchRestored),
       ]
       return dedupeById([...inactiveRows, ...afterRecovery])
     }
@@ -217,9 +250,10 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     const doneR = [
       ...completedMerchants.filter(matchRestoring),
       ...unreachableMerchants.filter(matchRestoring),
+      ...recoveryStateOnlyStores.filter(matchRestoring),
     ]
     return dedupeById([...hot, ...cold, ...activeR, ...incR, ...doneR])
-  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, completedMerchants, unreachableMerchants, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
+  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, completedMerchants, unreachableMerchants, recoveryStateOnlyStores, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
   /**
    * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
@@ -308,6 +342,9 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           }
           if (unreachableMerchants.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-orange-200 bg-orange-50 text-orange-900 font-medium">لم يرد</span>
+          }
+          if (recoveryStateOnlyStores.some(x => x.id === s.id)) {
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-900 font-medium">استعادة (من الحالة)</span>
           }
           if (newRegistered.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 font-medium">جديد — بانتظار شحنة</span>
