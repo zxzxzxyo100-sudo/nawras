@@ -3,15 +3,17 @@ export function isRestoredCategory(category) {
   return category === 'restored' || category === 'recovered'
 }
 
-/** YYYY-MM-DD لمقارنة يومية — يتجنب خطأ «نفس اليوم»: شحنة ببداية اليوم تبدو قبل مساء بدء الاستعادة */
-function calendarDayKey(v) {
-  if (v == null || v === '') return null
-  const s = String(v).replace(/\//g, '-').trim()
-  const head = s.length >= 10 ? s.slice(0, 10) : s
-  if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return head
-  const t = Date.parse(s.includes('T') ? s : `${head}T12:00:00`)
-  if (Number.isNaN(t)) return null
-  return new Date(t).toISOString().slice(0, 10)
+function parseDateInfo(v) {
+  if (v == null || v === '') return { ts: null, day: null, hasTime: false }
+  const raw = String(v).trim().replace(/\//g, '-')
+  const hasTime = /(?:T|\s)\d{1,2}:\d{2}/.test(raw)
+  const head = raw.length >= 10 ? raw.slice(0, 10) : raw
+  let day = null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(head)) day = head
+  const norm = hasTime ? raw.replace(' ', 'T') : `${head}T12:00:00`
+  const ts = Date.parse(norm)
+  if (day == null && !Number.isNaN(ts)) day = new Date(ts).toISOString().slice(0, 10)
+  return { ts: Number.isNaN(ts) ? null : ts, day, hasTime }
 }
 
 /**
@@ -22,10 +24,18 @@ export function isRecoveryCompletedByShipment(store, stateRow) {
   if (stateRow.category !== 'restoring') return false
   const ship = store?.last_shipment_date
   if (!ship || ship === 'لا يوجد') return false
-  const dShip = calendarDayKey(ship)
-  const dRestore = calendarDayKey(stateRow.restore_date)
-  if (!dShip || !dRestore) return false
-  return dShip >= dRestore
+  const shipInfo = parseDateInfo(ship)
+  const restoreInfo = parseDateInfo(stateRow.restore_date)
+  if (!shipInfo.day || !restoreInfo.day) return false
+
+  if (shipInfo.hasTime && restoreInfo.hasTime && shipInfo.ts != null && restoreInfo.ts != null) {
+    return shipInfo.ts >= restoreInfo.ts
+  }
+  if (!shipInfo.hasTime && restoreInfo.hasTime) {
+    // تاريخ شحنة بدون وقت: لا نعتبر "نفس يوم بدء/إعادة البدء" استعادة مكتملة.
+    return shipInfo.day > restoreInfo.day
+  }
+  return shipInfo.day >= restoreInfo.day
 }
 
 /** يظهر في «تمت الاستعادة»: recovered/restored أو اكتمال شحني معلّق على تحديث DB */
