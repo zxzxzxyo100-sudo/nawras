@@ -27,6 +27,7 @@ function rowToStore(row) {
   return {
     id: row.id,
     name: row.name,
+    phone: row.phone || '',
     registered_at: row.registered_at,
     total_shipments: row.total_shipments,
     last_shipment_date: row.last_shipment_date,
@@ -276,6 +277,7 @@ export default function IncubationNewCompleted() {
               <thead>
                 <tr className="bg-slate-50/95 text-slate-600 text-[11px] font-semibold border-b border-slate-200 text-right">
                   <th className="px-5 py-3.5 font-semibold">المتجر</th>
+                  {tab === 'no_answer' && <th className="px-5 py-3.5 font-semibold">الهاتف</th>}
                   <th className="px-5 py-3.5 font-semibold whitespace-nowrap">يوم من 14</th>
                   <th className="px-5 py-3.5 font-semibold">مرحلة المكالمة</th>
                   <th className="px-5 py-3.5 font-semibold">أيام منذ التسجيل</th>
@@ -289,7 +291,7 @@ export default function IncubationNewCompleted() {
               <tbody>
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-5 py-12 text-center text-slate-500">
+                    <td colSpan={tab === 'no_answer' ? 10 : 9} className="px-5 py-12 text-center text-slate-500">
                       لا توجد متاجر في هذا التبويب
                     </td>
                   </tr>
@@ -311,6 +313,11 @@ export default function IncubationNewCompleted() {
                           idClassName="text-xs font-mono text-slate-600 font-semibold"
                         />
                       </td>
+                      {tab === 'no_answer' && (
+                        <td className="px-5 py-4 text-slate-700 text-xs font-mono whitespace-nowrap" dir="ltr">
+                          {s.phone || '—'}
+                        </td>
+                      )}
                       <td className="px-5 py-4 text-slate-800 tabular-nums font-medium">
                         {s._cycle_day != null ? s._cycle_day : '—'}
                       </td>
