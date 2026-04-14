@@ -25,6 +25,7 @@ if ($userRole !== 'executive') {
 $pdo = getDB();
 ensure_workflow_schema($pdo);
 ensure_inactive_daily_stats_schema($pdo);
+nawras_ensure_daily_quota_schema($pdo);
 
 /** يوم العمل «اليوم» بتوقيت الرياض — يتوافق مع CURDATE() بعد ضبط الجلسة */
 try {
@@ -36,6 +37,39 @@ try {
 $targetActive = (int) ACTIVE_DAILY_SUCCESS_TARGET;
 $targetInactive = (int) INACTIVE_DAILY_SUCCESS_TARGET;
 $targetInc = 50;
+
+$tz = new DateTimeZone('Asia/Riyadh');
+$fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
+$toParam = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
+$isYmd = static function (string $v): bool {
+    return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $v);
+};
+if (($fromParam !== '' && !$isYmd($fromParam)) || ($toParam !== '' && !$isYmd($toParam))) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'صيغة التاريخ يجب أن تكون YYYY-MM-DD'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($fromParam === '' && $toParam === '') {
+    $today = new DateTimeImmutable('now', $tz);
+    $fromDate = $today->format('Y-m-d');
+    $toDate = $fromDate;
+} else {
+    $fromDate = $fromParam !== '' ? $fromParam : $toParam;
+    $toDate = $toParam !== '' ? $toParam : $fromParam;
+}
+if (strcmp($fromDate, $toDate) > 0) {
+    $tmp = $fromDate;
+    $fromDate = $toDate;
+    $toDate = $tmp;
+}
+$fromStart = (new DateTimeImmutable($fromDate . ' 00:00:00', $tz))->format('Y-m-d H:i:s');
+$toExclusive = (new DateTimeImmutable($toDate . ' 00:00:00', $tz))
+    ->modify('+1 day')
+    ->format('Y-m-d H:i:s');
+$rangeDays = max(
+    1,
+    (int) ((new DateTimeImmutable($fromDate, $tz))->diff(new DateTimeImmutable($toDate, $tz))->days ?? 0) + 1
+);
 
 $rows = [];
 
@@ -68,22 +102,29 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
     if ($role === 'active_manager') {
         $entry['role_label_ar'] = 'مسؤول المتاجر النشطة';
         $entry['metric_key'] = 'active_completed_today';
-        nawras_ensure_daily_quota_schema($pdo);
-        $dq = getDailyProgress($pdo, $un);
-        $entry['done_today'] = (int) ($dq['count'] ?? 0);
-        $entry['target'] = (int) ($dq['limit'] ?? $targetActive);
+        $entry['target'] = $targetActive * $rangeDays;
+        $c = $pdo->prepare(
+            'SELECT COUNT(*) FROM employee_daily_processed_stores
+             WHERE username = ? AND work_date BETWEEN ? AND ?'
+        );
+        $c->execute([$un, $fromDate, $toDate]);
+        $entry['done_today'] = (int) $c->fetchColumn();
     } elseif ($role === 'inactive_manager') {
         $entry['role_label_ar'] = 'مسؤول الاستعادة';
         $entry['metric_key'] = 'inactive_success_today';
-        $entry['target'] = $targetInactive;
-        $c = $pdo->prepare('SELECT COALESCE(successful_contacts, 0) FROM inactive_manager_daily_stats WHERE username = ? AND work_date = CURDATE()');
-        $c->execute([$un]);
-        $n = (int) $c->fetchColumn();
+        $entry['target'] = $targetInactive * $rangeDays;
+        $c = $pdo->prepare(
+            'SELECT COALESCE(SUM(successful_contacts), 0)
+             FROM inactive_manager_daily_stats
+             WHERE username = ? AND work_date BETWEEN ? AND ?'
+        );
+        $c->execute([$un, $fromDate, $toDate]);
+        $n = (int) ($c->fetchColumn() ?: 0);
         $entry['done_today'] = $n;
     } else {
         $entry['role_label_ar'] = 'مسؤول المتاجر (احتضان)';
         $entry['metric_key'] = 'incubation_calls_today';
-        $entry['target'] = $targetInc;
+        $entry['target'] = $targetInc * $rangeDays;
         /**
          * اليوم فقط — DATE(created_at)=CURDATE() مع جلسة +03:00 (الرياض).
          * مسار الاحتضان من «مسار الاحتضان»: inc_call1–3 + day0/3/10.
@@ -96,7 +137,8 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
         $fnLower = $fnTrim !== '' ? mb_strtolower($fnTrim, 'UTF-8') : '';
         $c = $pdo->prepare("
             SELECT COUNT(*) FROM call_logs
-            WHERE DATE(created_at) = CURDATE()
+            WHERE created_at >= ?
+            AND created_at < ?
             AND (
                 call_type IN (
                     'inc_call1', 'inc_call2', 'inc_call3',
@@ -115,6 +157,8 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
             )
         ");
         $c->execute([
+            $fromStart,
+            $toExclusive,
             $unTrim,
             $fnTrim,
             $fnTrim,
@@ -133,13 +177,54 @@ while ($u = $stUsers->fetch(PDO::FETCH_ASSOC)) {
     $rows[] = $entry;
 }
 
+$restoredCount = 0;
+$restoringStartedCount = 0;
+try {
+    $stRecovered = $pdo->prepare(
+        "SELECT COUNT(DISTINCT store_id)
+         FROM audit_logs
+         WHERE old_status = 'restoring'
+           AND new_status IN ('recovered','restored')
+           AND created_at >= ?
+           AND created_at < ?"
+    );
+    $stRecovered->execute([$fromStart, $toExclusive]);
+    $restoredCount = (int) ($stRecovered->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+}
+try {
+    $stStarted = $pdo->prepare(
+        "SELECT COUNT(DISTINCT store_id)
+         FROM audit_logs
+         WHERE new_status = 'restoring'
+           AND created_at >= ?
+           AND created_at < ?"
+    );
+    $stStarted->execute([$fromStart, $toExclusive]);
+    $restoringStartedCount = (int) ($stStarted->fetchColumn() ?: 0);
+} catch (Throwable $e) {
+}
+$recoveryPct = $restoringStartedCount > 0
+    ? round(($restoredCount / $restoringStartedCount) * 100, 1)
+    : 0.0;
+
 echo json_encode([
     'success' => true,
     'data'    => $rows,
+    'date_range' => [
+        'from' => $fromDate,
+        'to' => $toDate,
+        'days' => $rangeDays,
+    ],
+    'recovery_stats' => [
+        'restored_count' => $restoredCount,
+        'restoring_started_count' => $restoringStartedCount,
+        'recovery_rate_pct' => $recoveryPct,
+    ],
     'targets' => [
         'active_daily'   => $targetActive,
         'inactive_daily' => $targetInactive,
         'incubation_daily' => $targetInc,
     ],
-    'note_ar' => 'النشط: نفس عدّاد الحصة اليومية في المهام (متاجر مُعالَجة اليوم). الاستعادة: اتصالات ناجحة مسجّلة اليوم. الاحتضان: مكالمات المسار (1–3 و day0/3/10) أو مكالمة عامة (general) عندما يكون الدور مسؤول احتضان — اليوم بتوقيت الرياض؛ المنفّذ يُطابق اسم المستخدم أو الاسم الكامل.',
+    'note_ar' => 'النشط: متاجر مُعالَجة ضمن الفترة. الاستعادة: اتصالات ناجحة ضمن الفترة. الاحتضان: مكالمات المسار (1–3 و day0/3/10) أو general للدور نفسه ضمن الفترة. نسبة الاستعادة = (المتاجر المستعادة) ÷ (المتاجر التي بدأت الاستعادة) في نفس المدى الزمني.',
 ], JSON_UNESCAPED_UNICODE);

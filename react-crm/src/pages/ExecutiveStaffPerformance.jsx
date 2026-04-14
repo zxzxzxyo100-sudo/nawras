@@ -5,20 +5,25 @@ import { useAuth } from '../contexts/AuthContext'
 import { getExecutiveStaffGoals } from '../services/api'
 
 const ROLE_ORDER = { active_manager: 0, inactive_manager: 1, incubation_manager: 2 }
+const ymdToday = () => new Date().toISOString().slice(0, 10)
 
 export default function ExecutiveStaffPerformance() {
   const { user } = useAuth()
   const [rows, setRows] = useState([])
   const [targets, setTargets] = useState(null)
+  const [dateRange, setDateRange] = useState(null)
+  const [recoveryStats, setRecoveryStats] = useState(null)
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [fromDate, setFromDate] = useState(ymdToday())
+  const [toDate, setToDate] = useState(ymdToday())
 
   const load = useCallback(async () => {
     setErr('')
     setLoading(true)
     try {
-      const r = await getExecutiveStaffGoals()
+      const r = await getExecutiveStaffGoals({ from: fromDate, to: toDate })
       if (!r?.success) {
         setErr(r?.error || 'تعذّر التحميل')
         setRows([])
@@ -33,6 +38,8 @@ export default function ExecutiveStaffPerformance() {
       })
       setRows(list)
       setTargets(r.targets || null)
+      setDateRange(r.date_range || null)
+      setRecoveryStats(r.recovery_stats || null)
       setNote(typeof r.note_ar === 'string' ? r.note_ar : '')
     } catch (e) {
       setErr(e?.message || 'خطأ في الشبكة')
@@ -40,7 +47,7 @@ export default function ExecutiveStaffPerformance() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fromDate, toDate])
 
   useEffect(() => {
     if (user?.role === 'executive') load()
@@ -65,9 +72,14 @@ export default function ExecutiveStaffPerformance() {
             <div>
               <h1 className="text-xl font-black text-slate-900">أداء الفريق — أهداف اليوم</h1>
               <p className="text-sm text-slate-600 mt-0.5">
-                حسب طبيعة عمل كل موظف: نشط (منجز يومي)، استعادة (تم التواصل)، احتضان (مكالمات المسار 1–3 اليوم).
+                حسب طبيعة عمل كل موظف: نشط (متاجر معالجة)، استعادة (تم التواصل)، احتضان (مكالمات المسار 1–3) ضمن الفترة المحددة.
               </p>
               {note && <p className="text-xs text-slate-500 mt-2 max-w-3xl leading-relaxed">{note}</p>}
+              {dateRange && (
+                <p className="text-xs text-violet-700 mt-2 font-semibold">
+                  الفترة: {dateRange.from} إلى {dateRange.to} ({dateRange.days} يوم)
+                </p>
+              )}
             </div>
           </div>
           <button
@@ -81,6 +93,49 @@ export default function ExecutiveStaffPerformance() {
           </button>
         </div>
       </motion.div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">من</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">إلى</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={loading || !fromDate || !toDate}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            تطبيق
+          </button>
+        </div>
+      </div>
+
+      {recoveryStats && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 shadow-sm">
+          <p className="text-sm font-bold text-emerald-900">
+            نسبة المتاجر التي تمت استعادتها: {Number(recoveryStats.recovery_rate_pct || 0).toFixed(1)}%
+          </p>
+          <p className="text-xs text-emerald-800 mt-1">
+            {recoveryStats.restored_count || 0} مستعادة من أصل {recoveryStats.restoring_started_count || 0} بدأت الاستعادة في الفترة المحددة.
+          </p>
+        </div>
+      )}
 
       {targets && (
         <div className="flex flex-wrap gap-2 text-xs text-slate-600">
