@@ -739,6 +739,46 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
         }
         return null;
     };
+    $bucketById = [];
+    foreach (['hot_inactive', 'cold_inactive'] as $bucket) {
+        foreach ($result[$bucket] ?? [] as $s) {
+            $sid = (int) ($s['id'] ?? 0);
+            if ($sid > 0) {
+                $bucketById[$sid] = $bucket;
+            }
+        }
+    }
+    /**
+     * إصلاح رجعي: أي متجر جُمِّد تلقائياً بالسبب القديم ثم صار 5+ شحنات
+     * نخرجه من frozen ونرجعه إلى bucket الحالي (hot/cold) إن توفر.
+     */
+    try {
+        $stPrevAuto = $pdoDb->query("SELECT store_id FROM store_states WHERE category = 'frozen' AND state_reason = 'auto_total_shipments_lt5'");
+        $prevAutoRows = $stPrevAuto ? $stPrevAuto->fetchAll(PDO::FETCH_ASSOC) : [];
+        if (!empty($prevAutoRows)) {
+            $stUnfreeze = $pdoDb->prepare(
+                "UPDATE store_states
+                 SET category = ?, state_reason = 'auto_unfrozen_total_shipments_ge5', freeze_reason = '', updated_by = 'system'
+                 WHERE store_id = ? AND category = 'frozen' AND state_reason = 'auto_total_shipments_lt5'"
+            );
+            foreach ($prevAutoRows as $r) {
+                $sid = (int) ($r['store_id'] ?? 0);
+                if ($sid <= 0) {
+                    continue;
+                }
+                $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
+                $shipments = $resolveShipments(is_array($src) ? $src : [], $sid);
+                if ($shipments === null || $shipments < $maxExclusive) {
+                    continue;
+                }
+                $fallbackBucket = $bucketById[$sid] ?? 'hot_inactive';
+                $stUnfreeze->execute([$fallbackBucket, $sid]);
+            }
+        }
+    } catch (Throwable $e) {
+        // تجاهل — لا نوقف التصنيف الأساسي
+    }
+
     $candidates = [];
     foreach (['hot_inactive', 'cold_inactive'] as $bucket) {
         foreach ($result[$bucket] ?? [] as $s) {
