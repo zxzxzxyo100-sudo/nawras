@@ -17,6 +17,18 @@ if (!defined('INACTIVE_QUEUE_TARGET')) {
 if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
     define('INACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
+/** أولوية طابور الاستعادة: متاجر بعدد طرود معتمد أعلى من هذا الرقم تُرتَّب أولاً؛ ولا يُعيَّن في الطابور من عدده المعتمد ≤ هذا (أي يُشترط > 5 طلبيات) */
+if (!defined('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS')) {
+    define('INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS', 5);
+}
+/** أقصى صفوف في طابور «نشط» لكل موظف (نشط + لم يرد) — أعلى من 50 لأن جزءاً يكون بانتظار الاستبيان بعد المكالمة */
+if (!defined('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER')) {
+    define('MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER', 120);
+}
+/** أقصى عدد صفوف تعيين (نشط + لم يرد) لمسؤول واحد — أعلى من 50 حتى يمكن وجود متاجر «بانتظار استبيان بعد مكالمة» مع 50 «بلا مكالمة اليوم» */
+if (!defined('ACTIVE_ASSIGNMENTS_MAX_TOTAL')) {
+    define('ACTIVE_ASSIGNMENTS_MAX_TOTAL', 120);
+}
 if (!defined('SURVEY_COOLDOWN_DAYS')) {
     define('SURVEY_COOLDOWN_DAYS', 30);
 }
@@ -304,6 +316,18 @@ function count_pending_active_queue(PDO $pdo, $username) {
     return (int) $st->fetchColumn();
 }
 
+/** إجمالي صفوف طابور المتابعة الدورية (نشط + لم يرد) — لضبط سقف التعبئة */
+function count_total_active_workflow_assignments(PDO $pdo, $username) {
+    $st = $pdo->prepare("
+        SELECT COUNT(*) FROM store_assignments
+        WHERE assigned_to = ?
+        AND assignment_queue = 'active'
+        AND workflow_status IN ('active', 'no_answer')
+    ");
+    $st->execute([$username]);
+    return (int) $st->fetchColumn();
+}
+
 /**
  * عدد تعيينات «نشط» فقط — عند «لم يرد» ينقص العدد فيُستدعى fill لإضافة متجر ساخن جديد (صف لم يرد يبقى في المتابعة وليس في جدول المهام).
  */
@@ -358,6 +382,187 @@ function inactive_hot_pipeline_where_sql() {
 }
 
 /**
+ * خريطة store_id => إجمالي الشحنات من stores_search_lite.json (يُحدَّث مع all-stores.php).
+ *
+ * @return array<string,int>
+ */
+function wf_lite_total_shipments_map(): array {
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    $path = __DIR__ . '/cache/stores_search_lite.json';
+    if (is_readable($path)) {
+        $list = json_decode((string) file_get_contents($path), true);
+        if (is_array($list)) {
+            foreach ($list as $row) {
+                if (!is_array($row) || !isset($row['id'])) {
+                    continue;
+                }
+                $id = (string) (int) $row['id'];
+                if ($id === '0') {
+                    continue;
+                }
+                $map[$id] = (int) ($row['total_shipments'] ?? 0);
+            }
+        }
+    }
+
+    return $map;
+}
+
+/**
+ * خريطة store_id => عدد الطرود ضمن آخر نطاق جُلب بـ orders-summary.php (يُحدَّث عند فتح التطبيق / جلب النطاق).
+ *
+ * @return array<string,int>
+ */
+function wf_orders_range_shipments_map(): array {
+    static $map = null;
+    if ($map !== null) {
+        return $map;
+    }
+    $map = [];
+    $path = __DIR__ . '/cache/orders_range_shipments.json';
+    if (!is_readable($path)) {
+        return $map;
+    }
+    $j = json_decode((string) file_get_contents($path), true);
+    if (!is_array($j) || !isset($j['counts']) || !is_array($j['counts'])) {
+        return $map;
+    }
+    foreach ($j['counts'] as $k => $v) {
+        $id = (string) (int) $k;
+        if ($id === '0') {
+            continue;
+        }
+        $map[$id] = (int) $v;
+    }
+
+    return $map;
+}
+
+/**
+ * عدد الطرود/الطلبات المعتمد لطابور الاستعادة: max(طرود نطاق orders-summary، إجمالي الشحنات من الصف/lite)
+ * حتى لا يُصنَّف متجر بإجمالي عالٍ كـ «صفر طرود» فقط لأن النطاق الأخير صفر.
+ */
+function wf_inactive_priority_parcel_count(array $row): int {
+    $sidNorm = (string) (int) preg_replace('/\D+/', '', (string) ($row['store_id'] ?? ''));
+    $total = (int) ($row['total_shipments'] ?? 0);
+    if ($sidNorm === '0') {
+        return $total;
+    }
+    $rangeMap = wf_orders_range_shipments_map();
+    if (array_key_exists($sidNorm, $rangeMap)) {
+        return max((int) $rangeMap[$sidNorm], $total);
+    }
+
+    return $total;
+}
+
+/** هل يُسمح بإبقاء/تعيين المتجر في طابور الاستعادة؟ يُشترط عدد معتمد > INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS (أي ≥ 6) */
+function wf_inactive_queue_parcel_eligible(array $row): bool {
+    return wf_inactive_priority_parcel_count($row) > (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
+}
+
+/**
+ * يُلغى تعيين inactive (نشط / لم يرد) إذا لم يبلغ المتجر حد الطرود — ليُستبدل من المجمع بمتاجر أقوى حتى يكتمل الـ50.
+ *
+ * @return int عدد الصفوف المُحذوفة
+ */
+function release_inactive_assignments_below_parcel_threshold(PDO $pdo, string $username): int {
+    $u = trim($username);
+    if ($u === '') {
+        return 0;
+    }
+    $st = $pdo->prepare("
+        SELECT store_id FROM store_assignments
+        WHERE assigned_to = ? AND assignment_queue = 'inactive'
+        AND workflow_status IN ('active', 'no_answer')
+    ");
+    $st->execute([$u]);
+    $lite = wf_lite_total_shipments_map();
+    $released = 0;
+    while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+        $sid = (string) ($r['store_id'] ?? '');
+        $norm = (string) (int) preg_replace('/\D+/', '', $sid);
+        $row = [
+            'store_id'        => $sid,
+            'total_shipments' => (int) ($lite[$norm] ?? 0),
+        ];
+        if (wf_inactive_queue_parcel_eligible($row)) {
+            continue;
+        }
+        $del = $pdo->prepare("
+            DELETE FROM store_assignments
+            WHERE assigned_to = ? AND assignment_queue = 'inactive'
+            AND workflow_status IN ('active', 'no_answer')
+            AND CAST(store_id AS CHAR) = CAST(? AS CHAR)
+        ");
+        $del->execute([$u, $sid]);
+        $released += $del->rowCount();
+    }
+
+    return $released;
+}
+
+/**
+ * ترتيب مرشحي الاستعادة: أولاً عدد الطرود المعتمد > الحد (الأعلى أولاً)، ثم store_id.
+ *
+ * @param list<array{store_id:mixed,store_name?:string,total_shipments?:int,...}> $rows
+ */
+function wf_sort_inactive_recovery_candidates(array &$rows): void {
+    $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
+    usort($rows, static function (array $a, array $b) use ($min): int {
+        $sa = wf_inactive_priority_parcel_count($a);
+        $sb = wf_inactive_priority_parcel_count($b);
+        $pa = $sa > $min ? 1 : 0;
+        $pb = $sb > $min ? 1 : 0;
+        if ($pb !== $pa) {
+            return $pb <=> $pa;
+        }
+        if ($sb !== $sa) {
+            return $sb <=> $sa;
+        }
+        $ida = (string) ($a['store_id'] ?? '');
+        $idb = (string) ($b['store_id'] ?? '');
+
+        return strcmp($ida, $idb);
+    });
+}
+
+/**
+ * ترتيب صفوف مهام مسؤول الاستعادة المعروضة: نفس أولوية الطرود، ثم assigned_at.
+ *
+ * @param list<array<string,mixed>> $rows
+ * @return list<array<string,mixed>>
+ */
+function wf_sort_inactive_manager_task_rows(array $rows): array {
+    $min = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
+    usort($rows, static function (array $a, array $b) use ($min): int {
+        $sa = wf_inactive_priority_parcel_count($a);
+        $sb = wf_inactive_priority_parcel_count($b);
+        $pa = $sa > $min ? 1 : 0;
+        $pb = $sb > $min ? 1 : 0;
+        if ($pb !== $pa) {
+            return $pb <=> $pa;
+        }
+        if ($sb !== $sa) {
+            return $sb <=> $sa;
+        }
+        $ta = strtotime((string) ($a['assigned_at'] ?? '')) ?: 0;
+        $tb = strtotime((string) ($b['assigned_at'] ?? '')) ?: 0;
+        if ($ta !== $tb) {
+            return $ta <=> $tb;
+        }
+
+        return strcmp((string) ($a['store_id'] ?? ''), (string) ($b['store_id'] ?? ''));
+    });
+
+    return $rows;
+}
+
+/**
  * نفس مصدر الواجهة: ملف يُحدَّث عند كل تشغيل لـ all-stores.php
  * (تصنيف ساخن/بارد يُحسب من API وليس مخزّناً في store_states لكل متجر).
  */
@@ -374,6 +579,8 @@ function pick_next_inactive_pool_store(PDO $pdo) {
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $assigned[(string) ($row['store_id'] ?? '')] = true;
             }
+            $liteShip = wf_lite_total_shipments_map();
+            $candidates = [];
             foreach ($stores as $row) {
                 $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
                 $bucket = (string) ($row['bucket'] ?? '');
@@ -383,14 +590,32 @@ function pick_next_inactive_pool_store(PDO $pdo) {
                 if ($sid === '' || isset($assigned[$sid])) {
                     continue;
                 }
+                $sidNorm = (string) (int) preg_replace('/\D+/', '', $sid);
+                $ts = isset($row['total_shipments']) ? (int) $row['total_shipments'] : (int) ($liteShip[$sidNorm] ?? 0);
+                $cand = [
+                    'store_id'        => $row['store_id'],
+                    'store_name'      => $row['store_name'] ?? '',
+                    'total_shipments' => $ts,
+                ];
+                if (!wf_inactive_queue_parcel_eligible($cand)) {
+                    continue;
+                }
+                $candidates[] = $cand;
+            }
+            if ($candidates !== []) {
+                wf_sort_inactive_recovery_candidates($candidates);
+                $first = $candidates[0];
+
                 return [
-                    'store_id'   => $row['store_id'],
-                    'store_name' => $row['store_name'] ?? '',
+                    'store_id'   => $first['store_id'],
+                    'store_name' => $first['store_name'] ?? '',
                 ];
             }
+
             return null;
         }
     }
+
     return pick_next_inactive_pool_store_from_store_states($pdo);
 }
 
@@ -404,10 +629,36 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
             SELECT store_id FROM store_assignments WHERE assignment_queue = 'inactive'
         )
         ORDER BY ss.store_id ASC
-        LIMIT 1
     ";
     $stmt = $pdo->query($sql);
-    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($rows === []) {
+        return null;
+    }
+    $liteShip = wf_lite_total_shipments_map();
+    $candidates = [];
+    foreach ($rows as $r) {
+        $sidNorm = (string) (int) preg_replace('/\D+/', '', (string) ($r['store_id'] ?? ''));
+        $cand = [
+            'store_id'        => $r['store_id'],
+            'store_name'      => $r['store_name'] ?? '',
+            'total_shipments' => (int) ($liteShip[$sidNorm] ?? 0),
+        ];
+        if (!wf_inactive_queue_parcel_eligible($cand)) {
+            continue;
+        }
+        $candidates[] = $cand;
+    }
+    if ($candidates === []) {
+        return null;
+    }
+    wf_sort_inactive_recovery_candidates($candidates);
+    $first = $candidates[0];
+
+    return [
+        'store_id'   => $first['store_id'],
+        'store_name' => $first['store_name'] ?? '',
+    ];
 }
 
 function assign_inactive_store_to_user(PDO $pdo, $storeId, $storeName, $username, $assignedBy) {
@@ -433,6 +684,7 @@ function fill_inactive_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAd
     if (get_inactive_daily_success_count($pdo, $username) >= INACTIVE_DAILY_SUCCESS_TARGET) {
         return 0;
     }
+    release_inactive_assignments_below_parcel_threshold($pdo, (string) $username);
     $have = count_inactive_queue($pdo, $username);
     $need = INACTIVE_QUEUE_TARGET - $have;
     if ($need <= 0) {
@@ -466,8 +718,19 @@ function fill_slots_for_user(PDO $pdo, $username, $assignedBy, $maxToAdd = null)
     if (getDailyProgress($pdo, $username)['quota_reached']) {
         return 0;
     }
-    $have = count_active_queue($pdo, $username);
-    $need = ACTIVE_QUEUE_TARGET - $have;
+    /**
+     * كان العدّ يعتمد على كل التعيينات بحالة «active» فيُعتبر الطابور ممتلئاً (50)
+     * بينما الواجهة تعرض فقط «بلا مكالمة اليوم» — فيبقى صف واحد ظاهراً.
+     * نعبّئ حتى ACTIVE_QUEUE_TARGET صفاً تحتاج أول مكالمة اليوم، مع سقف إجمالي للصفوف.
+     */
+    $pending = count_pending_active_queue($pdo, $username);
+    $totalRows = count_total_active_workflow_assignments($pdo, $username);
+    $need = ACTIVE_QUEUE_TARGET - $pending;
+    if ($need <= 0) {
+        return 0;
+    }
+    $room = max(0, (int) MAX_ACTIVE_ASSIGNMENTS_TOTAL_PER_USER - $totalRows);
+    $need = min($need, $room);
     if ($need <= 0) {
         return 0;
     }

@@ -33,6 +33,22 @@ export function parcelsInRangeDisplay(store) {
   return totalShipments(store)
 }
 
+/**
+ * مقياس طابور الاستعادة (مطابقة PHP: max(طرود النطاق، إجمالي الشحنات)).
+ */
+export function inactiveRecoveryQueueMetric(store) {
+  const ts = totalShipments(store)
+  let r = 0
+  if (store && Object.prototype.hasOwnProperty.call(store, 'shipments_in_range')) {
+    const v = store.shipments_in_range
+    if (v !== undefined && v !== null && v !== '') {
+      const n = Number(v)
+      if (Number.isFinite(n)) r = n
+    }
+  }
+  return Math.max(ts, r)
+}
+
 /** يتوافق مع الخادم: status الفارغ يُعامل كـ نشط؛ Nawris قد يعيد «نشط» بالعربية */
 export function isActiveMerchantStatus(s) {
   const st = s?.status ?? s?.account_status
