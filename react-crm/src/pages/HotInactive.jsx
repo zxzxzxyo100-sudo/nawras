@@ -597,6 +597,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         <StoreDrawer
           store={selected}
           onClose={() => setSelected(null)}
+          reopenRecoveryFromRestored={isRestoredTab}
           qvNeedsFreezeSource="inactive"
           taskCompletion={
             user?.role === 'inactive_manager'
