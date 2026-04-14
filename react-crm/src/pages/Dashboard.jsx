@@ -67,7 +67,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick,
       onClick={onClick}
       whileHover={{ y: -5, boxShadow: `0 14px 40px ${glow}` }}
       whileTap={{ scale: 0.97 }}
-      className={`group relative rounded-2xl p-5 text-right overflow-hidden w-full ${
+      className={`group relative rounded-2xl p-4 sm:p-5 text-right overflow-hidden w-full ${
         dimmed ? 'opacity-[0.38] pointer-events-none' : ''
       }`}
       style={{ background: gradient, boxShadow: `0 4px 24px ${glow}` }}
@@ -81,7 +81,7 @@ function StoreTypeCard({ title, count, sub, gradient, glow, icon: Icon, onClick,
       <div className="relative flex items-start justify-between gap-3">
         <div>
           <p className="text-white/70 text-xs font-medium mb-2 uppercase tracking-widest">{title}</p>
-          <p className="text-white text-4xl font-black leading-none">{(count || 0).toLocaleString('ar-SA')}</p>
+          <p className="text-white text-3xl sm:text-4xl font-black leading-none">{(count || 0).toLocaleString('ar-SA')}</p>
           <p className="text-white/60 text-xs mt-2">{sub}</p>
         </div>
         <motion.div
@@ -301,7 +301,7 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="space-y-6 pb-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div className="space-y-4 sm:space-y-6 pb-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
 
       {/* ══ Header ══════════════════════════════════════════════════ */}
       <motion.div
@@ -318,7 +318,7 @@ export default function Dashboard() {
         />
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
               لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-purple-500">التحكم</span>
             </h1>
             <p className="text-slate-400 text-sm mt-0.5">
@@ -414,7 +414,7 @@ export default function Dashboard() {
         initial="hidden"
         animate="visible"
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="relative rounded-3xl p-6 lg:p-8 overflow-hidden text-white"
+        className="relative rounded-3xl p-4 sm:p-6 lg:p-8 overflow-hidden text-white"
         style={{ background: 'linear-gradient(135deg, #1e0a3c 0%, #2d1466 50%, #1a0a4e 100%)' }}
       >
         {/* Decorative blobs */}
@@ -429,7 +429,7 @@ export default function Dashboard() {
         </div>
 
         <div
-          className={`relative grid grid-cols-2 gap-6 ${
+          className={`relative grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 ${
             showIncubationHero ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
           }`}
         >
@@ -453,7 +453,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-white/50 text-xs font-medium">{s.label}</p>
-                <p className="text-white text-2xl font-black leading-tight">{s.value}</p>
+                <p className="text-white text-xl sm:text-2xl font-black leading-tight">{s.value}</p>
                 <p className="text-white/40 text-xs mt-0.5">{s.sub}</p>
               </div>
             </motion.div>
@@ -516,7 +516,7 @@ export default function Dashboard() {
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {can('new') && (
           <StoreTypeCard
@@ -672,7 +672,7 @@ export default function Dashboard() {
         initial="hidden"
         animate="visible"
         transition={{ duration: 0.5, delay: 0.35 }}
-        className="grid grid-cols-1 lg:grid-cols-5 gap-5"
+        className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5"
       >
 
         {/* Area Chart — سير العمل */}
@@ -694,8 +694,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={workflowData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+          <div className="h-[190px] sm:h-[220px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={workflowData} margin={{ top: 5, right: 5, bottom: 0, left: -10 }}>
               <svg>
                 <defs>
                   <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
@@ -716,6 +717,7 @@ export default function Dashboard() {
               <Area type="monotone" dataKey="شحنات"   stroke="#10b981" strokeWidth={2.5} fill="url(#gradShip)"  dot={{ fill: '#10b981', r: 3, strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Bar Chart — أداء الموظفين (executive فقط) / أداء الموظف (نشطة، استعادة، جديد، …) */}
@@ -747,8 +749,9 @@ export default function Dashboard() {
               <p className="text-xs">لا توجد مكالمات مسجّلة بعد</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={employeeData} margin={{ top: 5, right: 0, bottom: 5, left: -25 }}>
+            <div className="h-[180px] sm:h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={employeeData} margin={{ top: 5, right: 0, bottom: 5, left: -10 }}>
                 <svg>
                   <defs>
                     <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
@@ -785,6 +788,7 @@ export default function Dashboard() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            </div>
           )}
 
           {/* Employee List */}
