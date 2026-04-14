@@ -560,7 +560,12 @@ export default function InactiveRestoredFollowupSection({
       )}
 
       {selected && (
-        <StoreDrawer store={selected} onClose={() => setSelected(null)} qvNeedsFreezeSource="inactive" />
+        <StoreDrawer
+          store={selected}
+          onClose={() => setSelected(null)}
+          reopenRecoveryFromRestored={underRestoredHeading}
+          qvNeedsFreezeSource="inactive"
+        />
       )}
 
       {callStore && (
