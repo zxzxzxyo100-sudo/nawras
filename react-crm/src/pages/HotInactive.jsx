@@ -174,6 +174,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const activeShipping = stores.active_shipping || []
   const incubating = stores.incubating || []
   const newRegistered = stores.new_registered || []
+  const completedMerchants = stores.completed_merchants || []
+  const unreachableMerchants = stores.unreachable_merchants || []
 
   const filteredStores = useMemo(() => {
     const matchRestored = s => isRestoredForRecoveryLists(s, storeStates[s.id])
@@ -202,6 +204,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
         ...activeShipping.filter(matchRestored),
         ...incubating.filter(matchRestored),
         ...newRegistered.filter(matchRestored),
+        ...completedMerchants.filter(matchRestored),
+        ...unreachableMerchants.filter(matchRestored),
       ]
       return dedupeById([...inactiveRows, ...afterRecovery])
     }
@@ -210,8 +214,12 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     const cold = coldInactive.filter(matchRestoring)
     const activeR = activeShipping.filter(matchRestoring)
     const incR = [...incubating.filter(matchRestoring), ...newRegistered.filter(matchRestoring)]
-    return dedupeById([...hot, ...cold, ...activeR, ...incR])
-  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
+    const doneR = [
+      ...completedMerchants.filter(matchRestoring),
+      ...unreachableMerchants.filter(matchRestoring),
+    ]
+    return dedupeById([...hot, ...cold, ...activeR, ...incR, ...doneR])
+  }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, completedMerchants, unreachableMerchants, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
   /**
    * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
@@ -294,6 +302,12 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
           }
           if (activeShipping.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 font-medium">نشط يشحن (بعد الاستعادة)</span>
+          }
+          if (completedMerchants.some(x => x.id === s.id)) {
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-teal-200 bg-teal-50 text-teal-900 font-medium">المنجزة</span>
+          }
+          if (unreachableMerchants.some(x => x.id === s.id)) {
+            return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-orange-200 bg-orange-50 text-orange-900 font-medium">لم يرد</span>
           }
           if (newRegistered.some(x => x.id === s.id)) {
             return <span className="text-[11px] px-2 py-0.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 font-medium">جديد — بانتظار شحنة</span>
