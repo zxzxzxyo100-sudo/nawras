@@ -283,6 +283,29 @@ elseif ($action === 'set_status') {
 
     if ($category === 'restoring') {
         $pdo->prepare('UPDATE store_states SET restore_date = NOW() WHERE store_id = ?')->execute([$storeId]);
+        /**
+         * عند «إرجاع إلى جاري الاستعادة» من قائمة المنجزة:
+         * إعادة فتح تعيين طابور inactive حتى يخرج المتجر من قائمة «المنجزة»
+         * ويظهر فوراً ضمن مسار «جاري الاستعادة».
+         */
+        $resetRecoveryWindow = !empty($input['reset_recovery_window']);
+        $reopenInactiveFollowup = !empty($input['reopen_from_inactive_followup']);
+        $reopenFromDoneState = in_array($currentCat, ['restored', 'recovered'], true)
+            || $reopenInactiveFollowup
+            || ($resetRecoveryWindow && $currentCat === 'restoring');
+        if ($reopenFromDoneState) {
+            try {
+                ensure_store_assignments_workflow($pdo);
+                $pdo->prepare("
+                    UPDATE store_assignments
+                    SET workflow_status = 'active', workflow_updated_at = NOW(), assigned_at = NOW()
+                    WHERE store_id = ? AND assignment_queue = 'inactive'
+                      AND workflow_status IN ('completed','no_answer')
+                ")->execute([$storeId]);
+            } catch (Throwable $e) {
+                // لا نمنع التحويل إن فشل تحديث الطابور
+            }
+        }
     }
 
     if ($category === 'active_pending_calls' && $currentCat === 'frozen') {
