@@ -753,13 +753,24 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
      * نخرجه من frozen ونرجعه إلى bucket الحالي (hot/cold) إن توفر.
      */
     try {
-        $stPrevAuto = $pdoDb->query("SELECT store_id FROM store_states WHERE category = 'frozen' AND state_reason = 'auto_total_shipments_lt5'");
+        $stPrevAuto = $pdoDb->query("
+            SELECT store_id
+            FROM store_states
+            WHERE category = 'frozen'
+              AND updated_by = 'system'
+              AND (
+                    state_reason = 'auto_total_shipments_lt5'
+                    OR state_reason = 'auto_total_shipments_lt5_or_unknown'
+                    OR state_reason LIKE 'auto_%'
+                    OR freeze_reason LIKE 'تجميد تلقائي%'
+                  )
+        ");
         $prevAutoRows = $stPrevAuto ? $stPrevAuto->fetchAll(PDO::FETCH_ASSOC) : [];
         if (!empty($prevAutoRows)) {
             $stUnfreeze = $pdoDb->prepare(
                 "UPDATE store_states
                  SET category = ?, state_reason = 'auto_unfrozen_total_shipments_ge5', freeze_reason = '', updated_by = 'system'
-                 WHERE store_id = ? AND category = 'frozen' AND state_reason = 'auto_total_shipments_lt5'"
+                 WHERE store_id = ? AND category = 'frozen' AND updated_by = 'system'"
             );
             foreach ($prevAutoRows as $r) {
                 $sid = (int) ($r['store_id'] ?? 0);
@@ -767,11 +778,18 @@ function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, arra
                     continue;
                 }
                 $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
-                $shipments = $resolveShipments(is_array($src) ? $src : [], $sid);
+                if (!is_array($src)) {
+                    continue;
+                }
+                $shipments = $resolveShipments($src, $sid);
                 if ($shipments === null || $shipments < $maxExclusive) {
                     continue;
                 }
-                $fallbackBucket = $bucketById[$sid] ?? 'hot_inactive';
+                $lc = nawras_compute_lifecycle($src, time());
+                $fallbackBucket = nawras_lifecycle_legacy_bucket($lc);
+                if (!in_array($fallbackBucket, ['hot_inactive', 'cold_inactive'], true)) {
+                    $fallbackBucket = $bucketById[$sid] ?? 'hot_inactive';
+                }
                 $stUnfreeze->execute([$fallbackBucket, $sid]);
             }
         }
