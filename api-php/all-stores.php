@@ -715,27 +715,36 @@ function nawras_filter_out_store_id(array &$stores, $id) {
 function nawras_auto_freeze_inactive_low_orders(PDO $pdoDb, array &$result, array $allStores, array $new, array $inactive): void {
     $maxExclusive = 5;
     $resolveShipments = static function (array $s, int $sid) use ($allStores, $new, $inactive): ?int {
-        $vals = [];
-        if (array_key_exists('total_shipments', $s)) {
-            $vals[] = $s['total_shipments'];
+        $parseTotalShipments = static function ($v): ?int {
+            if ($v === null) {
+                return null;
+            }
+            if (is_int($v)) {
+                return $v >= 0 ? $v : null;
+            }
+            if (is_float($v)) {
+                return $v >= 0 ? (int) floor($v) : null;
+            }
+            if (is_string($v)) {
+                $t = trim($v);
+                if ($t === '') {
+                    return null;
+                }
+                // اعتماد مباشر لحقل total_shipments فقط كرقم طرود.
+                if (preg_match('/^\d+$/', $t) === 1) {
+                    return (int) $t;
+                }
+                return null;
+            }
+            return null;
+        };
+        $local = array_key_exists('total_shipments', $s) ? $parseTotalShipments($s['total_shipments']) : null;
+        if ($local !== null) {
+            return $local;
         }
         $src = $allStores[$sid] ?? $new[$sid] ?? $inactive[$sid] ?? null;
         if (is_array($src) && array_key_exists('total_shipments', $src)) {
-            $vals[] = $src['total_shipments'];
-        }
-        foreach ($vals as $v) {
-            if ($v === null || $v === '') {
-                continue;
-            }
-            if (is_numeric($v)) {
-                return (int) $v;
-            }
-            if (is_string($v)) {
-                $clean = preg_replace('/[^\d]/', '', $v);
-                if ($clean !== null && $clean !== '') {
-                    return (int) $clean;
-                }
-            }
+            return $parseTotalShipments($src['total_shipments']);
         }
         return null;
     };
