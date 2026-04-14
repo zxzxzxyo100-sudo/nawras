@@ -19,6 +19,31 @@ function wf_ensure_call_logs_outcome(PDO $pdo) {
     $done = true;
 }
 
+/** خريطة store_id => phone من ذاكرة البحث الخفيفة (يُحدَّث عند تشغيل all-stores.php). */
+function wf_lite_phone_by_store_id(): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+    $cache = [];
+    $path = __DIR__ . '/cache/stores_search_lite.json';
+    if (!is_readable($path)) {
+        return $cache;
+    }
+    $list = json_decode((string) file_get_contents($path), true);
+    if (!is_array($list)) {
+        return $cache;
+    }
+    foreach ($list as $row) {
+        if (!is_array($row) || !isset($row['id'])) {
+            continue;
+        }
+        $cache[(string) $row['id']] = isset($row['phone']) ? (string) $row['phone'] : '';
+    }
+
+    return $cache;
+}
+
 $pdo = getDB();
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
@@ -91,6 +116,15 @@ if ($action === 'get_my_workflow') {
             } else {
                 $inactive_followup_no_answer[] = $fr;
             }
+        }
+        $phoneById = wf_lite_phone_by_store_id();
+        foreach ($inactive_followup_contacted as $k => $fr) {
+            $sid = (string) ($fr['store_id'] ?? '');
+            $inactive_followup_contacted[$k]['phone'] = $phoneById[$sid] ?? '';
+        }
+        foreach ($inactive_followup_no_answer as $k => $fr) {
+            $sid = (string) ($fr['store_id'] ?? '');
+            $inactive_followup_no_answer[$k]['phone'] = $phoneById[$sid] ?? '';
         }
         jsonResponse([
             'success' => true,
