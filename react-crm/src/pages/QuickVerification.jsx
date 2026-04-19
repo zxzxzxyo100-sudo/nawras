@@ -16,11 +16,56 @@ import {
   BarChart3,
   ClipboardList,
   Shield,
+  ListFilter,
+  ArrowDownAZ,
+  ArrowUpAZ,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
+
+function surveyKindLabel(kind) {
+  switch (kind) {
+    case 'new_merchant_onboarding':
+      return 'تهيئة'
+    case 'active_csat':
+      return 'نشط CSAT'
+    case 'inactive_feedback':
+      return 'غير نشط'
+    case 'freeze_alert':
+      return 'تجميد'
+    case 'needs_freeze_request':
+      return 'يحتاج تجميد'
+    default:
+      return kind || '—'
+  }
+}
+
+function qvTrackLabel(track) {
+  switch (track) {
+    case 'incubation':
+      return 'مسار الاحتضان'
+    case 'active':
+      return 'نشطة'
+    case 'inactive':
+      return 'غير نشطة'
+    case 'other':
+      return 'أخرى'
+    default:
+      return '—'
+  }
+}
+
+/** يتوافق مع الخادم عند غياب qv_track (بيانات قديمة). */
+function rowQvTrack(row) {
+  if (row.qv_track) return row.qv_track
+  const c = (row.store_category || '').trim()
+  if (c === 'incubating') return 'incubation'
+  if (['inactive', 'hot_inactive', 'cold_inactive', 'restoring', 'restored', 'recovered'].includes(c)) return 'inactive'
+  if (['active', 'active_pending_calls', 'active_shipping', 'completed', 'unreachable', 'frozen'].includes(c)) return 'active'
+  return 'other'
+}
 
 function rowMatchesQuery(row, q) {
   if (!q.trim()) return true
@@ -30,7 +75,8 @@ function rowMatchesQuery(row, q) {
   const staff = (row.staff_username || row.staff_fullname || '').toLowerCase()
   const fr = String(row.freeze_reason || '').toLowerCase()
   const src = String(row.source_label || '').toLowerCase()
-  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s) || src.includes(s)
+  const sug = String(row.suggestions || '').toLowerCase()
+  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s) || src.includes(s) || sug.includes(s)
 }
 
 function isSatisfied(row) {
@@ -45,6 +91,7 @@ function isCrisis(row) {
 
 function satisfactionPercent(row) {
   if (row.survey_kind === 'freeze_alert' || row.survey_kind === 'needs_freeze_request') return 0
+  if (row.survey_kind === 'inactive_feedback') return 0
   if (row.survey_kind === 'new_merchant_onboarding') {
     const ans = row.answers || []
     const yes = ans.filter(a => a.yes).length
@@ -344,9 +391,11 @@ function CrisisCard({ row, onOpen, layoutId, sectionCount = 0 }) {
       ? 'تجميد'
       : row.survey_kind === 'needs_freeze_request'
         ? 'يحتاج تجميد'
-        : row.survey_kind === 'new_merchant_onboarding'
-          ? 'تهيئة'
-          : 'CSAT نشط'
+        : row.survey_kind === 'inactive_feedback'
+          ? 'غير نشط'
+          : row.survey_kind === 'new_merchant_onboarding'
+            ? 'تهيئة'
+            : 'CSAT نشط'
   const displayName = row.store_name || `متجر #${row.store_id}`
   const headerBadge =
     row.survey_kind === 'freeze_alert'
@@ -538,6 +587,7 @@ function DetailDrawer({
   const needsFreezeReq = row.survey_kind === 'needs_freeze_request'
   const freezeLike = freezeAlert || needsFreezeReq
   const onboarding = row.survey_kind === 'new_merchant_onboarding'
+  const inactiveFeedback = row.survey_kind === 'inactive_feedback'
 
   return (
     <AnimatePresence>
@@ -608,7 +658,15 @@ function DetailDrawer({
                   </div>
                 </>
               ) : null}
-              {!freezeLike ? (
+              {inactiveFeedback ? (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 shadow-inner">
+                  <p className="mb-2 text-[11px] font-black text-[#4B0082]">ملاحظة المتجر (غير نشط)</p>
+                  <p className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-900">
+                    {(row.suggestions || '').trim() || '—'}
+                  </p>
+                </div>
+              ) : null}
+              {!freezeLike && !inactiveFeedback ? (
                 <>
               <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">نتائج الاستبيان</p>
               {onboarding ? (
@@ -646,7 +704,7 @@ function DetailDrawer({
                 </>
               ) : null}
 
-              {canResolve && !row.resolved && !freezeLike ? (
+              {canResolve && !row.resolved && !freezeLike && !inactiveFeedback ? (
                 <div className="mt-6 rounded-xl border border-rose-100/90 bg-rose-50/35 p-4 shadow-inner">
                   <p className="mb-1 text-[11px] font-black text-rose-900">إنذار احتضان (اختياري)</p>
                   <p className="mb-3 text-[11px] leading-relaxed text-slate-600">
@@ -739,7 +797,10 @@ export default function QuickVerification() {
   const [activeRows, setActiveRows] = useState([])
   const [freezeRows, setFreezeRows] = useState([])
   const [needsFreezeRows, setNeedsFreezeRows] = useState([])
+  const [inactiveFeedbackRows, setInactiveFeedbackRows] = useState([])
   const [query, setQuery] = useState('')
+  const [trackFilter, setTrackFilter] = useState('all')
+  const [sortAz, setSortAz] = useState(true)
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
   const [drawerRow, setDrawerRow] = useState(null)
@@ -759,12 +820,14 @@ export default function QuickVerification() {
         setActiveRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setFreezeRows(Array.isArray(d.freeze_rows) ? d.freeze_rows : [])
         setNeedsFreezeRows(Array.isArray(d.needs_freeze_rows) ? d.needs_freeze_rows : [])
+        setInactiveFeedbackRows(Array.isArray(d.inactive_feedback_rows) ? d.inactive_feedback_rows : [])
       } else {
         setErr(d?.error || 'تعذّر التحميل')
         setOnboardingRows([])
         setActiveRows([])
         setFreezeRows([])
         setNeedsFreezeRows([])
+        setInactiveFeedbackRows([])
       }
     } catch (e) {
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
@@ -772,6 +835,7 @@ export default function QuickVerification() {
       setActiveRows([])
       setFreezeRows([])
       setNeedsFreezeRows([])
+      setInactiveFeedbackRows([])
     } finally {
       setLoading(false)
     }
@@ -782,7 +846,7 @@ export default function QuickVerification() {
   }, [load])
 
   const kpis = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows]
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
     if (!all.length) return { growth: 0, resolution: 100, global: 100 }
     const positive = all.filter(isSatisfied).length
     const growth = Math.round((positive / all.length) * 100)
@@ -792,14 +856,38 @@ export default function QuickVerification() {
     const gSum = all.reduce((acc, r) => acc + satisfactionPercent(r), 0)
     const global = Math.round(gSum / all.length)
     return { growth, resolution, global }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows])
 
   const statStrip = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows]
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
     const openCrisis = all.filter(r => !r.resolved && !isSatisfied(r)).length
     const resolved = all.filter(r => r.resolved).length
     return { total: all.length, openCrisis, resolved }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows])
+
+  const masterSurveyList = useMemo(() => {
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
+    const filtered = all.filter(row => {
+      if (!rowMatchesQuery(row, query)) return false
+      if (trackFilter === 'all') return true
+      return rowQvTrack(row) === trackFilter
+    })
+    const nameKey = r => (r.store_name || String(r.store_id || '')).trim()
+    filtered.sort((a, b) => {
+      const cmp = nameKey(a).localeCompare(nameKey(b), 'ar', { sensitivity: 'base' })
+      return sortAz ? cmp : -cmp
+    })
+    return filtered
+  }, [
+    onboardingRows,
+    activeRows,
+    inactiveFeedbackRows,
+    freezeRows,
+    needsFreezeRows,
+    query,
+    trackFilter,
+    sortAz,
+  ])
 
   const crisisOnb = useMemo(
     () =>
@@ -827,6 +915,14 @@ export default function QuickVerification() {
     [needsFreezeRows, query],
   )
 
+  const crisisInactiveFb = useMemo(
+    () =>
+      inactiveFeedbackRows.filter(
+        r => !r.resolved && isCrisis(r) && rowMatchesQuery(r, query),
+      ),
+    [inactiveFeedbackRows, query],
+  )
+
   const solvedOnb = useMemo(
     () => onboardingRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [onboardingRows, query],
@@ -842,6 +938,11 @@ export default function QuickVerification() {
   const solvedNeedsFreeze = useMemo(
     () => needsFreezeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [needsFreezeRows, query],
+  )
+
+  const solvedInactiveFb = useMemo(
+    () => inactiveFeedbackRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
+    [inactiveFeedbackRows, query],
   )
 
   const toggleQvMissedInc = useCallback(key => {
@@ -921,16 +1022,17 @@ export default function QuickVerification() {
     if (!drawerRow) return
     const stillOnb = onboardingRows.some(r => r.id === drawerRow.id)
     const stillAct = activeRows.some(r => r.id === drawerRow.id)
+    const stillIfb = inactiveFeedbackRows.some(r => r.id === drawerRow.id)
     const stillFr = freezeRows.some(r => r.id === drawerRow.id)
     const stillNf = needsFreezeRows.some(r => r.id === drawerRow.id)
-    if (!stillOnb && !stillAct && !stillFr && !stillNf) setDrawerRow(null)
+    if (!stillOnb && !stillAct && !stillIfb && !stillFr && !stillNf) setDrawerRow(null)
     else {
-      const fresh = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows].find(
+      const fresh = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows].find(
         r => r.id === drawerRow.id,
       )
       if (fresh && fresh.resolved !== drawerRow.resolved) setDrawerRow(fresh)
     }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows, drawerRow])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows, drawerRow])
 
   if (!can('quick_verification')) {
     return <Navigate to="/" replace />
@@ -940,9 +1042,17 @@ export default function QuickVerification() {
   const drawerCanResolve = drawerRow ? canResolveRow(drawerRow) : false
 
   const crisisTotal =
-    crisisOnb.length + crisisActive.length + crisisFreeze.length + crisisNeedsFreeze.length
+    crisisOnb.length +
+    crisisActive.length +
+    crisisInactiveFb.length +
+    crisisFreeze.length +
+    crisisNeedsFreeze.length
   const solvedTotal =
-    solvedOnb.length + solvedActive.length + solvedFreeze.length + solvedNeedsFreeze.length
+    solvedOnb.length +
+    solvedActive.length +
+    solvedInactiveFb.length +
+    solvedFreeze.length +
+    solvedNeedsFreeze.length
 
   return (
     <div
@@ -1139,9 +1249,102 @@ export default function QuickVerification() {
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="بحث بالاسم، رقم المتجر، الموظف، أو السبب…"
+            placeholder="بحث بالاسم، رقم المتجر، الموظف، السبب، أو نص الملاحظة…"
             className="w-full rounded-[1.25rem] border-0 bg-transparent py-4 pr-14 pl-5 text-sm font-medium text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:ring-2 focus:ring-violet-400/25"
           />
+          </div>
+        </div>
+
+        <div className="relative mb-10 overflow-hidden rounded-[1.35rem] border border-violet-200/50 bg-white/90 shadow-[0_12px_40px_-12px_rgba(75,0,130,0.12)] backdrop-blur-sm">
+          <div className="flex flex-col gap-4 border-b border-violet-100/80 bg-gradient-to-l from-violet-50/90 via-white to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex items-center gap-2 text-right">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <ListFilter size={20} strokeWidth={2.2} />
+              </span>
+              <div>
+                <p className="text-base font-black text-slate-900">جميع الاستبيانات (اليوم)</p>
+                <p className="text-xs font-medium text-slate-500">
+                  فلترة حسب مسار المتجر الحالي، وترتيب أبجدي بالاسم.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                <span className="whitespace-nowrap">المسار</span>
+                <select
+                  value={trackFilter}
+                  onChange={e => setTrackFilter(e.target.value)}
+                  className="rounded-xl border border-violet-200/80 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none ring-0 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20"
+                >
+                  <option value="all">الكل</option>
+                  <option value="incubation">مسار الاحتضان</option>
+                  <option value="active">نشطة</option>
+                  <option value="inactive">غير نشطة</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setSortAz(v => !v)}
+                className="inline-flex items-center gap-2 rounded-xl border border-violet-200/80 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50"
+              >
+                {sortAz ? <ArrowDownAZ size={16} strokeWidth={2.2} /> : <ArrowUpAZ size={16} strokeWidth={2.2} />}
+                {sortAz ? 'أ → ي' : 'ي → أ'}
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-right text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3">المتجر</th>
+                  <th className="px-4 py-3">نوع الاستبيان</th>
+                  <th className="px-4 py-3">مسار المتجر</th>
+                  <th className="px-4 py-3">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && masterSurveyList.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                      جارٍ التحميل…
+                    </td>
+                  </tr>
+                ) : masterSurveyList.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                      لا توجد استبيانات تطابق البحث أو الفلتر.
+                    </td>
+                  </tr>
+                ) : (
+                  masterSurveyList.map(row => (
+                    <tr
+                      key={`${row.survey_kind}-${row.id}`}
+                      className="cursor-pointer border-b border-slate-100/90 transition hover:bg-violet-50/50"
+                      onClick={() => setDrawerRow(row)}
+                    >
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        <span className="block truncate">{row.store_name || `متجر #${row.store_id}`}</span>
+                        <span className="text-[11px] font-semibold text-slate-400">#{row.store_id}</span>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-violet-900">{surveyKindLabel(row.survey_kind)}</td>
+                      <td className="px-4 py-3 text-slate-700">{qvTrackLabel(rowQvTrack(row))}</td>
+                      <td className="px-4 py-3">
+                        {row.resolved ? (
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">
+                            تم الحل
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-black text-amber-900">
+                            قيد المراجعة
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -1154,7 +1357,12 @@ export default function QuickVerification() {
           </p>
         ) : null}
 
-        {loading && !onboardingRows.length && !activeRows.length && !freezeRows.length && !needsFreezeRows.length ? (
+        {loading &&
+        !onboardingRows.length &&
+        !activeRows.length &&
+        !inactiveFeedbackRows.length &&
+        !freezeRows.length &&
+        !needsFreezeRows.length ? (
           <div className="flex flex-col items-center justify-center gap-4 py-28">
             <Loader2 className="h-12 w-12 animate-spin text-violet-600" strokeWidth={2.2} />
             <p className="text-sm font-semibold text-slate-500">جارٍ تحميل لوحة التحقيق…</p>
@@ -1212,6 +1420,29 @@ export default function QuickVerification() {
                         layoutId={`qv-c-${row.id}`}
                         onOpen={setDrawerRow}
                         sectionCount={crisisActive.length}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </SectionShell>
+
+              <SectionShell
+                title="غير النشطين — ملاحظات"
+                subtitle="استبيان «ماذا قال المتجر؟» لمسار غير النشط — يظهر للمراجعة التنفيذية."
+                count={crisisInactiveFb.length}
+                empty={crisisInactiveFb.length === 0}
+              >
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisInactiveFb.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisInactiveFb.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {crisisInactiveFb.map(row => (
+                      <CrisisCard
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-c-${row.id}`}
+                        onOpen={setDrawerRow}
+                        sectionCount={crisisInactiveFb.length}
                       />
                     ))}
                   </AnimatePresence>
@@ -1287,6 +1518,9 @@ export default function QuickVerification() {
                 ))}
                 {solvedActive.map(row => (
                   <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
+                ))}
+                {solvedInactiveFb.map(row => (
+                  <SolvedRow key={`ifb-${row.id}`} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                 ))}
                 {isExec
                   ? solvedFreeze.map(row => (

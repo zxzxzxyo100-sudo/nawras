@@ -25,9 +25,11 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / أدوات محلية
 .vscode/
 .idea/
+.cursor/
+.claude/
 *.swp
 *.swo
 *~
@@ -40,3 +42,7 @@ api-php/cache/stores_search_lite.json
 # ترحيل قاعدة البيانات لمرة واحدة (لا تُرفع أقفال الإنتاج)
 api-php/.sync_db_lock.json
 api-php/sync_db.php.bak
+
+# ملفات مؤقتة للصور
+*.root.tmp.png
+nawras-team-hero.untracked.png
