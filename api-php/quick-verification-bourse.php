@@ -31,6 +31,24 @@ if ($userRole !== 'executive' && $requestUsername === '') {
 $pdo = getDB();
 
 /**
+ * تصنيف مسار المتجر للتحقيق السريع (فلترة: احتضان / نشط / غير نشط).
+ */
+function nawras_qv_track_from_category($cat) {
+    $c = trim((string) $cat);
+    if ($c === 'incubating') {
+        return 'incubation';
+    }
+    if (in_array($c, ['inactive', 'hot_inactive', 'cold_inactive', 'restoring', 'restored', 'recovered'], true)) {
+        return 'inactive';
+    }
+    if (in_array($c, ['active', 'active_pending_calls', 'active_shipping', 'completed', 'unreachable', 'frozen'], true)) {
+        return 'active';
+    }
+
+    return 'other';
+}
+
+/**
  * توحيد "اليوم" وفق توقيت العمل (بغداد) بدل CURDATE() الخاص بسيرفر/DB
  * حتى لا تضيع سجلات تم تسجيلها اليوم محلياً.
  */
@@ -69,6 +87,7 @@ $labelsCsat = [
 ];
 $rows = [];
 $activeCsatRows = [];
+$inactiveFeedbackRows = [];
 
 try {
     $st = $pdo->prepare("
@@ -126,12 +145,14 @@ try {
         $score = (string) ($r['satisfaction_score'] ?? '');
         $qvAt = $r['qv_resolved_at'] ?? null;
         $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
+        $scat = trim((string) ($r['store_category'] ?? ''));
         $rows[] = [
             'id' => (int) $r['id'],
             'survey_kind' => 'new_merchant_onboarding',
             'store_id' => (int) $r['store_id'],
             'store_name' => $r['store_name'] !== '' ? $r['store_name'] : ('#' . $r['store_id']),
-            'store_category' => trim((string) ($r['store_category'] ?? '')),
+            'store_category' => $scat,
+            'qv_track' => nawras_qv_track_from_category($scat),
             'staff_username' => $staffKey,
             'staff_fullname' => $fullname,
             'answers' => $answers,
@@ -219,12 +240,14 @@ try {
         $arrow = $score === 'up' ? 'up' : ($score === 'mid' ? 'mid' : 'down');
         $qvAt = $r['qv_resolved_at'] ?? null;
         $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
+        $scatA = trim((string) ($r['store_category'] ?? ''));
         $activeCsatRows[] = [
             'id' => (int) $r['id'],
             'survey_kind' => 'active_csat',
             'store_id' => (int) $r['store_id'],
             'store_name' => $r['store_name'] !== '' ? $r['store_name'] : ('#' . $r['store_id']),
-            'store_category' => trim((string) ($r['store_category'] ?? '')),
+            'store_category' => $scatA,
+            'qv_track' => nawras_qv_track_from_category($scatA),
             'staff_username' => $staffKey,
             'staff_fullname' => $fullname,
             'avg' => round($avg, 2),
@@ -232,6 +255,57 @@ try {
             'arrow' => $arrow,
             'questions' => $questions,
             'gap_tags' => array_values(array_unique($tags)),
+            'suggestions' => trim((string) ($r['suggestions'] ?? '')),
+            'created_at' => $r['created_at'],
+            'resolved' => $resolved,
+            'resolved_at' => $resolved ? $r['qv_resolved_at'] : null,
+            'resolved_by' => $resolved ? trim((string) ($r['qv_resolved_by'] ?? '')) : null,
+            'executive_notes' => $resolved ? trim((string) ($r['qv_executive_notes'] ?? '')) : null,
+        ];
+    }
+
+    $stI = $pdo->prepare("
+        SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
+          COALESCE(ss.category, '') AS store_category,
+          s.suggestions,
+          s.performed_by, s.submitted_username, s.created_at,
+          qvr.resolved_at AS qv_resolved_at, qvr.resolved_by AS qv_resolved_by,
+          qvr.executive_notes AS qv_executive_notes
+        FROM surveys s
+        LEFT JOIN store_states ss ON ss.store_id = s.store_id
+        LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
+        WHERE s.created_at >= ?
+        AND s.created_at < ?
+        AND s.survey_kind = 'inactive_feedback'
+        ORDER BY s.created_at DESC
+    ");
+    $stI->execute([$todayStart, $tomorrowStart]);
+    while ($r = $stI->fetch(PDO::FETCH_ASSOC)) {
+        $uname = trim((string) ($r['submitted_username'] ?? ''));
+        $staffKey = $uname !== '' ? $uname : trim((string) ($r['performed_by'] ?? ''));
+        $fullname = $staffKey;
+        if ($staffKey !== '') {
+            $st2 = $pdo->prepare('SELECT fullname FROM users WHERE username = ? LIMIT 1');
+            $st2->execute([$staffKey]);
+            $ur = $st2->fetch(PDO::FETCH_ASSOC);
+            if ($ur && trim((string) ($ur['fullname'] ?? '')) !== '') {
+                $fullname = $ur['fullname'];
+            }
+        }
+        $qvAt = $r['qv_resolved_at'] ?? null;
+        $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
+        $scatI = trim((string) ($r['store_category'] ?? ''));
+        $inactiveFeedbackRows[] = [
+            'id' => (int) $r['id'],
+            'survey_kind' => 'inactive_feedback',
+            'store_id' => (int) $r['store_id'],
+            'store_name' => $r['store_name'] !== '' ? $r['store_name'] : ('#' . $r['store_id']),
+            'store_category' => $scatI,
+            'qv_track' => nawras_qv_track_from_category($scatI),
+            'staff_username' => $staffKey,
+            'staff_fullname' => $fullname,
+            'arrow' => 'down',
+            'gap_tags' => [],
             'suggestions' => trim((string) ($r['suggestions'] ?? '')),
             'created_at' => $r['created_at'],
             'resolved' => $resolved,
@@ -252,6 +326,10 @@ if ($userRole !== 'executive') {
         return $u !== '' && $u === $requestUsername;
     }));
     $activeCsatRows = array_values(array_filter($activeCsatRows, function ($r) use ($requestUsername) {
+        $u = isset($r['staff_username']) ? trim((string) $r['staff_username']) : '';
+        return $u !== '' && $u === $requestUsername;
+    }));
+    $inactiveFeedbackRows = array_values(array_filter($inactiveFeedbackRows, function ($r) use ($requestUsername) {
         $u = isset($r['staff_username']) ? trim((string) $r['staff_username']) : '';
         return $u !== '' && $u === $requestUsername;
     }));
@@ -407,6 +485,7 @@ if ($userRole === 'executive') {
                     'store_id' => (int) ($fr['store_id'] ?? 0),
                     'store_name' => $fr['store_name'] !== '' && $fr['store_name'] !== null ? (string) $fr['store_name'] : ('#' . (int) ($fr['store_id'] ?? 0)),
                     'store_category' => 'frozen',
+                    'qv_track' => 'active',
                     'staff_username' => trim((string) ($fr['frozen_by_username'] ?? '')),
                     'staff_fullname' => trim((string) ($fr['frozen_by'] ?? '')),
                     'freeze_reason' => trim((string) ($fr['freeze_reason'] ?? '')),
@@ -454,8 +533,10 @@ try {
     $stN = $pdo->prepare("
         SELECT r.id, r.store_id, r.store_name, r.reason, r.source,
           r.requested_by_username, r.requested_by_fullname, r.created_at,
+          COALESCE(ss.category, '') AS store_category_join,
           res.resolved_at AS qv_resolved_at, res.resolved_by AS qv_resolved_by, res.executive_notes AS qv_executive_notes
         FROM qv_needs_freeze_requests r
+        LEFT JOIN store_states ss ON ss.store_id = r.store_id
         LEFT JOIN quick_verification_needs_freeze_resolutions res ON res.needs_freeze_id = r.id
         WHERE r.created_at >= ?
         AND r.created_at < ?
@@ -470,6 +551,7 @@ try {
             $src = trim((string) ($nr['source'] ?? ''));
             $srcLabel = $src === 'inactive' ? 'غير نشطة' : 'متاجر جديدة';
             $uname = trim((string) ($nr['requested_by_username'] ?? ''));
+            $scatNf = trim((string) ($nr['store_category_join'] ?? ''));
             $needsFreezeRows[] = [
                 'id' => 'nf_' . $nid,
                 'needs_freeze_id' => $nid,
@@ -478,7 +560,8 @@ try {
                 'store_name' => $nr['store_name'] !== '' && $nr['store_name'] !== null
                     ? (string) $nr['store_name']
                     : ('#' . (int) ($nr['store_id'] ?? 0)),
-                'store_category' => '',
+                'store_category' => $scatNf,
+                'qv_track' => nawras_qv_track_from_category($scatNf),
                 'source' => $src,
                 'source_label' => $srcLabel,
                 'staff_username' => $uname,
@@ -511,6 +594,7 @@ echo json_encode([
     'staff_summary' => $staff_summary,
     'active_csat_rows' => $activeCsatRows,
     'active_csat_staff_summary' => $active_csat_staff_summary,
+    'inactive_feedback_rows' => $inactiveFeedbackRows,
     'freeze_rows' => $freezeRows,
     'needs_freeze_rows' => $needsFreezeRows,
 ], JSON_UNESCAPED_UNICODE);
