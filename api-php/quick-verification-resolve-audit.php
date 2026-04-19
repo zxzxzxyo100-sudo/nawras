@@ -79,12 +79,12 @@ if ($freezeAlertId > 0) {
             $pdo->exec('ALTER TABLE quick_verification_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
         } catch (Throwable $e) {
         }
-        $st = $pdo->prepare('SELECT id FROM qv_freeze_alerts WHERE id = ? AND DATE(created_at) = CURDATE() LIMIT 1');
+        $st = $pdo->prepare('SELECT id FROM qv_freeze_alerts WHERE id = ? LIMIT 1');
         $st->execute([$freezeAlertId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'تنبيه التجميد غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => false, 'error' => 'تنبيه التجميد غير موجود.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $ins = $pdo->prepare('
@@ -143,12 +143,12 @@ if ($needsFreezeId > 0) {
             $pdo->exec('ALTER TABLE quick_verification_needs_freeze_resolutions ADD COLUMN executive_notes TEXT NULL DEFAULT NULL');
         } catch (Throwable $e) {
         }
-        $st = $pdo->prepare('SELECT id FROM qv_needs_freeze_requests WHERE id = ? AND DATE(created_at) = CURDATE() LIMIT 1');
+        $st = $pdo->prepare('SELECT id FROM qv_needs_freeze_requests WHERE id = ? LIMIT 1');
         $st->execute([$needsFreezeId]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'الطلب غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => false, 'error' => 'الطلب غير موجود.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $ins = $pdo->prepare('
@@ -199,14 +199,14 @@ try {
 try {
     $st = $pdo->prepare('
         SELECT id, submitted_username, performed_by FROM surveys
-        WHERE id = ? AND DATE(created_at) = CURDATE()
+        WHERE id = ?
         LIMIT 1
     ');
     $st->execute([$surveyId]);
     $surveyRow = $st->fetch(PDO::FETCH_ASSOC);
     if (!$surveyRow) {
         http_response_code(404);
-        echo json_encode(['success' => false, 'error' => 'الاستبيان غير موجود أو ليس من اليوم.'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => false, 'error' => 'الاستبيان غير موجود.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
