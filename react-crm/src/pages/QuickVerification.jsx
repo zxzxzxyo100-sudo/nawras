@@ -19,11 +19,29 @@ import {
   ListFilter,
   ArrowDownAZ,
   ArrowUpAZ,
+  CalendarDays,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
+
+function formatYMD(d) {
+  const dt = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(dt.getTime())) return ''
+  const y = dt.getFullYear()
+  const m = String(dt.getMonth() + 1).padStart(2, '0')
+  const day = String(dt.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** افتراضي: سنة كاملة للخلف — عرض الاستبيانات السابقة */
+function getDefaultHistoryRange() {
+  const to = new Date()
+  const from = new Date()
+  from.setFullYear(from.getFullYear() - 1)
+  return { from: formatYMD(from), to: formatYMD(to) }
+}
 
 function surveyKindLabel(kind) {
   switch (kind) {
@@ -65,6 +83,17 @@ function rowQvTrack(row) {
   if (['inactive', 'hot_inactive', 'cold_inactive', 'restoring', 'restored', 'recovered'].includes(c)) return 'inactive'
   if (['active', 'active_pending_calls', 'active_shipping', 'completed', 'unreachable', 'frozen'].includes(c)) return 'active'
   return 'other'
+}
+
+function formatSurveyDate(iso) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(String(iso).replace(' ', 'T'))
+    if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16)
+    return d.toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return String(iso)
+  }
 }
 
 function rowMatchesQuery(row, q) {
@@ -231,11 +260,11 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
 }
 
 /** شريط مؤشرات سريعة — بطاقات KPI بألوان ممتدة على كامل المربع */
-function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
+function QvStatStrip({ total, openCrisis, resolved, globalSat, loading, rangeIsToday = true }) {
   const items = [
     {
-      label: 'تسجيلات اليوم',
-      sub: 'إجمالي ما ورد للتحقيق',
+      label: rangeIsToday ? 'تسجيلات اليوم' : 'إجمالي السجلات',
+      sub: rangeIsToday ? 'إجمالي ما ورد للتحقيق' : 'ضمن نطاق التاريخ المحدد',
       value: loading ? '—' : total.toLocaleString('ar-SA'),
       icon: ClipboardList,
       fullBg:
@@ -801,6 +830,11 @@ export default function QuickVerification() {
   const [query, setQuery] = useState('')
   const [trackFilter, setTrackFilter] = useState('all')
   const [sortAz, setSortAz] = useState(true)
+  const defRange = useMemo(() => getDefaultHistoryRange(), [])
+  const [qvDateMode, setQvDateMode] = useState('range')
+  const [qvDateFrom, setQvDateFrom] = useState(defRange.from)
+  const [qvDateTo, setQvDateTo] = useState(defRange.to)
+  const [dateRangeMeta, setDateRangeMeta] = useState(null)
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
   const [drawerRow, setDrawerRow] = useState(null)
@@ -811,17 +845,29 @@ export default function QuickVerification() {
     setLoading(true)
     setErr('')
     try {
-      const d = await getQuickVerificationBourse({
+      const payload = {
         user_role: user?.role || '',
         username: user?.username || '',
-      })
+      }
+      if (qvDateMode === 'range') {
+        if (!qvDateFrom || !qvDateTo || qvDateFrom > qvDateTo) {
+          setErr('حدّد تاريخي «من» و«إلى» بشكل صحيح.')
+          setLoading(false)
+          return
+        }
+        payload.from = qvDateFrom
+        payload.to = qvDateTo
+      }
+      const d = await getQuickVerificationBourse(payload)
       if (d?.success) {
+        setDateRangeMeta(d.date_range ?? null)
         setOnboardingRows(Array.isArray(d.rows) ? d.rows : [])
         setActiveRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setFreezeRows(Array.isArray(d.freeze_rows) ? d.freeze_rows : [])
         setNeedsFreezeRows(Array.isArray(d.needs_freeze_rows) ? d.needs_freeze_rows : [])
         setInactiveFeedbackRows(Array.isArray(d.inactive_feedback_rows) ? d.inactive_feedback_rows : [])
       } else {
+        setDateRangeMeta(null)
         setErr(d?.error || 'تعذّر التحميل')
         setOnboardingRows([])
         setActiveRows([])
@@ -830,6 +876,7 @@ export default function QuickVerification() {
         setInactiveFeedbackRows([])
       }
     } catch (e) {
+      setDateRangeMeta(null)
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
       setOnboardingRows([])
       setActiveRows([])
@@ -839,7 +886,7 @@ export default function QuickVerification() {
     } finally {
       setLoading(false)
     }
-  }, [user?.role, user?.username])
+  }, [user?.role, user?.username, qvDateMode, qvDateFrom, qvDateTo])
 
   useEffect(() => {
     void load()
@@ -1237,11 +1284,113 @@ export default function QuickVerification() {
             resolved={statStrip.resolved}
             globalSat={kpis.global}
             loading={loading}
+            rangeIsToday={dateRangeMeta?.mode === 'today'}
           />
         </div>
       </div>
 
       <div className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16 md:py-10">
+        <div className="relative mb-6 overflow-hidden rounded-[1.25rem] border border-violet-200/55 bg-white/92 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3 text-right">
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <CalendarDays size={20} strokeWidth={2.2} />
+              </span>
+              <div>
+                <p className="text-sm font-black text-slate-900">فلترة بالتاريخ</p>
+                <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-slate-500">
+                  اختر «اليوم فقط» أو حدّد نطاقاً (من — إلى) لعرض كل الاستبيانات السابقة ضمنه. النطاق الأقصى 1095 يوماً.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQvDateMode('today')}
+                  className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                    qvDateMode === 'today'
+                      ? 'bg-violet-700 text-white shadow-md'
+                      : 'border border-violet-200 bg-white text-violet-900 hover:bg-violet-50'
+                  }`}
+                >
+                  اليوم فقط
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = getDefaultHistoryRange()
+                    setQvDateFrom(r.from)
+                    setQvDateTo(r.to)
+                    setQvDateMode('range')
+                  }}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-50"
+                >
+                  سنة (افتراضي)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const to = new Date()
+                    const from = new Date()
+                    from.setDate(from.getDate() - 1095)
+                    setQvDateFrom(formatYMD(from))
+                    setQvDateTo(formatYMD(to))
+                    setQvDateMode('range')
+                  }}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-50"
+                >
+                  3 سنوات
+                </button>
+              </div>
+              <div
+                className={`flex flex-wrap items-center gap-2 ${qvDateMode === 'today' ? 'pointer-events-none opacity-45' : ''}`}
+              >
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="whitespace-nowrap">من</span>
+                  <input
+                    type="date"
+                    value={qvDateFrom}
+                    onChange={e => {
+                      setQvDateMode('range')
+                      setQvDateFrom(e.target.value)
+                    }}
+                    className="rounded-xl border border-violet-200/80 bg-white px-2 py-2 text-xs font-semibold text-slate-800"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="whitespace-nowrap">إلى</span>
+                  <input
+                    type="date"
+                    value={qvDateTo}
+                    onChange={e => {
+                      setQvDateMode('range')
+                      setQvDateTo(e.target.value)
+                    }}
+                    className="rounded-xl border border-violet-200/80 bg-white px-2 py-2 text-xs font-semibold text-slate-800"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-100 disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2.2} />
+                  تحديث
+                </button>
+              </div>
+            </div>
+          </div>
+          {dateRangeMeta ? (
+            <p className="mt-3 border-t border-violet-100 pt-3 text-center text-[11px] font-semibold text-violet-700">
+              {dateRangeMeta.mode === 'today'
+                ? 'العرض الحالي: يوم اليوم (توقيت بغداد)'
+                : `العرض الحالي: من ${dateRangeMeta.from} إلى ${dateRangeMeta.to}`}
+            </p>
+          ) : null}
+        </div>
+
         <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/28 via-white/45 to-fuchsia-200/25 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)] ring-1 ring-violet-200/30 backdrop-blur-sm">
           <div className="relative rounded-[1.25rem] border border-white/85 bg-white/78 backdrop-blur-xl shadow-inner">
           <Search className="pointer-events-none absolute right-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-violet-500/70" strokeWidth={2} />
@@ -1262,9 +1411,9 @@ export default function QuickVerification() {
                 <ListFilter size={20} strokeWidth={2.2} />
               </span>
               <div>
-                <p className="text-base font-black text-slate-900">جميع الاستبيانات (اليوم)</p>
+                <p className="text-base font-black text-slate-900">جدول الاستبيانات</p>
                 <p className="text-xs font-medium text-slate-500">
-                  فلترة حسب مسار المتجر الحالي، وترتيب أبجدي بالاسم.
+                  فلترة مسار المتجر وترتيب أبجدي؛ يظهر كل ما في النطاق الزمني أعلاه.
                 </p>
               </div>
             </div>
@@ -1294,25 +1443,26 @@ export default function QuickVerification() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-right text-sm">
+            <table className="w-full min-w-[760px] border-collapse text-right text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-black uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-3">المتجر</th>
                   <th className="px-4 py-3">نوع الاستبيان</th>
                   <th className="px-4 py-3">مسار المتجر</th>
+                  <th className="px-4 py-3 whitespace-nowrap">تاريخ التسجيل</th>
                   <th className="px-4 py-3">الحالة</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && masterSurveyList.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                       جارٍ التحميل…
                     </td>
                   </tr>
                 ) : masterSurveyList.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                       لا توجد استبيانات تطابق البحث أو الفلتر.
                     </td>
                   </tr>
@@ -1329,6 +1479,9 @@ export default function QuickVerification() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-violet-900">{surveyKindLabel(row.survey_kind)}</td>
                       <td className="px-4 py-3 text-slate-700">{qvTrackLabel(rowQvTrack(row))}</td>
+                      <td className="px-4 py-3 text-[11px] font-semibold tabular-nums text-slate-600 whitespace-nowrap">
+                        {formatSurveyDate(row.created_at)}
+                      </td>
                       <td className="px-4 py-3">
                         {row.resolved ? (
                           <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">

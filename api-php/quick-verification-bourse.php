@@ -49,14 +49,64 @@ function nawras_qv_track_from_category($cat) {
 }
 
 /**
- * توحيد "اليوم" وفق توقيت العمل (بغداد) بدل CURDATE() الخاص بسيرفر/DB
- * حتى لا تضيع سجلات تم تسجيلها اليوم محلياً.
+ * نطاق التاريخ: من GET ?from=&to= بصيغة YYYY-MM-DD (توقيت بغداد).
+ * — إن وُجد أحدهما دون الآخر: خطأ.
+ * — إن كانا فارغين: يوم اليوم فقط (السلوك السابق).
+ * — الحد الأقصى للنطاق: 1095 يوماً (~3 سنوات).
  */
 $appTz = new DateTimeZone('Asia/Baghdad');
-$todayStartDt = new DateTimeImmutable('today', $appTz);
-$tomorrowStartDt = $todayStartDt->modify('+1 day');
-$todayStart = $todayStartDt->format('Y-m-d H:i:s');
-$tomorrowStart = $tomorrowStartDt->format('Y-m-d H:i:s');
+$fromIn = trim((string) ($_GET['from'] ?? ''));
+$toIn = trim((string) ($_GET['to'] ?? ''));
+$qvMaxRangeDays = 1095;
+
+if (($fromIn !== '' && $toIn === '') || ($fromIn === '' && $toIn !== '')) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'أرسل تاريخي «من» و«إلى» معاً، أو اتركهما فارغين لعرض يوم اليوم فقط.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($fromIn === '' && $toIn === '') {
+    $todayStartDt = new DateTimeImmutable('today', $appTz);
+    $rangeEndDt = $todayStartDt->modify('+1 day');
+    $rangeStart = $todayStartDt->format('Y-m-d H:i:s');
+    $rangeEnd = $rangeEndDt->format('Y-m-d H:i:s');
+    $dateRangeMeta = [
+        'mode' => 'today',
+        'from' => $todayStartDt->format('Y-m-d'),
+        'to' => $todayStartDt->format('Y-m-d'),
+    ];
+} else {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromIn) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $toIn)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'صيغة التاريخ يجب أن تكون YYYY-MM-DD.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $fromDt = DateTimeImmutable::createFromFormat('Y-m-d', $fromIn, $appTz);
+    $toDt = DateTimeImmutable::createFromFormat('Y-m-d', $toIn, $appTz);
+    if (!$fromDt || $fromDt->format('Y-m-d') !== $fromIn || !$toDt || $toDt->format('Y-m-d') !== $toIn) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'تاريخ غير صالح.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($fromDt > $toDt) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'تاريخ «من» يجب أن يكون قبل أو يساوي «إلى».'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $inclusiveDays = (int) $fromDt->diff($toDt)->format('%a') + 1;
+    if ($inclusiveDays > $qvMaxRangeDays) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'النطاق الزمني طويل جداً (الحد الأقصى ' . $qvMaxRangeDays . ' يوماً).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $rangeStart = $fromDt->setTime(0, 0, 0)->format('Y-m-d H:i:s');
+    $rangeEnd = $toDt->modify('+1 day')->setTime(0, 0, 0)->format('Y-m-d H:i:s');
+    $dateRangeMeta = [
+        'mode' => 'range',
+        'from' => $fromIn,
+        'to' => $toIn,
+    ];
+}
 
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS quick_verification_resolutions (
@@ -107,7 +157,7 @@ try {
         AND COALESCE(s.survey_kind, '') = 'new_merchant_onboarding'
         ORDER BY s.created_at DESC
     ");
-    $st->execute([$todayStart, $tomorrowStart]);
+    $st->execute([$rangeStart, $rangeEnd]);
     while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
         $q = [(int) ($r['q1_delivery'] ?? 0), (int) ($r['q2_collection'] ?? 0), (int) ($r['q3_support'] ?? 0)];
         $answers = [];
@@ -185,7 +235,7 @@ try {
         AND COALESCE(NULLIF(TRIM(s.survey_kind), ''), 'active_csat') = 'active_csat'
         ORDER BY s.created_at DESC
     ");
-    $stA->execute([$todayStart, $tomorrowStart]);
+    $stA->execute([$rangeStart, $rangeEnd]);
     while ($r = $stA->fetch(PDO::FETCH_ASSOC)) {
         $qs = [
             (int) ($r['q1_delivery'] ?? 0),
@@ -279,7 +329,7 @@ try {
         AND s.survey_kind = 'inactive_feedback'
         ORDER BY s.created_at DESC
     ");
-    $stI->execute([$todayStart, $tomorrowStart]);
+    $stI->execute([$rangeStart, $rangeEnd]);
     while ($r = $stI->fetch(PDO::FETCH_ASSOC)) {
         $uname = trim((string) ($r['submitted_username'] ?? ''));
         $staffKey = $uname !== '' ? $uname : trim((string) ($r['performed_by'] ?? ''));
@@ -472,7 +522,7 @@ if ($userRole === 'executive') {
             AND a.created_at < ?
             ORDER BY a.created_at DESC
         ");
-        $stF->execute([$todayStart, $tomorrowStart]);
+        $stF->execute([$rangeStart, $rangeEnd]);
         if ($stF) {
             while ($fr = $stF->fetch(PDO::FETCH_ASSOC)) {
                 $qvAt = $fr['qv_resolved_at'] ?? null;
@@ -542,7 +592,7 @@ try {
         AND r.created_at < ?
         ORDER BY r.created_at DESC
     ");
-    $stN->execute([$todayStart, $tomorrowStart]);
+    $stN->execute([$rangeStart, $rangeEnd]);
     if ($stN) {
         while ($nr = $stN->fetch(PDO::FETCH_ASSOC)) {
             $qvAt = $nr['qv_resolved_at'] ?? null;
@@ -590,6 +640,7 @@ if ($userRole !== 'executive') {
 
 echo json_encode([
     'success' => true,
+    'date_range' => $dateRangeMeta,
     'rows' => $rows,
     'staff_summary' => $staff_summary,
     'active_csat_rows' => $activeCsatRows,
