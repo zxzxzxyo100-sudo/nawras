@@ -20,7 +20,11 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
+
+const MASTER_SURVEY_PAGE_SIZE = 10
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
@@ -835,6 +839,7 @@ export default function QuickVerification() {
   const [qvDateFrom, setQvDateFrom] = useState(defRange.from)
   const [qvDateTo, setQvDateTo] = useState(defRange.to)
   const [dateRangeMeta, setDateRangeMeta] = useState(null)
+  const [masterTablePage, setMasterTablePage] = useState(1)
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
   const [drawerRow, setDrawerRow] = useState(null)
@@ -935,6 +940,22 @@ export default function QuickVerification() {
     trackFilter,
     sortAz,
   ])
+
+  const masterSurveyTotalPages = Math.max(1, Math.ceil(masterSurveyList.length / MASTER_SURVEY_PAGE_SIZE))
+
+  const pagedMasterSurveyList = useMemo(() => {
+    const page = Math.min(masterTablePage, masterSurveyTotalPages)
+    const start = (page - 1) * MASTER_SURVEY_PAGE_SIZE
+    return masterSurveyList.slice(start, start + MASTER_SURVEY_PAGE_SIZE)
+  }, [masterSurveyList, masterTablePage, masterSurveyTotalPages])
+
+  useEffect(() => {
+    setMasterTablePage(1)
+  }, [query, trackFilter, sortAz, qvDateMode, qvDateFrom, qvDateTo])
+
+  useEffect(() => {
+    setMasterTablePage(p => Math.min(p, masterSurveyTotalPages))
+  }, [masterSurveyTotalPages])
 
   const crisisOnb = useMemo(
     () =>
@@ -1413,7 +1434,7 @@ export default function QuickVerification() {
               <div>
                 <p className="text-base font-black text-slate-900">جدول الاستبيانات</p>
                 <p className="text-xs font-medium text-slate-500">
-                  فلترة مسار المتجر وترتيب أبجدي؛ يظهر كل ما في النطاق الزمني أعلاه.
+                  فلترة مسار المتجر وترتيب أبجدي؛ يظهر كل ما في النطاق الزمني أعلاه ({MASTER_SURVEY_PAGE_SIZE} استبيانات لكل صفحة).
                 </p>
               </div>
             </div>
@@ -1467,7 +1488,7 @@ export default function QuickVerification() {
                     </td>
                   </tr>
                 ) : (
-                  masterSurveyList.map(row => (
+                  pagedMasterSurveyList.map(row => (
                     <tr
                       key={`${row.survey_kind}-${row.id}`}
                       className="cursor-pointer border-b border-slate-100/90 transition hover:bg-violet-50/50"
@@ -1499,6 +1520,43 @@ export default function QuickVerification() {
               </tbody>
             </table>
           </div>
+          {masterSurveyList.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-violet-100/90 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <p className="text-center text-[11px] font-semibold text-slate-600 sm:text-right">
+                عرض{' '}
+                {(Math.min(masterTablePage, masterSurveyTotalPages) - 1) * MASTER_SURVEY_PAGE_SIZE + 1}–
+                {Math.min(
+                  Math.min(masterTablePage, masterSurveyTotalPages) * MASTER_SURVEY_PAGE_SIZE,
+                  masterSurveyList.length,
+                )}{' '}
+                من {masterSurveyList.length.toLocaleString('ar-SA')}
+              </p>
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMasterTablePage(p => Math.max(1, p - 1))}
+                  disabled={masterTablePage <= 1}
+                  className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight size={16} strokeWidth={2.2} className="shrink-0" />
+                  السابق
+                </button>
+                <span className="min-w-[5rem] text-center text-xs font-black tabular-nums text-slate-700">
+                  {Math.min(masterTablePage, masterSurveyTotalPages).toLocaleString('ar-SA')} /{' '}
+                  {masterSurveyTotalPages.toLocaleString('ar-SA')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMasterTablePage(p => Math.min(masterSurveyTotalPages, p + 1))}
+                  disabled={masterTablePage >= masterSurveyTotalPages}
+                  className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  التالي
+                  <ChevronLeft size={16} strokeWidth={2.2} className="shrink-0" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {err ? (
