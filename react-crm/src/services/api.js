@@ -252,16 +252,16 @@ export const getInactiveRestoredFollowupStores = (params = {}) =>
 export const getDailyStaffSatisfaction = () =>
   http.get('/daily-staff-satisfaction.php', { params: { user_role: 'executive' } }).then(r => r.data)
 
-/** التحقيق السريع — استبيانات اليوم (تهيئة + CSAT نشط) */
-export const getQuickVerificationBourse = (params = {}) =>
-  http
-    .get('/quick-verification-bourse.php', {
-      params: {
-        user_role: params.user_role ?? 'executive',
-        username: params.username ?? '',
-      },
-    })
-    .then(r => r.data)
+/** التحقيق السريع — استبيانات ضمن نطاق (من/إلى YYYY-MM-DD) أو يوم اليوم إن لم يُمرَّر */
+export const getQuickVerificationBourse = (params = {}) => {
+  const p = {
+    user_role: params.user_role ?? 'executive',
+    username: params.username ?? '',
+  }
+  if (params.from) p.from = params.from
+  if (params.to) p.to = params.to
+  return http.get('/quick-verification-bourse.php', { params: p }).then(r => r.data)
+}
 
 /** تسجيل حل إشكالية تدقيق — استبيان اليوم */
 export const postQuickVerificationResolveAudit = data =>

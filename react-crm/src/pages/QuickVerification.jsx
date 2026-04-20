@@ -16,11 +16,89 @@ import {
   BarChart3,
   ClipboardList,
   Shield,
+  ListFilter,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
+
+const MASTER_SURVEY_PAGE_SIZE = 10
 import { useAuth } from '../contexts/AuthContext'
 import { getQuickVerificationBourse, postQuickVerificationResolveAudit } from '../services/api'
 import { QV_MISSED_INC_TAG } from '../utils/merchantOfficerQueue'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
+
+function formatYMD(d) {
+  const dt = d instanceof Date ? d : new Date(d)
+  if (Number.isNaN(dt.getTime())) return ''
+  const y = dt.getFullYear()
+  const m = String(dt.getMonth() + 1).padStart(2, '0')
+  const day = String(dt.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** افتراضي: سنة كاملة للخلف — عرض الاستبيانات السابقة */
+function getDefaultHistoryRange() {
+  const to = new Date()
+  const from = new Date()
+  from.setFullYear(from.getFullYear() - 1)
+  return { from: formatYMD(from), to: formatYMD(to) }
+}
+
+function surveyKindLabel(kind) {
+  switch (kind) {
+    case 'new_merchant_onboarding':
+      return 'تهيئة'
+    case 'active_csat':
+      return 'نشط CSAT'
+    case 'inactive_feedback':
+      return 'غير نشط'
+    case 'freeze_alert':
+      return 'تجميد'
+    case 'needs_freeze_request':
+      return 'يحتاج تجميد'
+    default:
+      return kind || '—'
+  }
+}
+
+function qvTrackLabel(track) {
+  switch (track) {
+    case 'incubation':
+      return 'مسار الاحتضان'
+    case 'active':
+      return 'نشطة'
+    case 'inactive':
+      return 'غير نشطة'
+    case 'other':
+      return 'أخرى'
+    default:
+      return '—'
+  }
+}
+
+/** يتوافق مع الخادم عند غياب qv_track (بيانات قديمة). */
+function rowQvTrack(row) {
+  if (row.qv_track) return row.qv_track
+  const c = (row.store_category || '').trim()
+  if (c === 'incubating') return 'incubation'
+  if (['inactive', 'hot_inactive', 'cold_inactive', 'restoring', 'restored', 'recovered'].includes(c)) return 'inactive'
+  if (['active', 'active_pending_calls', 'active_shipping', 'completed', 'unreachable', 'frozen'].includes(c)) return 'active'
+  return 'other'
+}
+
+function formatSurveyDate(iso) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(String(iso).replace(' ', 'T'))
+    if (Number.isNaN(d.getTime())) return String(iso).slice(0, 16)
+    return d.toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return String(iso)
+  }
+}
 
 function rowMatchesQuery(row, q) {
   if (!q.trim()) return true
@@ -30,7 +108,8 @@ function rowMatchesQuery(row, q) {
   const staff = (row.staff_username || row.staff_fullname || '').toLowerCase()
   const fr = String(row.freeze_reason || '').toLowerCase()
   const src = String(row.source_label || '').toLowerCase()
-  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s) || src.includes(s)
+  const sug = String(row.suggestions || '').toLowerCase()
+  return id.includes(s) || name.includes(s) || staff.includes(s) || fr.includes(s) || src.includes(s) || sug.includes(s)
 }
 
 function isSatisfied(row) {
@@ -45,6 +124,7 @@ function isCrisis(row) {
 
 function satisfactionPercent(row) {
   if (row.survey_kind === 'freeze_alert' || row.survey_kind === 'needs_freeze_request') return 0
+  if (row.survey_kind === 'inactive_feedback') return 0
   if (row.survey_kind === 'new_merchant_onboarding') {
     const ans = row.answers || []
     const yes = ans.filter(a => a.yes).length
@@ -184,11 +264,11 @@ function QuickAuditTopNav({ growth, resolution, globalSat, loading }) {
 }
 
 /** شريط مؤشرات سريعة — بطاقات KPI بألوان ممتدة على كامل المربع */
-function QvStatStrip({ total, openCrisis, resolved, globalSat, loading }) {
+function QvStatStrip({ total, openCrisis, resolved, globalSat, loading, rangeIsToday = true }) {
   const items = [
     {
-      label: 'تسجيلات اليوم',
-      sub: 'إجمالي ما ورد للتحقيق',
+      label: rangeIsToday ? 'تسجيلات اليوم' : 'إجمالي السجلات',
+      sub: rangeIsToday ? 'إجمالي ما ورد للتحقيق' : 'ضمن نطاق التاريخ المحدد',
       value: loading ? '—' : total.toLocaleString('ar-SA'),
       icon: ClipboardList,
       fullBg:
@@ -344,9 +424,11 @@ function CrisisCard({ row, onOpen, layoutId, sectionCount = 0 }) {
       ? 'تجميد'
       : row.survey_kind === 'needs_freeze_request'
         ? 'يحتاج تجميد'
-        : row.survey_kind === 'new_merchant_onboarding'
-          ? 'تهيئة'
-          : 'CSAT نشط'
+        : row.survey_kind === 'inactive_feedback'
+          ? 'غير نشط'
+          : row.survey_kind === 'new_merchant_onboarding'
+            ? 'تهيئة'
+            : 'CSAT نشط'
   const displayName = row.store_name || `متجر #${row.store_id}`
   const headerBadge =
     row.survey_kind === 'freeze_alert'
@@ -538,6 +620,7 @@ function DetailDrawer({
   const needsFreezeReq = row.survey_kind === 'needs_freeze_request'
   const freezeLike = freezeAlert || needsFreezeReq
   const onboarding = row.survey_kind === 'new_merchant_onboarding'
+  const inactiveFeedback = row.survey_kind === 'inactive_feedback'
 
   return (
     <AnimatePresence>
@@ -608,7 +691,15 @@ function DetailDrawer({
                   </div>
                 </>
               ) : null}
-              {!freezeLike ? (
+              {inactiveFeedback ? (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 shadow-inner">
+                  <p className="mb-2 text-[11px] font-black text-[#4B0082]">ملاحظة المتجر (غير نشط)</p>
+                  <p className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-900">
+                    {(row.suggestions || '').trim() || '—'}
+                  </p>
+                </div>
+              ) : null}
+              {!freezeLike && !inactiveFeedback ? (
                 <>
               <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#4B0082]">نتائج الاستبيان</p>
               {onboarding ? (
@@ -646,7 +737,7 @@ function DetailDrawer({
                 </>
               ) : null}
 
-              {canResolve && !row.resolved && !freezeLike ? (
+              {canResolve && !row.resolved && !freezeLike && !inactiveFeedback ? (
                 <div className="mt-6 rounded-xl border border-rose-100/90 bg-rose-50/35 p-4 shadow-inner">
                   <p className="mb-1 text-[11px] font-black text-rose-900">إنذار احتضان (اختياري)</p>
                   <p className="mb-3 text-[11px] leading-relaxed text-slate-600">
@@ -739,7 +830,16 @@ export default function QuickVerification() {
   const [activeRows, setActiveRows] = useState([])
   const [freezeRows, setFreezeRows] = useState([])
   const [needsFreezeRows, setNeedsFreezeRows] = useState([])
+  const [inactiveFeedbackRows, setInactiveFeedbackRows] = useState([])
   const [query, setQuery] = useState('')
+  const [trackFilter, setTrackFilter] = useState('all')
+  const [sortAz, setSortAz] = useState(true)
+  const defRange = useMemo(() => getDefaultHistoryRange(), [])
+  const [qvDateMode, setQvDateMode] = useState('range')
+  const [qvDateFrom, setQvDateFrom] = useState(defRange.from)
+  const [qvDateTo, setQvDateTo] = useState(defRange.to)
+  const [dateRangeMeta, setDateRangeMeta] = useState(null)
+  const [masterTablePage, setMasterTablePage] = useState(1)
   const [resolvingId, setResolvingId] = useState(null)
   const [tab, setTab] = useState('crisis')
   const [drawerRow, setDrawerRow] = useState(null)
@@ -750,39 +850,55 @@ export default function QuickVerification() {
     setLoading(true)
     setErr('')
     try {
-      const d = await getQuickVerificationBourse({
+      const payload = {
         user_role: user?.role || '',
         username: user?.username || '',
-      })
+      }
+      if (qvDateMode === 'range') {
+        if (!qvDateFrom || !qvDateTo || qvDateFrom > qvDateTo) {
+          setErr('حدّد تاريخي «من» و«إلى» بشكل صحيح.')
+          setLoading(false)
+          return
+        }
+        payload.from = qvDateFrom
+        payload.to = qvDateTo
+      }
+      const d = await getQuickVerificationBourse(payload)
       if (d?.success) {
+        setDateRangeMeta(d.date_range ?? null)
         setOnboardingRows(Array.isArray(d.rows) ? d.rows : [])
         setActiveRows(Array.isArray(d.active_csat_rows) ? d.active_csat_rows : [])
         setFreezeRows(Array.isArray(d.freeze_rows) ? d.freeze_rows : [])
         setNeedsFreezeRows(Array.isArray(d.needs_freeze_rows) ? d.needs_freeze_rows : [])
+        setInactiveFeedbackRows(Array.isArray(d.inactive_feedback_rows) ? d.inactive_feedback_rows : [])
       } else {
+        setDateRangeMeta(null)
         setErr(d?.error || 'تعذّر التحميل')
         setOnboardingRows([])
         setActiveRows([])
         setFreezeRows([])
         setNeedsFreezeRows([])
+        setInactiveFeedbackRows([])
       }
     } catch (e) {
+      setDateRangeMeta(null)
       setErr(e?.response?.data?.error || e?.message || 'خطأ في التحميل')
       setOnboardingRows([])
       setActiveRows([])
       setFreezeRows([])
       setNeedsFreezeRows([])
+      setInactiveFeedbackRows([])
     } finally {
       setLoading(false)
     }
-  }, [user?.role, user?.username])
+  }, [user?.role, user?.username, qvDateMode, qvDateFrom, qvDateTo])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const kpis = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows]
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
     if (!all.length) return { growth: 0, resolution: 100, global: 100 }
     const positive = all.filter(isSatisfied).length
     const growth = Math.round((positive / all.length) * 100)
@@ -792,14 +908,54 @@ export default function QuickVerification() {
     const gSum = all.reduce((acc, r) => acc + satisfactionPercent(r), 0)
     const global = Math.round(gSum / all.length)
     return { growth, resolution, global }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows])
 
   const statStrip = useMemo(() => {
-    const all = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows]
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
     const openCrisis = all.filter(r => !r.resolved && !isSatisfied(r)).length
     const resolved = all.filter(r => r.resolved).length
     return { total: all.length, openCrisis, resolved }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows])
+
+  const masterSurveyList = useMemo(() => {
+    const all = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows]
+    const filtered = all.filter(row => {
+      if (!rowMatchesQuery(row, query)) return false
+      if (trackFilter === 'all') return true
+      return rowQvTrack(row) === trackFilter
+    })
+    const nameKey = r => (r.store_name || String(r.store_id || '')).trim()
+    filtered.sort((a, b) => {
+      const cmp = nameKey(a).localeCompare(nameKey(b), 'ar', { sensitivity: 'base' })
+      return sortAz ? cmp : -cmp
+    })
+    return filtered
+  }, [
+    onboardingRows,
+    activeRows,
+    inactiveFeedbackRows,
+    freezeRows,
+    needsFreezeRows,
+    query,
+    trackFilter,
+    sortAz,
+  ])
+
+  const masterSurveyTotalPages = Math.max(1, Math.ceil(masterSurveyList.length / MASTER_SURVEY_PAGE_SIZE))
+
+  const pagedMasterSurveyList = useMemo(() => {
+    const page = Math.min(masterTablePage, masterSurveyTotalPages)
+    const start = (page - 1) * MASTER_SURVEY_PAGE_SIZE
+    return masterSurveyList.slice(start, start + MASTER_SURVEY_PAGE_SIZE)
+  }, [masterSurveyList, masterTablePage, masterSurveyTotalPages])
+
+  useEffect(() => {
+    setMasterTablePage(1)
+  }, [query, trackFilter, sortAz, qvDateMode, qvDateFrom, qvDateTo])
+
+  useEffect(() => {
+    setMasterTablePage(p => Math.min(p, masterSurveyTotalPages))
+  }, [masterSurveyTotalPages])
 
   const crisisOnb = useMemo(
     () =>
@@ -827,6 +983,14 @@ export default function QuickVerification() {
     [needsFreezeRows, query],
   )
 
+  const crisisInactiveFb = useMemo(
+    () =>
+      inactiveFeedbackRows.filter(
+        r => !r.resolved && isCrisis(r) && rowMatchesQuery(r, query),
+      ),
+    [inactiveFeedbackRows, query],
+  )
+
   const solvedOnb = useMemo(
     () => onboardingRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [onboardingRows, query],
@@ -842,6 +1006,11 @@ export default function QuickVerification() {
   const solvedNeedsFreeze = useMemo(
     () => needsFreezeRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
     [needsFreezeRows, query],
+  )
+
+  const solvedInactiveFb = useMemo(
+    () => inactiveFeedbackRows.filter(r => r.resolved && rowMatchesQuery(r, query)),
+    [inactiveFeedbackRows, query],
   )
 
   const toggleQvMissedInc = useCallback(key => {
@@ -921,16 +1090,17 @@ export default function QuickVerification() {
     if (!drawerRow) return
     const stillOnb = onboardingRows.some(r => r.id === drawerRow.id)
     const stillAct = activeRows.some(r => r.id === drawerRow.id)
+    const stillIfb = inactiveFeedbackRows.some(r => r.id === drawerRow.id)
     const stillFr = freezeRows.some(r => r.id === drawerRow.id)
     const stillNf = needsFreezeRows.some(r => r.id === drawerRow.id)
-    if (!stillOnb && !stillAct && !stillFr && !stillNf) setDrawerRow(null)
+    if (!stillOnb && !stillAct && !stillIfb && !stillFr && !stillNf) setDrawerRow(null)
     else {
-      const fresh = [...onboardingRows, ...activeRows, ...freezeRows, ...needsFreezeRows].find(
+      const fresh = [...onboardingRows, ...activeRows, ...inactiveFeedbackRows, ...freezeRows, ...needsFreezeRows].find(
         r => r.id === drawerRow.id,
       )
       if (fresh && fresh.resolved !== drawerRow.resolved) setDrawerRow(fresh)
     }
-  }, [onboardingRows, activeRows, freezeRows, needsFreezeRows, drawerRow])
+  }, [onboardingRows, activeRows, inactiveFeedbackRows, freezeRows, needsFreezeRows, drawerRow])
 
   if (!can('quick_verification')) {
     return <Navigate to="/" replace />
@@ -940,9 +1110,17 @@ export default function QuickVerification() {
   const drawerCanResolve = drawerRow ? canResolveRow(drawerRow) : false
 
   const crisisTotal =
-    crisisOnb.length + crisisActive.length + crisisFreeze.length + crisisNeedsFreeze.length
+    crisisOnb.length +
+    crisisActive.length +
+    crisisInactiveFb.length +
+    crisisFreeze.length +
+    crisisNeedsFreeze.length
   const solvedTotal =
-    solvedOnb.length + solvedActive.length + solvedFreeze.length + solvedNeedsFreeze.length
+    solvedOnb.length +
+    solvedActive.length +
+    solvedInactiveFb.length +
+    solvedFreeze.length +
+    solvedNeedsFreeze.length
 
   return (
     <div
@@ -1127,11 +1305,113 @@ export default function QuickVerification() {
             resolved={statStrip.resolved}
             globalSat={kpis.global}
             loading={loading}
+            rangeIsToday={dateRangeMeta?.mode === 'today'}
           />
         </div>
       </div>
 
       <div className="w-full px-5 py-8 sm:px-8 lg:px-10 xl:px-12 2xl:px-16 md:py-10">
+        <div className="relative mb-6 overflow-hidden rounded-[1.25rem] border border-violet-200/55 bg-white/92 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3 text-right">
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <CalendarDays size={20} strokeWidth={2.2} />
+              </span>
+              <div>
+                <p className="text-sm font-black text-slate-900">فلترة بالتاريخ</p>
+                <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-slate-500">
+                  اختر «اليوم فقط» أو حدّد نطاقاً (من — إلى) لعرض كل الاستبيانات السابقة ضمنه. النطاق الأقصى 1095 يوماً.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQvDateMode('today')}
+                  className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                    qvDateMode === 'today'
+                      ? 'bg-violet-700 text-white shadow-md'
+                      : 'border border-violet-200 bg-white text-violet-900 hover:bg-violet-50'
+                  }`}
+                >
+                  اليوم فقط
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = getDefaultHistoryRange()
+                    setQvDateFrom(r.from)
+                    setQvDateTo(r.to)
+                    setQvDateMode('range')
+                  }}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-50"
+                >
+                  سنة (افتراضي)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const to = new Date()
+                    const from = new Date()
+                    from.setDate(from.getDate() - 1095)
+                    setQvDateFrom(formatYMD(from))
+                    setQvDateTo(formatYMD(to))
+                    setQvDateMode('range')
+                  }}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-50"
+                >
+                  3 سنوات
+                </button>
+              </div>
+              <div
+                className={`flex flex-wrap items-center gap-2 ${qvDateMode === 'today' ? 'pointer-events-none opacity-45' : ''}`}
+              >
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="whitespace-nowrap">من</span>
+                  <input
+                    type="date"
+                    value={qvDateFrom}
+                    onChange={e => {
+                      setQvDateMode('range')
+                      setQvDateFrom(e.target.value)
+                    }}
+                    className="rounded-xl border border-violet-200/80 bg-white px-2 py-2 text-xs font-semibold text-slate-800"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="whitespace-nowrap">إلى</span>
+                  <input
+                    type="date"
+                    value={qvDateTo}
+                    onChange={e => {
+                      setQvDateMode('range')
+                      setQvDateTo(e.target.value)
+                    }}
+                    className="rounded-xl border border-violet-200/80 bg-white px-2 py-2 text-xs font-semibold text-slate-800"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-black text-violet-900 transition hover:bg-violet-100 disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} strokeWidth={2.2} />
+                  تحديث
+                </button>
+              </div>
+            </div>
+          </div>
+          {dateRangeMeta ? (
+            <p className="mt-3 border-t border-violet-100 pt-3 text-center text-[11px] font-semibold text-violet-700">
+              {dateRangeMeta.mode === 'today'
+                ? 'العرض الحالي: يوم اليوم (توقيت بغداد)'
+                : `العرض الحالي: من ${dateRangeMeta.from} إلى ${dateRangeMeta.to}`}
+            </p>
+          ) : null}
+        </div>
+
         <div className="relative mb-10 rounded-[1.35rem] bg-gradient-to-br from-violet-300/28 via-white/45 to-fuchsia-200/25 p-[2px] shadow-[0_12px_40px_-12px_rgba(75,0,130,0.15)] ring-1 ring-violet-200/30 backdrop-blur-sm">
           <div className="relative rounded-[1.25rem] border border-white/85 bg-white/78 backdrop-blur-xl shadow-inner">
           <Search className="pointer-events-none absolute right-5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-violet-500/70" strokeWidth={2} />
@@ -1139,10 +1419,144 @@ export default function QuickVerification() {
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="بحث بالاسم، رقم المتجر، الموظف، أو السبب…"
+            placeholder="بحث بالاسم، رقم المتجر، الموظف، السبب، أو نص الملاحظة…"
             className="w-full rounded-[1.25rem] border-0 bg-transparent py-4 pr-14 pl-5 text-sm font-medium text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:ring-2 focus:ring-violet-400/25"
           />
           </div>
+        </div>
+
+        <div className="relative mb-10 overflow-hidden rounded-[1.35rem] border border-violet-200/50 bg-white/90 shadow-[0_12px_40px_-12px_rgba(75,0,130,0.12)] backdrop-blur-sm">
+          <div className="flex flex-col gap-4 border-b border-violet-100/80 bg-gradient-to-l from-violet-50/90 via-white to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex items-center gap-2 text-right">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <ListFilter size={20} strokeWidth={2.2} />
+              </span>
+              <div>
+                <p className="text-base font-black text-slate-900">جدول الاستبيانات</p>
+                <p className="text-xs font-medium text-slate-500">
+                  فلترة مسار المتجر وترتيب أبجدي؛ يظهر كل ما في النطاق الزمني أعلاه ({MASTER_SURVEY_PAGE_SIZE} استبيانات لكل صفحة).
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                <span className="whitespace-nowrap">المسار</span>
+                <select
+                  value={trackFilter}
+                  onChange={e => setTrackFilter(e.target.value)}
+                  className="rounded-xl border border-violet-200/80 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none ring-0 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20"
+                >
+                  <option value="all">الكل</option>
+                  <option value="incubation">مسار الاحتضان</option>
+                  <option value="active">نشطة</option>
+                  <option value="inactive">غير نشطة</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setSortAz(v => !v)}
+                className="inline-flex items-center gap-2 rounded-xl border border-violet-200/80 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50"
+              >
+                {sortAz ? <ArrowDownAZ size={16} strokeWidth={2.2} /> : <ArrowUpAZ size={16} strokeWidth={2.2} />}
+                {sortAz ? 'أ → ي' : 'ي → أ'}
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse text-right text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-black uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3">المتجر</th>
+                  <th className="px-4 py-3">نوع الاستبيان</th>
+                  <th className="px-4 py-3">مسار المتجر</th>
+                  <th className="px-4 py-3 whitespace-nowrap">تاريخ التسجيل</th>
+                  <th className="px-4 py-3">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && masterSurveyList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                      جارٍ التحميل…
+                    </td>
+                  </tr>
+                ) : masterSurveyList.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                      لا توجد استبيانات تطابق البحث أو الفلتر.
+                    </td>
+                  </tr>
+                ) : (
+                  pagedMasterSurveyList.map(row => (
+                    <tr
+                      key={`${row.survey_kind}-${row.id}`}
+                      className="cursor-pointer border-b border-slate-100/90 transition hover:bg-violet-50/50"
+                      onClick={() => setDrawerRow(row)}
+                    >
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        <span className="block truncate">{row.store_name || `متجر #${row.store_id}`}</span>
+                        <span className="text-[11px] font-semibold text-slate-400">#{row.store_id}</span>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-violet-900">{surveyKindLabel(row.survey_kind)}</td>
+                      <td className="px-4 py-3 text-slate-700">{qvTrackLabel(rowQvTrack(row))}</td>
+                      <td className="px-4 py-3 text-[11px] font-semibold tabular-nums text-slate-600 whitespace-nowrap">
+                        {formatSurveyDate(row.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.resolved ? (
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">
+                            تم الحل
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-black text-amber-900">
+                            قيد المراجعة
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {masterSurveyList.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-violet-100/90 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <p className="text-center text-[11px] font-semibold text-slate-600 sm:text-right">
+                عرض{' '}
+                {(Math.min(masterTablePage, masterSurveyTotalPages) - 1) * MASTER_SURVEY_PAGE_SIZE + 1}–
+                {Math.min(
+                  Math.min(masterTablePage, masterSurveyTotalPages) * MASTER_SURVEY_PAGE_SIZE,
+                  masterSurveyList.length,
+                )}{' '}
+                من {masterSurveyList.length.toLocaleString('ar-SA')}
+              </p>
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMasterTablePage(p => Math.max(1, p - 1))}
+                  disabled={masterTablePage <= 1}
+                  className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight size={16} strokeWidth={2.2} className="shrink-0" />
+                  السابق
+                </button>
+                <span className="min-w-[5rem] text-center text-xs font-black tabular-nums text-slate-700">
+                  {Math.min(masterTablePage, masterSurveyTotalPages).toLocaleString('ar-SA')} /{' '}
+                  {masterSurveyTotalPages.toLocaleString('ar-SA')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMasterTablePage(p => Math.min(masterSurveyTotalPages, p + 1))}
+                  disabled={masterTablePage >= masterSurveyTotalPages}
+                  className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-900 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  التالي
+                  <ChevronLeft size={16} strokeWidth={2.2} className="shrink-0" />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {err ? (
@@ -1154,7 +1568,12 @@ export default function QuickVerification() {
           </p>
         ) : null}
 
-        {loading && !onboardingRows.length && !activeRows.length && !freezeRows.length && !needsFreezeRows.length ? (
+        {loading &&
+        !onboardingRows.length &&
+        !activeRows.length &&
+        !inactiveFeedbackRows.length &&
+        !freezeRows.length &&
+        !needsFreezeRows.length ? (
           <div className="flex flex-col items-center justify-center gap-4 py-28">
             <Loader2 className="h-12 w-12 animate-spin text-violet-600" strokeWidth={2.2} />
             <p className="text-sm font-semibold text-slate-500">جارٍ تحميل لوحة التحقيق…</p>
@@ -1212,6 +1631,29 @@ export default function QuickVerification() {
                         layoutId={`qv-c-${row.id}`}
                         onOpen={setDrawerRow}
                         sectionCount={crisisActive.length}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </SectionShell>
+
+              <SectionShell
+                title="غير النشطين — ملاحظات"
+                subtitle="استبيان «ماذا قال المتجر؟» لمسار غير النشط — يظهر للمراجعة التنفيذية."
+                count={crisisInactiveFb.length}
+                empty={crisisInactiveFb.length === 0}
+              >
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${crisisInactiveFb.length > 16 ? '2xl:grid-cols-5' : ''} ${crisisInactiveFb.length > 12 ? 'gap-3 sm:gap-4' : 'gap-5'}`}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {crisisInactiveFb.map(row => (
+                      <CrisisCard
+                        key={row.id}
+                        row={row}
+                        layoutId={`qv-c-${row.id}`}
+                        onOpen={setDrawerRow}
+                        sectionCount={crisisInactiveFb.length}
                       />
                     ))}
                   </AnimatePresence>
@@ -1287,6 +1729,9 @@ export default function QuickVerification() {
                 ))}
                 {solvedActive.map(row => (
                   <SolvedRow key={row.id} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
+                ))}
+                {solvedInactiveFb.map(row => (
+                  <SolvedRow key={`ifb-${row.id}`} row={row} onOpen={setDrawerRow} listSize={solvedTotal} />
                 ))}
                 {isExec
                   ? solvedFreeze.map(row => (
