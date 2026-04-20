@@ -979,8 +979,8 @@ try {
             $freezeReason = trim((string) ($fr['freeze_reason'] ?? ''));
             $stateReason = trim((string) ($fr['state_reason'] ?? ''));
             $isAutoFreeze = (
-                str_starts_with($stateReason, 'auto_')
-                || str_starts_with($freezeReason, 'تجميد تلقائي')
+                ($stateReason !== '' && strpos($stateReason, 'auto_') === 0)
+                || ($freezeReason !== '' && strpos($freezeReason, 'تجميد تلقائي') === 0)
             );
             if (!$isAutoFreeze) {
                 continue;
