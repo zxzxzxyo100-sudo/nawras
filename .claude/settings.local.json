@@ -38,7 +38,9 @@
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
       "Bash(curl -s --max-time 120 \"https://nawras-ly.com/api-php/all-stores.php\" -o check2.json)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(mkdir -p \"C:/Users/NEW/OneDrive/Desktop/nawras-main/react-crm/src/assets/images\")",
+      "Bash(cp \"C:/Users/NEW/OneDrive/Desktop/nawras-main/react-crm/src/assets/hero.png\" \"C:/Users/NEW/OneDrive/Desktop/nawras-main/react-crm/src/assets/images/logo.png\")"
     ]
   }
 }
