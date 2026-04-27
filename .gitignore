@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Netlify
+.netlify
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / أدوات محلية
+.vscode/
+.idea/
+.cursor/
+.claude/
+*.swp
+*.swo
+*~
+
+.vercel
+
+# ذاكرة بحث Autocomplete (تُبنى عند تشغيل all-stores.php)
+api-php/cache/stores_search_lite.json
+
+# ترحيل قاعدة البيانات لمرة واحدة (لا تُرفع أقفال الإنتاج)
+api-php/.sync_db_lock.json
+api-php/sync_db.php.bak
+
+# ملفات مؤقتة للصور
+*.root.tmp.png
+nawras-team-hero.untracked.png
