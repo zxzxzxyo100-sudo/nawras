@@ -212,46 +212,43 @@ if ($action === 'get_my_workflow') {
             sa.assigned_to,
             sa.assigned_at,
             sa.workflow_status,
-            sa.assignment_queue
+            sa.assignment_queue,
+            (
+                SELECT MAX(cl.created_at)
+                FROM call_logs cl
+                WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
+                  AND cl.performed_by = sa.assigned_to
+            ) AS last_contact_at
         FROM store_assignments sa
         WHERE sa.assigned_to = ?
-        AND sa.assignment_queue = 'active'
-        AND sa.workflow_status = 'active'
-        AND NOT EXISTS (
-            SELECT 1 FROM call_logs cl
-            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
-            AND DATE(cl.created_at) = CURDATE()
-        )
-        ORDER BY sa.assigned_at ASC
+          AND sa.assignment_queue = 'active'
+          AND sa.workflow_status IN ('active','no_answer')
+        ORDER BY
+            (last_contact_at IS NULL) DESC,
+            last_contact_at ASC,
+            sa.assigned_at ASC
         LIMIT " . (int) ACTIVE_QUEUE_TARGET . "
     ");
     $stActive->execute([$username]);
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
-
-    $stNoAns = $pdo->prepare("
-        SELECT sa.store_id, sa.store_name, sa.assigned_to, sa.assigned_at, sa.workflow_status, sa.assignment_queue
-        FROM store_assignments sa
-        WHERE sa.assigned_to = ?
-        AND sa.assignment_queue = 'active'
-        AND sa.workflow_status = 'no_answer'
-        AND EXISTS (
-            SELECT 1 FROM call_logs cl
-            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
-            AND DATE(cl.created_at) = CURDATE()
-            AND cl.outcome IN ('no_answer', 'busy')
-        )
-        ORDER BY sa.workflow_updated_at DESC, sa.assigned_at ASC
-    ");
-    $stNoAns->execute([$username]);
-    $noAnswer = $stNoAns->fetchAll(PDO::FETCH_ASSOC);
-
+    $vipThreshold = (int) ACTIVE_VIP_SHIPMENTS_THRESHOLD;
     $active = wf_enrich_workflow_tasks_from_lite($active);
-    $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
+    $active = array_values(array_filter($active, static function (array $row) use ($vipThreshold): bool {
+        return ((int) ($row['total_shipments'] ?? 0)) < $vipThreshold;
+    }));
 
-    if ($dailyQuota['quota_reached']) {
-        $active = [];
-        $noAnswer = [];
-    }
+    /**
+     * «لم يرد» = مجموعة فرعية من نفس القائمة الموحّدة (100 متجر) — لا استعلام مستقل ولا فلتر اليوم.
+     * الواجهة تستطيع عرضها كتبويب جانبي دون إخفاء أي متجر من العهدة.
+     */
+    $noAnswer = array_values(array_filter($active, static function (array $row): bool {
+        return ($row['workflow_status'] ?? '') === 'no_answer';
+    }));
+
+    /**
+     * تثبيت القائمة: حصة اليوم لا تُفرغ القائمة. المتجر يبقى ظاهراً حتى يكتمل استبيانه أو يصل 301 شحنة.
+     * عداد الحصة يبقى للعرض فقط في daily_quota.
+     */
 
     $stCompleted = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at

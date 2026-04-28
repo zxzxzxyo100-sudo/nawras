@@ -4,7 +4,11 @@
  * يُستدعى من active-workflow.php و cron-daily-queue-fill.php
  */
 if (!defined('ACTIVE_QUEUE_TARGET')) {
-    define('ACTIVE_QUEUE_TARGET', 50);
+    define('ACTIVE_QUEUE_TARGET', 100);
+}
+/** الحد الأقصى لعدد الشحنات الإجمالية قبل ترقية المتجر إلى VIP وخروجه من قائمة المتاجر النشطة */
+if (!defined('ACTIVE_VIP_SHIPMENTS_THRESHOLD')) {
+    define('ACTIVE_VIP_SHIPMENTS_THRESHOLD', 301);
 }
 /** عدّاد يومي تقريري فقط لمسؤول المتاجر النشطة — لا يوقف الإحلال أو التعبئة */
 if (!defined('ACTIVE_DAILY_SUCCESS_TARGET')) {
