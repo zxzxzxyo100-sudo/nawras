@@ -221,6 +221,9 @@ if ($action === 'get_my_workflow') {
             ) AS last_contact_at
         FROM store_assignments sa
         WHERE sa.assigned_to = ?
+          AND sa.assigned_to IS NOT NULL
+          AND TRIM(sa.assigned_to) <> ''
+          AND TRIM(sa.assigned_to) <> 'بدون تعيين'
           AND sa.assignment_queue = 'active'
           AND sa.workflow_status IN ('active','no_answer')
         ORDER BY
@@ -252,8 +255,13 @@ if ($action === 'get_my_workflow') {
     $stCompleted = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
         FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active' AND workflow_status = 'completed'
-        AND DATE(COALESCE(workflow_updated_at, assigned_at)) = CURDATE()
+        WHERE assigned_to = ?
+          AND assigned_to IS NOT NULL
+          AND TRIM(assigned_to) <> ''
+          AND TRIM(assigned_to) <> 'بدون تعيين'
+          AND assignment_queue = 'active'
+          AND workflow_status = 'completed'
+          AND DATE(COALESCE(workflow_updated_at, assigned_at)) = CURDATE()
         ORDER BY workflow_updated_at DESC
         LIMIT 200
     ");
@@ -264,7 +272,11 @@ if ($action === 'get_my_workflow') {
     $stAllAssigned = $pdo->prepare("
         SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue, workflow_updated_at
         FROM store_assignments
-        WHERE assigned_to = ? AND assignment_queue = 'active'
+        WHERE assigned_to = ?
+          AND assigned_to IS NOT NULL
+          AND TRIM(assigned_to) <> ''
+          AND TRIM(assigned_to) <> 'بدون تعيين'
+          AND assignment_queue = 'active'
         ORDER BY
             CASE workflow_status
                 WHEN 'active' THEN 0
