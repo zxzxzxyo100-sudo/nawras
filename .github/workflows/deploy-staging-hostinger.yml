@@ -1,0 +1,49 @@
+# نشر تلقائي للتجريبي: عند كل push إلى فرع staging → رفع الملفات عبر FTP إلى Hostinger
+#
+# لمرة واحدة في GitHub: Repository → Settings → Secrets and variables → Actions → New repository secret
+#   HOSTINGER_FTP_HOST      مثال: ftp.nawras-ly.com أو IP من hPanel → Files → FTP Accounts
+#   HOSTINGER_FTP_USER      اسم مستخدم FTP
+#   HOSTINGER_FTP_PASSWORD  كلمة المرور
+#   HOSTINGER_FTP_REMOTE_DIR  المسار على السيرفر، مثال: /domains/nawras-ly.com/public_html/staging
+#
+# إن فشل الاتصال جرّب تغيير protocol أدناه إلى ftp أو ftps-legacy حسب إعدادات Hostinger.
+
+name: Deploy staging to Hostinger (FTP)
+
+on:
+  push:
+    branches: [staging]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_HOST }}
+          username: ${{ secrets.HOSTINGER_FTP_USER }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./
+          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          state-name: .ftp-deploy-sync-state.json
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            react-crm/**
+            docs/**
+            .cursor/**
+            .claude/**
+            deploy-staging.ps1
+            **/*.md
+          log-level: minimal

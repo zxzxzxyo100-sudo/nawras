@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Cairo', 'Segoe UI', sans-serif;
+    direction: rtl;
+    background-color: #f1f5f9;
+  }
+}
+
+/* وميض بطاقة «تذاكر خاصة» عند وجود تذاكر مفتوحة أو زيادة عددها */
+@layer utilities {
+  @keyframes private-ticket-frost-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.14),
+        0 0 28px rgba(186, 230, 253, 0.12);
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.28),
+        0 0 48px rgba(224, 250, 255, 0.28);
+    }
+  }
+  .animate-private-ticket-frost {
+    animation: private-ticket-frost-pulse 2.1s ease-in-out infinite;
+  }
+}
