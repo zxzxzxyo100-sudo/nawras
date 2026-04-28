@@ -449,6 +449,50 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       ? (pendingStoresForTable ?? [])
       : filteredActive
 
+  /**
+   * تجميع متاجر «قيد المتابعة» للمدير التنفيذي حسب الموظف المعيَّن:
+   *  - أبجدياً (locale ar) للموظفين أولاً
+   *  - قسم «متاجر بانتظار التعيين» في النهاية لكل ما هو null/فارغ/«بدون تعيين»
+   * يُحترم فلتر assignFilter: 'all' يُظهر الكل؛ 'assigned' يُسقط قسم unassigned؛ 'unassigned' يُظهره وحده؛ username يُظهر مجموعته فقط.
+   */
+  const executiveGrouped = useMemo(() => {
+    if (!isPendingTab || !isExecutive) return null
+    const buckets = new Map()
+    const UNASSIGNED_KEY = '__unassigned__'
+    for (const s of pendingDisplayStores) {
+      const v = realAssignee(s.id)
+      const key = v === '' ? UNASSIGNED_KEY : v
+      if (!buckets.has(key)) buckets.set(key, [])
+      buckets.get(key).push(s)
+    }
+    const arName = (uname) => {
+      const u = users.find(x => x.username === uname)
+      return u?.fullname || uname
+    }
+    const userGroups = [...buckets.entries()]
+      .filter(([k]) => k !== UNASSIGNED_KEY)
+      .map(([k, list]) => ({ key: k, label: arName(k), count: list.length, stores: list, isUnassigned: false }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ar'))
+    const unassignedList = buckets.get(UNASSIGNED_KEY) || []
+    const groups = []
+    if (assignFilter === 'all') {
+      groups.push(...userGroups)
+      if (unassignedList.length > 0) {
+        groups.push({ key: UNASSIGNED_KEY, label: 'متاجر بانتظار التعيين', count: unassignedList.length, stores: unassignedList, isUnassigned: true })
+      }
+    } else if (assignFilter === 'assigned') {
+      groups.push(...userGroups)
+    } else if (assignFilter === 'unassigned') {
+      if (unassignedList.length > 0) {
+        groups.push({ key: UNASSIGNED_KEY, label: 'متاجر بانتظار التعيين', count: unassignedList.length, stores: unassignedList, isUnassigned: true })
+      }
+    } else {
+      const g = userGroups.find(x => x.key === assignFilter)
+      if (g) groups.push(g)
+    }
+    return groups
+  }, [isPendingTab, isExecutive, pendingDisplayStores, users, assignFilter])
+
   const activeDailyQuota = isActiveManager && isPendingTab ? activeWf?.daily_quota : null
 
   const selectedDbCategory = selected
@@ -836,7 +880,64 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             </div>
           )}
 
-          {!activeDailyQuota?.quota_reached && (
+          {!activeDailyQuota?.quota_reached && isExecutive && executiveGrouped && (
+            executiveGrouped.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                لا توجد متاجر ضمن قيد المتابعة
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {executiveGrouped.map(group => (
+                  <section key={group.key} className="space-y-2">
+                    <header className={`rounded-2xl border px-4 py-3 shadow-sm flex items-center justify-between ${
+                      group.isUnassigned
+                        ? 'border-amber-200/80 bg-gradient-to-l from-amber-50/90 to-white'
+                        : 'border-blue-200/80 bg-gradient-to-l from-blue-50/90 to-white'
+                    }`}>
+                      <h3 className={`text-sm font-bold flex items-center gap-2 ${group.isUnassigned ? 'text-amber-900' : 'text-blue-900'}`}>
+                        {group.isUnassigned ? <Users size={16} className="text-amber-600" /> : <UserCheck size={16} className="text-blue-600" />}
+                        {group.label}
+                      </h3>
+                      <span className={`inline-flex items-center justify-center min-w-[32px] h-[24px] px-2 rounded-full text-xs font-bold ${
+                        group.isUnassigned ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white'
+                      }`}>
+                        {group.count}
+                      </span>
+                    </header>
+                    <StoreTable
+                      variant="elite"
+                      stores={group.stores}
+                      onSelectStore={setSelected}
+                      onRestoreStore={setSelected}
+                      extraColumns={extraColumns}
+                      hideToolbar
+                      externalFilterOpen={advFilterOpen}
+                      onExternalFilterOpenChange={setAdvFilterOpen}
+                      emptyMsg="لا توجد متاجر"
+                      parcelsColumnSub={
+                        shipmentsRangeMeta?.from && shipmentsRangeMeta?.to
+                          ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
+                          : undefined
+                      }
+                      selectable
+                      selectedIds={selectedIds}
+                      onSelectionChange={setSelectedIds}
+                      eliteNeedsSurvey={s =>
+                        needsActiveSatisfactionSurvey(
+                          s.id,
+                          storeStates[s.id]?.category || s.category || '',
+                          surveyByStoreId,
+                        )}
+                      onEliteSurveyClick={store => setSurveyModalStore(store)}
+                      onCallStore={handleEliteCall}
+                    />
+                  </section>
+                ))}
+              </div>
+            )
+          )}
+
+          {!activeDailyQuota?.quota_reached && !isExecutive && (
           <StoreTable
             variant="elite"
             stores={pendingDisplayStores}
@@ -856,9 +957,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                 ? `من ${shipmentsRangeMeta.from} إلى ${shipmentsRangeMeta.to}`
                 : undefined
             }
-            selectable={isExecutive}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
+            selectable={false}
             eliteNeedsSurvey={s =>
               needsActiveSatisfactionSurvey(
                 s.id,
