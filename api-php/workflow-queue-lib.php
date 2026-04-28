@@ -296,7 +296,15 @@ function pick_next_pool_store(PDO $pdo) {
 }
 
 function count_active_queue(PDO $pdo, $username) {
-    $st = $pdo->prepare("SELECT COUNT(*) FROM store_assignments WHERE assigned_to = ? AND workflow_status = 'active' AND assignment_queue = 'active'");
+    $st = $pdo->prepare("
+        SELECT COUNT(*) FROM store_assignments
+        WHERE assigned_to = ?
+          AND assigned_to IS NOT NULL
+          AND TRIM(assigned_to) <> ''
+          AND TRIM(assigned_to) <> 'بدون تعيين'
+          AND workflow_status = 'active'
+          AND assignment_queue = 'active'
+    ");
     $st->execute([$username]);
     return (int) $st->fetchColumn();
 }
@@ -308,13 +316,16 @@ function count_pending_active_queue(PDO $pdo, $username) {
     $st = $pdo->prepare("
         SELECT COUNT(*) FROM store_assignments sa
         WHERE sa.assigned_to = ?
-        AND sa.workflow_status = 'active'
-        AND sa.assignment_queue = 'active'
-        AND NOT EXISTS (
-            SELECT 1 FROM call_logs cl
-            WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
-            AND DATE(cl.created_at) = CURDATE()
-        )
+          AND sa.assigned_to IS NOT NULL
+          AND TRIM(sa.assigned_to) <> ''
+          AND TRIM(sa.assigned_to) <> 'بدون تعيين'
+          AND sa.workflow_status = 'active'
+          AND sa.assignment_queue = 'active'
+          AND NOT EXISTS (
+              SELECT 1 FROM call_logs cl
+              WHERE CAST(cl.store_id AS CHAR) = CAST(sa.store_id AS CHAR)
+              AND DATE(cl.created_at) = CURDATE()
+          )
     ");
     $st->execute([$username]);
     return (int) $st->fetchColumn();
@@ -325,8 +336,11 @@ function count_total_active_workflow_assignments(PDO $pdo, $username) {
     $st = $pdo->prepare("
         SELECT COUNT(*) FROM store_assignments
         WHERE assigned_to = ?
-        AND assignment_queue = 'active'
-        AND workflow_status IN ('active', 'no_answer')
+          AND assigned_to IS NOT NULL
+          AND TRIM(assigned_to) <> ''
+          AND TRIM(assigned_to) <> 'بدون تعيين'
+          AND assignment_queue = 'active'
+          AND workflow_status IN ('active', 'no_answer')
     ");
     $st->execute([$username]);
     return (int) $st->fetchColumn();
