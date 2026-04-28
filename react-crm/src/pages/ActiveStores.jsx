@@ -62,6 +62,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [assignFilter, setAssignFilter]   = useState('all')
   // فتح/إغلاق لوحة التصفية الجانبية (قيد المتابعة)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  // فتح/إغلاق درج التصفية المتقدمة (تواريخ + بحث) — يُمرَّر إلى StoreTable
+  const [advFilterOpen, setAdvFilterOpen] = useState(false)
   /** متجر نافذة الاستبيان (منفصل عن «المحدد» حتى يبقى الاستبيان مفتوحاً عند إغلاق الدرج) */
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [callModalStore, setCallModalStore] = useState(null)
@@ -607,6 +609,17 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                 })}
               </FilterSection>
 
+              {/* قسم البحث/التواريخ المتقدمة — يفتح درج StoreFilterDrawer */}
+              <FilterSection title="بحث وتواريخ متقدمة" defaultOpen={false}>
+                <button
+                  onClick={() => { setAdvFilterOpen(true); setFilterPanelOpen(false); }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <span>اسم/رقم متجر، تاريخ تسجيل، تاريخ آخر شحنة…</span>
+                  <span className="text-blue-600 text-xs font-bold">فتح</span>
+                </button>
+              </FilterSection>
+
               {/* قسم الموظفين */}
               <FilterSection title="كل الموظفين" defaultOpen>
                 {users.map(u => {
@@ -815,6 +828,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={extraColumns}
+            hideToolbar
+            externalFilterOpen={advFilterOpen}
+            onExternalFilterOpenChange={setAdvFilterOpen}
             emptyMsg={
               fromDailyTasks && isActiveManager
                 ? 'لا توجد مهام معلّقة — ما عُيّن لك إما مُنجز أو غير موجود في الطابور.'
