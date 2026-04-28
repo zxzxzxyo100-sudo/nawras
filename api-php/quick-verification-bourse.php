@@ -217,6 +217,11 @@ try {
         ];
     }
 
+    /**
+     * نشط CSAT — تشمل أيضاً المتغيرات القديمة لـ survey_kind ('csat', NULL، فارغ).
+     * لا فلتر تقييم على مستوى SQL: نُحضر الكل ثم نحسب arrow من المتوسط في PHP لضمان
+     * ظهور المتاجر «غير الراضية» (avg < 3) في قسمها حتى لو حُفظ satisfaction_score خطأً.
+     */
     $stA = $pdo->prepare("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           COALESCE(ss.category, '') AS store_category,
@@ -231,8 +236,7 @@ try {
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
         WHERE s.created_at >= ?
         AND s.created_at < ?
-        /* سجلات قديمة بلا survey_kind تُعدّ CSAT نشط — مطابقة satisfaction-stats.php */
-        AND COALESCE(NULLIF(TRIM(s.survey_kind), ''), 'active_csat') = 'active_csat'
+        AND COALESCE(NULLIF(TRIM(s.survey_kind), ''), 'active_csat') IN ('active_csat','csat')
         ORDER BY s.created_at DESC
     ");
     $stA->execute([$rangeStart, $rangeEnd]);
@@ -286,8 +290,17 @@ try {
                 $fullname = $ur['fullname'];
             }
         }
-        $score = (string) ($r['satisfaction_score'] ?? '');
-        $arrow = $score === 'up' ? 'up' : ($score === 'mid' ? 'mid' : 'down');
+        /**
+         * السهم يُشتق من المتوسط الفعلي للأسئلة الستة — ليس من satisfaction_score المخزّن.
+         * هذا يمنع تسريب متاجر avg < 3 إلى «راضٍ» بسبب تقييم محفوظ خاطئ.
+         */
+        if ($avg < 3.0) {
+            $arrow = 'down';
+        } elseif ($avg < 4.0) {
+            $arrow = 'mid';
+        } else {
+            $arrow = 'up';
+        }
         $qvAt = $r['qv_resolved_at'] ?? null;
         $resolved = $qvAt !== null && trim((string) $qvAt) !== '';
         $scatA = trim((string) ($r['store_category'] ?? ''));
@@ -314,6 +327,7 @@ try {
         ];
     }
 
+    /** غير نشط — تشمل المتغير القديم 'inactive_note' أيضاً */
     $stI = $pdo->prepare("
         SELECT s.id, s.store_id, COALESCE(ss.store_name, '') AS store_name,
           COALESCE(ss.category, '') AS store_category,
@@ -326,7 +340,7 @@ try {
         LEFT JOIN quick_verification_resolutions qvr ON qvr.survey_id = s.id
         WHERE s.created_at >= ?
         AND s.created_at < ?
-        AND s.survey_kind = 'inactive_feedback'
+        AND s.survey_kind IN ('inactive_feedback','inactive_note')
         ORDER BY s.created_at DESC
     ");
     $stI->execute([$rangeStart, $rangeEnd]);
