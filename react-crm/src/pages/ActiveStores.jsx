@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { format, parseISO, addDays, differenceInCalendarDays } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff, Star } from 'lucide-react'
+import { TrendingUp, RefreshCw, UserCheck, Users, X, CheckCircle2, Shuffle, Filter, BadgeCheck, PhoneOff, Star, ChevronDown } from 'lucide-react'
 import StoreTable from '../components/StoreTable'
 import StoreDrawer from '../components/StoreDrawer'
 import CallModal from '../components/CallModal'
@@ -13,6 +13,26 @@ import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow } from '../se
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
+
+function FilterSection({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="rounded-xl bg-white border border-slate-200 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      >
+        <span>{title}</span>
+        <ChevronDown size={16} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-2 space-y-1.5 border-t border-slate-100 bg-slate-50/30">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ActiveStores({ embeddedSegment, fromDailyTasks = false } = {}) {
   const params = useParams()
@@ -40,6 +60,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [autoUsers, setAutoUsers]         = useState(new Set())
   // فلتر التعيين: 'all' | 'assigned' | 'unassigned' | username
   const [assignFilter, setAssignFilter]   = useState('all')
+  // فتح/إغلاق لوحة التصفية الجانبية (قيد المتابعة)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   /** متجر نافذة الاستبيان (منفصل عن «المحدد» حتى يبقى الاستبيان مفتوحاً عند إغلاق الدرج) */
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [callModalStore, setCallModalStore] = useState(null)
@@ -323,14 +345,20 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     ...extraColumns,
   ]
 
-  const assignedCount   = active.filter(s => assignments[s.id]?.assigned_to).length
+  /** اسم الموظف الحقيقي فقط — يستثني null/فارغ/«بدون تعيين» */
+  const realAssignee = (sid) => {
+    const v = (assignments[sid]?.assigned_to ?? '').toString().trim()
+    if (v === '' || v === 'بدون تعيين') return ''
+    return v
+  }
+  const assignedCount   = active.filter(s => realAssignee(s.id) !== '').length
   const unassignedCount = active.length - assignedCount
 
   // تطبيق الفلتر
   const filteredActive = useMemo(() => {
-    if (assignFilter === 'assigned')   return active.filter(s =>  assignments[s.id]?.assigned_to)
-    if (assignFilter === 'unassigned') return active.filter(s => !assignments[s.id]?.assigned_to)
-    if (assignFilter !== 'all')        return active.filter(s =>  assignments[s.id]?.assigned_to === assignFilter)
+    if (assignFilter === 'assigned')   return active.filter(s => realAssignee(s.id) !== '')
+    if (assignFilter === 'unassigned') return active.filter(s => realAssignee(s.id) === '')
+    if (assignFilter !== 'all')        return active.filter(s => realAssignee(s.id) === assignFilter)
     return active
   }, [active, assignments, assignFilter])
 
@@ -495,49 +523,119 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         </div>
       )}
 
-      {/* شريط الفلتر — قيد المكالمة فقط */}
+      {/* شريط الفلتر — زر واحد يفتح لوحة جانبية (قيد المكالمة فقط) */}
       {isPendingTab && isExecutive && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+        <div className="flex items-center justify-end">
+          <button
+            onClick={() => setFilterPanelOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+          >
             <Filter size={13} />
-            تصفية:
-          </span>
-          {[
-            { key: 'all',        label: `الكل (${active.length})` },
-            { key: 'assigned',   label: `معيّنة (${assignedCount})` },
-            { key: 'unassigned', label: `غير معيّنة (${unassignedCount})` },
-          ].map(f => (
-            <button
-              key={f.key}
-              onClick={() => setAssignFilter(f.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                assignFilter === f.key
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-          {/* فلتر لكل مسؤول */}
-          {users.map(u => {
-            const cnt = active.filter(s => assignments[s.id]?.assigned_to === u.username).length
-            if (cnt === 0) return null
-            return (
-              <button
-                key={u.username}
-                onClick={() => setAssignFilter(assignFilter === u.username ? 'all' : u.username)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                  assignFilter === u.username
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50'
-                }`}
-              >
-                {u.fullname || u.username} ({cnt})
-              </button>
-            )
-          })}
+            تصفية
+            {assignFilter !== 'all' && (
+              <span className="ms-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                {assignFilter === 'assigned' ? assignedCount
+                  : assignFilter === 'unassigned' ? unassignedCount
+                  : active.filter(s => realAssignee(s.id) === assignFilter).length}
+              </span>
+            )}
+          </button>
         </div>
+      )}
+
+      {/* لوحة التصفية الجانبية */}
+      {isPendingTab && isExecutive && filterPanelOpen && (
+        <>
+          <div
+            onClick={() => setFilterPanelOpen(false)}
+            className="fixed inset-0 bg-black/40 z-40"
+          />
+          <aside
+            dir="rtl"
+            className="fixed top-0 left-0 h-full w-[320px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
+                <Filter size={16} className="text-blue-600" />
+                تصفية
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setAssignFilter('all'); }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-slate-200"
+                >
+                  <X size={12} />
+                  مسح
+                </button>
+                <button
+                  onClick={() => setFilterPanelOpen(false)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-slate-200"
+                >
+                  <X size={12} />
+                  إغلاق
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {/* قسم الحالة */}
+              <FilterSection title="حالة التعيين" defaultOpen>
+                {[
+                  { key: 'all',        label: 'الكل',          count: active.length,   color: 'blue' },
+                  { key: 'assigned',   label: 'معيّنة',        count: assignedCount,   color: 'emerald' },
+                  { key: 'unassigned', label: 'غير معيّنة',   count: unassignedCount, color: 'amber' },
+                ].map(f => {
+                  const selected = assignFilter === f.key
+                  return (
+                    <button
+                      key={f.key}
+                      onClick={() => { setAssignFilter(f.key); setFilterPanelOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selected
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{f.label}</span>
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-[22px] px-2 rounded-full text-[11px] font-bold ${
+                        selected ? 'bg-white/20 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                      }`}>
+                        {f.count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </FilterSection>
+
+              {/* قسم الموظفين */}
+              <FilterSection title="كل الموظفين" defaultOpen>
+                {users.map(u => {
+                  const cnt = active.filter(s => realAssignee(s.id) === u.username).length
+                  if (cnt === 0) return null
+                  const selected = assignFilter === u.username
+                  return (
+                    <button
+                      key={u.username}
+                      onClick={() => { setAssignFilter(selected ? 'all' : u.username); setFilterPanelOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selected
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-50 text-indigo-700 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <span>{u.fullname || u.username}</span>
+                      <span className={`inline-flex items-center justify-center min-w-[28px] h-[22px] px-2 rounded-full text-[11px] font-bold ${
+                        selected ? 'bg-white/20 text-white' : 'bg-white text-indigo-600 border border-indigo-200'
+                      }`}>
+                        {cnt}
+                      </span>
+                    </button>
+                  )
+                })}
+              </FilterSection>
+            </div>
+          </aside>
+        </>
       )}
 
       {/* شريط التعيين الجماعي — قيد المكالمة فقط */}
