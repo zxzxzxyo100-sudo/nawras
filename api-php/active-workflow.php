@@ -227,7 +227,6 @@ if ($action === 'get_my_workflow') {
             (last_contact_at IS NULL) DESC,
             last_contact_at ASC,
             sa.assigned_at ASC
-        LIMIT " . (int) ACTIVE_QUEUE_TARGET . "
     ");
     $stActive->execute([$username]);
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
