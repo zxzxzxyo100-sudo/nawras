@@ -46,3 +46,7 @@ api-php/sync_db.php.bak
 # ملفات مؤقتة للصور
 *.root.tmp.png
 nawras-team-hero.untracked.png
+
+# حزم Electron المبنية محلياً (تتجاوز حد GitHub 100MB لكل ملف)
+Nawras-CRM-win32-x64/
+نظام النورس CRM-win32-x64/
