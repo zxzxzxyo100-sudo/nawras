@@ -128,6 +128,21 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     return [...base, ...fromInc.filter(s => !seen.has(s.id))]
   }, [stores.unreachable_merchants, stores.incubating, stores.new_registered, storeStates])
 
+  /** قَصْر القوائم على عهدة الموظف الحالي (active_manager). التنفيذي يرى الكل. */
+  const scopedToUser = useMemo(() => (rows) => {
+    if (!isActiveManager || !user?.username) return rows
+    return rows.filter(s => {
+      const a = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
+      const v = (a?.assigned_to ?? '').toString().trim()
+      if (v === '' || v === 'بدون تعيين') return false
+      return v === user.username
+    })
+  }, [assignments, isActiveManager, user?.username])
+
+  const scopedActive       = useMemo(() => scopedToUser(active),       [scopedToUser, active])
+  const scopedCompleted    = useMemo(() => scopedToUser(completed),    [scopedToUser, completed])
+  const scopedUnreachable  = useMemo(() => scopedToUser(unreachable),  [scopedToUser, unreachable])
+
   useEffect(() => {
     if (!isExecutive) return
     listUsers()
@@ -475,21 +490,21 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           <p className="text-slate-600 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
             {isPendingTab && (
               <>
-                {active.length} متجر — عمود الطرود: آخر 30 يومًا
-                {completed.length > 0 && (
-                  <span className="text-violet-600 font-medium"> — إجمالي منجز: {completed.length}</span>
+                {scopedActive.length} متجر — عمود الطرود: آخر 30 يومًا
+                {scopedCompleted.length > 0 && (
+                  <span className="text-violet-600 font-medium"> — إجمالي منجز: {scopedCompleted.length}</span>
                 )}
-                {unreachable.length > 0 && (
-                  <span className="text-amber-700 font-medium"> — لم يُصل للمتجر: {unreachable.length}</span>
+                {scopedUnreachable.length > 0 && (
+                  <span className="text-amber-700 font-medium"> — لم يُصل للمتجر: {scopedUnreachable.length}</span>
                 )}
               </>
             )}
             {isCompletedTab && (
-              <span>{completed.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
+              <span>{scopedCompleted.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
             )}
             {isUnreachableTab && (
               <span>
-                {unreachable.length} متجر — من مكالمة عامة («لم يرد»/«مشغول») أو زر «لم يرد» في المتابعة الدورية؛ يُنقل للمنجزة عند «تم الرد»
+                {scopedUnreachable.length} متجر — من مكالمة عامة («لم يرد»/«مشغول») أو زر «لم يرد» في المتابعة الدورية؛ يُنقل للمنجزة عند «تم الرد»
               </span>
             )}
             {isPendingTab && [...(stores.incubating || []), ...(stores.new_registered || [])].some(s => {
@@ -877,7 +892,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           </div>
           <StoreTable
             variant="elite"
-            stores={completed}
+            stores={scopedCompleted}
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={completedExtraColumns}
@@ -906,7 +921,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           </div>
           <StoreTable
             variant="elite"
-            stores={unreachable}
+            stores={scopedUnreachable}
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={unreachableExtraColumns}
