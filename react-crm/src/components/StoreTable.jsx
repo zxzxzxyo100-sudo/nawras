@@ -58,6 +58,11 @@ export default function StoreTable({
    * all = كل المتاجر وجميع الخانات | incubating = ?bucket=incubating | new48 = ?view=new48 (مسجّل خلال 48 ساعة)
    */
   listPreset = 'all',
+  /** إخفاء زر «تصفية» الأزرق وحقل عرض الصفحة من شريط الجدول — للأب الذي يدير التصفية بنفسه */
+  hideToolbar = false,
+  /** التحكم الخارجي بفتح/إغلاق درج التصفية (StoreFilterDrawer) — يُمكِّن الأب من فتحه من لوحته */
+  externalFilterOpen,
+  onExternalFilterOpenChange,
 }) {
   const isElite = variant === 'elite'
 
@@ -70,7 +75,13 @@ export default function StoreTable({
   const [shipTo, setShipTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
-  const [filterOpen, setFilterOpen] = useState(false)
+  const [internalFilterOpen, setInternalFilterOpen] = useState(false)
+  const filterOpen = externalFilterOpen ?? internalFilterOpen
+  const setFilterOpen = (v) => {
+    const next = typeof v === 'function' ? v(filterOpen) : v
+    if (onExternalFilterOpenChange) onExternalFilterOpenChange(next)
+    else setInternalFilterOpen(next)
+  }
   const [selectedBucketKeys, setSelectedBucketKeys] = useState(() => {
     if (listPreset === 'incubating') return ['incubating']
     /** «جديدة» 48 ساعة: جديد قبل الشحن + احتضان بعد أول شحنة ضمن الفلتر */
@@ -255,6 +266,7 @@ export default function StoreTable({
   return (
     <div className={shellClass} dir="rtl">
       {/* زر تصفية + عرض */}
+      {!hideToolbar && (
       <div className={toolbarClass}>
         <div
           className={
@@ -328,6 +340,7 @@ export default function StoreTable({
           </span>
         </div>
       </div>
+      )}
 
       <StoreFilterDrawer
         open={filterOpen}
