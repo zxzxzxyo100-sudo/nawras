@@ -533,11 +533,8 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* ── Logo ─────────────────────────────── */}
       <div className="relative z-10 px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
-          >
-            <span className="text-white font-black text-sm">ن</span>
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg bg-black flex items-center justify-center">
+            <img src="/favicon.png" alt="النورس" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <p className="text-white font-black text-sm leading-tight">النورس</p>
