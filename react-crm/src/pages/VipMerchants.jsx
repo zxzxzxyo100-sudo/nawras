@@ -4,7 +4,7 @@ import { getVipMerchantsMonthly } from '../services/api'
 import StoreDrawer from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
 
-const DEFAULT_MONTHS = 12
+const DEFAULT_MONTHS = 2
 const DEFAULT_THRESHOLD = 300
 
 function formatMonthAr(ym) {
@@ -19,7 +19,7 @@ export default function VipMerchants() {
   const [data, setData] = useState([])
   const [months, setMonths] = useState([])
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
-  const [windowMonths, setWindowMonths] = useState(DEFAULT_MONTHS)
+  const windowMonths = DEFAULT_MONTHS
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
@@ -73,25 +73,16 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            يُعتبر التاجر VIP إذا تجاوز شهرٌ واحد على الأقل من آخر{' '}
-            <span className="font-semibold text-slate-700">{windowMonths}</span> شهراً عتبة{' '}
+            يُعتبر التاجر VIP إذا تجاوز <span className="font-semibold text-slate-700">الشهر الحالي</span> أو{' '}
+            <span className="font-semibold text-slate-700">الشهر السابق</span> عتبة{' '}
             <span className="font-semibold text-slate-700">{threshold}</span> طرد.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
             <Calendar size={13} />
-            الفترة:
-            <select
-              value={windowMonths}
-              onChange={e => setWindowMonths(Number(e.target.value))}
-              className="bg-transparent font-semibold text-slate-800 outline-none"
-            >
-              {[3, 6, 12, 18, 24, 36].map(n => (
-                <option key={n} value={n}>{n} شهر</option>
-              ))}
-            </select>
-          </label>
+            الفترة: الشهر الحالي + السابق
+          </span>
           <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
             العتبة:
             <input
