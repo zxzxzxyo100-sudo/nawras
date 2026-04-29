@@ -104,14 +104,17 @@ try {
 }
 
 try {
+    /**
+     * كل المتاجر بالحالة الحالية 'restored'/'recovered' — بدون قيد تاريخي.
+     * «تمت الاستعادة» في الواجهة هو عدّاد الحالة الحالية (مطابق لصفحة «تمت الاستعادة»)
+     * بينما «بدأت الاستعادة» يبقى مقيَّداً بالفترة لقياس نشاط الموظفين فيها.
+     */
     $stState = $pdo->prepare("
         SELECT store_id, store_name, restore_date, updated_at, updated_by
         FROM store_states
         WHERE category IN ('restored', 'recovered')
-          AND COALESCE(restore_date, updated_at) >= ?
-          AND COALESCE(restore_date, updated_at) < ?
     ");
-    $stState->execute([$fromStart, $toExclusive]);
+    $stState->execute();
     $stateRows = $stState->fetchAll(PDO::FETCH_ASSOC) ?: [];
     foreach ($stateRows as $r) {
         $sid = (int) ($r['store_id'] ?? 0);
