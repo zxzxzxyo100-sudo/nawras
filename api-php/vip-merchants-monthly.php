@@ -37,13 +37,6 @@ header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
-$months = (int) ($_GET['months'] ?? 12);
-if ($months < 1) {
-    $months = 12;
-}
-if ($months > 36) {
-    $months = 36;
-}
 $threshold = (int) ($_GET['threshold'] ?? 300);
 if ($threshold < 1) {
     $threshold = 300;
@@ -52,12 +45,50 @@ if ($threshold < 1) {
 $tz = new DateTimeZone('Asia/Baghdad');
 $today = new DateTimeImmutable('today', $tz);
 
-/** بناء قائمة الأشهر من الأحدث إلى الأقدم */
+/**
+ * نطاق الأشهر المخصّص: ?from_month=YYYY-MM&to_month=YYYY-MM
+ * يفضّلان معاً؛ وإلا يُستخدم ?months=N (افتراضي 2) للخلف من هذا الشهر.
+ */
+$fromMonthIn = trim((string) ($_GET['from_month'] ?? ''));
+$toMonthIn = trim((string) ($_GET['to_month'] ?? ''));
 $monthList = [];
-$cur = $today->modify('first day of this month');
-for ($i = 0; $i < $months; $i++) {
-    $monthList[] = $cur->format('Y-m');
-    $cur = $cur->modify('-1 month');
+$useCustomRange = $fromMonthIn !== '' && $toMonthIn !== '';
+
+if ($useCustomRange) {
+    if (!preg_match('/^\d{4}-\d{2}$/', $fromMonthIn) || !preg_match('/^\d{4}-\d{2}$/', $toMonthIn)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'صيغة الشهر يجب أن تكون YYYY-MM.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $fromDt = DateTimeImmutable::createFromFormat('Y-m-d', $fromMonthIn . '-01', $tz);
+    $toDt = DateTimeImmutable::createFromFormat('Y-m-d', $toMonthIn . '-01', $tz);
+    if (!$fromDt || !$toDt) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'تاريخ غير صالح.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($fromDt > $toDt) {
+        $tmp = $fromDt; $fromDt = $toDt; $toDt = $tmp;
+    }
+    /** سقف 36 شهراً لتجنّب استدعاءات API هائلة */
+    $cur = $toDt;
+    while ($cur >= $fromDt && count($monthList) < 36) {
+        $monthList[] = $cur->format('Y-m');
+        $cur = $cur->modify('-1 month');
+    }
+} else {
+    $months = (int) ($_GET['months'] ?? 2);
+    if ($months < 1) {
+        $months = 2;
+    }
+    if ($months > 36) {
+        $months = 36;
+    }
+    $cur = $today->modify('first day of this month');
+    for ($i = 0; $i < $months; $i++) {
+        $monthList[] = $cur->format('Y-m');
+        $cur = $cur->modify('-1 month');
+    }
 }
 
 $monthly = [];   // [storeId => ['YYYY-MM' => count]]

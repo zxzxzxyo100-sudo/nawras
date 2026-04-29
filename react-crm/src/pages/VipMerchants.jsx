@@ -15,11 +15,24 @@ function formatMonthAr(ym) {
   return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' })
 }
 
+/** YYYY-MM للشهر الحالي حسب التوقيت المحلي */
+function currentYM() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+/** YYYY-MM للشهر السابق */
+function prevYM() {
+  const d = new Date()
+  d.setMonth(d.getMonth() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 export default function VipMerchants() {
   const [data, setData] = useState([])
   const [months, setMonths] = useState([])
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
-  const windowMonths = DEFAULT_MONTHS
+  const [fromMonth, setFromMonth] = useState(prevYM())
+  const [toMonth, setToMonth] = useState(currentYM())
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
@@ -29,7 +42,7 @@ export default function VipMerchants() {
     setLoading(true)
     setErr('')
     try {
-      const res = await getVipMerchantsMonthly({ months: windowMonths, threshold })
+      const res = await getVipMerchantsMonthly({ fromMonth, toMonth, threshold })
       if (res?.success) {
         setData(Array.isArray(res.data) ? res.data : [])
         setMonths(Array.isArray(res.months) ? res.months : [])
@@ -45,7 +58,7 @@ export default function VipMerchants() {
     }
   }
 
-  useEffect(() => { void load() }, [windowMonths, threshold])
+  useEffect(() => { void load() }, [fromMonth, toMonth, threshold])
 
   const filtered = useMemo(() => {
     if (!q.trim()) return data
@@ -73,16 +86,39 @@ export default function VipMerchants() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            يُعتبر التاجر VIP إذا تجاوز <span className="font-semibold text-slate-700">الشهر الحالي</span> أو{' '}
-            <span className="font-semibold text-slate-700">الشهر السابق</span> عتبة{' '}
+            يُعتبر التاجر VIP إذا تجاوز شهرٌ واحد ضمن النطاق المحدد عتبة{' '}
             <span className="font-semibold text-slate-700">{threshold}</span> طرد.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
             <Calendar size={13} />
-            الفترة: الشهر الحالي + السابق
-          </span>
+            من شهر:
+            <input
+              type="month"
+              value={fromMonth}
+              max={toMonth}
+              onChange={e => setFromMonth(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 outline-none"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+            إلى شهر:
+            <input
+              type="month"
+              value={toMonth}
+              min={fromMonth}
+              onChange={e => setToMonth(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => { setFromMonth(prevYM()); setToMonth(currentYM()) }}
+            className="text-xs px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          >
+            الحالي + السابق
+          </button>
           <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
             العتبة:
             <input
