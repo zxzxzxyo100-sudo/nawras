@@ -197,7 +197,7 @@ export default function VipMerchants() {
                 <tr><td colSpan={6 + months.length + 1} className="text-center py-16 text-slate-400">جارٍ التحميل…</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6 + months.length + 1} className="text-center py-16 text-slate-400">
-                  {q.trim() ? 'لا نتائج للبحث' : `لا يوجد تجار تجاوزوا ${threshold} طرداً في أي شهر من آخر ${windowMonths} شهراً`}
+                  {q.trim() ? 'لا نتائج للبحث' : `لا يوجد تجار تجاوزوا ${threshold} طرداً في أي شهر ضمن النطاق المحدد`}
                 </td></tr>
               ) : (
                 filtered.map(s => {
