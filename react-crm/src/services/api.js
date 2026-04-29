@@ -81,8 +81,16 @@ export const getVipMerchants = () =>
   http.get('/vip-merchants.php').then(r => r.data)
 
 /** كبار التجار — معيار شهري: أي شهر فيه ≥ threshold طرد */
-export const getVipMerchantsMonthly = ({ months = 12, threshold = 300 } = {}) =>
-  http.get('/vip-merchants-monthly.php', { params: { months, threshold } }).then(r => r.data)
+export const getVipMerchantsMonthly = ({ months, threshold = 300, fromMonth, toMonth } = {}) => {
+  const params = { threshold }
+  if (fromMonth && toMonth) {
+    params.from_month = fromMonth
+    params.to_month = toMonth
+  } else {
+    params.months = months ?? 2
+  }
+  return http.get('/vip-merchants-monthly.php', { params }).then(r => r.data)
+}
 
 /** ملخص الطرود لكل متجر ضمن نطاق تاريخ (يُستخدم لـ shipments_in_range) */
 export const getOrdersSummaryRange = (from, to) =>
