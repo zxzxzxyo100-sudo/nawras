@@ -108,16 +108,16 @@ foreach ($monthList as $ym) {
         if ($sid <= 0 || !is_array($store)) {
             continue;
         }
-        /** shipments_in_range هو عدد طرود الشهر — fallback إلى total_shipments عند الغياب */
+        /**
+         * عدد طرود الشهر = shipments_in_range فقط (نطاق محدد).
+         * total_shipments هو الإجمالي مدى الحياة — لا يُستخدم هنا.
+         */
         $monthCount = 0;
         foreach (['shipments_in_range', 'total_in_range', 'orders_in_range'] as $k) {
             if (isset($store[$k]) && is_numeric($store[$k])) {
                 $monthCount = (int) $store[$k];
                 break;
             }
-        }
-        if ($monthCount <= 0) {
-            $monthCount = nawris_total_shipments($store);
         }
         if (!isset($monthly[$sid])) {
             $monthly[$sid] = [];
