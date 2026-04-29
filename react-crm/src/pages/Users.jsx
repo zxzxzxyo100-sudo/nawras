@@ -3,6 +3,7 @@ import { Users as UsersIcon, Plus, Trash2, Edit2, X, Check, CheckCircle2, Circle
 import { listUsers, addUser, updateUser, deleteUser, getInactiveRecoveryDailyStatus } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { ROLES } from '../contexts/AuthContext'
+import ResponsiveDataView, { DataCard } from '../components/ResponsiveDataView'
 
 const ROLE_OPTIONS = Object.entries(ROLES).map(([value, { label }]) => ({ value, label }))
 
@@ -95,12 +96,34 @@ export default function Users() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-12 text-slate-400">جارٍ التحميل...</div>
-        ) : (
-          <table className="w-full text-sm">
+      {/* Table (desktop) / Cards (mobile) */}
+      <ResponsiveDataView
+        items={users}
+        emptyMsg={loading ? 'جارٍ التحميل...' : 'لا يوجد مستخدمون'}
+        keyOf={(u) => u.id}
+        renderCard={(u) => (
+          <DataCard
+            title={u.fullname}
+            subtitle={u.username}
+            badge={ROLES[u.role]?.label ?? u.role}
+            rows={[
+              ...(user?.role === 'executive' && u.role === 'inactive_manager'
+                ? [{ label: 'هدف الاستعادة اليوم', value: inactiveGoalByUser[u.username] ? 'تم ✓' : '—' }]
+                : []),
+              { label: 'تاريخ الإنشاء', value: u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '—' },
+            ]}
+            actions={[
+              { label: 'تعديل', icon: Edit2, onClick: () => openEdit(u), color: 'ghost' },
+              ...(u.id !== 1 ? [{ label: 'حذف', icon: Trash2, onClick: () => handleDelete(u), color: 'red' }] : []),
+            ]}
+          />
+        )}
+        desktop={(
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            {loading ? (
+              <div className="text-center py-12 text-slate-400">جارٍ التحميل...</div>
+            ) : (
+              <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
                 <th className="text-right px-5 py-3">الاسم</th>
@@ -161,8 +184,10 @@ export default function Users() {
               ))}
             </tbody>
           </table>
+            )}
+          </div>
         )}
-      </div>
+      />
 
       {/* Modal */}
       {showForm && (

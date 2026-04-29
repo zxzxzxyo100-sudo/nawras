@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
+import MobileBottomNav from './MobileBottomNav'
 import FloatingCallBar from './FloatingCallBar'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth } from '../contexts/AuthContext'
@@ -144,7 +145,7 @@ function LayoutInner() {
         )}
 
         <main
-          className={`flex-1 overflow-auto ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}
+          className={`flex-1 overflow-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-0 ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}
         >
           <Outlet />
         </main>
@@ -152,6 +153,9 @@ function LayoutInner() {
 
       {/* زر الاتصال العائم — للموظفين فقط */}
       {FLOATING_CALL_ROLES.includes(user?.role) && !sidebarOpen && <FloatingCallBar />}
+
+      {/* شريط التنقّل السفلي للموبايل */}
+      {!sidebarOpen && <MobileBottomNav />}
     </div>
   )
 }
