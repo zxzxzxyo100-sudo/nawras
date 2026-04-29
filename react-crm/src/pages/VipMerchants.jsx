@@ -174,8 +174,8 @@ export default function VipMerchants() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto overscroll-x-contain">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold border-b border-slate-100">
                 <th className="text-right px-4 py-3 sticky right-0 bg-slate-50 z-[1]">المتجر</th>

@@ -366,8 +366,8 @@ export default function StoreTable({
         onBucketKeysChange={setSelectedBucketKeys}
       />
 
-      <div className={tableWrapClass}>
-        <table className="w-full text-sm">
+      <div className={`${tableWrapClass} -mx-1 sm:mx-0 overscroll-x-contain`}>
+        <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className={theadTrClass}>
               {selectable && (
