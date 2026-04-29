@@ -1,121 +1,67 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Crown, RefreshCw, Search, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react'
-import { useStores } from '../contexts/StoresContext'
-import { getOrdersSummaryRange } from '../services/api'
+import { Crown, RefreshCw, Search, ExternalLink, Calendar } from 'lucide-react'
+import { getVipMerchantsMonthly } from '../services/api'
 import StoreDrawer from '../components/StoreDrawer'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { totalShipments } from '../utils/storeFields'
-import { VIP_MERCHANTS_COMING_SOON } from '../config/features'
 
-const VIP_MIN = 300
+const DEFAULT_MONTHS = 12
+const DEFAULT_THRESHOLD = 300
 
-/** عدد الأيام شاملاً بين تاريخين (YYYY-MM-DD) */
-function inclusiveDaySpan(fromStr, toStr) {
-  const a = new Date(`${fromStr}T12:00:00`)
-  const b = new Date(`${toStr}T12:00:00`)
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1
-  return Math.max(1, Math.round((b - a) / 86400000) + 1)
-}
-
-function shipmentTrend(current, previous) {
-  const c = Number(current) || 0
-  const p = Number(previous) || 0
-  if (c > p) return 'up'
-  if (c < p) return 'down'
-  return 'same'
-}
-
-function VipMerchantsComingSoon() {
-  return (
-    <div className="min-h-[52vh] flex flex-col items-center justify-center text-center px-4 py-16">
-      <div className="rounded-full bg-amber-50 border border-amber-200 p-5 mb-6 shadow-sm">
-        <Crown size={44} className="text-amber-500" strokeWidth={1.75} />
-      </div>
-      <h1 className="text-xl lg:text-2xl font-bold text-slate-800 flex items-center justify-center gap-2 flex-wrap">
-        كبار التجار
-        <span className="text-sm font-normal text-slate-500">(VIP)</span>
-      </h1>
-      <p className="mt-4 text-2xl sm:text-3xl font-semibold text-amber-600 tracking-wide">
-        قريباً
-      </p>
-      <p className="mt-4 text-slate-500 text-sm max-w-md leading-relaxed">
-        هذه الخاصية ستُفعَّل بعد ضبط واجهة الـ API. عنصر القائمة يبقى ظاهراً للوصول السريع عند الجاهزية.
-      </p>
-    </div>
-  )
+function formatMonthAr(ym) {
+  const [y, m] = String(ym).split('-')
+  if (!y || !m) return ym
+  const d = new Date(Number(y), Number(m) - 1, 1)
+  if (Number.isNaN(d.getTime())) return ym
+  return d.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' })
 }
 
 export default function VipMerchants() {
-  if (VIP_MERCHANTS_COMING_SOON) {
-    return <VipMerchantsComingSoon />
-  }
-  return <VipMerchantsFull />
-}
-
-function VipMerchantsFull() {
-  const { vipMerchants, loading, reload, shipmentsRangeMeta, lastLoaded } = useStores()
-  const [selected, setSelected] = useState(null)
+  const [data, setData] = useState([])
+  const [months, setMonths] = useState([])
+  const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
+  const [windowMonths, setWindowMonths] = useState(DEFAULT_MONTHS)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
   const [q, setQ] = useState('')
-  const [prevMap, setPrevMap] = useState({})
-  const [prevLabel, setPrevLabel] = useState('')
-  const [loadingPrev, setLoadingPrev] = useState(false)
+  const [selected, setSelected] = useState(null)
 
-  const vipStores = useMemo(() => {
-    const list = vipMerchants || []
-    return [...list].sort((a, b) => totalShipments(b) - totalShipments(a))
-  }, [vipMerchants])
-
-  useEffect(() => {
-    if (!shipmentsRangeMeta?.from) return
-    let cancelled = false
-    ;(async () => {
-      setLoadingPrev(true)
-      try {
-        const span = inclusiveDaySpan(shipmentsRangeMeta.from, shipmentsRangeMeta.to)
-        const prevTo = new Date(`${shipmentsRangeMeta.from}T12:00:00`)
-        prevTo.setDate(prevTo.getDate() - 1)
-        const prevFrom = new Date(prevTo)
-        prevFrom.setDate(prevFrom.getDate() - (span - 1))
-        const f = prevFrom.toISOString().slice(0, 10)
-        const t = prevTo.toISOString().slice(0, 10)
-        const res = await getOrdersSummaryRange(f, t)
-        if (cancelled) return
-        const m = {}
-        if (res?.success && Array.isArray(res.data)) {
-          res.data.forEach(s => {
-            const n = totalShipments(s)
-            m[s.id] = n
-            m[String(s.id)] = n
-          })
-        }
-        setPrevMap(m)
-        setPrevLabel(`مقارنة الطرود: النطاق الحالي مقابل ${f} — ${t}`)
-      } catch {
-        if (!cancelled) {
-          setPrevMap({})
-          setPrevLabel('')
-        }
-      } finally {
-        if (!cancelled) setLoadingPrev(false)
+  const load = async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const res = await getVipMerchantsMonthly({ months: windowMonths, threshold })
+      if (res?.success) {
+        setData(Array.isArray(res.data) ? res.data : [])
+        setMonths(Array.isArray(res.months) ? res.months : [])
+      } else {
+        setErr(res?.error || 'تعذّر جلب البيانات')
+        setData([])
       }
-    })()
-    return () => { cancelled = true }
-  }, [shipmentsRangeMeta?.from, shipmentsRangeMeta?.to, lastLoaded])
+    } catch (e) {
+      setErr(e?.response?.data?.error || e?.message || 'خطأ في الاتصال')
+      setData([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [windowMonths, threshold])
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return vipStores
+    if (!q.trim()) return data
     const low = q.trim().toLowerCase()
-    return vipStores.filter(
-      s =>
-        String(s.name || '').toLowerCase().includes(low) ||
-        String(s.id || '').includes(low) ||
-        String(s.phone || '').includes(low)
+    return data.filter(s =>
+      String(s.name || '').toLowerCase().includes(low)
+      || String(s.id || '').includes(low)
+      || String(s.phone || '').includes(low)
     )
-  }, [vipStores, q])
+  }, [data, q])
 
-  const hasSearch = Boolean(q.trim())
-  const emptyBecauseSearch = hasSearch && vipStores.length > 0 && filtered.length === 0
-  const emptyNoVip = !loading && vipStores.length === 0
+  const grandMaxMonth = useMemo(() => {
+    let max = 0
+    data.forEach(s => { if (s.monthly_max > max) max = s.monthly_max })
+    return max || threshold
+  }, [data, threshold])
 
   return (
     <div className="space-y-5">
@@ -127,34 +73,62 @@ function VipMerchantsFull() {
             <span className="text-sm font-normal text-slate-500">(VIP)</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            قائمة كبار التجار تُجلب من <span className="font-semibold text-slate-700">vip-merchants.php</span> (مسار مستقل) اعتماداً على{' '}
-            <span className="font-semibold text-slate-700">orders-summary</span> من Nawris مع جلب <span className="font-semibold text-slate-700">كل الصفحات</span> حتى لا يُفوت تاجر كبير.
-            الشرط: <span className="font-semibold text-slate-700">active</span> و{' '}
-            <span className="font-semibold text-slate-700">≥ {VIP_MIN}</span> طرد. للمدير التنفيذي فقط.
+            يُعتبر التاجر VIP إذا تجاوز شهرٌ واحد على الأقل من آخر{' '}
+            <span className="font-semibold text-slate-700">{windowMonths}</span> شهراً عتبة{' '}
+            <span className="font-semibold text-slate-700">{threshold}</span> طرد.
           </p>
-          {shipmentsRangeMeta?.from && shipmentsRangeMeta?.to && (
-            <p className="text-xs text-emerald-700 mt-1" dir="ltr">
-              نطاق الطرود (من استجابة API orders-summary): {shipmentsRangeMeta.from} ← {shipmentsRangeMeta.to}
-            </p>
-          )}
-          {prevLabel && (
-            <p className="text-xs text-slate-500 mt-0.5">{prevLabel}</p>
-          )}
         </div>
-        <button
-          type="button"
-          onClick={() => reload()}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          تحديث
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+            <Calendar size={13} />
+            الفترة:
+            <select
+              value={windowMonths}
+              onChange={e => setWindowMonths(Number(e.target.value))}
+              className="bg-transparent font-semibold text-slate-800 outline-none"
+            >
+              {[3, 6, 12, 18, 24, 36].map(n => (
+                <option key={n} value={n}>{n} شهر</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+            العتبة:
+            <input
+              type="number"
+              min={1}
+              value={threshold}
+              onChange={e => setThreshold(Math.max(1, Number(e.target.value) || 0))}
+              className="w-16 bg-transparent font-semibold text-slate-800 outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            تحديث
+          </button>
+        </div>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
-        <strong>المؤشر:</strong> أعداد عمود «طرود النطاق» من <strong>طلب orders-summary</strong> إلى Nawris؛ المقارنة مع الفترة السابقة بنفس الطول (تواريخ محسوبة من نطاق الـ API أعلاه).
-        {loadingPrev && <span className="mr-2 text-amber-700"> جارٍ جلب الفترة السابقة…</span>}
+      {err && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-800">
+          {err}
+        </div>
+      )}
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <strong>المؤشر:</strong> أعمدة الأشهر تُجلب شهراً بشهر من{' '}
+          <code className="font-mono text-xs">/external-api/customers/orders-summary</code>؛ المتاجر النشطة فقط.
+        </div>
+        <div className="text-xs text-amber-800">
+          نتائج: <strong>{data.length}</strong> تاجر — أعلى شهر:{' '}
+          <strong className="tabular-nums">{grandMaxMonth.toLocaleString('en-US')}</strong>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -169,7 +143,7 @@ function VipMerchantsFull() {
             />
           </div>
           <span className="text-sm text-slate-500 whitespace-nowrap">
-            {hasSearch ? `${filtered.length} من ${vipStores.length}` : `${vipStores.length} تاجر`}
+            {q.trim() ? `${filtered.length} من ${data.length}` : `${data.length} تاجر`}
           </span>
         </div>
 
@@ -177,84 +151,73 @@ function VipMerchantsFull() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold border-b border-slate-100">
-                <th className="text-right px-4 py-3">رقم المتجر</th>
-                <th className="text-right px-4 py-3">اسم المتجر</th>
+                <th className="text-right px-4 py-3 sticky right-0 bg-slate-50 z-[1]">المتجر</th>
                 <th className="text-right px-4 py-3">الهاتف</th>
-                <th className="text-right px-4 py-3">إجمالي الطرود (total_shipments)</th>
-                <th className="text-right px-4 py-3">طرود النطاق الحالي</th>
-                <th className="text-right px-4 py-3">الاتجاه</th>
+                <th className="text-right px-4 py-3">أعلى شهر</th>
+                <th className="text-right px-4 py-3">شهر الذروة</th>
+                <th className="text-right px-4 py-3">أشهر فوق العتبة</th>
                 <th className="text-right px-4 py-3">آخر شحنة</th>
+                {months.map(ym => (
+                  <th key={ym} className="text-center px-2 py-3 whitespace-nowrap text-[10px] font-mono text-slate-400">
+                    {ym}
+                  </th>
+                ))}
                 <th className="w-10 px-2" />
               </tr>
             </thead>
             <tbody>
-              {loading && vipStores.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400">جارٍ التحميل…</td>
-                </tr>
-              ) : emptyBecauseSearch ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400">
-                    لا نتائج للبحث — جرّب كلمات أخرى
-                  </td>
-                </tr>
-              ) : emptyNoVip ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-16 text-slate-400">
-                    لا يوجد تجار يطابقون شرط واجهة Nawris (status نشط، total_shipments ≥ {VIP_MIN})
-                  </td>
-                </tr>
+              {loading && data.length === 0 ? (
+                <tr><td colSpan={6 + months.length + 1} className="text-center py-16 text-slate-400">جارٍ التحميل…</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={6 + months.length + 1} className="text-center py-16 text-slate-400">
+                  {q.trim() ? 'لا نتائج للبحث' : `لا يوجد تجار تجاوزوا ${threshold} طرداً في أي شهر من آخر ${windowMonths} شهراً`}
+                </td></tr>
               ) : (
                 filtered.map(s => {
-                  const cur = s.shipments_in_range !== undefined && s.shipments_in_range !== null
-                    ? s.shipments_in_range
-                    : 0
-                  const prev = prevMap[s.id] ?? prevMap[String(s.id)] ?? 0
-                  const tr = shipmentTrend(cur, prev)
+                  const monthly = s.monthly || {}
+                  const maxMonthLabel = s.monthly_max_month ? formatMonthAr(s.monthly_max_month) : '—'
                   return (
                     <tr
                       key={s.id}
                       className="border-t border-slate-50 hover:bg-amber-50/40 cursor-pointer transition-colors"
                       onClick={() => setSelected(s)}
                     >
-                      <td className="px-4 py-3.5">
-                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg">{s.id}</span>
-                      </td>
-                      <td className="px-4 py-3.5 font-medium text-slate-800">
-                        <StoreNameWithId store={s} nameClassName="font-medium text-slate-800" idClassName="font-mono text-xs text-slate-500 font-semibold" />
+                      <td className="px-4 py-3.5 sticky right-0 bg-white z-[1] hover:bg-amber-50/40 min-w-[220px]">
+                        <StoreNameWithId
+                          store={s}
+                          nameClassName="font-medium text-slate-800"
+                          idClassName="font-mono text-xs text-slate-500 font-semibold"
+                        />
                       </td>
                       <td className="px-4 py-3.5 text-xs font-mono text-slate-600" dir="ltr">{s.phone || '—'}</td>
-                      <td className="px-4 py-3.5 font-bold text-slate-800">{totalShipments(s)}</td>
                       <td className="px-4 py-3.5">
-                        <span className="font-semibold text-slate-800">{cur}</span>
+                        <span className="inline-flex items-center justify-center min-w-[48px] px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold tabular-nums">
+                          {Number(s.monthly_max || 0).toLocaleString('en-US')}
+                        </span>
                       </td>
+                      <td className="px-4 py-3.5 text-slate-600 text-xs">{maxMonthLabel}</td>
                       <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          {tr === 'up' && (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-600" title="زيادة عن الفترة السابقة">
-                              <TrendingUp size={18} strokeWidth={2.5} />
-                            </span>
-                          )}
-                          {tr === 'down' && (
-                            <span className="inline-flex items-center gap-0.5 text-red-600" title="انخفاض عن الفترة السابقة">
-                              <TrendingDown size={18} strokeWidth={2.5} />
-                            </span>
-                          )}
-                          {tr === 'same' && (
-                            <span className="inline-flex text-slate-400" title="بدون تغيير">
-                              <Minus size={16} />
-                            </span>
-                          )}
-                          <span className="text-[10px] text-slate-400 tabular-nums" dir="ltr">
-                            ({cur} vs {prev})
-                          </span>
-                        </div>
+                        <span className="text-xs font-bold text-amber-700">{s.qualifying_months || 0}</span>
                       </td>
-                      <td className="px-4 py-3.5 text-slate-500">
+                      <td className="px-4 py-3.5 text-slate-500 text-xs">
                         {s.last_shipment_date && s.last_shipment_date !== 'لا يوجد'
                           ? new Date(s.last_shipment_date).toLocaleDateString('ar-SA')
-                          : <span className="text-red-400 text-xs">لا يوجد</span>}
+                          : <span className="text-rose-400">لا يوجد</span>}
                       </td>
+                      {months.map(ym => {
+                        const v = Number(monthly[ym] || 0)
+                        const over = v >= threshold
+                        return (
+                          <td key={ym} className="px-2 py-3.5 text-center">
+                            <span className={`inline-flex items-center justify-center min-w-[36px] px-1.5 py-0.5 rounded text-xs font-mono tabular-nums ${
+                              over ? 'bg-amber-100 text-amber-900 font-bold'
+                              : v > 0 ? 'text-slate-600' : 'text-slate-300'
+                            }`}>
+                              {v > 0 ? v.toLocaleString('en-US') : '·'}
+                            </span>
+                          </td>
+                        )
+                      })}
                       <td className="px-2 py-3.5" onClick={e => e.stopPropagation()}>
                         <button type="button" onClick={() => setSelected(s)} className="p-1 text-slate-300 hover:text-amber-600">
                           <ExternalLink size={14} />
