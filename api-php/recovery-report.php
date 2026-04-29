@@ -72,6 +72,11 @@ try {
 }
 
 try {
+    /**
+     * تمت الاستعادة خلال الفترة — أي انتقال إلى 'restored'/'recovered' بغض النظر عن الحالة السابقة.
+     * (سابقاً كان يشترط old_status='restoring' فيُهمل آلاف المتاجر التي بدأت الاستعادة قبل الفترة
+     *  أو وصلت إلى الاستعادة عبر اكتمال شحني آلي.)
+     */
     $stRestored = $pdo->prepare("
         SELECT
             store_id,
@@ -79,8 +84,7 @@ try {
             MIN(created_at) AS restored_at,
             MAX(performed_by) AS restored_by
         FROM audit_logs
-        WHERE old_status = 'restoring'
-          AND new_status IN ('recovered', 'restored')
+        WHERE new_status IN ('recovered', 'restored')
           AND created_at >= ?
           AND created_at < ?
         GROUP BY store_id
@@ -98,31 +102,54 @@ try {
     $restoredById = [];
 }
 
-$rows = [];
-$startedCount = 0;
-$restoredCount = 0;
+/** يضاف للسجل كل متجر تمت استعادته في الفترة — حتى لو لم تبدأ استعادته في نفس الفترة */
+$startedById = [];
 foreach ($startedRows as $s) {
     $sid = (int) ($s['store_id'] ?? 0);
     if ($sid <= 0) {
         continue;
     }
-    $startedCount++;
+    $startedById[$sid] = $s;
+}
+$allSids = array_unique(array_merge(array_keys($startedById), array_keys($restoredById)));
+
+$rows = [];
+$startedCount = count($startedById);
+$restoredCount = count($restoredById);
+foreach ($allSids as $sid) {
+    $sid = (int) $sid;
+    if ($sid <= 0) {
+        continue;
+    }
+    $start = $startedById[$sid] ?? null;
     $rest = $restoredById[$sid] ?? null;
-    $isRestored = is_array($rest);
-    if ($isRestored) {
-        $restoredCount++;
+    $name = '';
+    if (is_array($start) && !empty($start['store_name'])) {
+        $name = (string) $start['store_name'];
+    } elseif (is_array($rest) && !empty($rest['store_name'])) {
+        $name = (string) $rest['store_name'];
+    }
+    if ($name === '') {
+        $name = '#' . $sid;
     }
     $rows[] = [
         'store_id' => $sid,
-        'store_name' => (string) ($s['store_name'] ?? ('#' . $sid)),
-        'started_at' => (string) ($s['started_at'] ?? ''),
-        'started_by' => (string) ($s['started_by'] ?? ''),
-        'restored' => $isRestored,
-        'restored_at' => $isRestored ? (string) ($rest['restored_at'] ?? '') : '',
-        'restored_by' => $isRestored ? (string) ($rest['restored_by'] ?? '') : '',
+        'store_name' => $name,
+        'started_at' => is_array($start) ? (string) ($start['started_at'] ?? '') : '',
+        'started_by' => is_array($start) ? (string) ($start['started_by'] ?? '') : '',
+        'restored' => is_array($rest),
+        'restored_at' => is_array($rest) ? (string) ($rest['restored_at'] ?? '') : '',
+        'restored_by' => is_array($rest) ? (string) ($rest['restored_by'] ?? '') : '',
     ];
 }
 
+usort($rows, function ($a, $b) {
+    $ar = (string) ($a['restored_at'] ?: $a['started_at']);
+    $br = (string) ($b['restored_at'] ?: $b['started_at']);
+    return strcmp($br, $ar);
+});
+
+/** النسبة = تمت / بدأت (إذا كانت بدأت > 0) — كما السابق */
 $ratePct = $startedCount > 0 ? round(($restoredCount / $startedCount) * 100, 1) : 0.0;
 
 echo json_encode([
