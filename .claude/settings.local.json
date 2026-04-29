@@ -45,7 +45,9 @@
       "Bash(cp \"/c/Users/Onyx/Downloads/80a/WhatsApp Image 2026-04-28 at 12.39.01 PM.png\" \"/c/Users/Onyx/Desktop/nawras-main/react-crm/public/favicon.png\")",
       "Bash(cp \"/c/Users/Onyx/Downloads/80a/WhatsApp Image 2026-04-28 at 12.39.01 PM.png\" \"/c/Users/Onyx/Desktop/nawras-main/staging/favicon.png\")",
       "Bash(git check-ignore *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git reset *)",
+      "Bash(git restore *)"
     ]
   }
 }
