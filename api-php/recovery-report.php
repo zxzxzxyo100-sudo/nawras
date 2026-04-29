@@ -110,21 +110,56 @@ try {
      * بينما «بدأت الاستعادة» يبقى مقيَّداً بالفترة لقياس نشاط الموظفين فيها.
      */
     $stState = $pdo->prepare("
-        SELECT store_id, store_name, restore_date, updated_at, updated_by
+        SELECT store_id, store_name, restore_date, updated_at, updated_by, category
         FROM store_states
-        WHERE category IN ('restored', 'recovered')
+        WHERE category IN ('restored', 'recovered', 'restoring')
     ");
     $stState->execute();
     $stateRows = $stState->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    /** قراءة كاش الشحنات للتقاط «restoring» بشحنة بعد restore_date (يطابق منطق الواجهة) */
+    $liteShipments = [];
+    $lite = __DIR__ . '/cache/stores_search_lite.json';
+    if (is_readable($lite)) {
+        $raw = file_get_contents($lite);
+        $list = $raw !== false ? json_decode($raw, true) : null;
+        if (is_array($list)) {
+            foreach ($list as $row) {
+                if (!is_array($row) || !isset($row['id'])) {
+                    continue;
+                }
+                $sid = (int) $row['id'];
+                if ($sid <= 0) {
+                    continue;
+                }
+                $liteShipments[$sid] = (string) ($row['last_shipment_date'] ?? '');
+            }
+        }
+    }
+
     foreach ($stateRows as $r) {
         $sid = (int) ($r['store_id'] ?? 0);
         if ($sid <= 0 || isset($restoredById[$sid])) {
             continue;
         }
+        $cat = (string) ($r['category'] ?? '');
+        $restoreDate = (string) ($r['restore_date'] ?? '');
+
+        if ($cat === 'restoring') {
+            /** restoring لا يُحتسب إلا عندما تكون آخر شحنة بعد تاريخ بدء الاستعادة (اكتمال شحني) */
+            $ship = $liteShipments[$sid] ?? '';
+            if ($ship === '' || $ship === 'لا يوجد' || $restoreDate === '') {
+                continue;
+            }
+            if (strcmp($ship, $restoreDate) < 0) {
+                continue;
+            }
+        }
+
         $restoredById[$sid] = [
             'store_id' => $sid,
             'store_name' => (string) ($r['store_name'] ?? ''),
-            'restored_at' => (string) ($r['restore_date'] ?: $r['updated_at'] ?? ''),
+            'restored_at' => $restoreDate !== '' ? $restoreDate : (string) ($r['updated_at'] ?? ''),
             'restored_by' => (string) ($r['updated_by'] ?? ''),
         ];
     }
