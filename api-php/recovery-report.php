@@ -73,9 +73,10 @@ try {
 
 try {
     /**
-     * تمت الاستعادة خلال الفترة — أي انتقال إلى 'restored'/'recovered' بغض النظر عن الحالة السابقة.
-     * (سابقاً كان يشترط old_status='restoring' فيُهمل آلاف المتاجر التي بدأت الاستعادة قبل الفترة
-     *  أو وصلت إلى الاستعادة عبر اكتمال شحني آلي.)
+     * تمت الاستعادة خلال الفترة — مصدران مدمجان:
+     *  1) audit_logs: أي انتقال إلى 'restored'/'recovered' (بغض النظر عن old_status).
+     *  2) store_states: المتاجر الموجودة حالياً بحالة 'restored'/'recovered' وتاريخ restore_date ضمن الفترة
+     *     (يلتقط الاستعادات الآلية بالاكتمال الشحني التي قد لا تكتب في audit_logs).
      */
     $stRestored = $pdo->prepare("
         SELECT
@@ -100,6 +101,32 @@ try {
     }
 } catch (Throwable $e) {
     $restoredById = [];
+}
+
+try {
+    $stState = $pdo->prepare("
+        SELECT store_id, store_name, restore_date, updated_at, updated_by
+        FROM store_states
+        WHERE category IN ('restored', 'recovered')
+          AND COALESCE(restore_date, updated_at) >= ?
+          AND COALESCE(restore_date, updated_at) < ?
+    ");
+    $stState->execute([$fromStart, $toExclusive]);
+    $stateRows = $stState->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    foreach ($stateRows as $r) {
+        $sid = (int) ($r['store_id'] ?? 0);
+        if ($sid <= 0 || isset($restoredById[$sid])) {
+            continue;
+        }
+        $restoredById[$sid] = [
+            'store_id' => $sid,
+            'store_name' => (string) ($r['store_name'] ?? ''),
+            'restored_at' => (string) ($r['restore_date'] ?: $r['updated_at'] ?? ''),
+            'restored_by' => (string) ($r['updated_by'] ?? ''),
+        ];
+    }
+} catch (Throwable $e) {
+    /* store_states قد لا يحوي بعض الأعمدة في النسخ القديمة — تجاهل بهدوء */
 }
 
 /** يضاف للسجل كل متجر تمت استعادته في الفترة — حتى لو لم تبدأ استعادته في نفس الفترة */
