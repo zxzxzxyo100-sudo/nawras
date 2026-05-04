@@ -63,7 +63,7 @@ export default function FloatingCallBar() {
   return (
     <>
       {/* ─── زر الاتصال العائم ─────────────────────────────────── */}
-      <div className="fixed bottom-6 left-6 z-[900] flex flex-col items-center gap-2">
+      <div className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] lg:bottom-6 left-6 z-[900] flex flex-col items-center gap-2">
 
         <AnimatePresence>
           {open && !DISABLE_POINTS_AND_PERFORMANCE && (
@@ -151,7 +151,7 @@ export default function FloatingCallBar() {
               animate={{ opacity: 1, y: 0,  scale: 1    }}
               exit={{   opacity: 0, y: 20, scale: 0.95 }}
               transition={{ duration: 0.22, ease: 'easeOut' }}
-              className="fixed bottom-28 left-4 z-[900] w-80 rounded-2xl overflow-hidden shadow-2xl"
+              className="fixed bottom-[calc(170px+env(safe-area-inset-bottom))] lg:bottom-28 left-4 z-[900] w-80 max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden shadow-2xl"
               style={{
                 background: 'linear-gradient(145deg, #120828, #1a0a3c)',
                 border: '1px solid rgba(124,58,237,0.3)',

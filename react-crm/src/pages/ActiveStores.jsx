@@ -95,9 +95,12 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     }
   }
 
-  /** نشط قيد المكالمة — ليس «منجز» */
+  /** نشط قيد المكالمة — ليس «منجز» — لا متاجر صنّفت unreachable/completed من الحالة في DB */
   const active = useMemo(() => {
-    const base = stores.active_shipping || []
+    const base = (stores.active_shipping || []).filter(s => {
+      const c = storeStates[s.id]?.category
+      return c !== 'unreachable' && c !== 'completed' && c !== 'contacted'
+    })
     const incPool = [...(stores.incubating || []), ...(stores.new_registered || [])]
     const fromInc = incPool.filter(s => {
       const st = storeStates[s.id]
@@ -161,7 +164,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         else setActiveWf(null)
       })
       .catch(() => setActiveWf(null))
-  }, [isActiveManager, user?.username, lastLoaded])
+  }, [isActiveManager, user?.username, lastLoaded, activeSegment])
 
   // تعيين متجر واحد (dropdown في الجدول)
   async function handleAssignSingle(store, username) {
@@ -384,7 +387,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const isUnreachableTab = activeSegment === 'unreachable'
 
   /**
-   * طابور المسؤول النشط: تعيين نشط فقط، والحالة ليست «منجز» — حتى تختفي المهمة من «المهام» بعد الإكمال.
+   * طابور المسؤول النشط: تعيين نشط + workflow «active» فقط — «لم يرد» يذهب لتبويب لم يتم الوصول.
    */
   const workflowPendingForUser = useMemo(() => {
     if (!isActiveManager || !user?.username) return []
@@ -393,7 +396,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       if (!a || a.assigned_to !== user.username) return false
       if ((a.assignment_queue || 'active') !== 'active') return false
       const ws = a.workflow_status ?? 'active'
-      return ws === 'active' || ws === 'no_answer'
+      return ws === 'active'
     })
   }, [isActiveManager, user?.username, filteredActive, assignments])
 
@@ -407,7 +410,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const base = workflowPendingForUser
     if (!activeWf) return base
     if (activeWf.daily_quota?.quota_reached) return []
-    const tasks = [...(activeWf.active_tasks || []), ...(activeWf.no_answer_tasks || [])]
+    /** قيد المتابعة = active_tasks فقط (لا دمج no_answer — يظهر في «لم يتم الوصول») */
+    const tasks = [...(activeWf.active_tasks || [])]
     if (tasks.length === 0) return base
 
     const byId = new Map(base.map(s => [Number(s.id), s]))
@@ -443,6 +447,61 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     }
     return out
   }, [isPendingTab, isActiveManager, user?.username, activeWf, workflowPendingForUser])
+
+  /**
+   * تبويب «لم يتم الوصول»: يدمج صفوف قاعدة الحالة + تعيينات workflow لا تزال no_answer قبل مزامنة all-stores.
+   */
+  const unreachableDisplayStores = useMemo(() => {
+    if (!isUnreachableTab) return scopedUnreachable
+    if (!isActiveManager || !user?.username) return scopedUnreachable
+    const wfNa = activeWf?.no_answer_tasks
+    if (!Array.isArray(wfNa) || wfNa.length === 0) return scopedUnreachable
+
+    const seen = new Set(scopedUnreachable.map(s => Number(s.id)))
+    const poolById = new Map()
+    for (const row of [...active, ...completed, ...unreachable]) {
+      const id = Number(row?.id)
+      if (Number.isFinite(id) && id > 0) poolById.set(id, row)
+    }
+    const extra = []
+    for (const t of wfNa) {
+      const id = Number(t.store_id)
+      if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue
+      seen.add(id)
+      const existing = poolById.get(id)
+      if (existing) {
+        extra.push(existing)
+      } else {
+        const nm = (t.store_name && String(t.store_name).trim()) ? t.store_name : `متجر #${id}`
+        const phone = t.phone != null && String(t.phone).trim() ? String(t.phone).trim() : ''
+        const regAt = t.registered_at != null && String(t.registered_at).trim() ? String(t.registered_at).trim() : null
+        const lastShip =
+          t.last_shipment_date != null && String(t.last_shipment_date).trim()
+            ? String(t.last_shipment_date).trim()
+            : null
+        extra.push({
+          id,
+          name: nm,
+          phone,
+          registered_at: regAt,
+          last_shipment_date: lastShip,
+          total_shipments: Number(t.total_shipments) || 0,
+          shipments_in_range: Number(t.shipments_in_range) || 0,
+          _workflowNoAnswerOnly: true,
+        })
+      }
+    }
+    return [...scopedUnreachable, ...extra]
+  }, [
+    isUnreachableTab,
+    isActiveManager,
+    user?.username,
+    activeWf,
+    scopedUnreachable,
+    active,
+    completed,
+    unreachable,
+  ])
 
   const pendingDisplayStores =
     isPendingTab && isActiveManager
@@ -1020,7 +1079,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           </div>
           <StoreTable
             variant="elite"
-            stores={scopedUnreachable}
+            stores={unreachableDisplayStores}
             onSelectStore={setSelected}
             onRestoreStore={setSelected}
             extraColumns={unreachableExtraColumns}

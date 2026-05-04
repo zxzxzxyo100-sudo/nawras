@@ -1,0 +1,53 @@
+# نشر تلقائي للإنتاج: عند كل push إلى فرع main → رفع الملفات عبر FTP إلى Hostinger (موقع الإنتاج)
+#
+# المتطلبات في GitHub: Repository → Settings → Secrets and variables → Actions
+#   HOSTINGER_FTP_HOST                       (موجود — مشترك مع staging)
+#   HOSTINGER_FTP_USER                       (موجود)
+#   HOSTINGER_FTP_PASSWORD                   (موجود)
+#   HOSTINGER_FTP_REMOTE_DIR_PRODUCTION      ← أضف هذا السر فقط
+#       مثال: /domains/nawras-ly.com/public_html
+#
+# يستثني مجلدات التطوير وملفات React المصدرية — ينشر فقط الـ assets المبنية + api-php + index.html.
+
+name: Deploy production to Hostinger (FTP)
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_HOST }}
+          username: ${{ secrets.HOSTINGER_FTP_USER }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./
+          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR_PRODUCTION }}
+          state-name: .ftp-deploy-sync-state-production.json
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            react-crm/**
+            docs/**
+            .cursor/**
+            .claude/**
+            staging/**
+            Nawras-CRM-win32-x64/**
+            نظام النورس CRM-win32-x64/**
+            deploy-staging.ps1
+            **/*.md
+          log-level: minimal

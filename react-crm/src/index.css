@@ -7,6 +7,25 @@
     direction: rtl;
     background-color: #f1f5f9;
   }
+  /* شريط تمرير أفقي مرئي للجداول العريضة على الموبايل (WebKit يخفيه افتراضياً على iOS) */
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
+  }
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: rgba(148, 163, 184, 0.12);
+    border-radius: 9999px;
+  }
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: rgba(124, 58, 237, 0.45);
+    border-radius: 9999px;
+  }
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(124, 58, 237, 0.7);
+  }
+  /* تمرير لمسي أنعم على iOS */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* وميض بطاقة «تذاكر خاصة» عند وجود تذاكر مفتوحة أو زيادة عددها */
