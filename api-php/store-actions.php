@@ -429,13 +429,13 @@ elseif ($action === 'log_call') {
         $oc = $outcome !== '' ? $outcome : '';
         if ($oc === 'answered') {
             if (!$deferAmQueueComplete) {
-                $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
-                    ->execute([$sid]);
+                $pdo->prepare("UPDATE store_states SET category = 'completed', last_call_date = NOW(), updated_by = ? WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                    ->execute([$user, $sid]);
             }
         } elseif ($oc === 'busy' || $oc === 'no_answer') {
             if (!$deferAmQueueComplete) {
-                $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW() WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
-                    ->execute([$sid]);
+                $pdo->prepare("UPDATE store_states SET category = 'unreachable', last_call_date = NOW(), updated_by = ? WHERE store_id = ? AND category IN ('active_pending_calls','active','active_shipping','unreachable')")
+                    ->execute([$user, $sid]);
             }
         }
         // من النافذة/لوحة المتجر (ليس مسار «متابعة دورية + استبيان لاحق»): يُحدَّث store_states أعلاه

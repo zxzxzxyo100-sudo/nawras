@@ -266,3 +266,119 @@ function nawras_classify_mature_store_row(array $s, int $now, array &$result, ar
     $lc = nawras_apply_lifecycle_tags($s, $now);
     nawras_push_lifecycle_bucket($s, $lc, $result, $counts, false);
 }
+
+/**
+ * إزالة متجر من جميع حاويات استجابة all-stores.php ومسار الاحتضان.
+ *
+ * @param array<string, mixed> $result
+ * @param array<string, mixed> $incubation_path
+ */
+function nawras_strip_store_id_from_crm_buckets(array &$result, array &$incubation_path, int $sid): void
+{
+    $sid = (int) $sid;
+    if ($sid <= 0) {
+        return;
+    }
+    $filter = static function (array $rows) use ($sid) {
+        return array_values(array_filter($rows, static function ($s) use ($sid) {
+            return (int) ($s['id'] ?? 0) !== $sid;
+        }));
+    };
+    foreach (['incubating', 'new_registered', 'active_shipping', 'completed_merchants', 'unreachable_merchants', 'hot_inactive', 'cold_inactive', 'frozen_merchants'] as $k) {
+        if (!empty($result[$k]) && is_array($result[$k])) {
+            $result[$k] = $filter($result[$k]);
+        }
+    }
+    foreach (['call_1', 'call_delay', 'call_2', 'call_3', 'between'] as $pk) {
+        if (!empty($incubation_path[$pk]) && is_array($incubation_path[$pk])) {
+            $incubation_path[$pk] = $filter($incubation_path[$pk]);
+        }
+    }
+}
+
+/**
+ * يفرض ظهور المتاجر ذات store_states «منجز / تم التواصل / لم يتم الوصول» في القائمة الصحيحة
+ * حتى عندما يصنّف Nawris (دورة الحياة) نفس المتجر في hot_inactive أو cold_inactive أو غير active_shipping.
+ * بدون هذه الطبقة، فصل active_shipping + store_states لا يرى المتجر فيطغى عليه التصنيف التلقائي.
+ *
+ * @param array<string, mixed> $result
+ * @param array<string, int>   $counts
+ * @param array<string, mixed> $incubation_path
+ * @param array<int, array>    $allStores
+ * @param array<int, array>    $new
+ * @param array<int, array>    $inactive
+ */
+function nawras_overlay_manual_store_states(
+    PDO $pdoDb,
+    array &$result,
+    array &$counts,
+    array &$incubation_path,
+    array $allStores,
+    array $new,
+    array $inactive
+): void {
+    $st = $pdoDb->query(
+        "SELECT store_id, category, last_call_date, store_name FROM store_states
+         WHERE category IN ('completed','contacted','unreachable')"
+    );
+    if (!$st) {
+        return;
+    }
+    $dbRows = $st->fetchAll(PDO::FETCH_ASSOC);
+    if ($dbRows === []) {
+        return;
+    }
+
+    $byId = [];
+    foreach ($dbRows as $dbRow) {
+        $sid = (int) ($dbRow['store_id'] ?? 0);
+        if ($sid > 0) {
+            $byId[$sid] = $dbRow;
+        }
+    }
+    if ($byId === []) {
+        return;
+    }
+
+    $pool = [];
+    foreach ([$allStores, $new, $inactive] as $src) {
+        foreach ($src as $id => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $xid = isset($row['id']) ? (int) $row['id'] : (int) $id;
+            if ($xid > 0) {
+                $pool[$xid] = $row;
+            }
+        }
+    }
+
+    foreach (array_keys($byId) as $sid) {
+        nawras_strip_store_id_from_crm_buckets($result, $incubation_path, $sid);
+    }
+
+    foreach ($byId as $sid => $dbRow) {
+        $cat = (string) ($dbRow['category'] ?? '');
+        $s = $pool[$sid] ?? [
+            'id' => $sid,
+            'name' => (string) ($dbRow['store_name'] ?? ''),
+            'phone' => '',
+        ];
+        if (!empty($dbRow['last_call_date'])) {
+            $s['last_call_date'] = $dbRow['last_call_date'];
+        }
+        $s['_db_manual_overlay'] = true;
+
+        if ($cat === 'unreachable') {
+            $result['unreachable_merchants'][] = $s;
+        } elseif ($cat === 'completed' || $cat === 'contacted') {
+            $result['completed_merchants'][] = $s;
+        }
+    }
+
+    foreach (['incubating', 'new_registered', 'active_shipping', 'completed_merchants', 'unreachable_merchants', 'hot_inactive', 'cold_inactive', 'frozen_merchants'] as $k) {
+        $counts[$k] = isset($result[$k]) ? count($result[$k]) : ($counts[$k] ?? 0);
+    }
+    $counts['total_active'] = ($counts['active_shipping'] ?? 0) + ($counts['completed_merchants'] ?? 0) + ($counts['unreachable_merchants'] ?? 0)
+        + ($counts['hot_inactive'] ?? 0) + ($counts['cold_inactive'] ?? 0);
+}

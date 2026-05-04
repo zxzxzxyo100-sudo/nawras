@@ -142,9 +142,28 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     })
   }, [assignments, isActiveManager, user?.username])
 
+  /**
+   * منجز / لم يتم الوصول: بعد الإكمال يُحذَف التعيين من الطابور في الخادم فيختفي scopedToUser وحده.
+   * نعرض أيضاً إذا تطابق updated_by في store_states مع اسم المستخدم أو الاسم الكامل (يُملأ من حفظ المكالمة).
+   */
+  const scopedToUserOrLastHandler = useMemo(() => (rows) => {
+    if (!isActiveManager || !user?.username) return rows
+    const un = user.username.trim()
+    const fn = (user.fullname ?? '').trim()
+    return rows.filter(s => {
+      const a = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
+      const assignee = (a?.assigned_to ?? '').toString().trim()
+      if (assignee !== '' && assignee !== 'بدون تعيين' && assignee === un) return true
+      const st = storeStates[s.id] ?? storeStates[String(s.id)] ?? storeStates[Number(s.id)]
+      const by = (st?.updated_by ?? '').toString().trim()
+      if (by === '') return false
+      return by === un || (fn !== '' && by === fn)
+    })
+  }, [assignments, isActiveManager, user?.username, user?.fullname, storeStates])
+
   const scopedActive       = useMemo(() => scopedToUser(active),       [scopedToUser, active])
-  const scopedCompleted    = useMemo(() => scopedToUser(completed),    [scopedToUser, completed])
-  const scopedUnreachable  = useMemo(() => scopedToUser(unreachable),  [scopedToUser, unreachable])
+  const scopedCompleted    = useMemo(() => scopedToUserOrLastHandler(completed),    [scopedToUserOrLastHandler, completed])
+  const scopedUnreachable  = useMemo(() => scopedToUserOrLastHandler(unreachable),  [scopedToUserOrLastHandler, unreachable])
 
   useEffect(() => {
     if (!isExecutive) return
