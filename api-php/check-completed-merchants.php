@@ -1,6 +1,7 @@
 <?php
 /**
  * مهمة مجدولة (Cron): بعد 30 يوماً على last_call_date تُعاد الحالة من «منجز» إلى «نشط قيد المكالمة».
+ * لا يمس المتاجر التي أُكملت اليوم: الشرط last_call_date < NOW()-30 يوم AND last_call_date IS NOT NULL.
  * مثال crontab: كل يوم الساعة 03:00
  * 0 3 * * * php /path/to/check-completed-merchants.php
  */

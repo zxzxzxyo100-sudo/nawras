@@ -698,6 +698,16 @@ try {
     // بدون DB لا نفصل القائمة
 }
 
+// ── طبقة store_states: منجز / لم يتم الوصول تبقى ظاهرة حتى لو Nawris نقل المتجر لساخن/بارد (خارج active_shipping) ──
+try {
+    if (!isset($pdoDb)) {
+        require_once __DIR__ . '/db.php';
+        $pdoDb = getDB();
+    }
+    nawras_overlay_manual_store_states($pdoDb, $result, $counts, $incubation_path, $allStores, $new, $inactive);
+} catch (Throwable $e) {
+}
+
 // ── المتاجر المجمدة: قائمة منفصلة وإزالتها من باقي الخانات ─────
 /** @param array<int, mixed> $stores */
 function nawras_filter_out_store_id(array &$stores, $id) {
