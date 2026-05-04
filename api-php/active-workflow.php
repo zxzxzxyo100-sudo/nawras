@@ -121,20 +121,14 @@ if ($action === 'get_my_workflow') {
         }
         $active = wf_enrich_workflow_tasks_from_lite($active);
         $noAnswer = wf_enrich_workflow_tasks_from_lite($noAnswer);
-        $active = array_values(array_filter($active, static function (array $r): bool {
-            return wf_inactive_queue_parcel_eligible($r);
-        }));
-        $noAnswer = array_values(array_filter($noAnswer, static function (array $r): bool {
-            return wf_inactive_queue_parcel_eligible($r);
-        }));
+        /** لا نستبعد صفوف التعيين بحسب الطرود هنا — الفرز يفضّل الطرود العالية؛ الإحلال من المجمع يبقى مشروطاً في fill/release. */
         $active = wf_sort_inactive_manager_task_rows($active);
         $noAnswer = wf_sort_inactive_manager_task_rows($noAnswer);
         $inactiveDailySuccess = get_inactive_daily_success_count($pdo, $username);
-        /** إخفاء الطابور عند 50 «تم التواصل» يومياً — لا يعتمد على حصة الـ50 معالجة العامة. */
-        if ($inactiveDailySuccess >= INACTIVE_DAILY_SUCCESS_TARGET) {
-            $active = [];
-            $noAnswer = [];
-        }
+        /**
+         * عند بلوغ هدف «تم التواصل» اليومي نوقف تعبئة طابور جديد فقط (fill_inactive_slots_for_user).
+         * لا نُفرّغ قوائم المستخدم: يبقى «قيد الاتصال» و«لم يرد» ظاهراً حتى الإنجاز أو التحديث اليدوي.
+         */
         /** متابعة بعد إكمال المهمة: تعيينات منجزة (تم التواصل / لم يرد) — نفس مصدر الواجهة دون ملف PHP إضافي */
         $stFollow = $pdo->prepare("
             SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, workflow_updated_at

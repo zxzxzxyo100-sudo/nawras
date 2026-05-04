@@ -478,8 +478,8 @@ function wf_inactive_priority_parcel_count(array $row): int {
     return $total;
 }
 
-/** هل يُسمح بإبقاء/تعيين المتجر في طابور الاستعادة؟ يُشترط عدد معتمد > INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS (أي ≥ 6) */
-function wf_inactive_queue_parcel_eligible(array $row): bool {
+/** للسحب التلقائي من المجمع: يُفضّل متاجر طرودها المعتمدة أعلى من الحد */
+function wf_inactive_pool_pick_meets_priority_floor(array $row): bool {
     return wf_inactive_priority_parcel_count($row) > (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
 }
 
@@ -493,14 +493,16 @@ function release_inactive_assignments_below_parcel_threshold(PDO $pdo, string $u
     if ($u === '') {
         return 0;
     }
+    /** يُستبدل فقط التعيين «نشط» ذو طرود معتمدة منخفضة — «لم يرد» يبقى حتى يُعاد الاتصال أو يُكمّل */
     $st = $pdo->prepare("
         SELECT store_id FROM store_assignments
         WHERE assigned_to = ? AND assignment_queue = 'inactive'
-        AND workflow_status IN ('active', 'no_answer')
+        AND workflow_status = 'active'
     ");
     $st->execute([$u]);
     $lite = wf_lite_total_shipments_map();
     $released = 0;
+    $minShip = (int) INACTIVE_RECOVERY_PRIORITY_MIN_SHIPMENTS;
     while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
         $sid = (string) ($r['store_id'] ?? '');
         $norm = (string) (int) preg_replace('/\D+/', '', $sid);
@@ -508,13 +510,13 @@ function release_inactive_assignments_below_parcel_threshold(PDO $pdo, string $u
             'store_id'        => $sid,
             'total_shipments' => (int) ($lite[$norm] ?? 0),
         ];
-        if (wf_inactive_queue_parcel_eligible($row)) {
+        if (wf_inactive_priority_parcel_count($row) > $minShip) {
             continue;
         }
         $del = $pdo->prepare("
             DELETE FROM store_assignments
             WHERE assigned_to = ? AND assignment_queue = 'inactive'
-            AND workflow_status IN ('active', 'no_answer')
+            AND workflow_status = 'active'
             AND CAST(store_id AS CHAR) = CAST(? AS CHAR)
         ");
         $del->execute([$u, $sid]);
@@ -598,32 +600,38 @@ function pick_next_inactive_pool_store(PDO $pdo) {
                 $assigned[(string) ($row['store_id'] ?? '')] = true;
             }
             $liteShip = wf_lite_total_shipments_map();
-            $candidates = [];
-            foreach ($stores as $row) {
-                $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
-                $bucket = (string) ($row['bucket'] ?? '');
-                if ($bucket === 'cold_inactive') {
-                    continue;
+            $pickFloor = static function (bool $requirePriorityFloor) use ($stores, $assigned, $liteShip): ?array {
+                $candidates = [];
+                foreach ($stores as $row) {
+                    $sid = isset($row['store_id']) ? (string) $row['store_id'] : '';
+                    $bucket = (string) ($row['bucket'] ?? '');
+                    if ($bucket === 'cold_inactive') {
+                        continue;
+                    }
+                    if ($sid === '' || isset($assigned[$sid])) {
+                        continue;
+                    }
+                    $sidNorm = (string) (int) preg_replace('/\D+/', '', $sid);
+                    $ts = isset($row['total_shipments']) ? (int) $row['total_shipments'] : (int) ($liteShip[$sidNorm] ?? 0);
+                    $cand = [
+                        'store_id'        => $row['store_id'],
+                        'store_name'      => $row['store_name'] ?? '',
+                        'total_shipments' => $ts,
+                    ];
+                    if ($requirePriorityFloor && !wf_inactive_pool_pick_meets_priority_floor($cand)) {
+                        continue;
+                    }
+                    $candidates[] = $cand;
                 }
-                if ($sid === '' || isset($assigned[$sid])) {
-                    continue;
+                if ($candidates === []) {
+                    return null;
                 }
-                $sidNorm = (string) (int) preg_replace('/\D+/', '', $sid);
-                $ts = isset($row['total_shipments']) ? (int) $row['total_shipments'] : (int) ($liteShip[$sidNorm] ?? 0);
-                $cand = [
-                    'store_id'        => $row['store_id'],
-                    'store_name'      => $row['store_name'] ?? '',
-                    'total_shipments' => $ts,
-                ];
-                if (!wf_inactive_queue_parcel_eligible($cand)) {
-                    continue;
-                }
-                $candidates[] = $cand;
-            }
-            if ($candidates !== []) {
                 wf_sort_inactive_recovery_candidates($candidates);
-                $first = $candidates[0];
 
+                return $candidates[0];
+            };
+            $first = $pickFloor(true) ?? $pickFloor(false);
+            if ($first !== null) {
                 return [
                     'store_id'   => $first['store_id'],
                     'store_name' => $first['store_name'] ?? '',
@@ -662,16 +670,14 @@ function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
             'store_name'      => $r['store_name'] ?? '',
             'total_shipments' => (int) ($liteShip[$sidNorm] ?? 0),
         ];
-        if (!wf_inactive_queue_parcel_eligible($cand)) {
-            continue;
-        }
         $candidates[] = $cand;
     }
-    if ($candidates === []) {
-        return null;
-    }
-    wf_sort_inactive_recovery_candidates($candidates);
-    $first = $candidates[0];
+    $withFloor = array_values(array_filter($candidates, static function (array $c): bool {
+        return wf_inactive_pool_pick_meets_priority_floor($c);
+    }));
+    $pool = $withFloor !== [] ? $withFloor : $candidates;
+    wf_sort_inactive_recovery_candidates($pool);
+    $first = $pool[0];
 
     return [
         'store_id'   => $first['store_id'],
