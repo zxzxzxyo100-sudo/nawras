@@ -1159,7 +1159,7 @@ try {
         $pdoDb = getDB();
     }
     require_once __DIR__ . '/workflow-queue-lib.php';
-    purge_active_manager_assignments_for_exited_incubation($pdoDb, $result);
+    purge_active_manager_assignments_for_exited_incubation($pdoDb, $result, $incubation_path);
 } catch (Throwable $e) {
 }
 

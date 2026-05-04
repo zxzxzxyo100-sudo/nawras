@@ -148,20 +148,77 @@ function active_pipeline_where_sql() {
 }
 
 /**
+ * معرّفات متاجر ما زالت ضمن واجهة «قيد المتابعة» (نشط يشحن / جديد / احتضان) — لا تُحذف تعيينها الميداني عند التنظيف.
+ *
+ * @param array<string, mixed> $result
+ * @param array<string, mixed> $incubation_path
+ * @return array<int, true>
+ */
+function nawras_protected_store_ids_for_assignment_purge(array $result, array $incubation_path = []): array {
+    $protected = [];
+    foreach (['active_shipping', 'incubating', 'new_registered'] as $key) {
+        foreach ($result[$key] ?? [] as $s) {
+            $id = (int) ($s['id'] ?? 0);
+            if ($id > 0) {
+                $protected[$id] = true;
+            }
+        }
+    }
+    foreach ($incubation_path as $rows) {
+        if (!is_array($rows)) {
+            continue;
+        }
+        foreach ($rows as $s) {
+            $id = (int) ($s['id'] ?? 0);
+            if ($id > 0) {
+                $protected[$id] = true;
+            }
+        }
+    }
+
+    return $protected;
+}
+
+/**
  * إزالة تعيينات طابور «متابعة دورية» (assignment_queue = active) عندما لم يعد المتجر ضمن احتضان المسؤول النشط.
  * يُستدعى من all-stores.php بعد التصنيف حتى لا يبقى متجر «ساخن/بارد/منجز…» مُسنداً بعد تغيّر حالته.
+ *
+ * لا يُمسّ التعيين اليدوي للمتاجر الظاهرة في active_shipping / الاحتضان — كان يُحذَف خطأً إن وُجد نفس store_id
+ * في completed_merchants أو غيره بسبب طبقة overlay أو ازدواج التصنيف.
  */
-function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array $result) {
+function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array $result, array $incubation_path = []) {
     ensure_workflow_schema($pdo);
+    $protected = nawras_protected_store_ids_for_assignment_purge($result, $incubation_path);
+    $protectedIds = array_keys($protected);
+
     try {
-        $pdo->exec("
-            DELETE sa FROM store_assignments sa
-            INNER JOIN store_states ss ON CAST(sa.store_id AS CHAR) = CAST(ss.store_id AS CHAR)
-            WHERE sa.assignment_queue = 'active'
-            AND ss.category IN (
-                'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
-            )
-        ");
+        if ($protectedIds === []) {
+            $pdo->exec("
+                DELETE sa FROM store_assignments sa
+                INNER JOIN store_states ss ON CAST(sa.store_id AS CHAR) = CAST(ss.store_id AS CHAR)
+                WHERE sa.assignment_queue = 'active'
+                AND ss.category IN (
+                    'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
+                )
+            ");
+        } else {
+            foreach (array_chunk($protectedIds, 200) as $chunkP) {
+                $phP = implode(',', array_fill(0, count($chunkP), '?'));
+                $bindP = array_map(static function ($x) {
+                    return (string) $x;
+                }, $chunkP);
+                $st = $pdo->prepare("
+                    DELETE sa FROM store_assignments sa
+                    INNER JOIN store_states ss ON CAST(sa.store_id AS CHAR) = CAST(ss.store_id AS CHAR)
+                    WHERE sa.assignment_queue = 'active'
+                    AND ss.category IN (
+                        'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
+                    )
+                    AND CAST(sa.store_id AS UNSIGNED) NOT IN ($phP)
+                ");
+                $st->execute($bindP);
+            }
+        }
     } catch (Throwable $e) {
     }
     $seen = [];
@@ -173,10 +230,12 @@ function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array 
             }
         }
     }
-    if ($seen === []) {
+    $ids = array_values(array_filter(array_keys($seen), static function ($id) use ($protected) {
+        return !isset($protected[(int) $id]);
+    }));
+    if ($ids === []) {
         return;
     }
-    $ids = array_keys($seen);
     foreach (array_chunk($ids, 200) as $chunk) {
         $ph = implode(',', array_fill(0, count($chunk), '?'));
         $bind = array_map(static function ($x) {
