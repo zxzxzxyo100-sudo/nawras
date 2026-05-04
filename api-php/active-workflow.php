@@ -235,15 +235,19 @@ if ($action === 'get_my_workflow') {
     $active = $stActive->fetchAll(PDO::FETCH_ASSOC);
     $vipThreshold = (int) ACTIVE_VIP_SHIPMENTS_THRESHOLD;
     $active = wf_enrich_workflow_tasks_from_lite($active);
-    $active = array_values(array_filter($active, static function (array $row) use ($vipThreshold): bool {
+    $queueRows = array_values(array_filter($active, static function (array $row) use ($vipThreshold): bool {
         return ((int) ($row['total_shipments'] ?? 0)) < $vipThreshold;
     }));
 
     /**
-     * «لم يرد» = مجموعة فرعية من نفس القائمة الموحّدة (100 متجر) — لا استعلام مستقل ولا فلتر اليوم.
-     * الواجهة تستطيع عرضها كتبويب جانبي دون إخفاء أي متجر من العهدة.
+     * فصل صريح: قيد المتابعة = workflow_status «active» فقط.
+     * «لم يرد» (no_answer) لا يُعرَض في قيد المتابعة — تبويب «لم يتم الوصول» + no_answer_tasks.
      */
-    $noAnswer = array_values(array_filter($active, static function (array $row): bool {
+    $pendingActive = array_values(array_filter($queueRows, static function (array $row): bool {
+        return ($row['workflow_status'] ?? '') === 'active';
+    }));
+
+    $noAnswer = array_values(array_filter($queueRows, static function (array $row): bool {
         return ($row['workflow_status'] ?? '') === 'no_answer';
     }));
 
@@ -300,9 +304,9 @@ if ($action === 'get_my_workflow') {
         'daily_target_reached' => $dailyActive >= ACTIVE_DAILY_SUCCESS_TARGET,
         'daily_quota' => $dailyQuota,
         'cooldown_days' => SURVEY_COOLDOWN_DAYS,
-        'active_tasks' => $active,
+        'active_tasks' => $pendingActive,
         'no_answer_tasks' => $noAnswer,
-        'active_count' => count($active),
+        'active_count' => count($pendingActive),
         'no_answer_count' => count($noAnswer),
         'completed_tasks' => $completedTasks,
         'completed_count' => count($completedTasks),
