@@ -25,15 +25,29 @@ const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 /** مطابقة الخادم: أولوية لمتاجر «الطرود» في الجدول فوق 5 */
 const INACTIVE_TASK_PARCEL_PRIORITY_MIN = 5
 
+/** لا تُدرَج في مهام الاستعادة اليومية (قبل جاري/بعد تم الاستعادة) */
+function isExcludedFromInactiveDailyTasks(s, storeStates) {
+  const st = storeStates?.[s.id] ?? storeStates?.[String(s.id)] ?? storeStates?.[Number(s.id)]
+  if (!st) return false
+  const cat = st?.category
+  if (cat === 'restoring') return true
+  if (isRestoredCategory(cat)) return true
+  if (isRecoveryCompletedByShipment(s, st)) return true
+  return false
+}
+
 /** إن لم يُعرَض المتجر بعد في buckets الواجهة (كاش متأخر)، نبني صفاً من طابور active-workflow المُثرى */
-function storeFromInactiveWorkflowTask(t, byId) {
+function storeFromInactiveWorkflowTask(t, byId, storeStates) {
   const id = Number(t.store_id)
   if (!Number.isFinite(id) || id <= 0) return null
   const existing = byId.get(id)
-  if (existing) return existing
+  if (existing) {
+    if (isExcludedFromInactiveDailyTasks(existing, storeStates)) return null
+    return existing
+  }
   const tsRaw = t.total_shipments
   const ts = tsRaw != null && tsRaw !== '' ? Number(tsRaw) : 0
-  return {
+  const synthetic = {
     id,
     name: (t.store_name && String(t.store_name).trim()) || `#${id}`,
     phone: String(t.phone ?? '').trim(),
@@ -44,6 +58,8 @@ function storeFromInactiveWorkflowTask(t, byId) {
     status: null,
     bucket: 'hot_inactive',
   }
+  if (isExcludedFromInactiveDailyTasks(synthetic, storeStates)) return null
+  return synthetic
 }
 
 function sortInactiveRecoveryTasksByParcels(stores) {
@@ -238,10 +254,7 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       /** صفحة المهام: طابور «ساخن» قبل بدء الاستعادة — الإنجاز = نقل المتجر إلى «قيد الاستعادة» */
       if (recoveryTasksHotQueue) {
         return hotInactive.filter(s => {
-          const st = storeStates[s.id]
-          const cat = st?.category
-          if (cat === 'restoring') return false
-          if (isRestoredCategory(cat) || isRecoveryCompletedByShipment(s, st)) return false
+          if (isExcludedFromInactiveDailyTasks(s, storeStates)) return false
           return true
         })
       }
@@ -299,14 +312,15 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     const byId = new Map(filteredStores.map(s => [Number(s.id), s]))
     const ordered = []
     for (const t of queueRows) {
-      const s = storeFromInactiveWorkflowTask(t, byId)
+      const s = storeFromInactiveWorkflowTask(t, byId, storeStates)
       if (s) ordered.push(s)
     }
     if (ordered.length > 0) {
-      return sortInactiveRecoveryTasksByParcels(ordered)
+      const sorted = sortInactiveRecoveryTasksByParcels(ordered)
+      return sorted.filter(s => !isExcludedFromInactiveDailyTasks(s, storeStates))
     }
     return recoveryTasksHotQueue ? [] : filteredStores
-  }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
+  }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue, storeStates])
 
   /**
    * صفحة المهام: لا تعرض جميع «ساخن» عندما managerBatchStores === null (كان يحدث عندما inactiveWfSummary

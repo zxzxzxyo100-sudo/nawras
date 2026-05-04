@@ -124,7 +124,7 @@ export default function Tasks() {
   if (role === 'inactive_manager') {
   return (
       <div className="space-y-4 lg:space-y-5" dir="rtl">
-        <TasksIntro title="متاجر «غير نشط ساخن» التي لم تُنقل بعد إلى «قيد الاستعادة». هدف المهمة: متابعة المتجر وتحويل حالته إلى جاري الاستعادة؛ الطابور والحصة اليومية (50) كما في بقية النظام." />
+        <TasksIntro title="متاجر «غير نشط ساخن» فقط (لا تظهر هنا متاجر «قيد الاستعادة» أو «تمت الاستعادة» — تُعرض في صفحات الاستعادة). طابور المهام حتى 100 متجر؛ هدف «تم التواصل» اليومي (50) كما في بقية النظام." />
         <InactiveRestoredFollowupSection />
         <HotInactive embeddedRecoverySegment="all" recoveryTasksHotQueue />
         </div>

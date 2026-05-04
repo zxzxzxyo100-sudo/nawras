@@ -1,6 +1,6 @@
 <?php
 /**
- * مكتبة مشتركة: طوابير المسؤول النشط (50) ومسؤول الاستعادة (50)
+ * مكتبة مشتركة: طوابير المسؤول النشط ومسؤول الاستعادة (هدف طابور الاستعادة: INACTIVE_QUEUE_TARGET)
  * يُستدعى من active-workflow.php و cron-daily-queue-fill.php
  */
 if (!defined('ACTIVE_QUEUE_TARGET')) {
@@ -15,7 +15,7 @@ if (!defined('ACTIVE_DAILY_SUCCESS_TARGET')) {
     define('ACTIVE_DAILY_SUCCESS_TARGET', 50);
 }
 if (!defined('INACTIVE_QUEUE_TARGET')) {
-    define('INACTIVE_QUEUE_TARGET', 50);
+    define('INACTIVE_QUEUE_TARGET', 100);
 }
 /** هدف اتصالات ناجحة (تم) يومياً لمسؤول الاستعادة — بعدها لا تُعبَّأ قوائم جديدة */
 if (!defined('INACTIVE_DAILY_SUCCESS_TARGET')) {
@@ -639,6 +639,69 @@ function wf_sort_inactive_manager_task_rows(array $rows): array {
     });
 
     return $rows;
+}
+
+/**
+ * مهام مسؤول الاستعادة اليومية = «ساخن قبل جاري الاستعادة» — لا تعرض صفوفاً لمتاجر انتقلت إلى restoring/restored/recovered.
+ *
+ * @param list<array<string,mixed>> $rows
+ * @return list<array<string,mixed>>
+ */
+/**
+ * يُحرّر خانات طابور الاستعادة للمتاجر التي انتقلت إلى جاري/تمّت الاستعادة في السجل.
+ */
+function wf_release_inactive_assignments_for_recovery_pipeline_states(PDO $pdo): void {
+    ensure_workflow_schema($pdo);
+    try {
+        $pdo->exec("
+            DELETE sa FROM store_assignments sa
+            INNER JOIN store_states ss ON CAST(sa.store_id AS CHAR) = CAST(ss.store_id AS CHAR)
+            WHERE sa.assignment_queue = 'inactive'
+            AND sa.workflow_status IN ('active','no_answer')
+            AND ss.category IN ('restoring','restored','recovered')
+        ");
+    } catch (Throwable $e) {
+    }
+}
+
+function wf_filter_inactive_rows_not_in_recovery_states(PDO $pdo, array $rows): array {
+    if ($rows === []) {
+        return [];
+    }
+    $ids = [];
+    foreach ($rows as $r) {
+        $sid = (int) preg_replace('/\D+/', '', (string) ($r['store_id'] ?? ''));
+        if ($sid > 0) {
+            $ids[$sid] = true;
+        }
+    }
+    $idList = array_keys($ids);
+    if ($idList === []) {
+        return $rows;
+    }
+    $exclude = [];
+    foreach (array_chunk($idList, 400) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $bind = array_map(static function ($x) {
+            return (string) $x;
+        }, $chunk);
+        $st = $pdo->prepare(
+            "SELECT store_id, category FROM store_states WHERE CAST(store_id AS UNSIGNED) IN ($ph)"
+        );
+        $st->execute($bind);
+        while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+            $cat = (string) ($row['category'] ?? '');
+            if ($cat === 'restoring' || $cat === 'restored' || $cat === 'recovered') {
+                $exclude[(int) $row['store_id']] = true;
+            }
+        }
+    }
+
+    return array_values(array_filter($rows, static function (array $r) use ($exclude): bool {
+        $sid = (int) preg_replace('/\D+/', '', (string) ($r['store_id'] ?? ''));
+
+        return !isset($exclude[$sid]);
+    }));
 }
 
 /**

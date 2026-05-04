@@ -101,6 +101,7 @@ if ($action === 'get_my_workflow') {
     $queue = trim((string) ($_GET['queue'] ?? 'active'));
     $listType = trim((string) ($_GET['type'] ?? ''));
     if ($queue === 'inactive') {
+        wf_release_inactive_assignments_for_recovery_pipeline_states($pdo);
         fill_inactive_slots_for_user($pdo, $username, $username, null);
         $st = $pdo->prepare("
             SELECT store_id, store_name, assigned_to, assigned_at, workflow_status, assignment_queue
@@ -110,6 +111,7 @@ if ($action === 'get_my_workflow') {
         ");
         $st->execute([$username]);
         $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        $rows = wf_filter_inactive_rows_not_in_recovery_states($pdo, $rows);
         $active = [];
         $noAnswer = [];
         foreach ($rows as $r) {
