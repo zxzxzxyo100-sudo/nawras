@@ -18,12 +18,33 @@ import {
   isStillRestoringStore,
   isRecoveryCompletedByShipment,
 } from '../constants/storeCategories'
-import { inactiveRecoveryQueueMetric, parcelsInRangeDisplay } from '../utils/storeFields'
+import { parcelsInRangeDisplay } from '../utils/storeFields'
 
 const SEGMENTS = new Set(['all', 'restoring', 'restored'])
 
 /** مطابقة الخادم: أولوية لمتاجر «الطرود» في الجدول فوق 5 */
 const INACTIVE_TASK_PARCEL_PRIORITY_MIN = 5
+
+/** إن لم يُعرَض المتجر بعد في buckets الواجهة (كاش متأخر)، نبني صفاً من طابور active-workflow المُثرى */
+function storeFromInactiveWorkflowTask(t, byId) {
+  const id = Number(t.store_id)
+  if (!Number.isFinite(id) || id <= 0) return null
+  const existing = byId.get(id)
+  if (existing) return existing
+  const tsRaw = t.total_shipments
+  const ts = tsRaw != null && tsRaw !== '' ? Number(tsRaw) : 0
+  return {
+    id,
+    name: (t.store_name && String(t.store_name).trim()) || `#${id}`,
+    phone: String(t.phone ?? '').trim(),
+    registered_at: t.registered_at ?? '',
+    total_shipments: Number.isFinite(ts) ? ts : 0,
+    last_shipment_date: t.last_shipment_date ?? 'لا يوجد',
+    shipments_in_range: Number.isFinite(ts) ? ts : 0,
+    status: null,
+    bucket: 'hot_inactive',
+  }
+}
 
 function sortInactiveRecoveryTasksByParcels(stores) {
   return [...stores].sort((a, b) => {
@@ -256,14 +277,14 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   }, [hotInactive, coldInactive, activeShipping, incubating, newRegistered, completedMerchants, unreachableMerchants, recoveryStateOnlyStores, storeStates, isAllTab, isRestoredTab, recoveryTasksHotQueue])
 
   /**
-   * مسؤول الاستعادة: دفعة من طابور المهام؛ عند بلوغ الحصة اليومية يُرجع [].
+   * مسؤول الاستعادة: دفعة من طابور المهام (API).
+   * بلوغ هدف «تم التواصل» اليومي يوقف التعبئة فقط — لا يُصفّر الجدول؛ «لم يرد» يبقى ظاهراً حتى الإنجاز.
    * صفحة المهام: طابور «نشط» فقط — من نُقل إلى «لم يرد» يختفي من هنا ويُستبدل من المجمع (يظهر في متابعة المنجزة).
    */
   const managerBatchStores = useMemo(() => {
     if (user?.role !== 'inactive_manager') return null
     if (inactiveWfSummary === undefined) return undefined
     if (inactiveWfSummary === null) return []
-    if (inactiveWfSummary.daily_target_reached) return []
 
     const activeList = inactiveWfSummary.active_tasks || []
     const noAnsList = inactiveWfSummary.no_answer_tasks || []
@@ -274,18 +295,15 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     if (wfIds.size === 0) {
       return recoveryTasksHotQueue ? [] : filteredStores
     }
-    /** ترتيب طابور الـ API ثم فرز حسب طرود النطاق (>5) — لا نعتمد ترتيب filteredStores لأنه يُلغي الأولوية */
+    /** ترتيب طابور الـ API ثم فرز حسب طرود النطاق — لا نستبعد صفوفاً بحسب الطرود (يتوافق مع الخادم بعد إزالة حجب >5) */
     const byId = new Map(filteredStores.map(s => [Number(s.id), s]))
     const ordered = []
     for (const t of queueRows) {
-      const id = Number(t.store_id)
-      const s = byId.get(id)
+      const s = storeFromInactiveWorkflowTask(t, byId)
       if (s) ordered.push(s)
     }
     if (ordered.length > 0) {
-      const sorted = sortInactiveRecoveryTasksByParcels(ordered)
-      /** طابور المهام: لا يُعرض إلا متاجر عددها المعتمد > 5 (مطابقة الخادم) */
-      return sorted.filter(s => inactiveRecoveryQueueMetric(s) > INACTIVE_TASK_PARCEL_PRIORITY_MIN)
+      return sortInactiveRecoveryTasksByParcels(ordered)
     }
     return recoveryTasksHotQueue ? [] : filteredStores
   }, [user?.role, inactiveWfSummary, filteredStores, recoveryTasksHotQueue])
