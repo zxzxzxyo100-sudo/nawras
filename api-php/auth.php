@@ -1,15 +1,13 @@
 <?php
+// منع التخزين المؤقت
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
 require_once __DIR__ . '/db.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 
 try {
     $pdo = getDB();
 } catch (Exception $e) {
-    jsonResponse(['success' => false, 'error' => 'Database connection failed: ' . $e->getMessage()], 500);
+    jsonResponse(['success' => false, 'error' => 'فشل الاتصال بقاعدة البيانات: ' . $e->getMessage()], 500);
 }
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -21,7 +19,7 @@ if ($action === 'login') {
         $password = (string) ($input['password'] ?? '');
 
         if ($username === '') {
-            jsonResponse(['success' => false, 'error' => 'Username is required'], 400);
+            jsonResponse(['success' => false, 'error' => 'اسم المستخدم مطلوب'], 400);
         }
 
         $stmt = $pdo->prepare('SELECT id, username, fullname, role, password FROM users WHERE username = ?');
@@ -29,7 +27,7 @@ if ($action === 'login') {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            jsonResponse(['success' => false, 'error' => 'Invalid credentials'], 401);
+            jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
         }
 
         $stored = $row['password'] ?? '';
@@ -41,19 +39,13 @@ if ($action === 'login') {
         }
 
         if (!$ok) {
-            jsonResponse(['success' => false, 'error' => 'Invalid credentials'], 401);
+            jsonResponse(['success' => false, 'error' => 'بيانات الدخول غير صحيحة'], 401);
         }
 
         unset($row['password']);
-        $_SESSION['nawras_user'] = [
-            'id' => (int) ($row['id'] ?? 0),
-            'username' => (string) ($row['username'] ?? ''),
-            'fullname' => (string) ($row['fullname'] ?? ''),
-            'role' => (string) ($row['role'] ?? ''),
-        ];
         jsonResponse(['success' => true, 'user' => $row]);
     } catch (Exception $e) {
-        jsonResponse(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+        jsonResponse(['success' => false, 'error' => 'خطأ في قاعدة البيانات: ' . $e->getMessage()], 500);
     }
 }
 
@@ -68,7 +60,7 @@ elseif ($action === 'add_user') {
         $stmt->execute([$input['username'], $input['fullname'], $input['password'], $input['role']]);
         jsonResponse(['success' => true, 'id' => $pdo->lastInsertId()]);
     } catch (PDOException $e) {
-        jsonResponse(['success' => false, 'error' => 'Username already exists'], 400);
+        jsonResponse(['success' => false, 'error' => 'اسم المستخدم موجود مسبقاً'], 400);
     }
 }
 
@@ -88,6 +80,4 @@ elseif ($action === 'delete_user') {
     jsonResponse(['success' => true]);
 }
 
-else {
-    jsonResponse(['error' => 'Unknown action'], 400);
-}
+else { jsonResponse(['error' => 'Unknown action'], 400); }

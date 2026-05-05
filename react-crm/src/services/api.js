@@ -168,16 +168,6 @@ export const getAssignments = () =>
 export const assignStore = (data) =>
   http.post('/store-actions.php?action=assign_store', data).then(r => r.data)
 
-// ─── Lead Management (MySQL/PHP) ────────────────────────────────────────────
-export const getLeads = () =>
-  http.get('/leads_api.php').then(r => r.data)
-
-export const createLead = (data) =>
-  http.post('/leads_api.php', data).then(r => r.data)
-
-export const patchLead = (id, patch) =>
-  http.patch('/leads_api.php', { id, ...patch }).then(r => r.data)
-
 /** أتمتة مسؤول المتاجر (تجريبي): يوم 14 / يوم 11 أداء */
 export const postMerchantOfficerAutomation = (data) =>
   http.post('/merchant-officer-automation.php', data).then(r => r.data)
