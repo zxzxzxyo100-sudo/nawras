@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
     "axios": "^1.14.0",
     "canvas-confetti": "^1.9.4",
     "date-fns": "^4.1.0",

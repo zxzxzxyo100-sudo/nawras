@@ -5,12 +5,14 @@ const AuthContext = createContext(null)
 
 export const ROLES = {
   /** مسار الاحتضان (incubation): التنفيذي + مسؤول المتاجر الجديدة */
-  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'users', 'vip_merchants', 'staff_performance'] },
+  executive:          { label: 'المدير التنفيذي',       views: ['dashboard', 'quick_verification', 'new', 'active', 'hot_inactive', 'cold_inactive', 'incubation', 'users', 'vip_merchants', 'staff_performance', 'lead_management'] },
   /** بدون مسار الاحتضان — نشط يشحن + لوحة التحكم — التحقيق السريع للتنفيذي فقط */
   active_manager:     { label: 'مسؤول المتاجر النشطة',  views: ['dashboard', 'active', 'tasks'] },
   inactive_manager:   { label: 'مسؤول الاستعادة',        views: ['dashboard', 'hot_inactive', 'cold_inactive', 'tasks'] },
   /** موظف مبيعات / احتضان: متاجر جديدة + مسار الاحتضان — دون التحقيق السريع */
-  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation', 'tasks'] },
+  incubation_manager: { label: 'مسؤول المتاجر', views: ['dashboard', 'new', 'incubation', 'tasks', 'lead_management'] },
+  data_collector:     { label: 'جامع بيانات', views: ['dashboard', 'lead_management'] },
+  admin:              { label: 'مدير النظام', views: ['dashboard', 'users', 'lead_management'] },
 }
 
 export function AuthProvider({ children }) {

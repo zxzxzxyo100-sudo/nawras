@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   LayoutDashboard, Store, TrendingUp,
   Users, LogOut, Baby, X, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock, BadgeCheck, Package, ClipboardList,
+  ChevronDown, Circle, Layers, Lock, BadgeCheck, Package, ClipboardList, Phone,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
@@ -20,6 +20,7 @@ const NAV_ALL = [
   { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
   { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
   { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
+  { to: '/lead-management', label: 'جمع البيانات والمتابعة', icon: Phone,       view: 'lead_management' },
   { to: '/analytics/logistics', label: 'تحليلات اللوجستيات', icon: Package,   view: 'dashboard' },
 ]
 
@@ -407,8 +408,8 @@ const NAV_GROUPS = [
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/users', '__staff_performance_group__']
-      : ['/performance', '/users', '__staff_performance_group__'],
+      ? ['/lead-management', '/users', '__staff_performance_group__']
+      : ['/performance', '/lead-management', '/users', '__staff_performance_group__'],
   },
 ]
 
