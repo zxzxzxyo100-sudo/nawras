@@ -4,6 +4,7 @@ import { Menu, Package, FlaskConical } from 'lucide-react'
 import Sidebar from './Sidebar'
 import MobileBottomNav from './MobileBottomNav'
 import FloatingCallBar from './FloatingCallBar'
+import LegacyDashboardBoundary from './LegacyDashboardBoundary'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth } from '../contexts/AuthContext'
 import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
@@ -20,6 +21,7 @@ function LayoutInner() {
   const { pathname } = useLocation()
   /** التحقيق السريع: عرض كامل ملتصق بحواف منطقة المحتوى (دون p-4 الافتراضية) */
   const isQuickVerification = pathname === '/quick-verification'
+  const isLeadManagementRoute = pathname.startsWith('/lead-management')
 
   useEffect(() => {
     if (!sidebarOpen) return undefined
@@ -147,7 +149,13 @@ function LayoutInner() {
         <main
           className={`flex-1 overflow-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-0 ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}
         >
-          <Outlet />
+          {isLeadManagementRoute ? (
+            <Outlet />
+          ) : (
+            <LegacyDashboardBoundary>
+              <Outlet />
+            </LegacyDashboardBoundary>
+          )}
         </main>
       </div>
 

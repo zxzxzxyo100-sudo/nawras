@@ -46,6 +46,10 @@ function HomeRoot() {
   if (user?.role === 'inactive_manager') {
     return <Navigate to="/tasks" replace />
   }
+  // أدوار جمع البيانات لا تعتمد على لوحة المتاجر الرئيسية.
+  if (user?.role === 'data_collector' || user?.role === 'admin') {
+    return <Navigate to="/lead-management" replace />
+  }
   return <Dashboard />
 }
 
