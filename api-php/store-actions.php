@@ -158,6 +158,24 @@ function ensure_last_call_date_column(PDO $pdo) {
     $done = true;
 }
 
+/** يتحقق من وجود عمود بدون كسر الطلب إذا فشلت صلاحيات ALTER */
+function has_table_column($pdo, $table, $column) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$table, $column]);
+        return (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
@@ -169,7 +187,13 @@ if ($action === 'get_states') {
         $pdo->exec('ALTER TABLE store_states ADD COLUMN officer_performance_error TINYINT(1) NOT NULL DEFAULT 0');
     } catch (Throwable $e) {
     }
-    $stmt = $pdo->query("SELECT store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date, officer_performance_error FROM store_states");
+    $selectCols = "store_id, store_name, category, state_reason, freeze_reason, restore_date, graduated_at, updated_by, inc_call1_at, inc_call2_at, inc_call3_at, last_call_date";
+    if (has_table_column($pdo, 'store_states', 'officer_performance_error')) {
+        $selectCols .= ", officer_performance_error";
+    } else {
+        $selectCols .= ", 0 AS officer_performance_error";
+    }
+    $stmt = $pdo->query("SELECT {$selectCols} FROM store_states");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
