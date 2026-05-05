@@ -36,7 +36,7 @@ jobs:
           port: 21
           local-dir: ./
           server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR_PRODUCTION }}
-          state-name: .ftp-deploy-sync-state-production.json
+          state-name: .ftp-deploy-sync-state-production-v2.json
           exclude: |
             **/.git*
             **/.git*/**
