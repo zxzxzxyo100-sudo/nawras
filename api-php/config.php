@@ -33,13 +33,13 @@ if ($_isStaging) {
     define('DB_HOST', 'localhost');
     define('DB_NAME', 'u495355717_nawras_stg');
     define('DB_USER', 'u495355717_nawras_stg');
-    define('DB_PASS', 'Zidona11@');
+    define('DB_PASS', 'Alizidona2');
     define('IS_STAGING_ENV', true);
 } else {
     define('DB_HOST', 'localhost');
     define('DB_NAME', 'u495355717_nawras_crm');
     define('DB_USER', 'u495355717_nawras_admin');
-    define('DB_PASS', 'Zidona11');
+    define('DB_PASS', 'Alizidona2');
     define('IS_STAGING_ENV', false);
 }
 
