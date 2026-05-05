@@ -28,6 +28,8 @@ export default function LeadManagement() {
   const { user } = useAuth()
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [leads, setLeads] = useState([])
+  const [supabaseUser, setSupabaseUser] = useState(null)
+  const [authChecking, setAuthChecking] = useState(true)
   const [loadingList, setLoadingList] = useState(true)
   const [creating, setCreating] = useState(false)
   const [updatingLeadId, setUpdatingLeadId] = useState(null)
@@ -36,13 +38,46 @@ export default function LeadManagement() {
 
   const username = user?.fullname || user?.username || 'Unknown'
 
+  useEffect(() => {
+    let mounted = true
+
+    async function syncSupabaseAuth() {
+      const { data, error: authError } = await supabase.auth.getUser()
+      if (!mounted) return
+      if (authError) {
+        setError(authError.message || 'تعذر التحقق من هوية Supabase.')
+        setSupabaseUser(null)
+      } else {
+        setSupabaseUser(data?.user ?? null)
+      }
+      setAuthChecking(false)
+    }
+
+    void syncSupabaseAuth()
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+      setSupabaseUser(session?.user ?? null)
+    })
+
+    return () => {
+      mounted = false
+      sub?.subscription?.unsubscribe()
+    }
+  }, [])
+
   async function fetchLeads() {
+    if (!supabaseUser?.id) {
+      setLeads([])
+      setLoadingList(false)
+      return
+    }
     setLoadingList(true)
     setError('')
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
-    if (user?.id) {
-      query = query.eq('assigned_to', user.id)
-    }
+    const query = supabase
+      .from('leads')
+      .select('*')
+      .eq('assigned_to', supabaseUser.id)
+      .order('created_at', { ascending: false })
     const { data, error: fetchError } = await query
 
     if (fetchError) {
@@ -55,8 +90,9 @@ export default function LeadManagement() {
   }
 
   useEffect(() => {
+    if (authChecking) return
     void fetchLeads()
-  }, [user?.id])
+  }, [authChecking, supabaseUser?.id])
 
   function handleFormChange(event) {
     const { name, value } = event.target
@@ -65,6 +101,10 @@ export default function LeadManagement() {
 
   async function handleCreateLead(event) {
     event.preventDefault()
+    if (!supabaseUser?.id) {
+      setError('لا يمكن الإضافة بدون جلسة Supabase نشطة.')
+      return
+    }
     if (!formData.store_name.trim() || !formData.phone_number.trim()) {
       setError('يرجى إدخال اسم المتجر ورقم الهاتف.')
       return
@@ -78,7 +118,7 @@ export default function LeadManagement() {
       store_name: formData.store_name.trim(),
       phone_number: formData.phone_number.trim(),
       source: formData.source,
-      assigned_to: user?.id || null,
+      assigned_to: supabaseUser?.id || null,
     }
 
     const { error: insertError } = await supabase.from('leads').insert(payload)
@@ -152,7 +192,7 @@ export default function LeadManagement() {
           </select>
           <button
             type="submit"
-            disabled={creating}
+            disabled={creating || !supabaseUser}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
@@ -167,13 +207,28 @@ export default function LeadManagement() {
         </div>
       )}
 
+      {!authChecking && !supabaseUser && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          لا توجد جلسة Supabase نشطة لهذا المستخدم. يلزم تسجيل الدخول عبر Supabase أولاً لاستخدام «جمع البيانات والمتابعة».
+        </div>
+      )}
+
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <UserCheck size={16} className="text-violet-600" />
           <h2 className="text-base font-bold text-slate-900">العملاء المكلّفون لي</h2>
         </div>
 
-        {loadingList ? (
+        {authChecking ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
+            <Loader2 size={16} className="animate-spin" />
+            جارٍ التحقق من الجلسة...
+          </div>
+        ) : !supabaseUser ? (
+          <div className="rounded-xl border border-dashed border-amber-300 py-10 text-center text-sm text-amber-700">
+            سجّل دخول Supabase لعرض العملاء المكلّفين.
+          </div>
+        ) : loadingList ? (
           <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
             <Loader2 size={16} className="animate-spin" />
             جارٍ تحميل البيانات...
