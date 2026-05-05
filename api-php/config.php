@@ -38,11 +38,11 @@ if ($_isStaging) {
     define('IS_STAGING_ENV', true);
 } else {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_crm');
-    define('DB_USER', 'u495355717_nawras_admin');
-    $prodPassFromEnv = getenv('NAWRAS_PROD_DB_PASS');
-    define('DB_PASS', is_string($prodPassFromEnv) && $prodPassFromEnv !== '' ? $prodPassFromEnv : '^8_8N?dpedMyQXB');
-    define('IS_STAGING_ENV', false);
+  define('DB_HOST', 'localhost');
+define('DB_NAME', 'u495355717_nawras_crm');
+define('DB_USER', 'u495355717_nawras_admin');
+define('DB_PASS', '^8_8N?dpedMyQXB');
+define('IS_STAGING_ENV', false);
 }
 
 if (!defined('CRON_QUEUE_FILL_SECRET')) {
