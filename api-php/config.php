@@ -34,7 +34,7 @@ if ($_isStaging) {
     define('DB_NAME', 'u495355717_nawras_stg');
     define('DB_USER', 'u495355717_nawras_stg');
     $stgPassFromEnv = getenv('NAWRAS_STAGING_DB_PASS');
-    define('DB_PASS', is_string($stgPassFromEnv) && $stgPassFromEnv !== '' ? $stgPassFromEnv : 'Zidona11@');
+    define('DB_PASS', is_string($stgPassFromEnv) && $stgPassFromEnv !== '' ? $stgPassFromEnv : '^8_8N?dpedMyQXB@');
     define('IS_STAGING_ENV', true);
 } else {
     define('DB_HOST', 'localhost');
