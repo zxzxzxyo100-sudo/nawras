@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Plus, Phone, UserCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabaseClient'
+import { getLeads, createLead, updateLeadById } from '../services/api'
 
 const INITIAL_FORM = {
   store_name: '',
@@ -39,17 +39,12 @@ export default function LeadManagement() {
   async function fetchLeads() {
     setLoadingList(true)
     setError('')
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
-    if (user?.id) {
-      query = query.eq('assigned_to', user.id)
-    }
-    const { data, error: fetchError } = await query
-
-    if (fetchError) {
-      setError(fetchError.message || 'تعذّر تحميل قائمة العملاء المحتملين.')
+    const res = await getLeads(user?.id)
+    if (!res?.success) {
+      setError(res?.error || 'تعذّر تحميل قائمة العملاء المحتملين.')
       setLeads([])
     } else {
-      setLeads(data || [])
+      setLeads(res.data || [])
     }
     setLoadingList(false)
   }
@@ -81,9 +76,9 @@ export default function LeadManagement() {
       assigned_to: user?.id || null,
     }
 
-    const { error: insertError } = await supabase.from('leads').insert(payload)
-    if (insertError) {
-      setError(insertError.message || 'فشل إضافة العميل المحتمل.')
+    const res = await createLead(payload)
+    if (!res?.success) {
+      setError(res?.error || 'فشل إضافة العميل المحتمل.')
     } else {
       setSuccess('تمت إضافة العميل المحتمل بنجاح.')
       setFormData(INITIAL_FORM)
@@ -98,13 +93,9 @@ export default function LeadManagement() {
     setError('')
     setSuccess('')
 
-    const { error: updateError } = await supabase
-      .from('leads')
-      .update(patch)
-      .eq('id', leadId)
-
-    if (updateError) {
-      setError(updateError.message || 'فشل تحديث العميل المحتمل.')
+    const res = await updateLeadById(leadId, patch)
+    if (!res?.success) {
+      setError(res?.error || 'فشل تحديث العميل المحتمل.')
     } else {
       setSuccess('تم تحديث حالة العميل المحتمل.')
       await fetchLeads()

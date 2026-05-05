@@ -168,6 +168,16 @@ export const getAssignments = () =>
 export const assignStore = (data) =>
   http.post('/store-actions.php?action=assign_store', data).then(r => r.data)
 
+// ─── Leads (MySQL) ───────────────────────────────────────────────────────────
+export const getLeads = (assignedTo) =>
+  http.get('/leads.php', { params: { action: 'list', assigned_to: assignedTo || undefined } }).then(r => r.data)
+
+export const createLead = (data) =>
+  http.post('/leads.php?action=create', data).then(r => r.data)
+
+export const updateLeadById = (id, patch) =>
+  http.post('/leads.php?action=update', { id, ...patch }).then(r => r.data)
+
 /** أتمتة مسؤول المتاجر (تجريبي): يوم 14 / يوم 11 أداء */
 export const postMerchantOfficerAutomation = (data) =>
   http.post('/merchant-officer-automation.php', data).then(r => r.data)
