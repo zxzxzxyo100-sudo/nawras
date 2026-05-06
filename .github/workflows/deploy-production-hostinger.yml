@@ -41,6 +41,7 @@ jobs:
             **/.git*
             **/.git*/**
             **/node_modules/**
+            api-php/config.php
             react-crm/**
             docs/**
             .cursor/**
