@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Plus, Phone, UserCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabaseClient'
+import { createLead, getLeads, patchLead } from '../services/api'
 
 const INITIAL_FORM = {
   store_name: '',
@@ -10,9 +10,9 @@ const INITIAL_FORM = {
 }
 
 const SOURCE_OPTIONS = [
-  { value: 'social_media', label: 'Social Media' },
-  { value: 'field_visit', label: 'Field Visit' },
-  { value: 'referral', label: 'Referral' },
+  { value: 'social_media', label: 'سوشال ميديا' },
+  { value: 'field_visit', label: 'زيارة ميدانية' },
+  { value: 'other', label: 'مصدر آخر' },
 ]
 
 function formatDate(value) {
@@ -35,28 +35,26 @@ export default function LeadManagement() {
   const [success, setSuccess] = useState('')
 
   const username = user?.fullname || user?.username || 'Unknown'
+  const role = String(user?.role || '').toLowerCase()
+  const canAccess = role === 'admin' || role === 'data_collector'
 
   async function fetchLeads() {
     setLoadingList(true)
     setError('')
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
-    if (user?.id) {
-      query = query.eq('assigned_to', user.id)
-    }
-    const { data, error: fetchError } = await query
-
-    if (fetchError) {
-      setError(fetchError.message || 'تعذّر تحميل قائمة العملاء المحتملين.')
+    const res = await getLeads()
+    if (!res?.success) {
+      setError(res?.error || 'تعذّر تحميل قائمة العملاء المحتملين.')
       setLeads([])
     } else {
-      setLeads(data || [])
+      setLeads(res.data || [])
     }
     setLoadingList(false)
   }
 
   useEffect(() => {
+    if (!canAccess) return
     void fetchLeads()
-  }, [user?.id])
+  }, [canAccess, user?.id])
 
   function handleFormChange(event) {
     const { name, value } = event.target
@@ -78,12 +76,12 @@ export default function LeadManagement() {
       store_name: formData.store_name.trim(),
       phone_number: formData.phone_number.trim(),
       source: formData.source,
-      assigned_to: user?.id || null,
+      assigned_to_id: user?.id || null,
     }
 
-    const { error: insertError } = await supabase.from('leads').insert(payload)
-    if (insertError) {
-      setError(insertError.message || 'فشل إضافة العميل المحتمل.')
+    const res = await createLead(payload)
+    if (!res?.success) {
+      setError(res?.error || 'فشل إضافة العميل المحتمل.')
     } else {
       setSuccess('تمت إضافة العميل المحتمل بنجاح.')
       setFormData(INITIAL_FORM)
@@ -98,13 +96,9 @@ export default function LeadManagement() {
     setError('')
     setSuccess('')
 
-    const { error: updateError } = await supabase
-      .from('leads')
-      .update(patch)
-      .eq('id', leadId)
-
-    if (updateError) {
-      setError(updateError.message || 'فشل تحديث العميل المحتمل.')
+    const res = await patchLead(leadId, patch)
+    if (!res?.success) {
+      setError(res?.error || 'فشل تحديث العميل المحتمل.')
     } else {
       setSuccess('تم تحديث حالة العميل المحتمل.')
       await fetchLeads()
@@ -112,9 +106,17 @@ export default function LeadManagement() {
     setUpdatingLeadId(null)
   }
 
+  if (!canAccess) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
+        هذه الصفحة متاحة فقط لدوري Admin و Data Collector.
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-amber-200 bg-gradient-to-l from-amber-50 to-white p-5 shadow-sm ring-1 ring-amber-100">
         <h1 className="text-xl font-black text-slate-900">جمع البيانات والمتابعة</h1>
         <p className="mt-1 text-sm text-slate-500">إدارة العملاء المحتملين ومتابعة دورة التحويل خطوة بخطوة.</p>
       </div>
