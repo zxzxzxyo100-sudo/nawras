@@ -50,12 +50,21 @@ function current_user_from_session() {
     return ['id' => $id, 'role' => $role, 'username' => (string) ($u['username'] ?? '')];
 }
 
+/** يطابق صلاحية lead_management في الواجهة (AuthContext.ROLES) */
+function leads_allowed_roles(): array {
+    return ['admin', 'data_collector', 'executive', 'incubation_manager'];
+}
+
+function leads_can_manage_all_leads(string $role): bool {
+    return in_array($role, ['admin', 'executive', 'incubation_manager'], true);
+}
+
 function require_leads_access() {
     $u = current_user_from_session();
     if (!$u) {
         jsonResponse(['success' => false, 'error' => 'غير مصرح: الجلسة غير صالحة.'], 401);
     }
-    if (!in_array($u['role'], ['admin', 'data_collector'], true)) {
+    if (!in_array($u['role'], leads_allowed_roles(), true)) {
         jsonResponse(['success' => false, 'error' => 'غير مصرح لهذا الدور.'], 403);
     }
     return $u;
@@ -76,7 +85,7 @@ try {
     if (!is_array($input)) $input = $_POST;
 
     if ($method === 'GET') {
-        if ($user['role'] === 'admin') {
+        if (leads_can_manage_all_leads($user['role'])) {
             $st = $pdo->query("SELECT * FROM leads ORDER BY created_at DESC");
             jsonResponse(['success' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
         }
@@ -98,7 +107,7 @@ try {
         }
 
         $assignedTo = $user['id'];
-        if ($user['role'] === 'admin' && isset($input['assigned_to_id'])) {
+        if (leads_can_manage_all_leads($user['role']) && isset($input['assigned_to_id'])) {
             $cand = (int) $input['assigned_to_id'];
             if ($cand > 0) $assignedTo = $cand;
         }
@@ -121,7 +130,7 @@ try {
         $ownStmt->execute([$leadId]);
         $row = $ownStmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) jsonResponse(['success' => false, 'error' => 'العميل غير موجود.'], 404);
-        if ($user['role'] !== 'admin' && (int) $row['assigned_to_id'] !== $user['id']) {
+        if (!leads_can_manage_all_leads($user['role']) && (int) $row['assigned_to_id'] !== $user['id']) {
             jsonResponse(['success' => false, 'error' => 'غير مصرح بتعديل هذا السجل.'], 403);
         }
 
