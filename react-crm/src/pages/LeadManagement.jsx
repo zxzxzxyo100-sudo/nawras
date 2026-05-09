@@ -25,7 +25,7 @@ function formatDate(value) {
 }
 
 export default function LeadManagement() {
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [leads, setLeads] = useState([])
   const [loadingList, setLoadingList] = useState(true)
@@ -35,8 +35,12 @@ export default function LeadManagement() {
   const [success, setSuccess] = useState('')
 
   const username = user?.fullname || user?.username || 'Unknown'
-  const role = String(user?.role || '').toLowerCase()
-  const canAccess = role === 'admin' || role === 'data_collector'
+  /**
+   * مصدر الحقيقة لصلاحية رؤية الصفحة هو AuthContext.can('lead_management')
+   * المتسق مع <PrivateRoute view="lead_management"> في App.jsx (ROLES في AuthContext.jsx).
+   * بدلاً من قائمة أدوار صريحة هنا كانت ترفض executive و incubation_manager رغم أن الراوتر يسمح لهما.
+   */
+  const canAccess = can('lead_management')
 
   async function fetchLeads() {
     setLoadingList(true)
@@ -109,7 +113,7 @@ export default function LeadManagement() {
   if (!canAccess) {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
-        هذه الصفحة متاحة فقط لدوري Admin و Data Collector.
+        دورك الحالي لا يملك صلاحية الوصول إلى صفحة جمع البيانات والمتابعة.
       </div>
     )
   }
