@@ -270,6 +270,28 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
 
   const extraColumns = [
     {
+      key: 'workflow_status',
+      label: 'الحالة',
+      render: s => {
+        const a = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
+        const ws = a?.workflow_status
+        const isNoAnswer = s._workflowNoAnswer === true || ws === 'no_answer'
+        if (isNoAnswer) {
+          return (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title="مُعلّم لم يرد — معاودة الاتصال">
+              <PhoneOff size={11} className="opacity-80" />
+              لم يرد
+            </span>
+          )
+        }
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+            نشط
+          </span>
+        )
+      },
+    },
+    {
       key: 'days_since_ship',
       label: 'أيام منذ آخر شحنة',
       render: s => {
@@ -406,17 +428,21 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const isUnreachableTab = activeSegment === 'unreachable'
 
   /**
-   * طابور المسؤول النشط: تعيين نشط + workflow «active» فقط — «لم يرد» يذهب لتبويب لم يتم الوصول.
+   * طابور المسؤول النشط: تعيينات «active» و«no_answer» (لم يرد) معاً في «قيد المتابعة»
+   * حتى لا تختفي متاجر «لم يرد» من مهام الموظف. تظهر أيضاً في تبويب «لم يتم الوصول».
    */
   const workflowPendingForUser = useMemo(() => {
     if (!isActiveManager || !user?.username) return []
-    return filteredActive.filter(s => {
+    const matched = []
+    for (const s of filteredActive) {
       const a = assignments[s.id] ?? assignments[String(s.id)] ?? assignments[Number(s.id)]
-      if (!a || a.assigned_to !== user.username) return false
-      if ((a.assignment_queue || 'active') !== 'active') return false
+      if (!a || a.assigned_to !== user.username) continue
+      if ((a.assignment_queue || 'active') !== 'active') continue
       const ws = a.workflow_status ?? 'active'
-      return ws === 'active'
-    })
+      if (ws !== 'active' && ws !== 'no_answer') continue
+      matched.push(ws === 'no_answer' ? { ...s, _workflowNoAnswer: true } : s)
+    }
+    return matched
   }, [isActiveManager, user?.username, filteredActive, assignments])
 
   /**
@@ -429,21 +455,24 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const base = workflowPendingForUser
     if (!activeWf) return base
     if (activeWf.daily_quota?.quota_reached) return []
-    /** قيد المتابعة = active_tasks فقط (لا دمج no_answer — يظهر في «لم يتم الوصول») */
-    const tasks = [...(activeWf.active_tasks || [])]
+    /** قيد المتابعة = active_tasks + no_answer_tasks (لم يرد لا يضيع من مهام الموظف) */
+    const apiActive = (activeWf.active_tasks || []).map(t => ({ task: t, noAnswer: false }))
+    const apiNoAnswer = (activeWf.no_answer_tasks || []).map(t => ({ task: t, noAnswer: true }))
+    const tasks = [...apiActive, ...apiNoAnswer]
     if (tasks.length === 0) return base
 
     const byId = new Map(base.map(s => [Number(s.id), s]))
     const out = []
     const seen = new Set()
-    for (const t of tasks) {
+    for (const entry of tasks) {
+      const t = entry.task
       const id = Number(t.store_id)
       if (!Number.isFinite(id) || id <= 0) continue
       if (seen.has(id)) continue
       seen.add(id)
       const existing = byId.get(id)
       if (existing) {
-        out.push(existing)
+        out.push(entry.noAnswer ? { ...existing, _workflowNoAnswer: true } : existing)
       } else {
         const nm = (t.store_name && String(t.store_name).trim()) ? t.store_name : `متجر #${id}`
         const phone = t.phone != null && String(t.phone).trim() ? String(t.phone).trim() : ''
@@ -461,6 +490,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           total_shipments: Number(t.total_shipments) || 0,
           shipments_in_range: Number(t.shipments_in_range) || 0,
           _workflowQueueOnly: true,
+          _workflowNoAnswer: entry.noAnswer === true,
         })
       }
     }
