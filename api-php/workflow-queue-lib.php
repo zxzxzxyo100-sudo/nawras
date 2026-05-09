@@ -156,8 +156,13 @@ function active_pipeline_where_sql() {
  */
 function nawras_protected_store_ids_for_assignment_purge(array $result, array $incubation_path = []): array {
     $protected = [];
-foreach (['active_shipping', 'incubating', 'new_registered', 'completed_merchants', 'unreachable_merchants'] as $key) {
-    foreach ($result[$key] ?? [] as $s) {
+    /**
+     * تشمل أيضاً completed_merchants و unreachable_merchants — هذه التبويبات تُعرض داخل
+     * صفحة «نشط يشحن» في الواجهة ويُسمح للمدير التنفيذي بالتعيين فيها مباشرة، فلا يجوز
+     * أن يُحذَف التعيين بمجرد إعادة تحميل الصفحة لمجرد أن store_states.category = completed/unreachable.
+     */
+    foreach (['active_shipping', 'incubating', 'new_registered', 'completed_merchants', 'unreachable_merchants'] as $key) {
+        foreach ($result[$key] ?? [] as $s) {
             $id = (int) ($s['id'] ?? 0);
             if ($id > 0) {
                 $protected[$id] = true;
@@ -192,6 +197,12 @@ function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array 
     $protectedIds = array_keys($protected);
 
     try {
+        /**
+         * شبكة أمان زمنية: لا نحذف أي تعيين مضى على آخر تحديثه أقل من 24 ساعة — فقد يكون
+         * تعييناً يدوياً جديداً قبل أن يلتقط النظام تغييرات store_states أو طبقات overlay.
+         * بدون هذا الشرط: المدير التنفيذي يُعيّن متجراً ثم يَختفي تعيينه فوراً عند أول تحميل
+         * تالٍ للصفحة لأن purge ينقضّ على store_states.category خارج active_shipping.
+         */
         if ($protectedIds === []) {
             $pdo->exec("
                 DELETE sa FROM store_assignments sa
@@ -200,6 +211,7 @@ function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array 
                 AND ss.category IN (
                     'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
                 )
+                AND (sa.assigned_at IS NULL OR sa.assigned_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
             ");
         } else {
             foreach (array_chunk($protectedIds, 200) as $chunkP) {
@@ -215,6 +227,7 @@ function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array 
                         'hot_inactive', 'cold_inactive', 'completed', 'contacted', 'frozen', 'unreachable'
                     )
                     AND CAST(sa.store_id AS UNSIGNED) NOT IN ($phP)
+                    AND (sa.assigned_at IS NULL OR sa.assigned_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
                 ");
                 $st->execute($bindP);
             }
@@ -246,6 +259,7 @@ function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array 
                 DELETE FROM store_assignments
                 WHERE assignment_queue = 'active'
                 AND CAST(store_id AS CHAR) IN ($ph)
+                AND (assigned_at IS NULL OR assigned_at < DATE_SUB(NOW(), INTERVAL 24 HOUR))
             ");
             $st->execute($bind);
         } catch (Throwable $e) {
