@@ -26,6 +26,7 @@ import SatisfactionReport from './pages/SatisfactionReport'
 import RecoveryReport from './pages/RecoveryReport'
 import Tasks from './pages/Tasks'
 import LeadManagement from './pages/LeadManagement'
+import LeadsPortal from './pages/LeadsPortal'
 import GoldCoinAnimation from './components/GoldCoinAnimation'
 
 function PrivateRoute({ children, view, viewAny }) {
@@ -56,6 +57,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      {/* بوّابة جمع البيانات والمتابعة — جلسة دخول مستقلة لا تتطلب جلسة CRM الأساسية */}
+      <Route path="/leads-portal" element={<LeadsPortal />} />
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<HomeRoot />} />
         <Route path="/tasks"       element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
