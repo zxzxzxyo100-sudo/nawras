@@ -156,8 +156,8 @@ function active_pipeline_where_sql() {
  */
 function nawras_protected_store_ids_for_assignment_purge(array $result, array $incubation_path = []): array {
     $protected = [];
-    foreach (['active_shipping', 'incubating', 'new_registered'] as $key) {
-        foreach ($result[$key] ?? [] as $s) {
+foreach (['active_shipping', 'incubating', 'new_registered', 'completed_merchants', 'unreachable_merchants'] as $key) {
+    foreach ($result[$key] ?? [] as $s) {
             $id = (int) ($s['id'] ?? 0);
             if ($id > 0) {
                 $protected[$id] = true;
