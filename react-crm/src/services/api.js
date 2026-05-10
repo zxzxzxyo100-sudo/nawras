@@ -2,7 +2,24 @@ import axios from 'axios'
 
 const BASE = '/api-php'
 
-const http = axios.create({ baseURL: BASE })
+const http = axios.create({
+  baseURL: BASE,
+  /** لضمان إرسال cookie جلسة PHP مع طلبات /api-php (مثل leads_api) */
+  withCredentials: true,
+})
+
+http.interceptors.request.use(config => {
+  try {
+    const t = localStorage.getItem('nawras_session_resume')
+    if (t && typeof t === 'string' && t.trim() !== '') {
+      config.headers = config.headers ?? {}
+      config.headers['X-Nawras-Resume'] = t.trim()
+    }
+  } catch {
+    /* ignore */
+  }
+  return config
+})
 
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

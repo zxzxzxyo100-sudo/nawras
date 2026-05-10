@@ -1,19 +1,21 @@
 <?php
 require_once __DIR__ . '/db.php';
-
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
-}
+require_once __DIR__ . '/session-resume-lib.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 $pdo = getDB();
+nawras_apply_session_resume($pdo, (string) ($_SERVER['HTTP_X_NAWRAS_RESUME'] ?? ''));
+
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Nawras-Resume');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit;
+}
 
 function ensure_leads_schema(PDO $pdo) {
     static $done = false;

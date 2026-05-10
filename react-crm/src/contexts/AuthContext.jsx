@@ -41,6 +41,9 @@ export function AuthProvider({ children }) {
       const role = typeof roleRaw === 'string' ? roleRaw.toLowerCase() : roleRaw
       const normalized = ru && role ? { ...ru, role } : ru
       localStorage.setItem('nawras_session', JSON.stringify(normalized))
+      if (typeof res.session_resume === 'string' && res.session_resume.trim() !== '') {
+        localStorage.setItem('nawras_session_resume', res.session_resume.trim())
+      }
       setUser(normalized)
       return res.user
     } catch (err) {
@@ -51,6 +54,7 @@ export function AuthProvider({ children }) {
 
   function logout() {
     localStorage.removeItem('nawras_session')
+    localStorage.removeItem('nawras_session_resume')
     setUser(null)
   }
 

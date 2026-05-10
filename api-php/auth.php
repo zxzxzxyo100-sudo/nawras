@@ -2,6 +2,7 @@
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/session-resume-lib.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -51,7 +52,12 @@ if ($action === 'login') {
             'fullname' => (string) ($row['fullname'] ?? ''),
             'role' => (string) ($row['role'] ?? ''),
         ];
-        jsonResponse(['success' => true, 'user' => $row]);
+        $resume = nawras_build_session_resume_token($row);
+        jsonResponse([
+            'success'        => true,
+            'user'           => $row,
+            'session_resume' => $resume,
+        ]);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
     }
