@@ -2,12 +2,13 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/session-resume-lib.php';
 
+nawras_configure_session_cookie();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 $pdo = getDB();
-nawras_apply_session_resume($pdo, (string) ($_SERVER['HTTP_X_NAWRAS_RESUME'] ?? ''));
+nawras_apply_session_resume($pdo, nawras_read_resume_token_from_request());
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');

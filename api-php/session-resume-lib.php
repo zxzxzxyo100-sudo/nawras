@@ -1,6 +1,36 @@
 <?php
 declare(strict_types=1);
 
+/** إعدادات cookie الجلسة — قبل session_start (مسار / وSameSite=Lax لنفس النطاق). */
+function nawras_configure_session_cookie(): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    if (session_status() !== PHP_SESSION_NONE) {
+        return;
+    }
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $params = session_get_cookie_params();
+    $life = (int) ($params['lifetime'] ?? 0);
+    if ($life < 86400) {
+        $life = 86400 * 14;
+    }
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => $life,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        session_set_cookie_params($life, '/', '', $secure, true);
+    }
+}
+
 /**
  * استئناف جلسة PHP للـ API عندما تكون الواجهة ما زالت «مسجّلة» عبر localStorage
  * بينما انتهت أو فُقدت cookie الجلسة (شائع مع SPA + leads_api).
@@ -92,4 +122,34 @@ function nawras_apply_session_resume(PDO $pdo, string $headerValue): void {
         'fullname' => (string) ($row['fullname'] ?? ''),
         'role'     => (string) ($row['role'] ?? ''),
     ];
+}
+
+/**
+ * قراءة توكن الاستئناف من الترويسات (بعض الاستضافات لا تمرّر X-Custom-* وتمرّر Authorization فقط).
+ */
+function nawras_read_resume_token_from_request(): string {
+    $h = trim((string) ($_SERVER['HTTP_X_NAWRAS_RESUME'] ?? ''));
+    if ($h !== '') {
+        return $h;
+    }
+    $auth = '';
+    if (function_exists('apache_request_headers')) {
+        foreach (apache_request_headers() as $k => $v) {
+            if (strcasecmp((string) $k, 'Authorization') === 0) {
+                $auth = trim((string) $v);
+                break;
+            }
+        }
+    }
+    if ($auth === '' && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $auth = trim((string) $_SERVER['HTTP_AUTHORIZATION']);
+    }
+    if ($auth === '' && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $auth = trim((string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION']);
+    }
+    if ($auth !== '' && preg_match('/Bearer\s+(\S+)/i', $auth, $m)) {
+        return trim($m[1]);
+    }
+
+    return '';
 }

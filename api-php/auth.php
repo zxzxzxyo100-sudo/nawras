@@ -3,6 +3,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/session-resume-lib.php';
+nawras_configure_session_cookie();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -58,6 +59,25 @@ if ($action === 'login') {
             'user'           => $row,
             'session_resume' => $resume,
         ]);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
+    }
+}
+
+elseif ($action === 'issue_resume_token') {
+    $u = $_SESSION['nawras_user'] ?? null;
+    if (!is_array($u) || empty($u['id'])) {
+        jsonResponse(['success' => false, 'error' => 'الجلسة غير صالحة'], 401);
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT id, username, fullname, role FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([(int) $u['id']]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            jsonResponse(['success' => false, 'error' => 'المستخدم غير موجود'], 401);
+        }
+        $resume = nawras_build_session_resume_token($row);
+        jsonResponse(['success' => true, 'session_resume' => $resume]);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
     }

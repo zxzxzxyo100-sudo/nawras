@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { login as apiLogin, formatAuthError } from '../services/api'
+import { login as apiLogin, formatAuthError, issueResumeTokenIfSessionAlive } from '../services/api'
 
 const AuthContext = createContext(null)
 
@@ -20,16 +20,33 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const saved = localStorage.getItem('nawras_session')
-    if (saved) {
-      try {
-        const u = JSON.parse(saved)
-        const roleRaw = typeof u?.role === 'string' ? u.role.trim() : u?.role
-        const role = typeof roleRaw === 'string' ? roleRaw.toLowerCase() : roleRaw
-        if (u && role && ROLES[role]) setUser({ ...u, role })
-      } catch { /* ignore */ }
-    }
-    setLoading(false)
+    let cancelled = false
+    ;(async () => {
+      const saved = localStorage.getItem('nawras_session')
+      if (saved) {
+        try {
+          const u = JSON.parse(saved)
+          const roleRaw = typeof u?.role === 'string' ? u.role.trim() : u?.role
+          const role = typeof roleRaw === 'string' ? roleRaw.toLowerCase() : roleRaw
+          if (u && role && ROLES[role]) {
+            const normalized = { ...u, role }
+            setUser(normalized)
+            const resume = localStorage.getItem('nawras_session_resume')
+            if (!resume) {
+              try {
+                const res = await issueResumeTokenIfSessionAlive()
+                if (!cancelled && res?.success && typeof res.session_resume === 'string') {
+                  const t = res.session_resume.trim()
+                  if (t) localStorage.setItem('nawras_session_resume', t)
+                }
+              } catch { /* لا جلسة PHP أو الخادم قديم */ }
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      if (!cancelled) setLoading(false)
+    })()
+    return () => { cancelled = true }
   }, [])
 
   async function login(username, password) {

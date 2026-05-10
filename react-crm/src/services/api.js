@@ -12,8 +12,11 @@ http.interceptors.request.use(config => {
   try {
     const t = localStorage.getItem('nawras_session_resume')
     if (t && typeof t === 'string' && t.trim() !== '') {
+      const tok = t.trim()
       config.headers = config.headers ?? {}
-      config.headers['X-Nawras-Resume'] = t.trim()
+      config.headers['X-Nawras-Resume'] = tok
+      /** بعض الاستضافات لا تمرّر ترويسات مخصّصة؛ Authorization يُمرَّر عادةً */
+      config.headers['Authorization'] = `Bearer ${tok}`
     }
   } catch {
     /* ignore */
@@ -49,6 +52,12 @@ const FALLBACK_401_AR =
   'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم وكلمة المرور؛ على التجريبي تأكد أن الحساب موجود في قاعدة بيانات التجريب وليس الإنتاج فقط.'
 
 /** تسجيل الدخول — يمرّر رسالة الخادم العربية بدل رسالة axios الافتراضية */
+/** إن كانت cookie الجلسة ما زالت صالحة ولم يُخزَّن session_resume بعد — يُعاد التوكن دون إعادة إدخال كلمة المرور */
+export async function issueResumeTokenIfSessionAlive() {
+  const r = await http.post('/auth.php?action=issue_resume_token', {})
+  return r.data
+}
+
 export async function login(username, password) {
   try {
     const r = await http.post('/auth.php?action=login', { username, password })
