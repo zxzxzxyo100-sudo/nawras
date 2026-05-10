@@ -62,7 +62,7 @@ function AppRoutes() {
       <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route path="/"             element={<HomeRoot />} />
         <Route path="/tasks"       element={<PrivateRoute view="tasks"><Tasks /></PrivateRoute>} />
-        <Route path="/lead-management" element={<PrivateRoute view="lead_management"><LeadManagement /></PrivateRoute>} />
+        <Route path="/lead-management" element={<PrivateRoute><LeadManagement /></PrivateRoute>} />
         <Route
           path="/quick-verification"
           element={<PrivateRoute view="quick_verification"><QuickVerification /></PrivateRoute>}

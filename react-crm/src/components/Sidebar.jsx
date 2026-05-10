@@ -497,7 +497,7 @@ function StaffPerformanceNavGroup({ can, onClose }) {
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
-      { label: 'الرئيسية', keys: ['/', '/tasks', '/active/pending'] },
+      { label: 'الرئيسية', keys: ['/', '/tasks', '/active/pending', '/lead-management'] },
       ...(DISABLE_POINTS_AND_PERFORMANCE
         ? []
         : [{ label: 'الإدارة', keys: ['/performance'] }]),

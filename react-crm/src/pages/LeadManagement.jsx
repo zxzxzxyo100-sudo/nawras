@@ -25,7 +25,7 @@ function formatDate(value) {
 }
 
 export default function LeadManagement() {
-  const { user, can } = useAuth()
+  const { user } = useAuth()
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [leads, setLeads] = useState([])
   const [loadingList, setLoadingList] = useState(true)
@@ -35,12 +35,6 @@ export default function LeadManagement() {
   const [success, setSuccess] = useState('')
 
   const username = user?.fullname || user?.username || 'Unknown'
-  /**
-   * مصدر الحقيقة لصلاحية رؤية الصفحة هو AuthContext.can('lead_management')
-   * المتسق مع <PrivateRoute view="lead_management"> في App.jsx (ROLES في AuthContext.jsx).
-   * بدلاً من قائمة أدوار صريحة هنا كانت ترفض executive و incubation_manager رغم أن الراوتر يسمح لهما.
-   */
-  const canAccess = can('lead_management')
 
   async function fetchLeads() {
     setLoadingList(true)
@@ -56,9 +50,8 @@ export default function LeadManagement() {
   }
 
   useEffect(() => {
-    if (!canAccess) return
     void fetchLeads()
-  }, [canAccess, user?.id])
+  }, [user?.id])
 
   function handleFormChange(event) {
     const { name, value } = event.target
@@ -108,14 +101,6 @@ export default function LeadManagement() {
       await fetchLeads()
     }
     setUpdatingLeadId(null)
-  }
-
-  if (!canAccess) {
-    return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
-        دورك الحالي لا يملك صلاحية الوصول إلى صفحة جمع البيانات والمتابعة.
-      </div>
-    )
   }
 
   return (

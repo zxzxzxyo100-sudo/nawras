@@ -53,11 +53,6 @@ function current_user_from_session() {
     return ['id' => $id, 'role' => $role, 'username' => (string) ($u['username'] ?? '')];
 }
 
-/** يطابق صلاحية lead_management في الواجهة (AuthContext.ROLES) */
-function leads_allowed_roles(): array {
-    return ['admin', 'data_collector', 'executive', 'incubation_manager'];
-}
-
 function leads_can_manage_all_leads(string $role): bool {
     return in_array($role, ['admin', 'executive', 'incubation_manager'], true);
 }
@@ -66,9 +61,6 @@ function require_leads_access() {
     $u = current_user_from_session();
     if (!$u) {
         jsonResponse(['success' => false, 'error' => 'غير مصرح: الجلسة غير صالحة.'], 401);
-    }
-    if (!in_array($u['role'], leads_allowed_roles(), true)) {
-        jsonResponse(['success' => false, 'error' => 'غير مصرح لهذا الدور.'], 403);
     }
     return $u;
 }
