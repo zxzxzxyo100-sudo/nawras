@@ -58,6 +58,15 @@ export async function issueResumeTokenIfSessionAlive() {
   return r.data
 }
 
+/** يمسح جلسة PHP وcookie الاستئناف على الخادم (مع withCredentials) */
+export async function logoutServer() {
+  try {
+    await http.post('/auth.php?action=logout', {})
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function login(username, password) {
   try {
     const r = await http.post('/auth.php?action=login', { username, password })

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { login as apiLogin, formatAuthError, issueResumeTokenIfSessionAlive } from '../services/api'
+import { login as apiLogin, formatAuthError, issueResumeTokenIfSessionAlive, logoutServer } from '../services/api'
 
 const AuthContext = createContext(null)
 
@@ -70,6 +70,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    void logoutServer()
     localStorage.removeItem('nawras_session')
     localStorage.removeItem('nawras_session_resume')
     setUser(null)

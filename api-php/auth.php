@@ -54,6 +54,9 @@ if ($action === 'login') {
             'role' => (string) ($row['role'] ?? ''),
         ];
         $resume = nawras_build_session_resume_token($row);
+        if ($resume !== '') {
+            nawras_set_resume_cookie($resume);
+        }
         jsonResponse([
             'success'        => true,
             'user'           => $row,
@@ -77,10 +80,27 @@ elseif ($action === 'issue_resume_token') {
             jsonResponse(['success' => false, 'error' => 'المستخدم غير موجود'], 401);
         }
         $resume = nawras_build_session_resume_token($row);
+        if ($resume !== '') {
+            nawras_set_resume_cookie($resume);
+        }
         jsonResponse(['success' => true, 'session_resume' => $resume]);
     } catch (Exception $e) {
         jsonResponse(['success' => false, 'error' => 'Database error: ' . $e->getMessage()], 500);
     }
+}
+
+elseif ($action === 'logout') {
+    nawras_clear_resume_cookie();
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        $p = session_get_cookie_params();
+        $secure = !empty($p['secure']);
+        if (ini_get('session.use_cookies') && session_name()) {
+            setcookie(session_name(), '', time() - 42000, (string) ($p['path'] ?? '/'), (string) ($p['domain'] ?? ''), $secure, (bool) ($p['httponly'] ?? true));
+        }
+        session_destroy();
+    }
+    jsonResponse(['success' => true]);
 }
 
 elseif ($action === 'list_users') {

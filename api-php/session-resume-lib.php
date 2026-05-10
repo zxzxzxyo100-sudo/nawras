@@ -151,5 +151,59 @@ function nawras_read_resume_token_from_request(): string {
         return trim($m[1]);
     }
 
+    $c = trim((string) ($_COOKIE[nawras_resume_cookie_name()] ?? ''));
+    if ($c !== '') {
+        return $c;
+    }
+
     return '';
+}
+
+function nawras_resume_cookie_name(): string {
+    return 'nawras_resume';
+}
+
+/** مدة cookie الاستئناف (ثوانٍ) — قريبة من TTL التوكن */
+function nawras_resume_cookie_ttl(): int {
+    return 1209600;
+}
+
+/** يُرسَل مع الاستجابة؛ المتصفح يعيده تلقائياً مع /api-php/* دون ترويسات (مفيد عند فتح الرابط مباشرة أو حجب Authorization). */
+function nawras_set_resume_cookie(string $token): void {
+    $t = trim($token);
+    if ($t === '') {
+        return;
+    }
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $exp = time() + nawras_resume_cookie_ttl();
+    $name = nawras_resume_cookie_name();
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie($name, $t, [
+            'expires'  => $exp,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        setcookie($name, $t, $exp, '/', '', $secure, true);
+    }
+}
+
+function nawras_clear_resume_cookie(): void {
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $name = nawras_resume_cookie_name();
+    if (PHP_VERSION_ID >= 70300) {
+        setcookie($name, '', [
+            'expires'  => time() - 3600,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        setcookie($name, '', time() - 3600, '/', '', $secure, true);
+    }
 }
