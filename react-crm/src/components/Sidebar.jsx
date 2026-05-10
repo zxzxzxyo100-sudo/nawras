@@ -401,15 +401,22 @@ const NAV = DISABLE_POINTS_AND_PERFORMANCE
   ? NAV_ALL.filter(n => n.to !== '/performance')
   : NAV_ALL
 
+/** جمع البيانات: يظهر لأي مستخدم مسجّل دخوله (لا يعتمد على can('lead_management')) حتى لا يختفي مع مجموعة «الإدارة». */
+function navItemVisible(item, can, loggedIn) {
+  if (!item) return false
+  if (item.to === '/lead-management') return loggedIn
+  return can(item.view)
+}
+
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', '/tasks', '/quick-verification'] },
+  { label: 'الرئيسية',  keys: ['/', '/tasks', '/quick-verification', '/lead-management'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/lead-management', '/users', '__staff_performance_group__']
-      : ['/performance', '/lead-management', '/users', '__staff_performance_group__'],
+      ? ['/users', '__staff_performance_group__']
+      : ['/performance', '/users', '__staff_performance_group__'],
   },
 ]
 
@@ -572,7 +579,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 return <InactiveNavGroup key="inactive" can={can} onClose={onClose} />
               }
               const item = NAV.find(n => n.to === key)
-              if (!item || !can(item.view)) return null
+              if (!item || !navItemVisible(item, can, !!user)) return null
               return (
                 <NavLink
                   key={item.to}
@@ -630,7 +637,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 continue
               }
               const navItem = NAV.find(n => n.to === key)
-              if (navItem && can(navItem.view)) ordered.push({ kind: 'link', item: navItem })
+              if (navItem && navItemVisible(navItem, can, !!user)) ordered.push({ kind: 'link', item: navItem })
             }
             if (ordered.length === 0) return null
             return (
@@ -695,7 +702,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )
           }
 
-          const items = NAV.filter(n => group.keys.includes(n.to) && can(n.view))
+          const items = NAV.filter(n => group.keys.includes(n.to) && navItemVisible(n, can, !!user))
           if (items.length === 0) return null
           return (
             <div key={group.label} className="mb-5">
