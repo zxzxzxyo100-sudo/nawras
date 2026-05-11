@@ -40,7 +40,8 @@ if (!cron_daily_queue_fill_allowed()) {
 
 $pdo = getDB();
 $label = 'cron_' . date('Y-m-d_H:i:s') . '_Africa/Tripoli';
-$result = fill_all_active_and_inactive_queues($pdo, $label);
+// التعيين يدوي فقط — الطابور النشط لا يُعبَّأ تلقائياً؛ يُعبَّأ طابور الاستعادة فقط
+$result = fill_all_inactive_managers_only($pdo, $label);
 $result['success'] = true;
 $result['timezone'] = 'Africa/Tripoli';
 $result['ran_at_local'] = date('Y-m-d H:i:s');
