@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
   ArrowRight, BarChart3, CalendarRange, Download, HeartHandshake, Printer, RefreshCw, Phone,
 } from 'lucide-react'

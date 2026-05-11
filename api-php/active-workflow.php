@@ -171,10 +171,7 @@ if ($action === 'get_my_workflow') {
             'inactive_followup_no_answer_count' => count($inactive_followup_no_answer),
         ]);
     }
-    require_once __DIR__ . '/workflow-retroactive-lib.php';
-    workflow_retroactive_complete_from_csat_and_answered($pdo, 80);
-
-    fill_slots_for_user($pdo, $username, $username, null);
+    // التعيين يدوي فقط — لا تعبئة تلقائية ولا تصحيح رجعي يغيّر حالة التعيينات
 
     /** تبويب «تأخيرات المكالمات»: ?type=delayed — نوافذ احتضان متجاوزة أو تعيين متأخر، حتى 50، مرتبة بالأشد تأخيراً */
     if ($listType === 'delayed') {
@@ -367,9 +364,10 @@ elseif ($action === 'mark_no_answer') {
 
     /** لا تسجيل في employee_daily_processed_stores لـ«لم يرد» — الحصة للاستبيان/الإكمال فقط */
 
+    // التعيين يدوي فقط — لا تعبئة تلقائية للطابور النشط بعد «لم يرد»
     $added = $queue === 'inactive'
         ? fill_inactive_slots_for_user($pdo, $username, $username, null)
-        : fill_slots_for_user($pdo, $username, $username, null);
+        : 0;
     $payload = ['success' => true, 'replacement_added' => $added, 'queue' => $queue];
     if ($queue === 'inactive') {
         $payload['daily_successful_contacts'] = get_inactive_daily_success_count($pdo, $username);
@@ -650,7 +648,7 @@ elseif ($action === 'release_after_survey') {
         }
         jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين لهذا المتجر.'], 400);
     }
-    fill_slots_for_user($pdo, $username, $username, null);
+    // التعيين يدوي فقط — لا تعبئة تلقائية بعد إكمال الاستبيان
     $count = get_active_daily_success_count($pdo, $username);
     $sn = trim((string) ($input['store_name'] ?? ''));
     workflow_mark_active_store_contacted_completed($pdo, $storeId, $sn, $username);
@@ -670,18 +668,11 @@ elseif ($action === 'fill_all_queues') {
     if ($role !== 'executive') {
         jsonResponse(['success' => false, 'error' => 'غير مصرّح — المدير التنفيذي فقط.'], 403);
     }
-    $by = trim((string) ($input['assigned_by'] ?? 'system'));
-    $stmt = $pdo->query("SELECT username FROM users WHERE role = 'active_manager'");
-    $users = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    $report = [];
-    foreach ($users as $u) {
-        $n = fill_slots_for_user($pdo, $u, $by, null);
-        $report[$u] = $n;
-    }
+    // التعيين يدوي فقط — fill_all_queues معطّل للطابور النشط
     jsonResponse([
         'success' => true,
-        'filled_per_user' => $report,
-        'note' => 'تعيين المتابعة النشطة يدوي؛ لا تُضاف متاجر تلقائياً من المجمع.',
+        'filled_per_user' => [],
+        'note' => 'التعيين يدوي فقط — لا تُضاف متاجر تلقائياً من المجمع.',
     ]);
 }
 

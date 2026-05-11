@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { ArrowRight, CalendarRange, Download, FileSpreadsheet, RefreshCw, Repeat2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getRecoveryReport } from '../services/api'

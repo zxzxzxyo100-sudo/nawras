@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { BarChart3, CalendarRange, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'

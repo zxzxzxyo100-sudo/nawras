@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react'
-import { motion } from 'framer-motion'
 import {
   X, Phone, Zap, Star, CheckCircle2, PhoneOff, Undo2, PhoneCall,
 } from 'lucide-react'
