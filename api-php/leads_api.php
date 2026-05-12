@@ -41,7 +41,24 @@ function ensure_leads_schema(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
+    try { $pdo->exec("ALTER TABLE leads ADD COLUMN media_screenshot VARCHAR(500) NULL DEFAULT NULL"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE leads ADD COLUMN website_or_location VARCHAR(500) NULL DEFAULT NULL"); } catch (Throwable $e) {}
+
+    $uploadDir = __DIR__ . '/uploads/leads/';
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0755, true);
+    }
+
     $done = true;
+}
+
+function leads_upload_dir(): string {
+    return __DIR__ . '/uploads/leads/';
+}
+
+function leads_screenshot_url(string $path): string {
+    if ($path === '') return '';
+    return '/api-php/' . ltrim($path, '/');
 }
 
 function current_user_from_session() {
@@ -80,19 +97,31 @@ try {
     if (!is_array($input)) $input = $_POST;
 
     if ($method === 'GET') {
+        $fetch = static function (array $rows): array {
+            foreach ($rows as &$r) {
+                $r['media_screenshot_url'] = isset($r['media_screenshot']) && $r['media_screenshot'] !== ''
+                    ? leads_screenshot_url($r['media_screenshot'])
+                    : '';
+            }
+            unset($r);
+            return $rows;
+        };
         if (leads_can_manage_all_leads($user['role'])) {
             $st = $pdo->query("SELECT * FROM leads ORDER BY created_at DESC");
-            jsonResponse(['success' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+            jsonResponse(['success' => true, 'data' => $fetch($st->fetchAll(PDO::FETCH_ASSOC))]);
         }
         $st = $pdo->prepare("SELECT * FROM leads WHERE assigned_to_id = ? ORDER BY created_at DESC");
         $st->execute([$user['id']]);
-        jsonResponse(['success' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+        jsonResponse(['success' => true, 'data' => $fetch($st->fetchAll(PDO::FETCH_ASSOC))]);
     }
 
     if ($method === 'POST') {
-        $storeName = trim((string) ($input['store_name'] ?? ''));
-        $phoneNumber = trim((string) ($input['phone_number'] ?? ''));
-        $source = trim((string) ($input['source'] ?? 'social_media'));
+        // يدعم multipart/form-data (عند رفع صورة) و application/json
+        $post = !empty($_POST) ? $_POST : ($input ?? []);
+        $storeName   = trim((string) ($post['store_name']   ?? ''));
+        $phoneNumber = trim((string) ($post['phone_number'] ?? ''));
+        $source      = trim((string) ($post['source']       ?? 'social_media'));
+        $websiteOrLocation = trim((string) ($post['website_or_location'] ?? ''));
 
         if ($storeName === '' || $phoneNumber === '') {
             jsonResponse(['success' => false, 'error' => 'اسم المتجر ورقم الهاتف مطلوبان.'], 400);
@@ -102,16 +131,38 @@ try {
         }
 
         $assignedTo = $user['id'];
-        if (leads_can_manage_all_leads($user['role']) && isset($input['assigned_to_id'])) {
-            $cand = (int) $input['assigned_to_id'];
+        if (leads_can_manage_all_leads($user['role']) && isset($post['assigned_to_id'])) {
+            $cand = (int) $post['assigned_to_id'];
             if ($cand > 0) $assignedTo = $cand;
         }
 
+        $screenshotPath = null;
+        if (!empty($_FILES['media_screenshot']) && $_FILES['media_screenshot']['error'] === UPLOAD_ERR_OK) {
+            $file = $_FILES['media_screenshot'];
+            $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+            if (!in_array($file['type'], $allowedTypes, true)) {
+                jsonResponse(['success' => false, 'error' => 'نوع الملف غير مدعوم. استخدم JPG أو PNG أو WEBP.'], 400);
+            }
+            if ($file['size'] > 5 * 1024 * 1024) {
+                jsonResponse(['success' => false, 'error' => 'حجم الصورة يتجاوز 5 ميغابايت.'], 400);
+            }
+            $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) ?: 'jpg';
+            $filename = 'lead_' . time() . '_' . bin2hex(random_bytes(5)) . '.' . $ext;
+            $uploadDir = leads_upload_dir();
+            if (!is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0755, true);
+            }
+            if (!move_uploaded_file($file['tmp_name'], $uploadDir . $filename)) {
+                jsonResponse(['success' => false, 'error' => 'تعذّر حفظ الصورة على السيرفر.'], 500);
+            }
+            $screenshotPath = 'uploads/leads/' . $filename;
+        }
+
         $st = $pdo->prepare("
-            INSERT INTO leads (store_name, phone_number, source, assigned_to_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO leads (store_name, phone_number, source, assigned_to_id, media_screenshot, website_or_location)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $st->execute([$storeName, $phoneNumber, $source, $assignedTo]);
+        $st->execute([$storeName, $phoneNumber, $source, $assignedTo, $screenshotPath, $websiteOrLocation ?: null]);
         jsonResponse(['success' => true, 'id' => (int) $pdo->lastInsertId()]);
     }
 

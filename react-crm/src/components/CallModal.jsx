@@ -190,8 +190,11 @@ export default function CallModal({
   const dbCategory = storeStates[store.id]?.category || store.category || ''
   const inactiveFeedbackNeeded = useMemo(
     () =>
-      !inactiveRestoredFollowup && callType === 'general' && isInactiveMerchantCategory(dbCategory),
-    [inactiveRestoredFollowup, callType, dbCategory],
+      !inactiveRestoredFollowup
+      && !(fromDailyTasks && user?.role === 'active_manager')
+      && callType === 'general'
+      && isInactiveMerchantCategory(dbCategory),
+    [inactiveRestoredFollowup, fromDailyTasks, user?.role, callType, dbCategory],
   )
 
   /**
@@ -217,10 +220,12 @@ export default function CallModal({
      * متابعة دورية — مسؤول المتاجر من المهام اليومية: أسئلة نعم/لا (شحن/تتبع/مهام)
      * طالما المتجر ليس في مسار «نشط قيد مكالمة» (هناك استبيان النجوم منفصل).
      */
+    if (fromDailyTasks && user?.role === 'active_manager') {
+      return false
+    }
+
     if (
-      fromDailyTasks
-      && user?.role === 'active_manager'
-      && callType === 'general'
+      callType === 'general'
       && !PENDING_CALL_PIPELINE_CATEGORIES.has(dbCategory)
     ) {
       return true
@@ -258,11 +263,9 @@ export default function CallModal({
       if (callType !== 'general' || outcome !== 'answered' || inactiveFeedbackNeeded) {
         return false
       }
+      if (fromDailyTasks && user?.role === 'active_manager') return true
       const inPendingPipeline = PENDING_CALL_PIPELINE_CATEGORIES.has(dbCategory)
-      const periodicFollowUpMandatory =
-        fromDailyTasks
-        && user?.role === 'active_manager'
-        && inPendingPipeline
+      const periodicFollowUpMandatory = fromDailyTasks && user?.role === 'active_manager' && inPendingPipeline
       if (periodicFollowUpMandatory) return true
       return needsActiveSatisfactionSurvey(store.id, dbCategory, surveyByStoreId)
     },

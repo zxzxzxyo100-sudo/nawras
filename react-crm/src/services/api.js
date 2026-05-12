@@ -207,8 +207,12 @@ export const assignStore = (data) =>
 export const getLeads = () =>
   http.get('/leads_api.php').then(r => r.data)
 
-export const createLead = (data) =>
-  http.post('/leads_api.php', data).then(r => r.data)
+export const createLead = (data) => {
+  if (data instanceof FormData) {
+    return http.post('/leads_api.php', data, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+  }
+  return http.post('/leads_api.php', data).then(r => r.data)
+}
 
 export const patchLead = (id, patch) =>
   http.patch('/leads_api.php', { id, ...patch }).then(r => r.data)

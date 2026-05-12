@@ -192,6 +192,8 @@ function nawras_protected_store_ids_for_assignment_purge(array $result, array $i
  * في completed_merchants أو غيره بسبب طبقة overlay أو ازدواج التصنيف.
  */
 function purge_active_manager_assignments_for_exited_incubation(PDO $pdo, array $result, array $incubation_path = []) {
+    // التعيين يدوي فقط — لا حذف تلقائي للتعيينات عند تغيير فئة المتجر
+    return;
     ensure_workflow_schema($pdo);
     $protected = nawras_protected_store_ids_for_assignment_purge($result, $incubation_path);
     $protectedIds = array_keys($protected);
