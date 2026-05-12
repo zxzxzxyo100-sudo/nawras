@@ -1156,6 +1156,11 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             await reload()
             setCallModalStore(null)
           }}
+          taskCompletion={
+            fromDailyTasks && user?.role === 'active_manager'
+              ? { releaseActiveWorkflow: true, onActiveGoalBurst: () => {} }
+              : null
+          }
         />
       )}
 
