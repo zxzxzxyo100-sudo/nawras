@@ -560,35 +560,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Navigation ───────────────────────── */}
       <nav className="relative z-10 flex-1 overflow-y-auto py-4 px-3">
-        {/* جمع البيانات: أول رابط في الشريط لأي مستخدم مسجّل */}
-        {!!user && (
-          <div className="mb-4">
-            <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest px-3 mb-1">جمع البيانات</p>
-            <NavLink
-              to="/lead-management"
-              onClick={handleNav}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
-                  isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                }`
-              }
-              style={({ isActive }) => isActive
-                ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
-                : {}
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                    <Phone size={14} className={isActive ? 'text-white' : 'text-white/50'} />
-                  </div>
-                  <span className="truncate">جمع البيانات والمتابعة</span>
-                  {isActive && <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />}
-                </>
-              )}
-            </NavLink>
-          </div>
-        )}
         {navGroupsForUser(user?.role).map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
@@ -791,35 +762,6 @@ export default function Sidebar({ isOpen, onClose }) {
           )
         })}
 
-        {/* جمع البيانات: رابط ثابت لأي مستخدم مسجّل دخوله - v2 */}
-        {!!user && (
-          <div className="mb-2">
-            <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest px-3 mb-1">جمع البيانات</p>
-            <NavLink
-              to="/lead-management"
-              onClick={handleNav}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
-                  isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                }`
-              }
-              style={({ isActive }) => isActive
-                ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
-                : {}
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                    <Phone size={14} className={isActive ? 'text-white' : 'text-white/50'} />
-                  </div>
-                  <span className="truncate">جمع البيانات والمتابعة</span>
-                  {isActive && <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />}
-                </>
-              )}
-            </NavLink>
-          </div>
-        )}
       </nav>
 
       {/* ── User ─────────────────────────────── */}
