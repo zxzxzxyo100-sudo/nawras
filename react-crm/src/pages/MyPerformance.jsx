@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,

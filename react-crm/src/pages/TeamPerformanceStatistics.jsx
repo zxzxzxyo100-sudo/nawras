@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, CalendarRange, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'

@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { useState, useEffect, useCallback } from 'react'
 import { Ticket, Loader2, CheckCircle2, AlertCircle, UserPlus } from 'lucide-react'
 import {
