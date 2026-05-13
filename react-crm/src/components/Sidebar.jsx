@@ -410,7 +410,7 @@ function navItemVisible(item, can, loggedIn) {
 
 // تقسيم روابط التنقل لمجموعات
 const NAV_GROUPS = [
-  { label: 'الرئيسية',  keys: ['/', '/tasks', '/quick-verification', '/lead-management'] },
+  { label: 'الرئيسية', keys: ['/', '/tasks', '/quick-verification'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
@@ -504,7 +504,7 @@ function StaffPerformanceNavGroup({ can, onClose }) {
 function navGroupsForUser(role) {
   if (role === 'active_manager') {
     return [
-      { label: 'الرئيسية', keys: ['/', '/tasks', '/active/pending', '/lead-management'] },
+      { label: 'الرئيسية', keys: ['/', '/tasks', '/active/pending'] },
       ...(DISABLE_POINTS_AND_PERFORMANCE
         ? []
         : [{ label: 'الإدارة', keys: ['/performance'] }]),
@@ -560,6 +560,24 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* ── Navigation ───────────────────────── */}
       <nav className="relative z-10 flex-1 overflow-y-auto py-4 px-3">
+        {!!user && (
+          <div className="mb-4">
+            <NavLink
+              to="/lead-management"
+              onClick={handleNav}
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+              style={({ isActive }) => isActive ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' } : {}}
+            >
+              {({ isActive }) => (<>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                  <Phone size={14} className={isActive ? 'text-white' : 'text-white/50'} />
+                </div>
+                <span className="truncate">جمع البيانات والمتابعة</span>
+                {isActive && <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />}
+              </>)}
+            </NavLink>
+          </div>
+        )}
         {navGroupsForUser(user?.role).map(group => {
           if (group.keys.includes('__store_section__')) {
             const blocks = STORE_NAV_ORDER.map(key => {
