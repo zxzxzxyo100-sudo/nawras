@@ -193,12 +193,17 @@ export default function LeadManagement() {
   async function fetchLeads() {
     setLoadingList(true)
     setError('')
-    const res = await getLeads()
-    if (!res?.success) {
-      setError(res?.error || 'تعذّر تحميل القائمة.')
+    try {
+      const res = await getLeads()
+      if (!res?.success) {
+        setError(res?.error || 'تعذّر تحميل القائمة.')
+        setLeads([])
+      } else {
+        setLeads(res.data || [])
+      }
+    } catch {
+      setError('تعذّر الاتصال بالخادم. يرجى تسجيل الدخول والمحاولة مجدداً.')
       setLeads([])
-    } else {
-      setLeads(res.data || [])
     }
     setLoadingList(false)
   }
@@ -267,12 +272,16 @@ export default function LeadManagement() {
     setUpdatingId(leadId)
     setError('')
     setSuccess('')
-    const res = await patchLead(leadId, patch)
-    if (!res?.success) {
-      setError(res?.error || 'فشل تحديث العميل المحتمل.')
-    } else {
-      setSuccess('تم التحديث.')
-      await fetchLeads()
+    try {
+      const res = await patchLead(leadId, patch)
+      if (!res?.success) {
+        setError(res?.error || 'فشل تحديث العميل المحتمل.')
+      } else {
+        setSuccess('تم التحديث.')
+        await fetchLeads()
+      }
+    } catch {
+      setError('تعذّر الاتصال بالخادم.')
     }
     setUpdatingId(null)
   }
