@@ -428,8 +428,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const isUnreachableTab = activeSegment === 'unreachable'
 
   /**
-   * طابور المسؤول النشط: تعيينات «active» و«no_answer» (لم يرد) معاً في «قيد المتابعة»
-   * حتى لا تختفي متاجر «لم يرد» من مهام الموظف. تظهر أيضاً في تبويب «لم يتم الوصول».
+   * طابور المسؤول النشط: تعيينات «active» فقط في «قيد المتابعة».
+   * «no_answer» تظهر فقط في تبويب «لم يتم الوصول».
    */
   const workflowPendingForUser = useMemo(() => {
     if (!isActiveManager || !user?.username) return []
@@ -439,8 +439,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       if (!a || a.assigned_to !== user.username) continue
       if ((a.assignment_queue || 'active') !== 'active') continue
       const ws = a.workflow_status ?? 'active'
-      if (ws !== 'active' && ws !== 'no_answer') continue
-      matched.push(ws === 'no_answer' ? { ...s, _workflowNoAnswer: true } : s)
+      if (ws !== 'active') continue
+      matched.push(s)
     }
     return matched
   }, [isActiveManager, user?.username, filteredActive, assignments])
@@ -455,10 +455,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const base = workflowPendingForUser
     if (!activeWf) return base
     if (activeWf.daily_quota?.quota_reached) return []
-    /** قيد المتابعة = active_tasks + no_answer_tasks (لم يرد لا يضيع من مهام الموظف) */
+    /** قيد المتابعة = active_tasks فقط — no_answer_tasks تظهر في تبويب «لم يتم الوصول» */
     const apiActive = (activeWf.active_tasks || []).map(t => ({ task: t, noAnswer: false }))
-    const apiNoAnswer = (activeWf.no_answer_tasks || []).map(t => ({ task: t, noAnswer: true }))
-    const tasks = [...apiActive, ...apiNoAnswer]
+    const tasks = [...apiActive]
     if (tasks.length === 0) return base
 
     const byId = new Map(base.map(s => [Number(s.id), s]))
