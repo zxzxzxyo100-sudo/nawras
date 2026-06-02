@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { AlertTriangle, TrendingDown, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, TrendingDown, RefreshCw, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
 import { getEarlyWarning } from '../services/api'
 
 function severityClass(dropPercent) {
@@ -9,11 +9,11 @@ function severityClass(dropPercent) {
 }
 
 export default function EarlyWarningWidget() {
-  const [data,      setData]      = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
-  const [expanded,  setExpanded]  = useState(true)
-  const [showAll,   setShowAll]   = useState(false)
+  const [data,     setData]     = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(null)
+  const [expanded, setExpanded] = useState(true)
+  const [showAll,  setShowAll]  = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -21,9 +21,9 @@ export default function EarlyWarningWidget() {
     try {
       const res = await getEarlyWarning()
       if (res?.success) setData(res)
-      else setError('فشل جلب البيانات')
-    } catch {
-      setError('خطأ في الاتصال')
+      else setError('تعذّر جلب البيانات من الخادم')
+    } catch (e) {
+      setError('خطأ في الاتصال — تحقق من الاتصال بالإنترنت')
     } finally {
       setLoading(false)
     }
@@ -31,75 +31,97 @@ export default function EarlyWarningWidget() {
 
   useEffect(() => { load() }, [load])
 
-  const warnings  = data?.warnings ?? []
-  const visible   = showAll ? warnings : warnings.slice(0, 8)
-  const hasMore   = warnings.length > 8
+  const warnings = data?.warnings ?? []
+  const visible  = showAll ? warnings : warnings.slice(0, 8)
+  const hasMore  = warnings.length > 8
+  const hasWarnings = warnings.length > 0
 
-  // لا تُظهر الودجت إذا لم يكن هناك تحذيرات (بعد التحميل)
-  if (!loading && !error && warnings.length === 0) return null
+  // لون رأس الودجت حسب الحالة
+  const headerBg = loading
+    ? 'from-slate-50 to-white'
+    : error
+      ? 'from-red-50 to-white'
+      : hasWarnings
+        ? 'from-amber-50 to-white'
+        : 'from-emerald-50 to-white'
+
+  const headerIcon = loading
+    ? <RefreshCw size={18} className="text-slate-400 animate-spin shrink-0" />
+    : error
+      ? <AlertTriangle size={18} className="text-red-500 shrink-0" />
+      : hasWarnings
+        ? <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+        : <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+
+  const headerTitle = loading
+    ? 'إنذار مبكر — جارٍ التحليل...'
+    : error
+      ? 'إنذار مبكر — خطأ في جلب البيانات'
+      : hasWarnings
+        ? `إنذار مبكر — ${warnings.length} متجر تراجعت طلباته`
+        : 'إنذار مبكر — جميع المتاجر مستقرة'
 
   return (
-    <div className="rounded-2xl border border-amber-200/70 bg-white/80 backdrop-blur-sm shadow-sm overflow-hidden" dir="rtl">
+    <div className="rounded-2xl border border-slate-200/80 bg-white/80 backdrop-blur-sm shadow-sm overflow-hidden" dir="rtl">
       {/* رأس الودجت */}
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-l from-amber-50 to-white hover:from-amber-100/70 transition-colors"
+        className={`w-full flex items-center justify-between px-4 py-3 bg-gradient-to-l ${headerBg} hover:brightness-[0.97] transition-all`}
       >
         <div className="flex items-center gap-2">
-          <AlertTriangle size={18} className="text-amber-600 shrink-0" />
-          <span className="text-sm font-bold text-amber-900">إنذار مبكر — تراجع في الطلبات</span>
-          {!loading && data && (
-            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-600 text-white text-xs font-bold">
-              {warnings.length}
-            </span>
-          )}
+          {headerIcon}
+          <span className="text-sm font-bold text-slate-800">{headerTitle}</span>
         </div>
         <div className="flex items-center gap-2">
           {data && (
-            <span className="text-[10px] text-amber-700/60">
-              {data.cached_today ? 'بيانات مؤقتة' : 'محدّث'}
-              {' · '}أمس: {data.total_yesterday?.toLocaleString('ar-SA')}
-              {' · '}اليوم: {data.total_today?.toLocaleString('ar-SA')}
+            <span className="text-[10px] text-slate-400 hidden sm:block">
+              أمس: {data.total_yesterday?.toLocaleString('ar-SA')} طرد
+              {' · '}اليوم: {data.total_today?.toLocaleString('ar-SA')} طرد
+              {data.cached_today ? ' · (مؤقت)' : ''}
             </span>
           )}
           <button
             type="button"
             onClick={e => { e.stopPropagation(); load() }}
             disabled={loading}
-            className="p-1 rounded-lg hover:bg-amber-100 transition-colors"
+            className="p-1 rounded-lg hover:bg-black/5 transition-colors"
             title="تحديث"
           >
-            <RefreshCw size={13} className={`text-amber-600 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw size={13} className={`text-slate-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          {expanded ? <ChevronUp size={16} className="text-amber-600" /> : <ChevronDown size={16} className="text-amber-600" />}
+          {expanded
+            ? <ChevronUp   size={16} className="text-slate-400" />
+            : <ChevronDown size={16} className="text-slate-400" />
+          }
         </div>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-1">
+        <div className="px-4 pb-4 pt-2">
           {loading && (
-            <div className="flex items-center gap-2 py-6 justify-center text-sm text-slate-500">
-              <RefreshCw size={14} className="animate-spin text-amber-500" />
-              جارٍ تحليل البيانات...
-            </div>
+            <p className="text-xs text-slate-400 text-center py-4">
+              جارٍ مقارنة بيانات اليوم بأمس — قد يستغرق حتى دقيقة...
+            </p>
           )}
 
           {error && !loading && (
             <p className="text-sm text-red-600 py-3 text-center">{error}</p>
           )}
 
-          {!loading && !error && warnings.length === 0 && (
-            <p className="text-sm text-slate-500 py-3 text-center">لا توجد تحذيرات حالياً — جميع المتاجر مستقرة</p>
+          {!loading && !error && !hasWarnings && (
+            <p className="text-sm text-emerald-700 py-3 text-center font-medium">
+              لا توجد تحذيرات — كل المتاجر (≥{data?.threshold} طلبات أمس) مستقرة أو في تحسّن
+            </p>
           )}
 
-          {!loading && !error && warnings.length > 0 && (
+          {!loading && !error && hasWarnings && (
             <>
-              <p className="text-[11px] text-amber-700/70 mb-2 mt-1">
-                متاجر لديها ≥{data?.threshold} طلب أمس وانخفضت اليوم •{' '}
-                <span className="text-red-600">■</span> ≥50%{' '}
-                <span className="text-orange-600">■</span> ≥25%{' '}
-                <span className="text-amber-600">■</span> أقل
+              <p className="text-[11px] text-slate-500 mb-2">
+                متاجر لديها ≥{data?.threshold} طلب أمس وانخفضت اليوم ·{' '}
+                <span className="text-red-600 font-semibold">■</span> ≥50%{' '}
+                <span className="text-orange-500 font-semibold">■</span> ≥25%{' '}
+                <span className="text-amber-500 font-semibold">■</span> أقل
               </p>
 
               <div className="space-y-1.5">
@@ -110,15 +132,12 @@ export default function EarlyWarningWidget() {
                       key={w.store_id}
                       className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 ${s.bg} ${s.border}`}
                     >
-                      {/* اسم المتجر */}
                       <div className="min-w-0 flex-1">
                         <span className={`text-xs font-semibold ${s.text} truncate block`}>
                           {w.store_name}
-                          <span className="font-normal opacity-60 mr-1">#{w.store_id}</span>
+                          <span className="font-normal opacity-50 mr-1">#{w.store_id}</span>
                         </span>
                       </div>
-
-                      {/* الأرقام */}
                       <div className="flex items-center gap-2 shrink-0 text-xs tabular-nums">
                         <span className="text-slate-500">أمس: <b className="text-slate-700">{w.yesterday_count}</b></span>
                         <TrendingDown size={12} className={s.text} />
@@ -136,7 +155,7 @@ export default function EarlyWarningWidget() {
                 <button
                   type="button"
                   onClick={() => setShowAll(s => !s)}
-                  className="mt-2 w-full text-center text-xs text-amber-700 hover:text-amber-900 font-medium py-1"
+                  className="mt-2 w-full text-center text-xs text-slate-500 hover:text-slate-800 font-medium py-1"
                 >
                   {showAll ? 'عرض أقل' : `عرض ${warnings.length - 8} إضافية...`}
                 </button>
