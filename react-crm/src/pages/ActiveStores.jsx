@@ -370,18 +370,29 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     {
       key: 'revert_eta',
       label: 'العودة لقيد المكالمة',
-      render: s => {
-        const raw = s.last_call_date || storeStates[s.id]?.last_call_date
-        const d = parseDbDate(raw)
-        if (!d) return <span className="text-slate-400 text-xs">—</span>
-        const revert = addDays(d, 30)
-        const daysLeft = differenceInCalendarDays(revert, new Date())
+      render: () => {
+        // العودة في اليوم 30 من الشهر (أو آخر يوم إذا كان الشهر أقصر)
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth()
+        const lastDayThisMonth = new Date(year, month + 1, 0).getDate()
+        const targetThisMonth  = Math.min(30, lastDayThisMonth)
+        const dateThisMonth    = new Date(year, month, targetThisMonth)
+        let revert
+        if (now < dateThisMonth) {
+          revert = dateThisMonth
+        } else {
+          const lastDayNextMonth = new Date(year, month + 2, 0).getDate()
+          const targetNextMonth  = Math.min(30, lastDayNextMonth)
+          revert = new Date(year, month + 1, targetNextMonth)
+        }
+        const daysLeft = differenceInCalendarDays(revert, now)
         if (daysLeft <= 0) {
           return <span className="text-[11px] text-amber-700 font-medium">بانتظار المزامنة (Cron)</span>
         }
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-100">
-            بعد {daysLeft.toLocaleString('ar-SA')} يومًا
+            {format(revert, 'd MMMM', { locale: ar })} — بعد {daysLeft.toLocaleString('ar-SA')} يومًا
           </span>
         )
       },
@@ -651,7 +662,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
               </>
             )}
             {isCompletedTab && (
-              <span>{scopedCompleted.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
+              <span>{scopedCompleted.length} متجر — تُعاد تلقائياً في اليوم 30 من كل شهر (Cron)</span>
             )}
             {isUnreachableTab && (
               <span>
@@ -941,7 +952,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             <p className="text-[11px] text-emerald-800/80 mt-0.5">
               {fromDailyTasks
                 ? 'ما يظهر هنا معيّن لك ولم تُكمّل بعد (استبيان + تم الرد). عند الإكمال يُزال من القائمة. لم يتم الوصول يظهر في تبويبه.'
-                : '«تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المتابعة.'}
+                : '«تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول». في اليوم 30 من كل شهر تُعاد المنجزات تلقائياً إلى قيد المتابعة.'}
             </p>
             {activeDailyQuota && !activeDailyQuota.quota_reached && (
               <p className="text-[11px] font-semibold text-emerald-900 mt-2 tabular-nums">
@@ -1093,7 +1104,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
               المتاجر المنجزة
             </h2>
             <p className="text-[11px] text-violet-800/80 mt-0.5">
-              بعد 30 يوماً من تاريخ المكالمة تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
+              في اليوم 30 من كل شهر تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
             </p>
           </div>
           <StoreTable
