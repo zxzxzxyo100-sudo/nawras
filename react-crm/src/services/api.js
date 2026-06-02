@@ -133,6 +133,10 @@ export const getOrdersSummaryRange = (from, to) =>
     .get(`/orders-summary.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
     .then(r => r.data)
 
+/** نظام الإنذار المبكر: متاجر انخفضت طلباتها اليوم مقارنةً بالأمس (10+ طلبات أمس) */
+export const getEarlyWarning = () =>
+  http.get('/early-warning.php').then(r => r.data)
+
 export const getStoreStates = () =>
   http.get('/store-actions.php?action=get_states').then(r => r.data)
 

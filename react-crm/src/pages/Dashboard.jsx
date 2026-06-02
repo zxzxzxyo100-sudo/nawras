@@ -16,6 +16,7 @@ import { useStores } from '../contexts/StoresContext'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
 import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
+import EarlyWarningWidget from '../components/EarlyWarningWidget'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -460,6 +461,12 @@ export default function Dashboard() {
           ))}
         </div>
       </motion.div>
+
+      {(isExecutive || user?.role === 'active_manager') && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ duration: 0.4, delay: 0.12 }}>
+          <EarlyWarningWidget />
+        </motion.div>
+      )}
 
       {isExecutive && can('quick_verification') ? (
         <motion.div
