@@ -70,6 +70,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
   const [resetLoading, setResetLoading] = useState(null) // 'completed' | 'unreachable' | 'all'
   const [resetMsg, setResetMsg] = useState('')
+  const [unassignLoading, setUnassignLoading] = useState(null)
 
   const isExecutive = user?.role === 'executive'
   const isActiveManager = user?.role === 'active_manager'
@@ -114,6 +115,23 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     } finally {
       setResetLoading(null)
       setTimeout(() => setResetMsg(''), 4000)
+    }
+  }
+
+  async function handleUnassign(store) {
+    setUnassignLoading(store.id)
+    try {
+      await assignStore({
+        store_id:    store.id,
+        store_name:  store.name,
+        assigned_to: '',
+        assigned_by: user?.fullname || user?.username || '',
+      })
+      await reload()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUnassignLoading(null)
     }
   }
 
@@ -1078,6 +1096,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                         )}
                       onEliteSurveyClick={store => setSurveyModalStore(store)}
                       onCallStore={handleEliteCall}
+                      eliteCanUnassign={s => !!realAssignee(s.id)}
+                      onEliteUnassign={handleUnassign}
+                      eliteUnassignLoadingId={unassignLoading}
                     />
                   </section>
                 ))}

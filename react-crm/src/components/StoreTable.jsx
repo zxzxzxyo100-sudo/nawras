@@ -9,6 +9,7 @@ import {
   PhoneOff,
   RotateCcw,
   ClipboardList,
+  UserMinus,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
 import { filterStoresByToolbar } from '../utils/storeFilters'
@@ -48,6 +49,10 @@ export default function StoreTable({
   eliteWorkflowNoAnswer,
   onEliteWorkflowNoAnswer,
   eliteWorkflowNoAnswerLoadingId,
+  /** إلغاء التعيين — يُعرض زر عندما يعيد الدالة true */
+  eliteCanUnassign,
+  onEliteUnassign,
+  eliteUnassignLoadingId,
   /**
    * تلوين صفوف (غير نشط ساخن/بارد): getStyle يعيد خلفية/لون نص؛ paintMode + onPaintClick للتلوين بالنقر
    */
@@ -573,6 +578,22 @@ export default function StoreTable({
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 text-amber-900 transition-all hover:bg-amber-100 hover:shadow-[0_0_14px_-4px_rgba(245,158,11,0.35)]"
                             >
                               <ClipboardList size={16} strokeWidth={2} className="text-amber-700" />
+                            </button>
+                          )}
+                          {typeof eliteCanUnassign === 'function'
+                            && eliteCanUnassign(store)
+                            && typeof onEliteUnassign === 'function' && (
+                            <button
+                              type="button"
+                              title="إلغاء التعيين"
+                              disabled={eliteUnassignLoadingId === store.id}
+                              onClick={e => {
+                                e.stopPropagation()
+                                onEliteUnassign(store)
+                              }}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 hover:shadow-[0_0_12px_-4px_rgba(239,68,68,0.3)] disabled:opacity-45"
+                            >
+                              <UserMinus size={15} strokeWidth={2} />
                             </button>
                           )}
                           <button
