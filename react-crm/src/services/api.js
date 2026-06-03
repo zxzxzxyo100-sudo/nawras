@@ -137,6 +137,10 @@ export const getOrdersSummaryRange = (from, to) =>
 export const getEarlyWarning = () =>
   http.get('/early-warning.php').then(r => r.data)
 
+/** إعادة متاجر «منجز» و/أو «unreachable» إلى «قيد المتابعة» يدوياً */
+export const resetActiveStores = (type, username) =>
+  http.post('/reset-active-stores.php', { type, username }).then(r => r.data)
+
 export const getStoreStates = () =>
   http.get('/store-actions.php?action=get_states').then(r => r.data)
 

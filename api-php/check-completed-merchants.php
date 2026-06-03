@@ -1,10 +1,9 @@
 <?php
 /**
- * مهمة مجدولة (Cron): في اليوم 30 من كل شهر (أو آخر يوم إذا كان الشهر أقصر)
- * تُعاد جميع المتاجر المنجزة (category='completed') إلى «نشط قيد المكالمة».
- *
- * مثال crontab (يومياً الساعة 03:00 — يتحقق داخلياً من أنه يوم 30):
- * 0 3 * * * php /path/to/check-completed-merchants.php
+ * مهمة مجدولة (Cron): تُعيد جميع المتاجر المنجزة إلى «نشط قيد المكالمة» عند التشغيل.
+ * لا يوجد شرط زمني — يُشغَّل بالجدولة المطلوبة مباشرةً.
+ * مثال crontab (أول كل شهر الساعة 03:00):
+ * 0 3 1 * * php /path/to/check-completed-merchants.php
  */
 require_once __DIR__ . '/config.php';
 
@@ -21,42 +20,19 @@ try {
     // موجود مسبقاً
 }
 
-// ─── حساب يوم العودة الشهري ───────────────────────────────────────────────────
-// اليوم المستهدف هو 30، إلا إذا كان الشهر أقصر (مثل فبراير) فيُستخدم آخر يوم فيه.
-$lastDayOfMonth = (int) date('d', strtotime('last day of this month'));
-$targetDay      = min(30, $lastDayOfMonth);
-$todayDay       = (int) date('j');
-
-if ($todayDay < $targetDay) {
-    // لم يحن وقت العودة الشهرية بعد
-    jsonResponse([
-        'success'          => true,
-        'message'          => 'ليس يوم العودة الشهرية بعد',
-        'updated'          => 0,
-        'target_day'       => $targetDay,
-        'today_day'        => $todayDay,
-        'checked_at'       => date('Y-m-d H:i:s'),
-    ]);
-    exit;
-}
-
-// ─── نقل المنجزات إلى قيد المكالمة ──────────────────────────────────────────
-// يُستثنى ما أُكمل اليوم (last_call_date = CURDATE) حتى لا يُعاد فوراً.
 $sql = "UPDATE store_states
     SET category       = 'active_pending_calls',
         last_call_date = NULL
-    WHERE category = 'completed'
+    WHERE category IN ('completed', 'unreachable')
       AND (last_call_date IS NULL OR DATE(last_call_date) < CURDATE())";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute();
-$n = $stmt->rowCount();
+$n = (int) $stmt->rowCount();
 
 jsonResponse([
     'success'    => true,
-    'message'    => "تمت إعادة المتاجر المنجزة في يوم {$targetDay} من الشهر",
-    'updated'    => $n !== false ? (int) $n : 0,
-    'target_day' => $targetDay,
-    'today_day'  => $todayDay,
+    'message'    => 'تمت إعادة المتاجر المنجزة وغير المتاحة إلى قيد المكالمة',
+    'updated'    => $n,
     'checked_at' => date('Y-m-d H:i:s'),
 ]);
