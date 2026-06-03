@@ -263,6 +263,28 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     finally { setSaving(false) }
   }
 
+  async function handleBulkUnassign() {
+    if (selectedIds.size === 0) return
+    setSaving(true)
+    try {
+      const storeMap = Object.fromEntries(active.map(s => [s.id, s]))
+      await Promise.all(
+        [...selectedIds].map(id =>
+          assignStore({
+            store_id:    id,
+            store_name:  storeMap[id]?.name || '',
+            assigned_to: '',
+            assigned_by: user?.fullname || user?.username || '',
+          })
+        )
+      )
+      await reload()
+      showSuccess(`تم إلغاء تعيين ${selectedIds.size} متجر`)
+      clearSelection()
+    } catch (e) { console.error(e) }
+    finally { setSaving(false) }
+  }
+
   // توزيع تلقائي (round-robin بين اليوزرات المحددة)
   async function handleAutoAssign() {
     const targets = [...autoUsers]
@@ -892,7 +914,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           </div>
 
           {/* تبويب وضع التعيين */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setAssignMode('manual')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -914,6 +936,14 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             >
               <Shuffle size={13} />
               توزيع تلقائي
+            </button>
+            <button
+              onClick={handleBulkUnassign}
+              disabled={saving === true}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              <X size={13} />
+              إلغاء التعيين ({selectedIds.size})
             </button>
           </div>
 
