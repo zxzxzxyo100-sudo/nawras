@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ─── إعدادات ──────────────────────────────────────────────────────────────────
-define('EW_THRESHOLD',        10);    // الحد الأدنى للتراجع المطلق (طلبات)
+define('EW_THRESHOLD',        1);     // أي تراجع ولو طلب واحد
 define('EW_TODAY_CACHE_TTL',  3600);  // كاش اليوم: ساعة واحدة
 define('EW_MAX_PAGES',        200);
 

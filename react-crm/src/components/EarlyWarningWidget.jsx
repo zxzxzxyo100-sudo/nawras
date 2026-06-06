@@ -111,14 +111,14 @@ export default function EarlyWarningWidget() {
 
           {!loading && !error && !hasWarnings && (
             <p className="text-sm text-emerald-700 py-3 text-center font-medium">
-              لا توجد تحذيرات — لا يوجد متجر تراجع بـ {data?.threshold}+ طلبات عن أمس
+              لا توجد تحذيرات — جميع المتاجر مستقرة أو في تحسّن عن أمس
             </p>
           )}
 
           {!loading && !error && hasWarnings && (
             <>
               <p className="text-[11px] text-slate-500 mb-2">
-                متاجر تراجعت بـ {data?.threshold}+ طلبات عن أمس ·{' '}
+                متاجر تراجعت طلباتها عن أمس ·{' '}
                 <span className="text-red-600 font-semibold">■</span> ≥50%{' '}
                 <span className="text-orange-500 font-semibold">■</span> ≥25%{' '}
                 <span className="text-amber-500 font-semibold">■</span> أقل
