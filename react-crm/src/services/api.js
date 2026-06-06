@@ -134,8 +134,8 @@ export const getOrdersSummaryRange = (from, to) =>
     .then(r => r.data)
 
 /** نظام الإنذار المبكر: متاجر انخفضت طلباتها اليوم مقارنةً بالأمس (10+ طلبات أمس) */
-export const getEarlyWarning = () =>
-  http.get('/early-warning.php').then(r => r.data)
+export const getEarlyWarning = (force = false) =>
+  http.get('/early-warning.php' + (force ? '?force=1' : '')).then(r => r.data)
 
 /** إعادة متاجر «منجز» و/أو «unreachable» إلى «قيد المتابعة» يدوياً */
 export const resetActiveStores = (type, username) =>

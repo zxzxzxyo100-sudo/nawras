@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // ─── إعدادات ──────────────────────────────────────────────────────────────────
 define('EW_THRESHOLD',        1);     // أي تراجع ولو طلب واحد
-define('EW_TODAY_CACHE_TTL',  3600);  // كاش اليوم: ساعة واحدة
+define('EW_TODAY_CACHE_TTL',  900);   // كاش اليوم: 15 دقيقة
 define('EW_MAX_PAGES',        200);
 
 $today     = date('Y-m-d');
@@ -77,8 +77,13 @@ function ew_load_day(string $date, string $file, int $ttl): array {
 }
 
 // ─── جلب البيانات ─────────────────────────────────────────────────────────────
-$yesterdayCounts = ew_load_day($yesterday, $yesterdayFile, 0);              // كاش دائم
-$todayCounts     = ew_load_day($today,     $todayFile,     EW_TODAY_CACHE_TTL); // كاش ساعة
+$forceRefresh = !empty($_GET['force']) || !empty($_GET['nocache']);
+if ($forceRefresh && file_exists($todayFile)) {
+    @unlink($todayFile);
+}
+
+$yesterdayCounts = ew_load_day($yesterday, $yesterdayFile, 0);
+$todayCounts     = ew_load_day($today,     $todayFile,     EW_TODAY_CACHE_TTL);
 
 // ─── بناء قائمة التحذيرات ─────────────────────────────────────────────────────
 $warnings = [];

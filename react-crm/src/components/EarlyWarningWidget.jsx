@@ -15,11 +15,11 @@ export default function EarlyWarningWidget() {
   const [expanded, setExpanded] = useState(true)
   const [showAll,  setShowAll]  = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await getEarlyWarning()
+      const res = await getEarlyWarning(force)
       if (res?.success) setData(res)
       else setError('تعذّر جلب البيانات من الخادم')
     } catch (e) {
@@ -83,7 +83,7 @@ export default function EarlyWarningWidget() {
           )}
           <button
             type="button"
-            onClick={e => { e.stopPropagation(); load() }}
+            onClick={e => { e.stopPropagation(); load(true) }}
             disabled={loading}
             className="p-1 rounded-lg hover:bg-black/5 transition-colors"
             title="تحديث"
