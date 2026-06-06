@@ -1,8 +1,8 @@
 <?php
 /**
  * early-warning.php
- * نظام الإنذار المبكر: يقارن طلبات اليوم بأمس لكل متجر.
- * يُنبّه عند انخفاض طلبات متجر (لديه 10+ طرود أمس) مقارنةً باليوم.
+ * نظام الإنذار المبكر: يقارن طلبات أمس بقبل أمس لكل متجر.
+ * يُنبّه عند انخفاض طلبات أمس عن قبل أمس.
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/nawris-orders-summary-core.php';
@@ -20,20 +20,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ─── إعدادات ──────────────────────────────────────────────────────────────────
-define('EW_THRESHOLD',        1);     // أي تراجع ولو طلب واحد
-define('EW_TODAY_CACHE_TTL',  900);   // كاش اليوم: 15 دقيقة
-define('EW_MAX_PAGES',        200);
+define('EW_THRESHOLD',     1);    // أي تراجع ولو طلب واحد
+define('EW_CACHE_TTL',     0);    // كلا اليومين كاش دائم (أيام كاملة منتهية)
+define('EW_MAX_PAGES',     200);
 
-$today     = date('Y-m-d');
-$yesterday = date('Y-m-d', strtotime('-1 day'));
+$yesterday  = date('Y-m-d', strtotime('-1 day'));
+$dayBefore  = date('Y-m-d', strtotime('-2 days'));
 
 $cacheDir = __DIR__ . '/cache';
 if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0755, true);
 }
 
-$yesterdayFile = $cacheDir . '/ew_yesterday_' . $yesterday . '.json';
-$todayFile     = $cacheDir . '/ew_today_'     . $today     . '.json';
+$yesterdayFile = $cacheDir . '/ew_day_' . $yesterday . '.json';
+$dayBeforeFile = $cacheDir . '/ew_day_' . $dayBefore . '.json';
 
 // ─── دالة تحليل نتيجة الـ API ─────────────────────────────────────────────────
 function ew_extract_counts(array $storeMap): array {
@@ -49,24 +49,16 @@ function ew_extract_counts(array $storeMap): array {
 }
 
 // ─── جلب أو كاش بيانات يوم معيّن ─────────────────────────────────────────────
-function ew_load_day(string $date, string $file, int $ttl): array {
-    if (file_exists($file)) {
-        $age = time() - (int) filemtime($file);
-        if ($ttl === 0 || $age < $ttl) {  // ttl=0 → دائم (أمس)
-            $raw = @file_get_contents($file);
-            if ($raw !== false) {
-                $data = json_decode($raw, true);
-                if (is_array($data)) {
-                    return $data;
-                }
-            }
+function ew_load_day(string $date, string $file, bool $force = false): array {
+    if (!$force && file_exists($file)) {
+        $raw = @file_get_contents($file);
+        if ($raw !== false) {
+            $data = json_decode($raw, true);
+            if (is_array($data)) return $data;
         }
     }
 
-    // جلب من Nawris API
     $result = nawris_orders_summary_fetch_all($date, $date, EW_MAX_PAGES, true);
-
-    // إذا فشل SSL حاول بدون تحقق
     if (!($result['meta']['ok'] ?? false) && !empty($result['meta']['curl_errno'])) {
         $result = nawris_orders_summary_fetch_all($date, $date, EW_MAX_PAGES, false);
     }
@@ -78,55 +70,47 @@ function ew_load_day(string $date, string $file, int $ttl): array {
 
 // ─── جلب البيانات ─────────────────────────────────────────────────────────────
 $forceRefresh = !empty($_GET['force']) || !empty($_GET['nocache']);
-if ($forceRefresh && file_exists($todayFile)) {
-    @unlink($todayFile);
-}
 
-$yesterdayCounts = ew_load_day($yesterday, $yesterdayFile, 0);
-$todayCounts     = ew_load_day($today,     $todayFile,     EW_TODAY_CACHE_TTL);
+// أمس وقبل أمس — كلاهما يوم منتهٍ، الكاش دائم إلا عند force
+$yesterdayCounts = ew_load_day($yesterday, $yesterdayFile, $forceRefresh);
+$dayBeforeCounts = ew_load_day($dayBefore, $dayBeforeFile, false);
 
 // ─── بناء قائمة التحذيرات ─────────────────────────────────────────────────────
+// المرجع: قبل أمس | المقارنة: أمس
 $warnings = [];
 
-foreach ($yesterdayCounts as $sid => $yData) {
-    $yCount = $yData['count'];
-    $tCount = isset($todayCounts[$sid]) ? $todayCounts[$sid]['count'] : 0;
-    $drop   = $yCount - $tCount;
+foreach ($dayBeforeCounts as $sid => $dbData) {
+    $dbCount = $dbData['count'];                                        // قبل أمس
+    $yCount  = isset($yesterdayCounts[$sid]) ? $yesterdayCounts[$sid]['count'] : 0; // أمس
+    $drop    = $dbCount - $yCount;
 
-    if ($drop < EW_THRESHOLD) {
-        continue;
-    }
+    if ($drop < EW_THRESHOLD) continue;
 
-    $dropPercent = $yCount > 0 ? (int) round(($drop / $yCount) * 100) : 100;
+    $dropPercent = $dbCount > 0 ? (int) round(($drop / $dbCount) * 100) : 100;
 
     $warnings[] = [
-        'store_id'        => $sid,
-        'store_name'      => $yData['name'],
-        'yesterday_count' => $yCount,
-        'today_count'     => $tCount,
-        'drop'            => $drop,
-        'drop_percent'    => $dropPercent,
+        'store_id'          => $sid,
+        'store_name'        => $dbData['name'],
+        'day_before_count'  => $dbCount,
+        'yesterday_count'   => $yCount,
+        'drop'              => $drop,
+        'drop_percent'      => $dropPercent,
     ];
 }
 
-// ترتيب: الأكبر انخفاضاً أولاً
 usort($warnings, fn ($a, $b) => $b['drop'] - $a['drop']);
 
 // ─── إحصائيات ─────────────────────────────────────────────────────────────────
-$totalYesterday   = array_sum(array_column($yesterdayCounts, 'count'));
-$totalToday       = array_sum(array_column($todayCounts,     'count'));
-$cachedTodayFresh = file_exists($todayFile) && (time() - (int) filemtime($todayFile)) < EW_TODAY_CACHE_TTL;
+$totalDayBefore  = array_sum(array_column($dayBeforeCounts,  'count'));
+$totalYesterday  = array_sum(array_column($yesterdayCounts,  'count'));
 
 echo json_encode([
-    'success'          => true,
-    'warnings'         => $warnings,
-    'total_warnings'   => count($warnings),
-    'threshold'        => EW_THRESHOLD,
-    'today'            => $today,
-    'yesterday'        => $yesterday,
-    'total_yesterday'  => $totalYesterday,
-    'total_today'      => $totalToday,
-    'cached_today'     => $cachedTodayFresh,
-    'cached_yesterday' => file_exists($yesterdayFile),
-    'cache_age_today'  => file_exists($todayFile) ? (time() - (int) filemtime($todayFile)) : null,
+    'success'         => true,
+    'warnings'        => $warnings,
+    'total_warnings'  => count($warnings),
+    'threshold'       => EW_THRESHOLD,
+    'yesterday'       => $yesterday,
+    'day_before'      => $dayBefore,
+    'total_yesterday' => $totalYesterday,
+    'total_day_before'=> $totalDayBefore,
 ], JSON_UNESCAPED_UNICODE);

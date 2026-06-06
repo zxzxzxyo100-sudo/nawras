@@ -31,12 +31,11 @@ export default function EarlyWarningWidget() {
 
   useEffect(() => { load() }, [load])
 
-  const warnings = data?.warnings ?? []
-  const visible  = showAll ? warnings : warnings.slice(0, 8)
-  const hasMore  = warnings.length > 8
+  const warnings   = data?.warnings ?? []
+  const visible    = showAll ? warnings : warnings.slice(0, 8)
+  const hasMore    = warnings.length > 8
   const hasWarnings = warnings.length > 0
 
-  // لون رأس الودجت حسب الحالة
   const headerBg = loading
     ? 'from-slate-50 to-white'
     : error
@@ -63,7 +62,6 @@ export default function EarlyWarningWidget() {
 
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white/80 backdrop-blur-sm shadow-sm overflow-hidden" dir="rtl">
-      {/* رأس الودجت */}
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
@@ -76,9 +74,8 @@ export default function EarlyWarningWidget() {
         <div className="flex items-center gap-2">
           {data && (
             <span className="text-[10px] text-slate-400 hidden sm:block">
-              أمس: {data.total_yesterday?.toLocaleString('ar-SA')} طرد
-              {' · '}اليوم: {data.total_today?.toLocaleString('ar-SA')} طرد
-              {data.cached_today ? ' · (مؤقت)' : ''}
+              قبل أمس: {data.total_day_before?.toLocaleString('ar-SA')} طرد
+              {' · '}أمس: {data.total_yesterday?.toLocaleString('ar-SA')} طرد
             </span>
           )}
           <button
@@ -101,7 +98,7 @@ export default function EarlyWarningWidget() {
         <div className="px-4 pb-4 pt-2">
           {loading && (
             <p className="text-xs text-slate-400 text-center py-4">
-              جارٍ مقارنة بيانات اليوم بأمس — قد يستغرق حتى دقيقة...
+              جارٍ مقارنة أمس بقبل أمس — قد يستغرق حتى دقيقة...
             </p>
           )}
 
@@ -111,14 +108,14 @@ export default function EarlyWarningWidget() {
 
           {!loading && !error && !hasWarnings && (
             <p className="text-sm text-emerald-700 py-3 text-center font-medium">
-              لا توجد تحذيرات — جميع المتاجر مستقرة أو في تحسّن عن أمس
+              لا توجد تحذيرات — جميع المتاجر مستقرة أو في تحسّن عن قبل أمس
             </p>
           )}
 
           {!loading && !error && hasWarnings && (
             <>
               <p className="text-[11px] text-slate-500 mb-2">
-                متاجر تراجعت طلباتها عن أمس ·{' '}
+                متاجر تراجعت طلبات أمس عن قبل أمس ·{' '}
                 <span className="text-red-600 font-semibold">■</span> ≥50%{' '}
                 <span className="text-orange-500 font-semibold">■</span> ≥25%{' '}
                 <span className="text-amber-500 font-semibold">■</span> أقل
@@ -139,9 +136,9 @@ export default function EarlyWarningWidget() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 text-xs tabular-nums">
-                        <span className="text-slate-500">أمس: <b className="text-slate-700">{w.yesterday_count}</b></span>
+                        <span className="text-slate-500">قبل أمس: <b className="text-slate-700">{w.day_before_count}</b></span>
                         <TrendingDown size={12} className={s.text} />
-                        <span className="text-slate-500">اليوم: <b className={s.text}>{w.today_count}</b></span>
+                        <span className="text-slate-500">أمس: <b className={s.text}>{w.yesterday_count}</b></span>
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full font-bold text-[11px] ${s.badge}`}>
                           ↓{w.drop_percent}%
                         </span>
