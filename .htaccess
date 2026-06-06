@@ -33,4 +33,7 @@ php_value max_execution_time 120
         Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
         Header set Access-Control-Allow-Headers "Content-Type"
     </FilesMatch>
+    # Disable QUIC/HTTP3 to prevent ERR_QUIC_PROTOCOL_ERROR
+    Header always unset alt-svc
+    Header always unset Alt-Svc
 </IfModule>
