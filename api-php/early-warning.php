@@ -32,8 +32,8 @@ if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0755, true);
 }
 
-$yesterdayFile = $cacheDir . '/ew_day_' . $yesterday . '.json';
-$dayBeforeFile = $cacheDir . '/ew_day_' . $dayBefore . '.json';
+$yesterdayFile = $cacheDir . '/ew_v2_' . $yesterday . '.json';
+$dayBeforeFile = $cacheDir . '/ew_v2_' . $dayBefore . '.json';
 
 // ─── دالة تحليل نتيجة الـ API ─────────────────────────────────────────────────
 function ew_extract_counts(array $storeMap): array {
@@ -42,7 +42,7 @@ function ew_extract_counts(array $storeMap): array {
         $out[(int) $sid] = [
             'id'    => (int) $sid,
             'name'  => $store['name'] ?? ('#' . $sid),
-            'count' => (int) ($store['total_shipments'] ?? 0),
+            'count' => (int) ($store['shipments_in_range'] ?? 0),
         ];
     }
     return $out;
