@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ─── إعدادات ──────────────────────────────────────────────────────────────────
-define('EW_THRESHOLD',        10);    // الحد الأدنى لطلبات أمس
+define('EW_THRESHOLD',        10);    // الحد الأدنى للتراجع المطلق (طلبات)
 define('EW_TODAY_CACHE_TTL',  3600);  // كاش اليوم: ساعة واحدة
 define('EW_MAX_PAGES',        200);
 
@@ -85,25 +85,23 @@ $warnings = [];
 
 foreach ($yesterdayCounts as $sid => $yData) {
     $yCount = $yData['count'];
-    if ($yCount < EW_THRESHOLD) {
+    $tCount = isset($todayCounts[$sid]) ? $todayCounts[$sid]['count'] : 0;
+    $drop   = $yCount - $tCount;
+
+    if ($drop < EW_THRESHOLD) {
         continue;
     }
 
-    $tCount = isset($todayCounts[$sid]) ? $todayCounts[$sid]['count'] : 0;
+    $dropPercent = $yCount > 0 ? (int) round(($drop / $yCount) * 100) : 100;
 
-    if ($tCount < $yCount) {
-        $drop        = $yCount - $tCount;
-        $dropPercent = (int) round(($drop / $yCount) * 100);
-
-        $warnings[] = [
-            'store_id'        => $sid,
-            'store_name'      => $yData['name'],
-            'yesterday_count' => $yCount,
-            'today_count'     => $tCount,
-            'drop'            => $drop,
-            'drop_percent'    => $dropPercent,
-        ];
-    }
+    $warnings[] = [
+        'store_id'        => $sid,
+        'store_name'      => $yData['name'],
+        'yesterday_count' => $yCount,
+        'today_count'     => $tCount,
+        'drop'            => $drop,
+        'drop_percent'    => $dropPercent,
+    ];
 }
 
 // ترتيب: الأكبر انخفاضاً أولاً
