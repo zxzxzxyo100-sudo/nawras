@@ -327,18 +327,12 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
    * لم يُحمَّل بعد أو فشل الطلب — فيُعرض ~كل المتاجر ويبدو أن الإنجاز لا يزيل الصفوف).
    */
   const storesForTable = useMemo(() => {
-    if (isRecoveryTab) {
-      return filteredStores
-    }
-    if (user?.role === 'inactive_manager' && recoveryTasksHotQueue) {
-      if (inactiveWfSummary === undefined || inactiveWfSummary === null) return []
-      return managerBatchStores ?? []
-    }
-    if (managerBatchStores === null || managerBatchStores === undefined) {
-      return filteredStores
-    }
+    if (isRecoveryTab) return filteredStores
+    // صفحة المهام لمسؤول الاستعادة: كل المتاجر الساخنة غير المستعادة بعد
+    if (user?.role === 'inactive_manager' && recoveryTasksHotQueue) return filteredStores
+    if (managerBatchStores === null || managerBatchStores === undefined) return filteredStores
     return managerBatchStores
-  }, [user?.role, recoveryTasksHotQueue, inactiveWfSummary, managerBatchStores, filteredStores, isRecoveryTab])
+  }, [user?.role, recoveryTasksHotQueue, managerBatchStores, filteredStores, isRecoveryTab])
 
   const dq = inactiveWfSummary?.daily_quota
   const quotaCount =
