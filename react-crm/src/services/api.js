@@ -256,6 +256,10 @@ export const fillAllInactiveQueues = (data) =>
 export const refreshStorePool = () =>
   http.get('/all-stores.php', { timeout: 120000 }).then(r => r.data)
 
+/** تحرير سجلات الاستعادة المكتملة/لم يرد + إعادة ملء الطوابير (executive فقط) */
+export const resetInactivePool = (data) =>
+  http.post('/reset-inactive-pool.php', data).then(r => r.data)
+
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
 

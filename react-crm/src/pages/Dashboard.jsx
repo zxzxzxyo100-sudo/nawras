@@ -15,7 +15,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse, fillAllInactiveQueues, refreshStorePool } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse, fillAllInactiveQueues, refreshStorePool, resetInactivePool } from '../services/api'
 import EarlyWarningWidget from '../components/EarlyWarningWidget'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
@@ -186,18 +186,30 @@ export default function Dashboard() {
   async function handleRefreshPool() {
     if (poolRefreshing) return
     setPoolRefreshing(true)
-    setPoolMsg('')
+    setPoolMsg('جارٍ تحرير السجلات القديمة…')
     try {
-      const res = await refreshStorePool()
-      const hotCount = res?.counts?.hot_inactive ?? res?.counts?.hot ?? null
-      await fillAllInactiveQueues({ user_role: 'executive', assigned_by: user?.username || '' })
+      // 1. حذف سجلات الاستعادة المكتملة/لم يرد + ملء أولي
+      const resetRes = await resetInactivePool({ user_role: 'executive', assigned_by: user?.username || '' })
+      const cleared = resetRes?.cleared ?? 0
+      const filled1 = resetRes?.filled ?? 0
+      setPoolMsg(`تم تحرير ${cleared} سجل — جارٍ تحديث بيانات المتاجر (30-90 ث)…`)
+      // 2. تحديث كامل لكاش المتاجر (يُعيد بناء inactive_recovery_pool.json)
+      const storeRes = await refreshStorePool()
+      const hotCount = storeRes?.counts?.hot_inactive ?? null
+      // 3. إعادة ملء الطوابير من المجمع الجديد
+      const fillRes = await fillAllInactiveQueues({ user_role: 'executive', assigned_by: user?.username || '' })
+      const filled2 = Object.values(fillRes?.filled_inactive_per_user || {}).reduce((a, b) => a + b, 0)
       await reload()
-      setPoolMsg(`تم تحديث المجمع بنجاح${hotCount != null ? ` — ${hotCount} متجر ساخن متاح` : ''}`)
+      const totalFilled = filled1 + filled2
+      setPoolMsg(
+        `تم بنجاح — حُرِّر ${cleared} سجل، أُضيف ${totalFilled} متجر للطوابير` +
+        (hotCount != null ? ` — المجمع: ${hotCount} ساخن` : '')
+      )
     } catch (e) {
       setPoolMsg('خطأ أثناء تحديث المجمع — حاول مرة أخرى')
     } finally {
       setPoolRefreshing(false)
-      setTimeout(() => setPoolMsg(''), 6000)
+      setTimeout(() => setPoolMsg(''), 8000)
     }
   }
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
