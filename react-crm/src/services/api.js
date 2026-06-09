@@ -252,6 +252,10 @@ export const getDailyQuota = username =>
 export const fillAllInactiveQueues = (data) =>
   http.post('/active-workflow.php?action=fill_all_inactive_queues', data).then(r => r.data)
 
+/** تحديث كامل لبيانات المتاجر + مجمع الاستعادة — يستغرق 30-90 ثانية */
+export const refreshStorePool = () =>
+  http.get('/all-stores.php', { timeout: 120000 }).then(r => r.data)
+
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
 

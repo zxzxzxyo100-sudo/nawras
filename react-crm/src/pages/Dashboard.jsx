@@ -15,7 +15,7 @@ import {
 import { useStores } from '../contexts/StoresContext'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import StoreNameWithId from '../components/StoreNameWithId'
-import { getDailyStaffSatisfaction, getQuickVerificationBourse } from '../services/api'
+import { getDailyStaffSatisfaction, getQuickVerificationBourse, fillAllInactiveQueues, refreshStorePool } from '../services/api'
 import EarlyWarningWidget from '../components/EarlyWarningWidget'
 import ExecutivePrivateTicketsSection from '../components/ExecutivePrivateTicketsSection'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from '../components/NawrasBrandBackdrop'
@@ -121,6 +121,8 @@ export default function Dashboard() {
   const [staffMissions, setStaffMissions] = useState(null)
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
+  const [poolRefreshing, setPoolRefreshing] = useState(false)
+  const [poolMsg, setPoolMsg] = useState('')
   const [freezeQvPending, setFreezeQvPending] = useState(null)
   const loadFreezeQvPending = useCallback(async () => {
     if (!isExecutive) {
@@ -178,6 +180,24 @@ export default function Dashboard() {
     void loadFreezeQvPending()
     if (isExecutive && !IS_STAGING_OR_DEV) {
       void loadStaffSatisfaction()
+    }
+  }
+
+  async function handleRefreshPool() {
+    if (poolRefreshing) return
+    setPoolRefreshing(true)
+    setPoolMsg('')
+    try {
+      const res = await refreshStorePool()
+      const hotCount = res?.counts?.hot_inactive ?? res?.counts?.hot ?? null
+      await fillAllInactiveQueues({ user_role: 'executive', assigned_by: user?.username || '' })
+      await reload()
+      setPoolMsg(`تم تحديث المجمع بنجاح${hotCount != null ? ` — ${hotCount} متجر ساخن متاح` : ''}`)
+    } catch (e) {
+      setPoolMsg('خطأ أثناء تحديث المجمع — حاول مرة أخرى')
+    } finally {
+      setPoolRefreshing(false)
+      setTimeout(() => setPoolMsg(''), 6000)
     }
   }
   // ── بيانات سير العمل (آخر 7 أيام) ─────────────────────────────
@@ -465,6 +485,36 @@ export default function Dashboard() {
       {(isExecutive || user?.role === 'active_manager') && (
         <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ duration: 0.4, delay: 0.12 }}>
           <EarlyWarningWidget />
+        </motion.div>
+      )}
+
+      {isExecutive && (
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ duration: 0.4, delay: 0.14 }}>
+          <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-l from-amber-50/80 to-white px-4 py-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" dir="rtl">
+            <div>
+              <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <Flame size={15} className="text-amber-600 shrink-0" />
+                مجمع الاستعادة — غير نشط ساخن
+              </h3>
+              <p className="text-[11px] text-amber-800/80 mt-0.5">
+                تحديث بيانات المتاجر + إعادة ملء طوابير مسؤولي الاستعادة من المجمع الجديد.
+              </p>
+              {poolMsg && (
+                <p className={`text-[11px] mt-1 font-semibold ${poolMsg.startsWith('خطأ') ? 'text-red-600' : 'text-emerald-700'}`}>
+                  {poolMsg}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleRefreshPool}
+              disabled={poolRefreshing}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-700 border border-amber-300 bg-white hover:bg-amber-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={poolRefreshing ? 'animate-spin' : ''} />
+              {poolRefreshing ? 'جارٍ التحديث (30-90 ث)…' : 'تحديث المجمع'}
+            </button>
+          </div>
         </motion.div>
       )}
 
