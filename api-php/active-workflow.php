@@ -464,7 +464,14 @@ elseif ($action === 'inactive_followup_success') {
     $chk->execute([$sid, $username]);
     $ws = (string) ($chk->fetchColumn() ?: '');
     if ($ws === '') {
-        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
+        // إذا كان المتجر hot_inactive بدون تعيين لهذا المستخدم، عيّنه تلقائياً
+        $ssChk = $pdo->prepare("SELECT store_id FROM store_states WHERE store_id = ? AND category = 'hot_inactive' LIMIT 1");
+        $ssChk->execute([$storeId]);
+        if (!$ssChk->fetchColumn()) {
+            jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
+        }
+        assign_inactive_store_to_user($pdo, $storeId, $storeName, $username, 'system');
+        $ws = 'active';
     }
 
     if ($ws === 'active' || $ws === 'no_answer') {
