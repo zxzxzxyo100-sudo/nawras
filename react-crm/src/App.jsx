@@ -24,6 +24,7 @@ import TeamPerformanceStatistics from './pages/TeamPerformanceStatistics'
 import ConversionRateReport from './pages/ConversionRateReport'
 import SatisfactionReport from './pages/SatisfactionReport'
 import RecoveryReport from './pages/RecoveryReport'
+import IncubationCallsReport from './pages/IncubationCallsReport'
 import Tasks from './pages/Tasks'
 import LeadManagement from './pages/LeadManagement'
 import LeadsPortal from './pages/LeadsPortal'
@@ -150,6 +151,10 @@ function AppRoutes() {
         <Route
           path="/staff-performance/recovery-report"
           element={<PrivateRoute view="staff_performance"><RecoveryReport /></PrivateRoute>}
+        />
+        <Route
+          path="/staff-performance/incubation-calls-report"
+          element={<PrivateRoute view="staff_performance"><IncubationCallsReport /></PrivateRoute>}
         />
         <Route
           path="/staff-performance"
