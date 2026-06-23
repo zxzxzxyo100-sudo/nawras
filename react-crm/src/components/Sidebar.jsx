@@ -427,6 +427,7 @@ const STAFF_PERFORMANCE_SUB = [
   { to: '/staff-performance/recovery-report', label: 'تقرير الاستعادة', kind: 'recovery' },
   { to: '/staff-performance/conversion-report', label: 'تقرير نسبة التحويل', kind: 'conversion' },
   { to: '/staff-performance/satisfaction-report', label: 'تقرير معدل الرضا', kind: 'satisfaction' },
+  { to: '/staff-performance/incubation-calls-report', label: 'تقرير مكالمات الاحتضان', kind: 'incubation_calls' },
 ]
 
 function staffPerfSubActive(kind, pathname) {
@@ -437,6 +438,7 @@ function staffPerfSubActive(kind, pathname) {
   if (kind === 'recovery') return pathname.startsWith('/staff-performance/recovery-report')
   if (kind === 'conversion') return pathname.startsWith('/staff-performance/conversion-report')
   if (kind === 'satisfaction') return pathname.startsWith('/staff-performance/satisfaction-report')
+  if (kind === 'incubation_calls') return pathname.startsWith('/staff-performance/incubation-calls-report')
   return false
 }
 

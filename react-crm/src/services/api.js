@@ -378,6 +378,18 @@ export const getRecoveryReport = (opts = {}) =>
     })
     .then(r => r.data)
 
+/** تقرير مكالمات الاحتضان (الأولى/الثانية/الثالثة) — للمدير التنفيذي */
+export const getIncubationCallsReport = (opts = {}) =>
+  http
+    .get('/incubation-calls-report.php', {
+      params: {
+        user_role: 'executive',
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+      },
+    })
+    .then(r => r.data)
+
 // ─── مهام يومية (إخفاء «تم») ────────────────────────────────────────────────
 export const getDailyTaskDismissals = (username, date) =>
   http
