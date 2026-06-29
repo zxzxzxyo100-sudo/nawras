@@ -527,9 +527,13 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     if (!isPendingTab || !isActiveManager || !user?.username) return null
     const base = workflowPendingForUser
     if (!activeWf) return base
-    if (activeWf.daily_quota?.quota_reached) return []
-    /** قيد المتابعة = active_tasks فقط — no_answer_tasks تظهر في تبويب «لم يتم الوصول» */
-    const apiActive = (activeWf.active_tasks || []).map(t => ({ task: t, noAnswer: false }))
+    /**
+     * قيد المتابعة = كل التعيينات النشطة غير المنجزة (workflow_status = active) — بلا حصر بحصة اليوم
+     * ولا استثناء VIP. «لم يرد» و«المنجزة» تظهر في تبويباتها. المصدر all_assigned_tasks (الأشمل).
+     */
+    const apiActive = (activeWf.all_assigned_tasks || [])
+      .filter(t => (t.workflow_status ?? 'active') === 'active')
+      .map(t => ({ task: t, noAnswer: false }))
     const tasks = [...apiActive]
     if (tasks.length === 0) return base
 
@@ -1136,7 +1140,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             )
           )}
 
-          {!activeDailyQuota?.quota_reached && !isExecutive && (
+          {!isExecutive && (
           <StoreTable
             variant="elite"
             stores={pendingDisplayStores}

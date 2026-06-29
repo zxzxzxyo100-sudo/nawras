@@ -286,6 +286,8 @@ if ($action === 'get_my_workflow') {
     ");
     $stAllAssigned->execute([$username]);
     $allAssignedTasks = $stAllAssigned->fetchAll(PDO::FETCH_ASSOC);
+    // إثراء بالهاتف/التسجيل/آخر شحنة/الشحنات حتى تكتمل صفوف «قيد المتابعة» المبنية من هذا المصدر
+    $allAssignedTasks = wf_enrich_workflow_tasks_from_lite($allAssignedTasks);
 
     $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
