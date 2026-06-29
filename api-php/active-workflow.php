@@ -464,10 +464,10 @@ elseif ($action === 'inactive_followup_success') {
     $chk->execute([$sid, $username]);
     $ws = (string) ($chk->fetchColumn() ?: '');
     if ($ws === '') {
-        // إذا كان المتجر ضمن مجمع الاستعادة (ساخن أو بارد) بدون تعيين لهذا المستخدم، عيّنه تلقائياً
-        $ssChk = $pdo->prepare("SELECT store_id FROM store_states WHERE store_id = ? AND category IN ('hot_inactive','cold_inactive') LIMIT 1");
-        $ssChk->execute([$storeId]);
-        if (!$ssChk->fetchColumn()) {
+        // إذا كان المتجر ضمن مجمع الاستعادة (ساخن أو بارد) بدون تعيين لهذا المستخدم، عيّنه تلقائياً.
+        // نعتمد cache/inactive_recovery_pool.json (تصنيف دورة الحياة كالواجهة) لا store_states وحده،
+        // لأن متاجر «recovery_warm» تظهر «غير نشط ساخن» دون صف مطابق في store_states.
+        if (!wf_is_store_in_inactive_recovery_pool($pdo, $storeId)) {
             jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
         }
         assign_inactive_store_to_user($pdo, $storeId, $storeName, $username, 'system');
