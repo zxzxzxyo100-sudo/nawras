@@ -84,6 +84,12 @@ function dedupeById(list) {
   })
 }
 
+/** للمتجر تاريخ آخر شحنة صالح؟ (نفس إشارة الخادم: «شحنت ثم توقفت» مقابل «لم تشحن أصلاً») */
+function hotStoreHasShipped(s) {
+  const d = s?.last_shipment_date
+  return Boolean(d && d !== 'لا يوجد')
+}
+
 function recoveryIdBadge(store, storeStates) {
   const st = storeStates[store.id]
   const cat = st?.category
@@ -158,6 +164,8 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
   const inactiveRowColors = useInactiveRowColors('hot')
   const [rowPaintMode, setRowPaintMode] = useState(false)
   const [rowColorKey, setRowColorKey] = useState('1')
+  /** فلتر تبويب «الكل»: تمييز سبب التحول لغير نشط ساخن — لم تشحن أصلاً (48 ساعة) مقابل توقفت عن الشحن (14 يوم) */
+  const [shipFilter, setShipFilter] = useState('all')
 
   const handlePaintClick = useCallback(
     store => {
@@ -333,6 +341,25 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
     if (managerBatchStores === null || managerBatchStores === undefined) return filteredStores
     return managerBatchStores
   }, [user?.role, recoveryTasksHotQueue, managerBatchStores, filteredStores, isRecoveryTab])
+
+  /** أعداد كل فئة (تبويب «الكل» فقط) — للأزرار */
+  const shipFilterCounts = useMemo(() => {
+    const rows = Array.isArray(storesForTable) ? storesForTable : []
+    let never = 0
+    let stopped = 0
+    for (const s of rows) {
+      if (hotStoreHasShipped(s)) stopped++
+      else never++
+    }
+    return { all: rows.length, never, stopped }
+  }, [storesForTable])
+
+  /** القائمة المعروضة بعد فلتر سبب التحول (الفلتر فعّال في تبويب «الكل» فقط) */
+  const displayedStores = useMemo(() => {
+    if (!isAllTab || shipFilter === 'all') return storesForTable
+    const rows = Array.isArray(storesForTable) ? storesForTable : []
+    return rows.filter(s => (shipFilter === 'never' ? !hotStoreHasShipped(s) : hotStoreHasShipped(s)))
+  }, [storesForTable, shipFilter, isAllTab])
 
   const dq = inactiveWfSummary?.daily_quota
   const quotaCount =
@@ -646,10 +673,35 @@ export default function HotInactive({ embeddedRecoverySegment, recoveryTasksHotQ
       />
       )}
 
+      {isAllTab && !(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_target_reached) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">سبب التحول:</span>
+          {[
+            { key: 'all', label: 'الكل', count: shipFilterCounts.all },
+            { key: 'never', label: 'لم تشحن أصلاً (48 ساعة)', count: shipFilterCounts.never },
+            { key: 'stopped', label: 'توقفت عن الشحن (14 يوم)', count: shipFilterCounts.stopped },
+          ].map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setShipFilter(opt.key)}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition ${
+                shipFilter === opt.key
+                  ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {opt.label}
+              <span className="mr-1.5 tabular-nums opacity-70">({opt.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {!(user?.role === 'inactive_manager' && inactiveWfSummary?.daily_target_reached) && (
       <StoreTable
         variant="elite"
-        stores={storesForTable}
+        stores={displayedStores}
         onSelectStore={setSelected}
         onRestoreStore={setSelected}
         renderIdBadge={s => recoveryIdBadge(s, storeStates)}
