@@ -1098,13 +1098,15 @@ function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $s
         }
     }
 
+    // الحالات النهائية (frozen/restoring/completed/contacted) مُستبعَدة أعلاه بالفعل،
+    // فأي فئة أخرى (بما فيها فارغة/NULL/غير متوقعة) يجب أن تتحوّل إلى «لم يتم الوصول للمتجر»
+    // — لا نُقيّد بقائمة سماح لتفادي فشل صامت يُبقي المتجر ضمن «قيد المتابعة».
     $upd = $pdo->prepare("
         UPDATE store_states
         SET category = 'unreachable',
             last_call_date = NOW(),
             updated_by = ?
         WHERE store_id = ?
-        AND category IN ('active_pending_calls','active','active_shipping','unreachable','incubating')
     ");
     $upd->execute([$username, $storeId]);
     if ($upd->rowCount() > 0) {
@@ -1126,10 +1128,7 @@ function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $s
             } catch (Throwable $e2) {
             }
         }
-        return;
     }
-
-    // صف موجود لكن ليس ضمن مسار نشط يشحن — لا نغيّر الفئة (مثلاً inactive) لتجنّب أخطاء بيانات
 }
 
 /**
