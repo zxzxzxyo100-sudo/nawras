@@ -2,11 +2,14 @@
 /**
  * معدل الاحتفاظ بالعملاء (Customer Retention Rate) — من المتاجر النشطة.
  *
- * الفترة: الشهر الحالي (حتى اليوم) مقابل الشهر الماضي (كاملاً)، بتوقيت الرياض.
- * عميل "نشط" في فترة ما = متجر له طرد واحد على الأقل ضمن نطاق تلك الفترة (عبر orders-summary
- * الخاص بمنصة Nawris، بنفس منطق orders-summary.php).
+ * "نشط" هنا يطابق تعريف «نشط يشحن» في store-lifecycle-lib.php: متجر شحن خلال آخر 14 يوماً
+ * من تاريخ مرجعي معيّن (active_days = 14 — بعد يوم 15 يتحول إلى hot_inactive). نتحقق من ذلك عبر
+ * shipments_in_range ضمن نافذة متحركة من 14 يوماً تنتهي عند التاريخ المرجعي (بدل شهر تقويمي كامل).
  *
- * المعادلة: عدد المتاجر النشطة في كلا الفترتين (مستمرة) ÷ عدد المتاجر النشطة في بداية الفترة × 100.
+ * التاريخ المرجعي لبداية الفترة = نهاية الشهر الماضي (بداية الشهر الحالي). لنهاية الفترة = اليوم —
+ * لذلك «نشطون في نهاية الفترة» يطابق تقريباً عدّاد «نشط يشحن» الحي في الداشبورد.
+ *
+ * المعادلة: عدد المتاجر النشطة في كلا التاريخين المرجعيين (مستمرة) ÷ عدد المتاجر النشطة في بداية الفترة × 100.
  */
 require_once __DIR__ . '/config.php';
 
@@ -75,17 +78,29 @@ function retention_fetch_active_store_ids(string $from, string $to): array
     return array_keys($storeMap);
 }
 
+const ACTIVE_WINDOW_DAYS = 14;
+
 $tz  = new DateTimeZone('Asia/Riyadh');
 $now = new DateTimeImmutable('now', $tz);
 
 $currentMonthStart = $now->modify('first day of this month');
-$previousMonthEnd   = $currentMonthStart->modify('-1 day');
-$previousMonthStart = $previousMonthEnd->modify('first day of this month');
+$previousMonthEnd  = $currentMonthStart->modify('-1 day');
 
-$periodEndFrom = $currentMonthStart->format('Y-m-d');
-$periodEndTo   = $now->format('Y-m-d');
-$periodStartFrom = $previousMonthStart->format('Y-m-d');
-$periodStartTo   = $previousMonthEnd->format('Y-m-d');
+/** تاريخان مرجعيان: بداية الفترة (نهاية الشهر الماضي) ونهاية الفترة (اليوم) */
+$refStart = $previousMonthEnd;
+$refEnd   = $now;
+
+/** نافذة 14 يوماً تنتهي عند تاريخ مرجعي — تطابق تعريف daysSinceLast <= 14 */
+function retention_window(DateTimeImmutable $ref, int $days): array
+{
+    return [
+        $ref->modify('-' . ($days - 1) . ' days')->format('Y-m-d'),
+        $ref->format('Y-m-d'),
+    ];
+}
+
+[$periodStartFrom, $periodStartTo] = retention_window($refStart, ACTIVE_WINDOW_DAYS);
+[$periodEndFrom, $periodEndTo]     = retention_window($refEnd, ACTIVE_WINDOW_DAYS);
 
 $startIds = retention_fetch_active_store_ids($periodStartFrom, $periodStartTo);
 $endIds   = retention_fetch_active_store_ids($periodEndFrom, $periodEndTo);
@@ -103,12 +118,13 @@ echo json_encode([
     'retained_count'       => $retainedCount,
     'start_count'          => $startCount,
     'end_active_count'     => count($endIds),
-    'period_start_label'   => $previousMonthStart->format('Y/m'),
-    'period_end_label'     => $currentMonthStart->format('Y/m'),
+    'period_start_label'   => $refStart->format('Y-m-d'),
+    'period_end_label'     => $refEnd->format('Y-m-d'),
     'period_start_from'    => $periodStartFrom,
     'period_start_to'      => $periodStartTo,
     'period_end_from'      => $periodEndFrom,
     'period_end_to'        => $periodEndTo,
-    'rule'                 => 'نشط = طرد واحد على الأقل ضمن الفترة؛ الاحتفاظ = نشط في الفترتين ÷ نشط في بداية الفترة × 100',
+    'active_window_days'   => ACTIVE_WINDOW_DAYS,
+    'rule'                 => 'نشط = شحن ضمن آخر 14 يوماً من التاريخ المرجعي (نفس تعريف «نشط يشحن»)؛ الاحتفاظ = نشط عند التاريخين ÷ نشط في بداية الفترة × 100',
     'generated_at'         => date('c'),
 ], JSON_UNESCAPED_UNICODE);
