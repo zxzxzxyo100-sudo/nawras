@@ -43,6 +43,7 @@ jobs:
             **/node_modules/**
             api-php/config.php
             react-crm/**
+            android/**
             docs/**
             .cursor/**
             .claude/**
