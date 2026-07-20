@@ -60,7 +60,9 @@ function retention_fetch_active_store_ids(string $from, string $to): array
                 if ($sid === null) {
                     continue;
                 }
-                if ((int) ($store['total_shipments'] ?? 0) > 0) {
+                /* total_shipments هو إجمالي تاريخي غير مرتبط بـ from/to — لا يصلح لتحديد النشاط ضمن الفترة.
+                   shipments_in_range هو المرتبط فعلياً بنطاق التاريخ الممرَّر. */
+                if ((int) ($store['shipments_in_range'] ?? 0) > 0) {
                     $storeMap[(int) $sid] = true;
                 }
             }
