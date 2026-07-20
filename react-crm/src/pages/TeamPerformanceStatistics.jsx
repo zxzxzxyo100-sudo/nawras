@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart3, CalendarRange, FileSpreadsheet, ListTree, Package, RefreshCw, Store } from 'lucide-react'
+import { BarChart3, CalendarRange, FileSpreadsheet, ListTree, Package, RefreshCw, Repeat2, Store } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
-import { getRegistrationMonthStats } from '../services/api'
+import { getRegistrationMonthStats, getCustomerRetentionStats } from '../services/api'
 import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 /** تسميات مراحل المسار (_inc) — مطابقة لمنطق all-stores.php */
@@ -33,6 +33,39 @@ export default function TeamPerformanceStatistics() {
   const [dateFrom, setDateFrom] = useState(initRange.from)
   const [dateTo, setDateTo] = useState(initRange.to)
   const [rangeError, setRangeError] = useState(null)
+
+  const [retention, setRetention] = useState({
+    retention_percent: null,
+    retained_count: null,
+    start_count: null,
+    period_start_label: null,
+    period_end_label: null,
+  })
+  const [retentionLoading, setRetentionLoading] = useState(true)
+  const [retentionError, setRetentionError] = useState(null)
+
+  const fetchRetention = useCallback(async () => {
+    setRetentionLoading(true)
+    setRetentionError(null)
+    try {
+      const r = await getCustomerRetentionStats()
+      if (r?.success) {
+        setRetention({
+          retention_percent: typeof r.retention_percent === 'number' ? r.retention_percent : null,
+          retained_count: typeof r.retained_count === 'number' ? r.retained_count : null,
+          start_count: typeof r.start_count === 'number' ? r.start_count : null,
+          period_start_label: typeof r.period_start_label === 'string' ? r.period_start_label : null,
+          period_end_label: typeof r.period_end_label === 'string' ? r.period_end_label : null,
+        })
+      } else {
+        setRetentionError('تعذّر جلب معدل الاحتفاظ بالعملاء')
+      }
+    } catch {
+      setRetentionError('تعذّر جلب معدل الاحتفاظ بالعملاء')
+    } finally {
+      setRetentionLoading(false)
+    }
+  }, [])
 
   const fetchStats = useCallback(async (from, to) => {
     setRangeError(null)
@@ -86,7 +119,8 @@ export default function TeamPerformanceStatistics() {
     setDateFrom(from)
     setDateTo(to)
     fetchStats(from, to)
-  }, [user?.role, fetchStats])
+    fetchRetention()
+  }, [user?.role, fetchStats, fetchRetention])
 
   const applyRange = () => fetchStats(dateFrom, dateTo)
 
@@ -275,6 +309,81 @@ export default function TeamPerformanceStatistics() {
             يُحتسب «شحن» فقط عند وجود <span className="font-semibold text-slate-700">تاريخ آخر شحنة</span> صالح في
             بيانات المتجر — لا يُكفي إجمالي الطرود بدون تاريخ (قد يشمل هدايا أو طلبات لم تُسَلَّم للشركة بعد). حدود
             الفترة (من/إلى) بتوقيت الرياض. المصدر: ذاكرة all-stores.
+          </p>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        className="rounded-2xl border border-slate-200/90 bg-white p-5 lg:p-6 shadow-sm"
+      >
+        {retentionError && (
+          <p className="text-sm text-red-800 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">{retentionError}</p>
+        )}
+
+        <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/40 p-5 lg:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 text-emerald-800">
+              <Repeat2 size={20} />
+              <span className="text-sm font-black">معدل الاحتفاظ بالعملاء</span>
+              {retention.period_start_label && retention.period_end_label && (
+                <span className="text-xs font-semibold text-slate-500 mr-1">
+                  ({retention.period_start_label} ← {retention.period_end_label})
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={fetchRetention}
+              disabled={retentionLoading}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={12} className={retentionLoading ? 'animate-spin' : ''} />
+              تحديث
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-emerald-100 bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-slate-600 mb-1">
+                <Store size={16} />
+                <span className="text-xs font-bold">نشطون في بداية الفترة</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-slate-900">
+                {retentionLoading ? '…' : retention.start_count != null ? Number(retention.start_count).toLocaleString('ar-SA') : '—'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-teal-100 bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-slate-600 mb-1">
+                <Repeat2 size={16} />
+                <span className="text-xs font-bold">مستمرون في نهاية الفترة</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums text-teal-800">
+                {retentionLoading ? '…' : retention.retained_count != null ? Number(retention.retained_count).toLocaleString('ar-SA') : '—'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:col-span-1">
+              <p className="text-xs font-bold text-slate-600 mb-1">نسبة الاحتفاظ</p>
+              <p className="text-4xl font-black tabular-nums text-emerald-700 leading-tight">
+                {retentionLoading
+                  ? '…'
+                  : retention.retention_percent != null
+                    ? `${Number(retention.retention_percent).toLocaleString('ar-SA')}%`
+                    : '—'}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                {retention.start_count != null && retention.retained_count != null && retention.start_count > 0
+                  ? `${Number(retention.retained_count).toLocaleString('ar-SA')} مستمر ÷ ${Number(retention.start_count).toLocaleString('ar-SA')} في البداية × 100.`
+                  : 'لا تتوفر بيانات كافية لحساب النسبة.'}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500 mt-4 leading-relaxed border-t border-emerald-100/80 pt-4">
+            يُحسب المعدل من المتاجر النشطة فقط (طرد واحد على الأقل ضمن الفترة). بداية الفترة = الشهر الماضي كاملاً،
+            نهاية الفترة = الشهر الحالي حتى اليوم — بتوقيت الرياض. المصدر: بيانات الطرود المباشرة من منصة نورس.
           </p>
         </div>
       </motion.div>

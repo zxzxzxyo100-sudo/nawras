@@ -133,6 +133,10 @@ export const getOrdersSummaryRange = (from, to) =>
     .get(`/orders-summary.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
     .then(r => r.data)
 
+/** معدل الاحتفاظ بالعملاء: من المتاجر النشطة — هذا الشهر مقابل الشهر الماضي */
+export const getCustomerRetentionStats = () =>
+  http.get('/customer-retention-stats.php').then(r => r.data)
+
 /** نظام الإنذار المبكر: متاجر انخفضت طلباتها اليوم مقارنةً بالأمس (10+ طلبات أمس) */
 export const getEarlyWarning = (force = false) =>
   http.get('/early-warning.php' + (force ? '?force=1' : '')).then(r => r.data)
