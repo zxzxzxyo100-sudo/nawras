@@ -5,12 +5,22 @@
 define('NAWRIS_TOKEN', 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703');
 define('NAWRIS_BASE',  'https://backoffice.nawris.algoriza.com/external-api');
 
-// Pagination limits
-define('MAX_PAGES_NEW',      50);
-define('MAX_PAGES_INACTIVE', 80);
-define('MAX_PAGES_ORDERS',   80);
-define('MAX_PAGES_RECOVERY', 30);
-define('MAX_PAGES_ALL',     200);
+/// Runtime limits
+@set_time_limit(0);
+@ini_set('max_execution_time', '0');
+@ini_set('max_input_time', '300');
+@ini_set('memory_limit', '1024M');
+
+if (!headers_sent()) {
+    header('X-LiteSpeed-NoAbort: 1');
+}
+
+define('MEMORY_LIGHT',  '256M');
+define('MEMORY_MEDIUM', '512M');
+define('MEMORY_HEAVY',  '1024M');
+define('TIME_SHORT',    '300');
+define('TIME_MEDIUM',   '600');
+define('TIME_LONG',     '1200');
 
 // Runtime limits
 define('MEMORY_LIGHT',  '96M');
