@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, Phone, Lock, ArrowLeftRight, Package, Calendar, TrendingUp, History, Smartphone, AlertTriangle, RefreshCw, Building2, UserPlus } from 'lucide-react'
 import { setStoreStatus, getAuditLog, postQuickVerificationSubmitNeedsFreeze, getStoreCallLogsRaw } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useStores } from '../contexts/StoresContext'
@@ -557,6 +557,12 @@ export default function StoreDrawer({
             <InfoItem icon={Package} label="إجمالي الطرود" value={parseInt(store.total_shipments) || 0} />
             <InfoItem icon={TrendingUp} label="آخر شحنة" value={store.last_shipment_date && store.last_shipment_date !== 'لا يوجد' ? new Date(store.last_shipment_date).toLocaleDateString('ar-SA') : 'لا يوجد'} />
             <InfoItem icon={History} label="أيام منذ التسجيل" value={store.registered_at ? Math.floor((new Date() - new Date(store.registered_at)) / 86400000) + ' يوم' : '—'} />
+            {store.responsible_branch && (
+              <InfoItem icon={Building2} label="الفرع المسؤول" value={store.responsible_branch} />
+            )}
+            {store.registered_by && (
+              <InfoItem icon={UserPlus} label="سجّله" value={store.registered_by} />
+            )}
             {store.phone && (
               <div className="col-span-2">
                 <InfoItem icon={Smartphone} label="رقم الهاتف" value={

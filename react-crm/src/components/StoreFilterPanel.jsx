@@ -28,6 +28,11 @@ export default function StoreFilterPanel({
   showBucketFilter = false,
   selectedBucketKeys = [],
   onBucketKeysChange,
+  /** تصفية بحسب الفرع المسؤول (قيم حرة من API نورس) */
+  showBranchFilter = false,
+  availableBranches = [],
+  selectedBranchKeys = null,
+  onBranchKeysChange,
 }) {
   const label = 'block text-[11px] text-slate-500 mb-1'
   const inp = isElite
@@ -78,6 +83,33 @@ export default function StoreFilterPanel({
                     className={`rounded border-slate-300 ${isElite ? 'accent-violet-600' : 'accent-blue-600'} w-4 h-4 shrink-0`}
                   />
                   <span className="text-sm text-slate-700">{STORE_BUCKET_LABELS[key]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        {showBranchFilter && onBranchKeysChange && (
+          <div className="space-y-2 sm:col-span-2 xl:col-span-4">
+            <span className={label}>الفرع المسؤول</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {availableBranches.map(branch => (
+                <label
+                  key={branch}
+                  className="inline-flex items-center gap-2 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBranchKeys == null || selectedBranchKeys.includes(branch)}
+                    onChange={() => {
+                      const current = selectedBranchKeys ?? availableBranches
+                      const set = new Set(current)
+                      if (set.has(branch)) set.delete(branch)
+                      else set.add(branch)
+                      onBranchKeysChange([...set])
+                    }}
+                    className={`rounded border-slate-300 ${isElite ? 'accent-violet-600' : 'accent-blue-600'} w-4 h-4 shrink-0`}
+                  />
+                  <span className="text-sm text-slate-700">{branch}</span>
                 </label>
               ))}
             </div>

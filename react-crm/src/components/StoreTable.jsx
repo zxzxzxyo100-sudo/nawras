@@ -12,7 +12,7 @@ import {
   UserMinus,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar } from '../utils/storeFilters'
+import { filterStoresByToolbar, getDistinctBranches } from '../utils/storeFilters'
 import { STORE_BUCKET_KEYS } from '../utils/storeBuckets'
 import StoreFilterDrawer from './StoreFilterDrawer'
 import StoreNameWithId from './StoreNameWithId'
@@ -93,6 +93,9 @@ export default function StoreTable({
     if (listPreset === 'new48') return ['new_registered', 'incubating']
     return [...STORE_BUCKET_KEYS]
   })
+  /** تصفية بحسب الفرع المسؤول — null يعني بدون تصفية (كل الفروع) */
+  const [selectedBranchKeys, setSelectedBranchKeys] = useState(null)
+  const availableBranches = useMemo(() => getDistinctBranches(stores), [stores])
 
   useEffect(() => {
     if (!enableBucketFilter) return
@@ -111,11 +114,12 @@ export default function StoreTable({
       shipFrom,
       shipTo,
       ...(enableBucketFilter ? { bucketKeys: selectedBucketKeys } : {}),
+      ...(selectedBranchKeys != null ? { branchKeys: selectedBranchKeys } : {}),
       ...(listPreset === 'new48'
         ? { registeredWithinHours: 48, strictNewOnly: true }
         : {}),
     }),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, listPreset]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, selectedBranchKeys, listPreset]
   )
 
   const filtered = useMemo(
@@ -146,6 +150,7 @@ export default function StoreTable({
       else if (listPreset === 'new48') setSelectedBucketKeys(['new_registered', 'incubating'])
       else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
     }
+    setSelectedBranchKeys(null)
   }
 
   const isBucketAtPresetDefault = useMemo(() => {
@@ -175,8 +180,9 @@ export default function StoreTable({
         || shipFrom
         || shipTo
         || (enableBucketFilter && !isBucketAtPresetDefault)
+        || selectedBranchKeys != null
       ),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, isBucketAtPresetDefault]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, isBucketAtPresetDefault, selectedBranchKeys]
   )
 
   // multi-select helpers
@@ -369,6 +375,10 @@ export default function StoreTable({
         showBucketFilter={enableBucketFilter}
         selectedBucketKeys={selectedBucketKeys}
         onBucketKeysChange={setSelectedBucketKeys}
+        showBranchFilter={availableBranches.length > 0}
+        availableBranches={availableBranches}
+        selectedBranchKeys={selectedBranchKeys}
+        onBranchKeysChange={setSelectedBranchKeys}
       />
 
       <div className={`${tableWrapClass} -mx-1 sm:mx-0 overscroll-x-contain`}>
