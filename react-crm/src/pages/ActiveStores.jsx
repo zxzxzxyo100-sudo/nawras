@@ -54,6 +54,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [selectedIds, setSelectedIds]     = useState(new Set())
   const [bulkUser, setBulkUser]           = useState('')
   const [successMsg, setSuccessMsg]       = useState('')
+  const [errorMsg, setErrorMsg]           = useState('')
   // وضع التعيين: 'manual' | 'auto'
   const [assignMode, setAssignMode]       = useState('manual')
   // اليوزرات المحددة للتوزيع التلقائي
@@ -240,48 +241,71 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     finally { setSaving(null) }
   }
 
+  // ينفّذ طلبات التعيين على دفعات صغيرة بدل إطلاقها كلها دفعة واحدة،
+  // ولا يوقف بقية الدفعة إذا فشل طلب واحد فقط
+  async function runAssignBatch(ids, buildPayload, { chunkSize = 8 } = {}) {
+    const idList = [...ids]
+    const failed = []
+    for (let i = 0; i < idList.length; i += chunkSize) {
+      const chunk = idList.slice(i, i + chunkSize)
+      const results = await Promise.allSettled(chunk.map(id => assignStore(buildPayload(id))))
+      results.forEach((r, idx) => {
+        if (r.status === 'rejected') failed.push(chunk[idx])
+      })
+    }
+    return failed
+  }
+
   // تعيين جماعي يدوي (كل المحددين → يوزر واحد)
   async function handleBulkAssign() {
     if (!bulkUser || selectedIds.size === 0) return
     setSaving(true)
+    setErrorMsg('')
     try {
       const storeMap = Object.fromEntries(active.map(s => [s.id, s]))
-      await Promise.all(
-        [...selectedIds].map(id =>
-          assignStore({
-            store_id:    id,
-            store_name:  storeMap[id]?.name || '',
-            assigned_to: bulkUser,
-            assigned_by: user?.fullname || user?.username || '',
-          })
-        )
-      )
+      const total = selectedIds.size
+      const failed = await runAssignBatch(selectedIds, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: bulkUser,
+        assigned_by: user?.fullname || user?.username || '',
+      }))
       await reload()
-      showSuccess(`تم تعيين ${selectedIds.size} متجر لـ "${users.find(u=>u.username===bulkUser)?.fullname || bulkUser}"`)
-      clearSelection()
-    } catch (e) { console.error(e) }
+      const okCount = total - failed.length
+      if (failed.length === 0) {
+        showSuccess(`تم تعيين ${total} متجر لـ "${users.find(u=>u.username===bulkUser)?.fullname || bulkUser}"`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم تعيين ${okCount} من ${total} متجر فقط — فشل تعيين ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء التعيين، حاول مرة أخرى') }
     finally { setSaving(false) }
   }
 
   async function handleBulkUnassign() {
     if (selectedIds.size === 0) return
     setSaving(true)
+    setErrorMsg('')
     try {
       const storeMap = Object.fromEntries(active.map(s => [s.id, s]))
-      await Promise.all(
-        [...selectedIds].map(id =>
-          assignStore({
-            store_id:    id,
-            store_name:  storeMap[id]?.name || '',
-            assigned_to: '',
-            assigned_by: user?.fullname || user?.username || '',
-          })
-        )
-      )
+      const total = selectedIds.size
+      const failed = await runAssignBatch(selectedIds, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: '',
+        assigned_by: user?.fullname || user?.username || '',
+      }))
       await reload()
-      showSuccess(`تم إلغاء تعيين ${selectedIds.size} متجر`)
-      clearSelection()
-    } catch (e) { console.error(e) }
+      const okCount = total - failed.length
+      if (failed.length === 0) {
+        showSuccess(`تم إلغاء تعيين ${total} متجر`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم إلغاء تعيين ${okCount} من ${total} متجر فقط — فشل إلغاء تعيين ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء إلغاء التعيين، حاول مرة أخرى') }
     finally { setSaving(false) }
   }
 
@@ -290,25 +314,27 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const targets = [...autoUsers]
     if (targets.length === 0 || selectedIds.size === 0) return
     setSaving(true)
+    setErrorMsg('')
     try {
       const storeMap  = Object.fromEntries(active.map(s => [s.id, s]))
       const storeList = [...selectedIds]
-      await Promise.all(
-        storeList.map((id, idx) => {
-          const assignee = targets[idx % targets.length]
-          return assignStore({
-            store_id:    id,
-            store_name:  storeMap[id]?.name || '',
-            assigned_to: assignee,
-            assigned_by: user?.fullname || user?.username || '',
-          })
-        })
-      )
+      const assigneeById = Object.fromEntries(storeList.map((id, idx) => [id, targets[idx % targets.length]]))
+      const failed = await runAssignBatch(storeList, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: assigneeById[id],
+        assigned_by: user?.fullname || user?.username || '',
+      }))
       await reload()
       const perUser = Math.ceil(storeList.length / targets.length)
-      showSuccess(`تم توزيع ${storeList.length} متجر على ${targets.length} مسؤول (~${perUser} لكل منهم)`)
-      clearSelection()
-    } catch (e) { console.error(e) }
+      if (failed.length === 0) {
+        showSuccess(`تم توزيع ${storeList.length} متجر على ${targets.length} مسؤول (~${perUser} لكل منهم)`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم توزيع ${storeList.length - failed.length} من ${storeList.length} متجر فقط — فشل توزيع ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء التوزيع، حاول مرة أخرى') }
     finally { setSaving(false) }
   }
 
@@ -765,6 +791,14 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-medium">
           <CheckCircle2 size={16} />
           {successMsg}
+        </div>
+      )}
+
+      {/* رسالة خطأ */}
+      {errorMsg && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium">
+          <X size={16} />
+          {errorMsg}
         </div>
       )}
 

@@ -43,6 +43,9 @@ api-php/cache/stores_search_lite.json
 api-php/.sync_db_lock.json
 api-php/sync_db.php.bak
 
+# أسرار حقيقية (باسووردات قاعدة البيانات وتوكن API) - لا تُرفع لريبو عام
+api-php/config.php
+
 # ملفات مؤقتة للصور
 *.root.tmp.png
 nawras-team-hero.untracked.png

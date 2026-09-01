@@ -1,8 +1,10 @@
 <?php
 // Central settings for Nawras CRM API
+// انسخ هذا الملف إلى config.php واملأ القيم الحقيقية محلياً/على السيرفر.
+// config.php غير مرفوع على GitHub (موجود في .gitignore) لأنه يحتوي أسرار حقيقية.
 
 // External Nawris API
-define('NAWRIS_TOKEN', 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703');
+define('NAWRIS_TOKEN', 'REPLACE_WITH_REAL_TOKEN');
 define('NAWRIS_BASE',  'https://backoffice.nawris.algoriza.com/external-api');
 
 // Pagination limits
@@ -36,15 +38,15 @@ $_isStaging = (
 
 if ($_isStaging) {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_stg');
-    define('DB_USER', 'u495355717_nawras_stg');
-    define('DB_PASS', 'Zidona11@');
+    define('DB_NAME', 'REPLACE_WITH_STAGING_DB_NAME');
+    define('DB_USER', 'REPLACE_WITH_STAGING_DB_USER');
+    define('DB_PASS', 'REPLACE_WITH_STAGING_DB_PASS');
     define('IS_STAGING_ENV', true);
 } else {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_crm');
-    define('DB_USER', 'u495355717_nawras_admin');
-    define('DB_PASS', 'Zidona11!');
+    define('DB_NAME', 'REPLACE_WITH_PRODUCTION_DB_NAME');
+    define('DB_USER', 'REPLACE_WITH_PRODUCTION_DB_USER');
+    define('DB_PASS', 'REPLACE_WITH_PRODUCTION_DB_PASS');
     define('IS_STAGING_ENV', false);
 }
 
