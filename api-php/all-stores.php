@@ -1093,6 +1093,7 @@ function nawras_lite_store_row($s, $fallbackId = null) {
         'registered_at'       => isset($s['registered_at']) ? (string) $s['registered_at'] : '',
         'total_shipments'     => (int) ($s['total_shipments'] ?? 0),
         'last_shipment_date'  => isset($s['last_shipment_date']) ? (string) $s['last_shipment_date'] : '',
+        'responsible_branch'  => isset($s['responsible_branch']) ? (string) $s['responsible_branch'] : '',
     ];
 }
 $search_lite_map = [];

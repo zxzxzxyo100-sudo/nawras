@@ -188,6 +188,7 @@ export const getRegistrationMonthStats = (opts = {}) => {
   if (opts.detail) params.detail = 1
   if (opts.from) params.from = opts.from
   if (opts.to) params.to = opts.to
+  if (opts.branch) params.branch = opts.branch
   return http.get('/registration-month-stats.php', { params }).then(r => r.data)
 }
 

@@ -17,6 +17,7 @@ header('Cache-Control: no-cache');
 
 /** تقرير تفصيلي: ?detail=1 — قائمة المتاجر المسجّلة في الفترة مع حقول الشحن */
 $detail = isset($_GET['detail']) && ($_GET['detail'] === '1' || $_GET['detail'] === 'true');
+$branchParam = isset($_GET['branch']) ? trim((string) $_GET['branch']) : '';
 
 $tz = new DateTimeZone('Asia/Riyadh');
 $fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
@@ -142,6 +143,9 @@ if (!$cacheStale) {
         if ($regTs < $startTs || $regTs >= $endTs) {
             continue;
         }
+        if ($branchParam !== '' && trim((string) ($row['responsible_branch'] ?? '')) !== $branchParam) {
+            continue;
+        }
         $registered++;
         $byDate = registration_month_row_has_shipped($row);
         if ($byDate) {
@@ -187,6 +191,7 @@ $out = [
     'range_from'               => $rangeFromStr,
     'range_to'                 => $rangeToStr,
     'period_kind'              => $periodKind,
+    'branch'                   => $branchParam !== '' ? $branchParam : null,
     'cache_stale'              => $cacheStale,
     'hint'                     => $cacheStale
         ? 'حدّث الذاكرة بتشغيل all-stores.php (نسخة البحث القديمة لا تتضمّن تواريخ التسجيل).'
