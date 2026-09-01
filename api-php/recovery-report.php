@@ -16,6 +16,7 @@ if ($userRole !== 'executive') {
 
 $fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
 $toParam = isset($_GET['to']) ? trim((string) $_GET['to']) : '';
+$branchParam = isset($_GET['branch']) ? trim((string) $_GET['branch']) : '';
 $isYmd = static function (string $v): bool {
     return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $v);
 };
@@ -54,18 +55,22 @@ $restoredById = [];
 try {
     $stStarted = $pdo->prepare("
         SELECT
-            store_id,
-            MAX(store_name) AS store_name,
-            MIN(created_at) AS started_at,
-            MAX(performed_by) AS started_by
-        FROM audit_logs
-        WHERE new_status = 'restoring'
-          AND created_at >= ?
-          AND created_at < ?
-        GROUP BY store_id
+            al.store_id,
+            MAX(al.store_name) AS store_name,
+            MIN(al.created_at) AS started_at,
+            MAX(al.performed_by) AS started_by
+        FROM audit_logs al
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = al.store_id' : '') . "
+        WHERE al.new_status = 'restoring'
+          AND al.created_at >= ?
+          AND al.created_at < ?
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+        GROUP BY al.store_id
         ORDER BY started_at DESC
     ");
-    $stStarted->execute([$fromStart, $toExclusive]);
+    $startedParams = [$fromStart, $toExclusive];
+    if ($branchParam !== '') $startedParams[] = $branchParam;
+    $stStarted->execute($startedParams);
     $startedRows = $stStarted->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) {
     $startedRows = [];
@@ -80,17 +85,21 @@ try {
      */
     $stRestored = $pdo->prepare("
         SELECT
-            store_id,
-            MAX(store_name) AS store_name,
-            MIN(created_at) AS restored_at,
-            MAX(performed_by) AS restored_by
-        FROM audit_logs
-        WHERE new_status IN ('recovered', 'restored')
-          AND created_at >= ?
-          AND created_at < ?
-        GROUP BY store_id
+            al.store_id,
+            MAX(al.store_name) AS store_name,
+            MIN(al.created_at) AS restored_at,
+            MAX(al.performed_by) AS restored_by
+        FROM audit_logs al
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = al.store_id' : '') . "
+        WHERE al.new_status IN ('recovered', 'restored')
+          AND al.created_at >= ?
+          AND al.created_at < ?
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+        GROUP BY al.store_id
     ");
-    $stRestored->execute([$fromStart, $toExclusive]);
+    $restoredParams = [$fromStart, $toExclusive];
+    if ($branchParam !== '') $restoredParams[] = $branchParam;
+    $stRestored->execute($restoredParams);
     $restoredRows = $stRestored->fetchAll(PDO::FETCH_ASSOC) ?: [];
     foreach ($restoredRows as $r) {
         $sid = (int) ($r['store_id'] ?? 0);
@@ -110,11 +119,13 @@ try {
      * بينما «بدأت الاستعادة» يبقى مقيَّداً بالفترة لقياس نشاط الموظفين فيها.
      */
     $stState = $pdo->prepare("
-        SELECT store_id, store_name, restore_date, updated_at, updated_by, category
-        FROM store_states
-        WHERE category IN ('restored', 'recovered', 'restoring')
+        SELECT ss.store_id, ss.store_name, ss.restore_date, ss.updated_at, ss.updated_by, ss.category
+        FROM store_states ss
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = ss.store_id' : '') . "
+        WHERE ss.category IN ('restored', 'recovered', 'restoring')
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
     ");
-    $stState->execute();
+    $stState->execute($branchParam !== '' ? [$branchParam] : []);
     $stateRows = $stState->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     /** قراءة كاش الشحنات للتقاط «restoring» بشحنة بعد restore_date (يطابق منطق الواجهة) */
@@ -221,6 +232,7 @@ echo json_encode([
     'success' => true,
     'from' => $fromDate,
     'to' => $toDate,
+    'branch' => $branchParam !== '' ? $branchParam : null,
     'started_count' => $startedCount,
     'restored_count' => $restoredCount,
     'recovery_rate_pct' => $ratePct,

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/onboarding-config.php';
 require_once __DIR__ . '/store-lifecycle-lib.php';
+require_once __DIR__ . '/store-branch-lib.php';
 
 ini_set('memory_limit',      MEMORY_HEAVY);
 ini_set('max_execution_time', TIME_LONG);
@@ -120,6 +121,9 @@ foreach ($inactive as $id => $s) {
         }
     }
 }
+
+// ── مزامنة الفرع المسؤول/سجّله إلى قاعدة البيانات (أفضل جهد، مُقيّد بمعدّل) ──
+nawras_sync_branch_map($allStores);
 
 // ═══ هياكل النتيجة ════════════════════════════════════════════
 $result = [

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarRange, Download, FileSpreadsheet, RefreshCw, Repeat2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getRecoveryReport } from '../services/api'
+import { getRecoveryReport, getBranches } from '../services/api'
 import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 function csvEscape(s) {
@@ -27,8 +27,17 @@ export default function RecoveryReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [data, setData] = useState(null)
+  const [branches, setBranches] = useState([])
+  const [branch, setBranch] = useState('')
 
-  const fetchReport = useCallback(async (from, to) => {
+  useEffect(() => {
+    if (user?.role !== 'executive') return
+    getBranches().then(r => {
+      if (r?.success) setBranches(r.branches || [])
+    }).catch(() => {})
+  }, [user?.role])
+
+  const fetchReport = useCallback(async (from, to, branchFilter) => {
     setLoading(true)
     setError('')
     if (!isValidYmdRange(from, to)) {
@@ -37,7 +46,7 @@ export default function RecoveryReport() {
       return
     }
     try {
-      const r = await getRecoveryReport({ from, to })
+      const r = await getRecoveryReport({ from, to, branch: branchFilter })
       if (!r?.success) {
         setError(r?.error || 'تعذّر تحميل تقرير الاستعادة.')
         setData(null)
@@ -54,8 +63,8 @@ export default function RecoveryReport() {
 
   useEffect(() => {
     if (user?.role !== 'executive') return
-    fetchReport(fromDate, toDate)
-  }, [user?.role, fetchReport, fromDate, toDate])
+    fetchReport(fromDate, toDate, branch)
+  }, [user?.role, fetchReport, fromDate, toDate, branch])
 
   const rows = useMemo(() => (Array.isArray(data?.rows) ? data.rows : []), [data])
 
@@ -63,7 +72,7 @@ export default function RecoveryReport() {
     const { from, to } = defaultCalendarMonthYmd()
     setFromDate(from)
     setToDate(to)
-    fetchReport(from, to)
+    fetchReport(from, to, branch)
   }
 
   function downloadCsv() {
@@ -138,9 +147,21 @@ export default function RecoveryReport() {
                 onChange={e => setToDate(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 tabular-nums"
               />
+              {branches.length > 0 && (
+                <select
+                  value={branch}
+                  onChange={e => setBranch(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800"
+                >
+                  <option value="">كل الفروع</option>
+                  {branches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
-                onClick={() => fetchReport(fromDate, toDate)}
+                onClick={() => fetchReport(fromDate, toDate, branch)}
                 className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-teal-700"
               >
                 تطبيق
@@ -162,7 +183,7 @@ export default function RecoveryReport() {
               </Link>
               <button
                 type="button"
-                onClick={() => fetchReport(fromDate, toDate)}
+                onClick={() => fetchReport(fromDate, toDate, branch)}
                 disabled={loading}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >

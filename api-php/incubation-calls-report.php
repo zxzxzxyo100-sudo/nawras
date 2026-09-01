@@ -23,6 +23,7 @@ if ($userRole !== 'executive') {
 
 $fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
 $toParam   = isset($_GET['to'])   ? trim((string) $_GET['to'])   : '';
+$branchParam = isset($_GET['branch']) ? trim((string) $_GET['branch']) : '';
 
 $isYmd = static function (string $v): bool {
     return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $v);
@@ -88,17 +89,21 @@ foreach ($callTypes as $ct) {
 try {
     $st = $pdo->prepare("
         SELECT
-            call_type,
-            COALESCE(outcome, '') AS outcome,
+            cl.call_type,
+            COALESCE(cl.outcome, '') AS outcome,
             COUNT(*)             AS cnt
-        FROM call_logs
-        WHERE call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
-          AND created_at >= ?
-          AND created_at <  ?
-        GROUP BY call_type, outcome
-        ORDER BY call_type, cnt DESC
+        FROM call_logs cl
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = cl.store_id' : '') . "
+        WHERE cl.call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
+          AND cl.created_at >= ?
+          AND cl.created_at <  ?
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+        GROUP BY cl.call_type, outcome
+        ORDER BY cl.call_type, cnt DESC
     ");
-    $st->execute([$fromStart, $toExclusive]);
+    $summaryParams = [$fromStart, $toExclusive];
+    if ($branchParam !== '') $summaryParams[] = $branchParam;
+    $st->execute($summaryParams);
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $ct      = (string) ($row['call_type'] ?? '');
         $outcome = (string) ($row['outcome']   ?? '');
@@ -120,18 +125,22 @@ $byStaff = [];   // [ call_type ][ performed_by ] = [ total, outcomes ]
 try {
     $st = $pdo->prepare("
         SELECT
-            call_type,
-            performed_by,
-            COALESCE(outcome, '') AS outcome,
+            cl.call_type,
+            cl.performed_by,
+            COALESCE(cl.outcome, '') AS outcome,
             COUNT(*)              AS cnt
-        FROM call_logs
-        WHERE call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
-          AND created_at >= ?
-          AND created_at <  ?
-        GROUP BY call_type, performed_by, outcome
-        ORDER BY call_type, cnt DESC
+        FROM call_logs cl
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = cl.store_id' : '') . "
+        WHERE cl.call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
+          AND cl.created_at >= ?
+          AND cl.created_at <  ?
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+        GROUP BY cl.call_type, cl.performed_by, outcome
+        ORDER BY cl.call_type, cnt DESC
     ");
-    $st->execute([$fromStart, $toExclusive]);
+    $byStaffParams = [$fromStart, $toExclusive];
+    if ($branchParam !== '') $byStaffParams[] = $branchParam;
+    $st->execute($byStaffParams);
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $ct      = (string) ($row['call_type']    ?? '');
         $by      = (string) ($row['performed_by'] ?? 'غير معروف');
@@ -155,22 +164,26 @@ $rows = [];
 try {
     $st = $pdo->prepare("
         SELECT
-            id,
-            store_id,
-            store_name,
-            call_type,
-            COALESCE(outcome, '') AS outcome,
-            note,
-            performed_by,
-            created_at
-        FROM call_logs
-        WHERE call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
-          AND created_at >= ?
-          AND created_at <  ?
-        ORDER BY created_at DESC
+            cl.id,
+            cl.store_id,
+            cl.store_name,
+            cl.call_type,
+            COALESCE(cl.outcome, '') AS outcome,
+            cl.note,
+            cl.performed_by,
+            cl.created_at
+        FROM call_logs cl
+        " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = cl.store_id' : '') . "
+        WHERE cl.call_type IN ('inc_call1', 'inc_call2', 'inc_call3')
+          AND cl.created_at >= ?
+          AND cl.created_at <  ?
+          " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+        ORDER BY cl.created_at DESC
         LIMIT 500
     ");
-    $st->execute([$fromStart, $toExclusive]);
+    $rowsParams = [$fromStart, $toExclusive];
+    if ($branchParam !== '') $rowsParams[] = $branchParam;
+    $st->execute($rowsParams);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
 } catch (Throwable $e) {}
 
@@ -234,6 +247,7 @@ echo json_encode([
     'success'  => true,
     'from'     => $fromDate,
     'to'       => $toDate,
+    'branch'   => $branchParam !== '' ? $branchParam : null,
     'summary'  => $summary,
     'rows'     => $rows,
 ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

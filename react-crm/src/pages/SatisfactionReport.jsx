@@ -5,7 +5,7 @@ import {
   ArrowRight, BarChart3, CalendarRange, Download, HeartHandshake, Printer, RefreshCw, Phone,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getSatisfactionStats } from '../services/api'
+import { getSatisfactionStats, getBranches } from '../services/api'
 import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 function csvEscape(s) {
@@ -37,8 +37,17 @@ export default function SatisfactionReport() {
   const initRange = defaultCalendarMonthYmd()
   const [dateFrom, setDateFrom] = useState(initRange.from)
   const [dateTo, setDateTo] = useState(initRange.to)
+  const [branches, setBranches] = useState([])
+  const [branch, setBranch] = useState('')
 
-  const fetchReport = useCallback(async (from, to) => {
+  useEffect(() => {
+    if (user?.role !== 'executive') return
+    getBranches().then(r => {
+      if (r?.success) setBranches(r.branches || [])
+    }).catch(() => {})
+  }, [user?.role])
+
+  const fetchReport = useCallback(async (from, to, branchFilter) => {
     setLoading(true)
     setError(null)
     if (!isValidYmdRange(from, to)) {
@@ -47,7 +56,7 @@ export default function SatisfactionReport() {
       return
     }
     try {
-      const r = await getSatisfactionStats({ detail: true, from, to })
+      const r = await getSatisfactionStats({ detail: true, from, to, branch: branchFilter })
       if (r?.success) {
         setData(r)
       } else {
@@ -67,8 +76,8 @@ export default function SatisfactionReport() {
     const { from, to } = defaultCalendarMonthYmd()
     setDateFrom(from)
     setDateTo(to)
-    fetchReport(from, to)
-  }, [user?.role, fetchReport])
+    fetchReport(from, to, branch)
+  }, [user?.role, fetchReport]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows = useMemo(() => (Array.isArray(data?.csat_report_rows) ? data.csat_report_rows : []), [data])
 
@@ -180,9 +189,21 @@ export default function SatisfactionReport() {
                 onChange={(e) => setDateTo(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 tabular-nums"
               />
+              {branches.length > 0 && (
+                <select
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800"
+                >
+                  <option value="">كل الفروع</option>
+                  {branches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
-                onClick={() => fetchReport(dateFrom, dateTo)}
+                onClick={() => fetchReport(dateFrom, dateTo, branch)}
                 className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
               >
                 تطبيق
@@ -193,7 +214,8 @@ export default function SatisfactionReport() {
                   const { from, to } = defaultCalendarMonthYmd()
                   setDateFrom(from)
                   setDateTo(to)
-                  fetchReport(from, to)
+                  setBranch('')
+                  fetchReport(from, to, '')
                 }}
                 className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs font-semibold text-rose-900"
               >
@@ -210,7 +232,7 @@ export default function SatisfactionReport() {
               </Link>
               <button
                 type="button"
-                onClick={() => fetchReport(dateFrom, dateTo)}
+                onClick={() => fetchReport(dateFrom, dateTo, branch)}
                 disabled={loading}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >

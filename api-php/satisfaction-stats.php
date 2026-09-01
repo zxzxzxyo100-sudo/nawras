@@ -17,6 +17,7 @@ header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache');
 
 $detail = isset($_GET['detail']) && ($_GET['detail'] === '1' || $_GET['detail'] === 'true');
+$branchParam = isset($_GET['branch']) ? trim((string) $_GET['branch']) : '';
 
 $tz = new DateTimeZone('Asia/Riyadh');
 $fromParam = isset($_GET['from']) ? trim((string) $_GET['from']) : '';
@@ -74,21 +75,33 @@ $endSql = $rangeEndEx->format('Y-m-d H:i:s');
 
 $pdo = getDB();
 
-$callsStmt = $pdo->prepare('SELECT COUNT(*) FROM call_logs WHERE created_at >= ? AND created_at < ?');
-$callsStmt->execute([$startSql, $endSql]);
+$callsSql = 'SELECT COUNT(*) FROM call_logs cl WHERE cl.created_at >= ? AND cl.created_at < ?';
+$callsParams = [$startSql, $endSql];
+if ($branchParam !== '') {
+    $callsSql = "SELECT COUNT(*) FROM call_logs cl
+        JOIN store_branch_map sbm ON sbm.store_id = cl.store_id
+        WHERE cl.created_at >= ? AND cl.created_at < ? AND sbm.responsible_branch = ?";
+    $callsParams[] = $branchParam;
+}
+$callsStmt = $pdo->prepare($callsSql);
+$callsStmt->execute($callsParams);
 $callsLogged = (int) $callsStmt->fetchColumn();
 
 /** CSAT: نشط — يشمل القديم بدون نوع */
 $csatSql = "
-    SELECT id, store_id, q1_delivery, q2_collection, q3_support, q4_app, q5_payments, q6_returns,
-           satisfaction_score, survey_kind, performed_by, created_at
-    FROM surveys
-    WHERE created_at >= ? AND created_at < ?
-      AND COALESCE(survey_kind, '') NOT IN ('inactive_feedback', 'new_merchant_onboarding')
-      AND (survey_kind IS NULL OR survey_kind = '' OR survey_kind = 'active_csat')
+    SELECT s.id, s.store_id, s.q1_delivery, s.q2_collection, s.q3_support, s.q4_app, s.q5_payments, s.q6_returns,
+           s.satisfaction_score, s.survey_kind, s.performed_by, s.created_at
+    FROM surveys s
+    " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = s.store_id' : '') . "
+    WHERE s.created_at >= ? AND s.created_at < ?
+      AND COALESCE(s.survey_kind, '') NOT IN ('inactive_feedback', 'new_merchant_onboarding')
+      AND (s.survey_kind IS NULL OR s.survey_kind = '' OR s.survey_kind = 'active_csat')
+      " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
 ";
+$csatParams = [$startSql, $endSql];
+if ($branchParam !== '') $csatParams[] = $branchParam;
 $csatStmt = $pdo->prepare($csatSql);
-$csatStmt->execute([$startSql, $endSql]);
+$csatStmt->execute($csatParams);
 $csatRows = $csatStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $csatN = count($csatRows);
@@ -141,13 +154,18 @@ $csatPercentOf100 = $csatAvg !== null ? (int) round($csatAvg * 20.0) : null;
 $csatPositivePercent = $csatN > 0 ? (int) round(100 * $csatUp / $csatN) : null;
 
 /** تهيئة متجر جديد — أول 3 أسئلة */
-$onbStmt = $pdo->prepare("
-    SELECT id, store_id, q1_delivery, q2_collection, q3_support, satisfaction_score, performed_by, created_at
-    FROM surveys
-    WHERE created_at >= ? AND created_at < ?
-      AND survey_kind = 'new_merchant_onboarding'
-");
-$onbStmt->execute([$startSql, $endSql]);
+$onbSql = "
+    SELECT s.id, s.store_id, s.q1_delivery, s.q2_collection, s.q3_support, s.satisfaction_score, s.performed_by, s.created_at
+    FROM surveys s
+    " . ($branchParam !== '' ? 'JOIN store_branch_map sbm ON sbm.store_id = s.store_id' : '') . "
+    WHERE s.created_at >= ? AND s.created_at < ?
+      AND s.survey_kind = 'new_merchant_onboarding'
+      " . ($branchParam !== '' ? 'AND sbm.responsible_branch = ?' : '') . "
+";
+$onbParams = [$startSql, $endSql];
+if ($branchParam !== '') $onbParams[] = $branchParam;
+$onbStmt = $pdo->prepare($onbSql);
+$onbStmt->execute($onbParams);
 $onbRows = $onbStmt->fetchAll(PDO::FETCH_ASSOC);
 $onbN = count($onbRows);
 $onbSum = 0.0;
@@ -194,6 +212,7 @@ $out = [
     'range_from'                   => $rangeFromStr,
     'range_to'                     => $rangeToStr,
     'period_kind'                  => $periodKind,
+    'branch'                       => $branchParam !== '' ? $branchParam : null,
     'rule'                         => 'الرضا (نشط): متوسط ستة أسئلة 1–5؛ «إيجابي» = تصنيف الخادم up (متوسط ≥ 4). التغطية = استبيانات CSAT ÷ المكالمات.',
     'generated_at'                 => date('c'),
 ];

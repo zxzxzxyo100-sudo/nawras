@@ -5,7 +5,7 @@ import {
   RefreshCw, TrendingUp, Users,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getIncubationCallsReport } from '../services/api'
+import { getIncubationCallsReport, getBranches } from '../services/api'
 import { defaultCalendarMonthYmd, isValidYmdRange } from '../utils/statsDateRange'
 
 // ── مساعدات ─────────────────────────────────────────────────────────────────
@@ -214,8 +214,17 @@ export default function IncubationCallsReport() {
   const [error,    setError]    = useState('')
   const [data,     setData]     = useState(null)
   const [activeTab, setActiveTab] = useState('inc_call1')
+  const [branches, setBranches] = useState([])
+  const [branch, setBranch] = useState('')
 
-  const fetchReport = useCallback(async (from, to) => {
+  useEffect(() => {
+    if (user?.role !== 'executive') return
+    getBranches().then(r => {
+      if (r?.success) setBranches(r.branches || [])
+    }).catch(() => {})
+  }, [user?.role])
+
+  const fetchReport = useCallback(async (from, to, branchFilter) => {
     setLoading(true)
     setError('')
     if (!isValidYmdRange(from, to)) {
@@ -224,7 +233,7 @@ export default function IncubationCallsReport() {
       return
     }
     try {
-      const r = await getIncubationCallsReport({ from, to })
+      const r = await getIncubationCallsReport({ from, to, branch: branchFilter })
       if (!r?.success) {
         setError(r?.error || 'تعذّر تحميل التقرير.')
         setData(null)
@@ -241,14 +250,14 @@ export default function IncubationCallsReport() {
 
   useEffect(() => {
     if (user?.role !== 'executive') return
-    fetchReport(fromDate, toDate)
-  }, [user?.role, fetchReport, fromDate, toDate])
+    fetchReport(fromDate, toDate, branch)
+  }, [user?.role, fetchReport, fromDate, toDate, branch])
 
   function setThisMonth() {
     const { from, to } = defaultCalendarMonthYmd()
     setFromDate(from)
     setToDate(to)
-    fetchReport(from, to)
+    fetchReport(from, to, branch)
   }
 
   const summary = useMemo(() => (Array.isArray(data?.summary) ? data.summary : []), [data])
@@ -333,6 +342,20 @@ export default function IncubationCallsReport() {
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 shadow-sm focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none"
               />
             </div>
+            {branches.length > 0 && (
+              <div className="flex justify-end">
+                <select
+                  value={branch}
+                  onChange={e => setBranch(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 shadow-sm focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none"
+                >
+                  <option value="">كل الفروع</option>
+                  {branches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
@@ -343,7 +366,7 @@ export default function IncubationCallsReport() {
               </button>
               <button
                 type="button"
-                onClick={() => fetchReport(fromDate, toDate)}
+                onClick={() => fetchReport(fromDate, toDate, branch)}
                 disabled={loading}
                 className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
               >

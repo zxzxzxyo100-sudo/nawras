@@ -199,8 +199,13 @@ export const getSatisfactionStats = (opts = {}) => {
   if (opts.detail) params.detail = 1
   if (opts.from) params.from = opts.from
   if (opts.to) params.to = opts.to
+  if (opts.branch) params.branch = opts.branch
   return http.get('/satisfaction-stats.php', { params }).then(r => r.data)
 }
+
+/** قائمة الفروع المعروفة (من مزامنة store_branch_map) — لقوائم تصفية التقارير */
+export const getBranches = () =>
+  http.get('/branches.php').then(r => r.data)
 
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
@@ -378,6 +383,7 @@ export const getRecoveryReport = (opts = {}) =>
         user_role: 'executive',
         from: opts.from || undefined,
         to: opts.to || undefined,
+        branch: opts.branch || undefined,
       },
     })
     .then(r => r.data)
@@ -390,6 +396,7 @@ export const getIncubationCallsReport = (opts = {}) =>
         user_role: 'executive',
         from: opts.from || undefined,
         to: opts.to || undefined,
+        branch: opts.branch || undefined,
       },
     })
     .then(r => r.data)

@@ -194,6 +194,15 @@ tryExec($pdo, "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ", 'CREATE points_log', $steps);
 
+// ── store_branch_map (تعيين الفرع المسؤول / سجّله لكل متجر) ─────────
+tryExec($pdo, "CREATE TABLE IF NOT EXISTS store_branch_map (
+    store_id INT PRIMARY KEY,
+    responsible_branch VARCHAR(255) NULL DEFAULT NULL,
+    registered_by VARCHAR(255) NULL DEFAULT NULL,
+    updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_branch (responsible_branch)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", 'CREATE store_branch_map', $steps);
+
 $at = date('c');
 file_put_contents($lockPath, json_encode(['status' => 'completed', 'at' => $at, 'env' => IS_STAGING_ENV ? 'staging' : 'production'], JSON_UNESCAPED_UNICODE));
 
