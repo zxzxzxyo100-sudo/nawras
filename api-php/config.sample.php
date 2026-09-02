@@ -33,6 +33,7 @@ $_uri  = $_SERVER['REQUEST_URI'] ?? '';
 
 $_isStaging = (
     stripos($_host, 'staging') !== false ||
+    strcasecmp($_host, 'nawris.nawras-ly.com') === 0 ||
     strpos($_uri, '/staging/') !== false
 );
 
