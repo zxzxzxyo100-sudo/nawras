@@ -57,4 +57,3 @@ if (!defined('SYNC_DB_SECRET')) {
     $syncEnv = getenv('NAWRAS_SYNC_DB_SECRET');
     define('SYNC_DB_SECRET', is_string($syncEnv) && $syncEnv !== '' ? $syncEnv : '');
 }
-ر
