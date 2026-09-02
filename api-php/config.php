@@ -1,5 +1,4 @@
-<?php
-// Central settings for Nawras CRM API
+<?php// Central settings for Nawras CRM API
 
 // External Nawris API
 define('NAWRIS_TOKEN', 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703');
