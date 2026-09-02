@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
 import { X, Star, ClipboardList, Info } from 'lucide-react'
 import { saveSurvey, markDailyTaskDone } from '../services/api'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'

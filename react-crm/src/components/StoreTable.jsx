@@ -9,9 +9,10 @@ import {
   PhoneOff,
   RotateCcw,
   ClipboardList,
+  UserMinus,
 } from 'lucide-react'
 import { parcelsInRangeDisplay } from '../utils/storeFields'
-import { filterStoresByToolbar } from '../utils/storeFilters'
+import { filterStoresByToolbar, getDistinctBranches } from '../utils/storeFilters'
 import { STORE_BUCKET_KEYS } from '../utils/storeBuckets'
 import StoreFilterDrawer from './StoreFilterDrawer'
 import StoreNameWithId from './StoreNameWithId'
@@ -48,6 +49,10 @@ export default function StoreTable({
   eliteWorkflowNoAnswer,
   onEliteWorkflowNoAnswer,
   eliteWorkflowNoAnswerLoadingId,
+  /** إلغاء التعيين — يُعرض زر عندما يعيد الدالة true */
+  eliteCanUnassign,
+  onEliteUnassign,
+  eliteUnassignLoadingId,
   /**
    * تلوين صفوف (غير نشط ساخن/بارد): getStyle يعيد خلفية/لون نص؛ paintMode + onPaintClick للتلوين بالنقر
    */
@@ -88,6 +93,9 @@ export default function StoreTable({
     if (listPreset === 'new48') return ['new_registered', 'incubating']
     return [...STORE_BUCKET_KEYS]
   })
+  /** تصفية بحسب الفرع المسؤول — null يعني بدون تصفية (كل الفروع) */
+  const [selectedBranchKeys, setSelectedBranchKeys] = useState(null)
+  const availableBranches = useMemo(() => getDistinctBranches(stores), [stores])
 
   useEffect(() => {
     if (!enableBucketFilter) return
@@ -106,11 +114,12 @@ export default function StoreTable({
       shipFrom,
       shipTo,
       ...(enableBucketFilter ? { bucketKeys: selectedBucketKeys } : {}),
+      ...(selectedBranchKeys != null ? { branchKeys: selectedBranchKeys } : {}),
       ...(listPreset === 'new48'
         ? { registeredWithinHours: 48, strictNewOnly: true }
         : {}),
     }),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, listPreset]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, selectedBucketKeys, selectedBranchKeys, listPreset]
   )
 
   const filtered = useMemo(
@@ -141,6 +150,7 @@ export default function StoreTable({
       else if (listPreset === 'new48') setSelectedBucketKeys(['new_registered', 'incubating'])
       else setSelectedBucketKeys([...STORE_BUCKET_KEYS])
     }
+    setSelectedBranchKeys(null)
   }
 
   const isBucketAtPresetDefault = useMemo(() => {
@@ -170,8 +180,9 @@ export default function StoreTable({
         || shipFrom
         || shipTo
         || (enableBucketFilter && !isBucketAtPresetDefault)
+        || selectedBranchKeys != null
       ),
-    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, isBucketAtPresetDefault]
+    [nameQuery, namePickedStoreId, idQuery, regFrom, regTo, shipFrom, shipTo, enableBucketFilter, isBucketAtPresetDefault, selectedBranchKeys]
   )
 
   // multi-select helpers
@@ -364,6 +375,10 @@ export default function StoreTable({
         showBucketFilter={enableBucketFilter}
         selectedBucketKeys={selectedBucketKeys}
         onBucketKeysChange={setSelectedBucketKeys}
+        showBranchFilter={availableBranches.length > 0}
+        availableBranches={availableBranches}
+        selectedBranchKeys={selectedBranchKeys}
+        onBranchKeysChange={setSelectedBranchKeys}
       />
 
       <div className={`${tableWrapClass} -mx-1 sm:mx-0 overscroll-x-contain`}>
@@ -573,6 +588,22 @@ export default function StoreTable({
                               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 text-amber-900 transition-all hover:bg-amber-100 hover:shadow-[0_0_14px_-4px_rgba(245,158,11,0.35)]"
                             >
                               <ClipboardList size={16} strokeWidth={2} className="text-amber-700" />
+                            </button>
+                          )}
+                          {typeof eliteCanUnassign === 'function'
+                            && eliteCanUnassign(store)
+                            && typeof onEliteUnassign === 'function' && (
+                            <button
+                              type="button"
+                              title="إلغاء التعيين"
+                              disabled={eliteUnassignLoadingId === store.id}
+                              onClick={e => {
+                                e.stopPropagation()
+                                onEliteUnassign(store)
+                              }}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 hover:shadow-[0_0_12px_-4px_rgba(239,68,68,0.3)] disabled:opacity-45"
+                            >
+                              <UserMinus size={15} strokeWidth={2} />
                             </button>
                           )}
                           <button

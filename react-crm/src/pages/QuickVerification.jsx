@@ -847,12 +847,13 @@ export default function QuickVerification() {
   const [qvMissedInc, setQvMissedInc] = useState({ c1: false, c2: false, c3: false })
 
   const load = useCallback(async () => {
+    if (!user?.role) return          // انتظر تحميل بيانات المستخدم
     setLoading(true)
     setErr('')
     try {
       const payload = {
-        user_role: user?.role || '',
-        username: user?.username || '',
+        user_role: user.role,
+        username: user.username || '',
       }
       if (qvDateMode === 'range') {
         if (!qvDateFrom || !qvDateTo || qvDateFrom > qvDateTo) {

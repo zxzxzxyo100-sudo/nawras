@@ -1,9 +1,9 @@
 <?php
 /**
- * مهمة مجدولة (Cron): بعد 30 يوماً على last_call_date تُعاد الحالة من «منجز» إلى «نشط قيد المكالمة».
- * لا يمس المتاجر التي أُكملت اليوم: الشرط last_call_date < NOW()-30 يوم AND last_call_date IS NOT NULL.
- * مثال crontab: كل يوم الساعة 03:00
- * 0 3 * * * php /path/to/check-completed-merchants.php
+ * مهمة مجدولة (Cron): تُعيد جميع المتاجر المنجزة إلى «نشط قيد المكالمة» عند التشغيل.
+ * لا يوجد شرط زمني — يُشغَّل بالجدولة المطلوبة مباشرةً.
+ * مثال crontab (أول كل شهر الساعة 03:00):
+ * 0 3 1 * * php /path/to/check-completed-merchants.php
  */
 require_once __DIR__ . '/config.php';
 
@@ -17,23 +17,22 @@ $pdo = getDB();
 try {
     $pdo->exec('ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL AFTER inc_call3_at');
 } catch (Throwable $e) {
-    // موجود
+    // موجود مسبقاً
 }
 
 $sql = "UPDATE store_states
-    SET category = 'active_pending_calls',
+    SET category       = 'active_pending_calls',
         last_call_date = NULL
-    WHERE category = 'completed'
-      AND last_call_date IS NOT NULL
-      AND last_call_date < DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    WHERE category IN ('completed', 'unreachable')
+      AND (last_call_date IS NULL OR DATE(last_call_date) < CURDATE())";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute();
-$n = $stmt->rowCount();
+$n = (int) $stmt->rowCount();
 
 jsonResponse([
-    'success'   => true,
-    'message'   => 'تمت معالجة المتاجر المنجزة المنتهية',
-    'updated'   => $n !== false ? (int) $n : 0,
-    'checked_at'=> date('Y-m-d H:i:s'),
+    'success'    => true,
+    'message'    => 'تمت إعادة المتاجر المنجزة وغير المتاحة إلى قيد المكالمة',
+    'updated'    => $n,
+    'checked_at' => date('Y-m-d H:i:s'),
 ]);

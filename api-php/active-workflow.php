@@ -286,6 +286,8 @@ if ($action === 'get_my_workflow') {
     ");
     $stAllAssigned->execute([$username]);
     $allAssignedTasks = $stAllAssigned->fetchAll(PDO::FETCH_ASSOC);
+    // إثراء بالهاتف/التسجيل/آخر شحنة/الشحنات حتى تكتمل صفوف «قيد المتابعة» المبنية من هذا المصدر
+    $allAssignedTasks = wf_enrich_workflow_tasks_from_lite($allAssignedTasks);
 
     $dailyActive = get_active_daily_success_count($pdo, $username);
     jsonResponse([
@@ -464,7 +466,14 @@ elseif ($action === 'inactive_followup_success') {
     $chk->execute([$sid, $username]);
     $ws = (string) ($chk->fetchColumn() ?: '');
     if ($ws === '') {
-        jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
+        // إذا كان المتجر ضمن مجمع الاستعادة (ساخن أو بارد) بدون تعيين لهذا المستخدم، عيّنه تلقائياً.
+        // نعتمد cache/inactive_recovery_pool.json (تصنيف دورة الحياة كالواجهة) لا store_states وحده،
+        // لأن متاجر «recovery_warm» تظهر «غير نشط ساخن» دون صف مطابق في store_states.
+        if (!wf_is_store_in_inactive_recovery_pool($pdo, $storeId)) {
+            jsonResponse(['success' => false, 'error' => 'لا يوجد تعيين غير نشط لهذا المتجر.'], 400);
+        }
+        assign_inactive_store_to_user($pdo, $storeId, $storeName, $username, 'system');
+        $ws = 'active';
     }
 
     if ($ws === 'active' || $ws === 'no_answer') {

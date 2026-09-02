@@ -1,13 +1,14 @@
 Options -Indexes
 
 # PHP settings for heavy operations
-php_value memory_limit 256M
-php_value max_execution_time 120
-
+php_value memory_limit 512M
+php_value max_execution_time 300
+php_value max_input_time 300
 # React Router — redirect all non-file/api requests to index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
+   RewriteRule .* - [E=noabort:1]
+   RewriteRule .* - [E=nstat:1]
 
     # Allow api-php directory to work normally
     RewriteRule ^api-php/ - [L]
@@ -20,9 +21,20 @@ php_value max_execution_time 120
     RewriteRule . /index.html [L]
 </IfModule>
 
-# CORS for api-php
-<FilesMatch "\.(php)$">
-    Header set Access-Control-Allow-Origin "*"
-    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
-    Header set Access-Control-Allow-Headers "Content-Type"
-</FilesMatch>
+<IfModule mod_headers.c>
+    # منع cache لـ index.html فقط
+    <FilesMatch "index\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+    # CORS for api-php
+    <FilesMatch "\.(php)$">
+        Header set Access-Control-Allow-Origin "*"
+        Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Header set Access-Control-Allow-Headers "Content-Type"
+    </FilesMatch>
+    # Disable QUIC/HTTP3 to prevent ERR_QUIC_PROTOCOL_ERROR
+    Header always unset alt-svc
+    Header always unset Alt-Svc
+</IfModule>

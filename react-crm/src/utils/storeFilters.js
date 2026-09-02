@@ -52,6 +52,18 @@ export function isStoreStrictlyNew(s, nowMs = Date.now()) {
 }
 
 /**
+ * قائمة الفروع المتوفرة فعلياً ضمن المتاجر الممرَّرة (قيم حرة من API نورس)، مرتّبة أبجدياً
+ */
+export function getDistinctBranches(stores) {
+  const set = new Set()
+  for (const s of stores) {
+    const br = s.responsible_branch
+    if (br != null && String(br).trim() !== '') set.add(String(br).trim())
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'ar'))
+}
+
+/**
  * تصفية موحّدة: اسم، رقم/معرّف المتجر، نطاق تاريخ التسجيل، نطاق تاريخ آخر شحنة
  */
 export function filterStoresByToolbar(stores, filters) {
@@ -69,6 +81,11 @@ export function filterStoresByToolbar(stores, filters) {
      * مصفوفة فارغة = لا يمر أي متجر.
      */
     bucketKeys = null,
+    /**
+     * تصفية بحسب الفرع المسؤول (store.responsible_branch). null = بدون تصفية.
+     * مصفوفة فارغة = لا يمر أي متجر.
+     */
+    branchKeys = null,
     /** إن وُجد رقم > 0: يبقى المتجر إن كان تسجيله خلال آخر N ساعة */
     registeredWithinHours = null,
     /** لوحة «جديدة»: فقط متاجر جديدة حقيقية (ليست احتضان/ساخن/بارد) */
@@ -88,6 +105,11 @@ export function filterStoresByToolbar(stores, filters) {
       if (bucketKeys.length === 0) return false
       const b = s.bucket
       if (b == null || !bucketKeys.includes(b)) return false
+    }
+    if (branchKeys != null) {
+      if (branchKeys.length === 0) return false
+      const br = s.responsible_branch
+      if (br == null || br === '' || !branchKeys.includes(br)) return false
     }
     if (namePickedStoreId != null && namePickedStoreId !== '') {
       if (String(s.id) !== String(namePickedStoreId)) return false

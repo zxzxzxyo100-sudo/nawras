@@ -21,6 +21,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # FTP-Deploy-Action@v4.3.5 لم يُختبر على Node 24 (الافتراضي الجديد لعمليات الـ Actions) —
+      # التبديل المفاجئ لوقت تشغيل الـ action قد يفسّر أخطاء 550 العشوائية عند إنشاء المجلدات.
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,6 +46,7 @@ jobs:
             **/node_modules/**
             api-php/config.php
             react-crm/**
+            android/**
             docs/**
             .cursor/**
             .claude/**

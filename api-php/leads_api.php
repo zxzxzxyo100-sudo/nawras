@@ -43,6 +43,9 @@ function ensure_leads_schema(PDO $pdo) {
 
     try { $pdo->exec("ALTER TABLE leads ADD COLUMN media_screenshot VARCHAR(500) NULL DEFAULT NULL"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE leads ADD COLUMN website_or_location VARCHAR(500) NULL DEFAULT NULL"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE leads ADD COLUMN responsible_name VARCHAR(255) NULL DEFAULT NULL"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE leads ADD COLUMN region VARCHAR(255) NULL DEFAULT NULL"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE leads ADD COLUMN account_id VARCHAR(100) NULL DEFAULT NULL"); } catch (Throwable $e) {}
 
     $uploadDir = __DIR__ . '/uploads/leads/';
     if (!is_dir($uploadDir)) {
@@ -158,11 +161,14 @@ try {
             $screenshotPath = 'uploads/leads/' . $filename;
         }
 
+        $responsibleName = trim((string) ($post['responsible_name'] ?? ''));
+        $region          = trim((string) ($post['region']           ?? ''));
+
         $st = $pdo->prepare("
-            INSERT INTO leads (store_name, phone_number, source, assigned_to_id, media_screenshot, website_or_location)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO leads (store_name, phone_number, source, assigned_to_id, media_screenshot, website_or_location, responsible_name, region)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $st->execute([$storeName, $phoneNumber, $source, $assignedTo, $screenshotPath, $websiteOrLocation ?: null]);
+        $st->execute([$storeName, $phoneNumber, $source, $assignedTo, $screenshotPath, $websiteOrLocation ?: null, $responsibleName ?: null, $region ?: null]);
         jsonResponse(['success' => true, 'id' => (int) $pdo->lastInsertId()]);
     }
 
@@ -180,23 +186,40 @@ try {
             jsonResponse(['success' => false, 'error' => 'غير مصرح بتعديل هذا السجل.'], 403);
         }
 
-        $allowed = ['contact_status', 'requires_field_visit', 'field_visit_done', 'account_opened'];
+        $boolFields   = ['requires_field_visit', 'field_visit_done', 'account_opened'];
+        $stringFields = ['store_name', 'phone_number', 'source', 'website_or_location', 'responsible_name', 'region', 'account_id'];
         $set = [];
         $vals = [];
-        foreach ($allowed as $k) {
+
+        if (array_key_exists('contact_status', $input)) {
+            $status = trim((string) $input['contact_status']);
+            if (!in_array($status, ['pending', 'answered', 'no_answer'], true)) {
+                jsonResponse(['success' => false, 'error' => 'حالة التواصل غير صالحة.'], 400);
+            }
+            $set[] = "contact_status = ?";
+            $vals[] = $status;
+        }
+
+        foreach ($boolFields as $k) {
             if (!array_key_exists($k, $input)) continue;
-            if ($k === 'contact_status') {
-                $status = trim((string) $input[$k]);
-                if (!in_array($status, ['pending', 'answered', 'no_answer'], true)) {
-                    jsonResponse(['success' => false, 'error' => 'حالة التواصل غير صالحة.'], 400);
-                }
+            $set[] = "$k = ?";
+            $vals[] = to_bool_int($input[$k]);
+        }
+
+        foreach ($stringFields as $k) {
+            if (!array_key_exists($k, $input)) continue;
+            if ($k === 'source') {
+                $src = trim((string) $input[$k]);
+                if (!in_array($src, ['social_media', 'field_visit', 'other'], true)) $src = 'other';
                 $set[] = "$k = ?";
-                $vals[] = $status;
+                $vals[] = $src;
             } else {
+                $v = trim((string) $input[$k]);
                 $set[] = "$k = ?";
-                $vals[] = to_bool_int($input[$k]);
+                $vals[] = $v === '' ? null : $v;
             }
         }
+
         if (!$set) jsonResponse(['success' => false, 'error' => 'لا يوجد تغيير.'], 400);
 
         $vals[] = $leadId;

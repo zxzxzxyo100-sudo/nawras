@@ -7,6 +7,7 @@ import FloatingCallBar from './FloatingCallBar'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth } from '../contexts/AuthContext'
 import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
+import logo from '../assets/images/logo.png'
 
 // يظهر الشريط فقط في بناء البيئة التجريبية
 const IS_STAGING = typeof __STAGING__ !== 'undefined' && __STAGING__
@@ -76,9 +77,19 @@ function LayoutInner() {
             <Menu size={20} />
           </button>
           <div className="relative z-10 flex min-w-0 flex-1 items-center justify-center gap-2 px-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-              <Package size={14} className="text-white" />
-            </div>
+            <img
+              src={logo}
+              alt="شعار النوارس"
+              className="object-contain shrink-0"
+              style={{
+                height: '38px',
+                width: 'auto',
+                marginInlineEnd: '10px',
+                filter: isQuickVerification
+                  ? 'drop-shadow(0 0 6px rgba(255,255,255,0.25))'
+                  : 'drop-shadow(0 0 8px rgba(0,0,0,0.1))',
+              }}
+            />
             <div className="min-w-0 text-center">
               <span
                 className={`block font-bold text-base truncate ${
@@ -132,9 +143,17 @@ function LayoutInner() {
               aria-hidden
             />
             <div className="relative z-10 flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-md shadow-violet-500/25">
-                <Package size={16} className="text-white" />
-              </div>
+              <img
+                src={logo}
+                alt="شعار النوارس"
+                className="object-contain shrink-0"
+                style={{
+                  height: '38px',
+                  width: 'auto',
+                  marginInlineEnd: '10px',
+                  filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.1))',
+                }}
+              />
               <div>
                 <p className="text-sm font-black text-slate-800">نظام النورس — CRM</p>
                 <p className="text-[11px] text-slate-500">لوحة التحكم والمهام</p>

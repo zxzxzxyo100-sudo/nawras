@@ -1,8 +1,10 @@
 <?php
 // Central settings for Nawras CRM API
+// انسخ هذا الملف إلى config.php واملأ القيم الحقيقية محلياً/على السيرفر.
+// config.php غير مرفوع على GitHub (موجود في .gitignore) لأنه يحتوي أسرار حقيقية.
 
 // External Nawris API
-define('NAWRIS_TOKEN', 'f651a69a2df9596088c524208de21d91d09457b9fc3e75bade2903390713f703');
+define('NAWRIS_TOKEN', 'REPLACE_WITH_REAL_TOKEN');
 define('NAWRIS_BASE',  'https://backoffice.nawris.algoriza.com/external-api');
 
 // Pagination limits
@@ -10,15 +12,20 @@ define('MAX_PAGES_NEW',      50);
 define('MAX_PAGES_INACTIVE', 80);
 define('MAX_PAGES_ORDERS',   80);
 define('MAX_PAGES_RECOVERY', 30);
-define('MAX_PAGES_ALL',     200);
+define('MAX_PAGES_ALL',      200);
 
 // Runtime limits
-define('MEMORY_LIGHT',  '96M');
-define('MEMORY_MEDIUM', '128M');
-define('MEMORY_HEAVY',  '256M');
-define('TIME_SHORT',    '30');
-define('TIME_MEDIUM',   '60');
-define('TIME_LONG',     '120');
+@set_time_limit(0);
+@ini_set('max_execution_time', '0');
+@ini_set('max_input_time', '300');
+@ini_set('memory_limit', '1024M');
+
+define('MEMORY_LIGHT',  '256M');
+define('MEMORY_MEDIUM', '512M');
+define('MEMORY_HEAVY',  '1024M');
+define('TIME_SHORT',    '300');
+define('TIME_MEDIUM',   '600');
+define('TIME_LONG',     '1200');
 
 // Auto-select DB by host/path
 $_host = $_SERVER['HTTP_HOST']   ?? '';
@@ -31,15 +38,15 @@ $_isStaging = (
 
 if ($_isStaging) {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_stg');
-    define('DB_USER', 'u495355717_nawras_stg');
-    define('DB_PASS', 'Zidona11@');
+    define('DB_NAME', 'REPLACE_WITH_STAGING_DB_NAME');
+    define('DB_USER', 'REPLACE_WITH_STAGING_DB_USER');
+    define('DB_PASS', 'REPLACE_WITH_STAGING_DB_PASS');
     define('IS_STAGING_ENV', true);
 } else {
     define('DB_HOST', 'localhost');
-    define('DB_NAME', 'u495355717_nawras_crm');
-    define('DB_USER', 'u495355717_nawras_admin');
-    define('DB_PASS', 'Zidona11');
+    define('DB_NAME', 'REPLACE_WITH_PRODUCTION_DB_NAME');
+    define('DB_USER', 'REPLACE_WITH_PRODUCTION_DB_USER');
+    define('DB_PASS', 'REPLACE_WITH_PRODUCTION_DB_PASS');
     define('IS_STAGING_ENV', false);
 }
 

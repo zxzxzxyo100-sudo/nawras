@@ -783,6 +783,35 @@ function pick_next_inactive_pool_store(PDO $pdo) {
     return pick_next_inactive_pool_store_from_store_states($pdo);
 }
 
+/**
+ * هل المتجر ضمن مجمع الاستعادة (ساخن/بارد) كما تحسبه الواجهة؟
+ * المصدر الأساسي: cache/inactive_recovery_pool.json (تصنيف دورة الحياة — يطابق العرض)؛
+ * احتياطي: store_states.category IN ('hot_inactive','cold_inactive') لمن سُجّل يدوياً/بالمزامنة.
+ * لا نعتمد على store_states وحده لأن متاجر «recovery_warm» تُصنَّف في الذاكرة دون صف في الجدول.
+ */
+function wf_is_store_in_inactive_recovery_pool(PDO $pdo, $storeId): bool {
+    $target = (int) preg_replace('/\D+/', '', (string) $storeId);
+    if ($target <= 0) {
+        return false;
+    }
+    $cacheFile = __DIR__ . '/cache/inactive_recovery_pool.json';
+    if (is_readable($cacheFile)) {
+        $raw = @file_get_contents($cacheFile);
+        $j = is_string($raw) ? json_decode($raw, true) : null;
+        $stores = is_array($j) && isset($j['stores']) && is_array($j['stores']) ? $j['stores'] : [];
+        foreach ($stores as $row) {
+            $sid = (int) preg_replace('/\D+/', '', (string) ($row['store_id'] ?? ''));
+            if ($sid === $target) {
+                return true;
+            }
+        }
+    }
+    $chk = $pdo->prepare("SELECT store_id FROM store_states WHERE store_id = ? AND category IN ('hot_inactive','cold_inactive') LIMIT 1");
+    $chk->execute([(string) $storeId]);
+
+    return (bool) $chk->fetchColumn();
+}
+
 /** احتياطي: متاجر مسجّلة في store_states كساخن/بارد فقط */
 function pick_next_inactive_pool_store_from_store_states(PDO $pdo) {
     $sql = "
@@ -1069,13 +1098,15 @@ function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $s
         }
     }
 
+    // الحالات النهائية (frozen/restoring/completed/contacted) مُستبعَدة أعلاه بالفعل،
+    // فأي فئة أخرى (بما فيها فارغة/NULL/غير متوقعة) يجب أن تتحوّل إلى «لم يتم الوصول للمتجر»
+    // — لا نُقيّد بقائمة سماح لتفادي فشل صامت يُبقي المتجر ضمن «قيد المتابعة».
     $upd = $pdo->prepare("
         UPDATE store_states
         SET category = 'unreachable',
             last_call_date = NOW(),
             updated_by = ?
         WHERE store_id = ?
-        AND category IN ('active_pending_calls','active','active_shipping','unreachable','incubating')
     ");
     $upd->execute([$username, $storeId]);
     if ($upd->rowCount() > 0) {
@@ -1097,10 +1128,7 @@ function workflow_mark_active_store_no_answer_unreachable(PDO $pdo, $storeId, $s
             } catch (Throwable $e2) {
             }
         }
-        return;
     }
-
-    // صف موجود لكن ليس ضمن مسار نشط يشحن — لا نغيّر الفئة (مثلاً inactive) لتجنّب أخطاء بيانات
 }
 
 /**

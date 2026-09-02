@@ -133,6 +133,18 @@ export const getOrdersSummaryRange = (from, to) =>
     .get(`/orders-summary.php?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
     .then(r => r.data)
 
+/** معدل الاحتفاظ بالعملاء: من المتاجر النشطة — هذا الشهر مقابل الشهر الماضي */
+export const getCustomerRetentionStats = () =>
+  http.get('/customer-retention-stats.php').then(r => r.data)
+
+/** نظام الإنذار المبكر: متاجر انخفضت طلباتها اليوم مقارنةً بالأمس (10+ طلبات أمس) */
+export const getEarlyWarning = (force = false) =>
+  http.get('/early-warning.php' + (force ? '?force=1' : '')).then(r => r.data)
+
+/** إعادة متاجر «منجز» و/أو «unreachable» إلى «قيد المتابعة» يدوياً */
+export const resetActiveStores = (type, username) =>
+  http.post('/reset-active-stores.php', { type, username }).then(r => r.data)
+
 export const getStoreStates = () =>
   http.get('/store-actions.php?action=get_states').then(r => r.data)
 
@@ -176,6 +188,7 @@ export const getRegistrationMonthStats = (opts = {}) => {
   if (opts.detail) params.detail = 1
   if (opts.from) params.from = opts.from
   if (opts.to) params.to = opts.to
+  if (opts.branch) params.branch = opts.branch
   return http.get('/registration-month-stats.php', { params }).then(r => r.data)
 }
 
@@ -187,8 +200,13 @@ export const getSatisfactionStats = (opts = {}) => {
   if (opts.detail) params.detail = 1
   if (opts.from) params.from = opts.from
   if (opts.to) params.to = opts.to
+  if (opts.branch) params.branch = opts.branch
   return http.get('/satisfaction-stats.php', { params }).then(r => r.data)
 }
+
+/** قائمة الفروع المعروفة (من مزامنة store_branch_map) — لقوائم تصفية التقارير */
+export const getBranches = () =>
+  http.get('/branches.php').then(r => r.data)
 
 // ─── Bulk reset ──────────────────────────────────────────────────────────────
 export const resetCategory = (storeIds, user, userRole, reason) =>
@@ -243,6 +261,14 @@ export const getDailyQuota = username =>
 
 export const fillAllInactiveQueues = (data) =>
   http.post('/active-workflow.php?action=fill_all_inactive_queues', data).then(r => r.data)
+
+/** تحديث كامل لبيانات المتاجر + مجمع الاستعادة — يستغرق 30-90 ثانية */
+export const refreshStorePool = () =>
+  http.get('/all-stores.php', { timeout: 120000 }).then(r => r.data)
+
+/** تحرير سجلات الاستعادة المكتملة/لم يرد + إعادة ملء الطوابير (executive فقط) */
+export const resetInactivePool = (data) =>
+  http.post('/reset-inactive-pool.php', data).then(r => r.data)
 
 export const markSurveyNoAnswer = (data) =>
   http.post('/active-workflow.php?action=mark_no_answer', data).then(r => r.data)
@@ -358,6 +384,20 @@ export const getRecoveryReport = (opts = {}) =>
         user_role: 'executive',
         from: opts.from || undefined,
         to: opts.to || undefined,
+        branch: opts.branch || undefined,
+      },
+    })
+    .then(r => r.data)
+
+/** تقرير مكالمات الاحتضان (الأولى/الثانية/الثالثة) — للمدير التنفيذي */
+export const getIncubationCallsReport = (opts = {}) =>
+  http
+    .get('/incubation-calls-report.php', {
+      params: {
+        user_role: 'executive',
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+        branch: opts.branch || undefined,
       },
     })
     .then(r => r.data)

@@ -9,7 +9,7 @@ import CallModal from '../components/CallModal'
 import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
+import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow, resetActiveStores } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
@@ -54,6 +54,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [selectedIds, setSelectedIds]     = useState(new Set())
   const [bulkUser, setBulkUser]           = useState('')
   const [successMsg, setSuccessMsg]       = useState('')
+  const [errorMsg, setErrorMsg]           = useState('')
   // وضع التعيين: 'manual' | 'auto'
   const [assignMode, setAssignMode]       = useState('manual')
   // اليوزرات المحددة للتوزيع التلقائي
@@ -68,6 +69,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [callModalStore, setCallModalStore] = useState(null)
   const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
+  const [resetLoading, setResetLoading] = useState(null) // 'completed' | 'unreachable' | 'all'
+  const [resetMsg, setResetMsg] = useState('')
+  const [unassignLoading, setUnassignLoading] = useState(null)
 
   const isExecutive = user?.role === 'executive'
   const isActiveManager = user?.role === 'active_manager'
@@ -92,6 +96,43 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       console.error(e)
     } finally {
       setWorkflowNoAnswerLoading(null)
+    }
+  }
+
+  async function handleResetStores(type) {
+    if (!window.confirm(`هل أنت متأكد من إعادة متاجر «${type === 'completed' ? 'المنجزة' : type === 'unreachable' ? 'لم يتم الوصول' : 'المنجزة + لم يتم الوصول'}» إلى قيد المتابعة؟`)) return
+    setResetLoading(type)
+    setResetMsg('')
+    try {
+      const res = await resetActiveStores(type, user?.username || '')
+      if (res?.success) {
+        setResetMsg(res.message || 'تمت الإعادة بنجاح')
+        await reload()
+      } else {
+        setResetMsg('حدث خطأ أثناء الإعادة')
+      }
+    } catch (e) {
+      setResetMsg('خطأ في الاتصال بالخادم')
+    } finally {
+      setResetLoading(null)
+      setTimeout(() => setResetMsg(''), 4000)
+    }
+  }
+
+  async function handleUnassign(store) {
+    setUnassignLoading(store.id)
+    try {
+      await assignStore({
+        store_id:    store.id,
+        store_name:  store.name,
+        assigned_to: '',
+        assigned_by: user?.fullname || user?.username || '',
+      })
+      await reload()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUnassignLoading(null)
     }
   }
 
@@ -200,26 +241,71 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     finally { setSaving(null) }
   }
 
+  // ينفّذ طلبات التعيين على دفعات صغيرة بدل إطلاقها كلها دفعة واحدة،
+  // ولا يوقف بقية الدفعة إذا فشل طلب واحد فقط
+  async function runAssignBatch(ids, buildPayload, { chunkSize = 8 } = {}) {
+    const idList = [...ids]
+    const failed = []
+    for (let i = 0; i < idList.length; i += chunkSize) {
+      const chunk = idList.slice(i, i + chunkSize)
+      const results = await Promise.allSettled(chunk.map(id => assignStore(buildPayload(id))))
+      results.forEach((r, idx) => {
+        if (r.status === 'rejected') failed.push(chunk[idx])
+      })
+    }
+    return failed
+  }
+
   // تعيين جماعي يدوي (كل المحددين → يوزر واحد)
   async function handleBulkAssign() {
     if (!bulkUser || selectedIds.size === 0) return
     setSaving(true)
+    setErrorMsg('')
     try {
       const storeMap = Object.fromEntries(active.map(s => [s.id, s]))
-      await Promise.all(
-        [...selectedIds].map(id =>
-          assignStore({
-            store_id:    id,
-            store_name:  storeMap[id]?.name || '',
-            assigned_to: bulkUser,
-            assigned_by: user?.fullname || user?.username || '',
-          })
-        )
-      )
+      const total = selectedIds.size
+      const failed = await runAssignBatch(selectedIds, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: bulkUser,
+        assigned_by: user?.fullname || user?.username || '',
+      }))
       await reload()
-      showSuccess(`تم تعيين ${selectedIds.size} متجر لـ "${users.find(u=>u.username===bulkUser)?.fullname || bulkUser}"`)
-      clearSelection()
-    } catch (e) { console.error(e) }
+      const okCount = total - failed.length
+      if (failed.length === 0) {
+        showSuccess(`تم تعيين ${total} متجر لـ "${users.find(u=>u.username===bulkUser)?.fullname || bulkUser}"`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم تعيين ${okCount} من ${total} متجر فقط — فشل تعيين ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء التعيين، حاول مرة أخرى') }
+    finally { setSaving(false) }
+  }
+
+  async function handleBulkUnassign() {
+    if (selectedIds.size === 0) return
+    setSaving(true)
+    setErrorMsg('')
+    try {
+      const storeMap = Object.fromEntries(active.map(s => [s.id, s]))
+      const total = selectedIds.size
+      const failed = await runAssignBatch(selectedIds, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: '',
+        assigned_by: user?.fullname || user?.username || '',
+      }))
+      await reload()
+      const okCount = total - failed.length
+      if (failed.length === 0) {
+        showSuccess(`تم إلغاء تعيين ${total} متجر`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم إلغاء تعيين ${okCount} من ${total} متجر فقط — فشل إلغاء تعيين ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء إلغاء التعيين، حاول مرة أخرى') }
     finally { setSaving(false) }
   }
 
@@ -228,25 +314,27 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     const targets = [...autoUsers]
     if (targets.length === 0 || selectedIds.size === 0) return
     setSaving(true)
+    setErrorMsg('')
     try {
       const storeMap  = Object.fromEntries(active.map(s => [s.id, s]))
       const storeList = [...selectedIds]
-      await Promise.all(
-        storeList.map((id, idx) => {
-          const assignee = targets[idx % targets.length]
-          return assignStore({
-            store_id:    id,
-            store_name:  storeMap[id]?.name || '',
-            assigned_to: assignee,
-            assigned_by: user?.fullname || user?.username || '',
-          })
-        })
-      )
+      const assigneeById = Object.fromEntries(storeList.map((id, idx) => [id, targets[idx % targets.length]]))
+      const failed = await runAssignBatch(storeList, id => ({
+        store_id:    id,
+        store_name:  storeMap[id]?.name || '',
+        assigned_to: assigneeById[id],
+        assigned_by: user?.fullname || user?.username || '',
+      }))
       await reload()
       const perUser = Math.ceil(storeList.length / targets.length)
-      showSuccess(`تم توزيع ${storeList.length} متجر على ${targets.length} مسؤول (~${perUser} لكل منهم)`)
-      clearSelection()
-    } catch (e) { console.error(e) }
+      if (failed.length === 0) {
+        showSuccess(`تم توزيع ${storeList.length} متجر على ${targets.length} مسؤول (~${perUser} لكل منهم)`)
+        clearSelection()
+      } else {
+        setErrorMsg(`تم توزيع ${storeList.length - failed.length} من ${storeList.length} متجر فقط — فشل توزيع ${failed.length} متجر، حاول مرة أخرى`)
+        setSelectedIds(new Set(failed))
+      }
+    } catch (e) { console.error(e); setErrorMsg('حدث خطأ أثناء التوزيع، حاول مرة أخرى') }
     finally { setSaving(false) }
   }
 
@@ -370,18 +458,29 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     {
       key: 'revert_eta',
       label: 'العودة لقيد المكالمة',
-      render: s => {
-        const raw = s.last_call_date || storeStates[s.id]?.last_call_date
-        const d = parseDbDate(raw)
-        if (!d) return <span className="text-slate-400 text-xs">—</span>
-        const revert = addDays(d, 30)
-        const daysLeft = differenceInCalendarDays(revert, new Date())
+      render: () => {
+        // العودة في اليوم 30 من الشهر (أو آخر يوم إذا كان الشهر أقصر)
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth()
+        const lastDayThisMonth = new Date(year, month + 1, 0).getDate()
+        const targetThisMonth  = Math.min(30, lastDayThisMonth)
+        const dateThisMonth    = new Date(year, month, targetThisMonth)
+        let revert
+        if (now < dateThisMonth) {
+          revert = dateThisMonth
+        } else {
+          const lastDayNextMonth = new Date(year, month + 2, 0).getDate()
+          const targetNextMonth  = Math.min(30, lastDayNextMonth)
+          revert = new Date(year, month + 1, targetNextMonth)
+        }
+        const daysLeft = differenceInCalendarDays(revert, now)
         if (daysLeft <= 0) {
           return <span className="text-[11px] text-amber-700 font-medium">بانتظار المزامنة (Cron)</span>
         }
         return (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-violet-50 text-violet-800 border border-violet-100">
-            بعد {daysLeft.toLocaleString('ar-SA')} يومًا
+            {format(revert, 'd MMMM', { locale: ar })} — بعد {daysLeft.toLocaleString('ar-SA')} يومًا
           </span>
         )
       },
@@ -428,8 +527,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const isUnreachableTab = activeSegment === 'unreachable'
 
   /**
-   * طابور المسؤول النشط: تعيينات «active» و«no_answer» (لم يرد) معاً في «قيد المتابعة»
-   * حتى لا تختفي متاجر «لم يرد» من مهام الموظف. تظهر أيضاً في تبويب «لم يتم الوصول».
+   * طابور المسؤول النشط: تعيينات «active» فقط في «قيد المتابعة».
+   * «no_answer» تظهر فقط في تبويب «لم يتم الوصول».
    */
   const workflowPendingForUser = useMemo(() => {
     if (!isActiveManager || !user?.username) return []
@@ -439,8 +538,8 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       if (!a || a.assigned_to !== user.username) continue
       if ((a.assignment_queue || 'active') !== 'active') continue
       const ws = a.workflow_status ?? 'active'
-      if (ws !== 'active' && ws !== 'no_answer') continue
-      matched.push(ws === 'no_answer' ? { ...s, _workflowNoAnswer: true } : s)
+      if (ws !== 'active') continue
+      matched.push(s)
     }
     return matched
   }, [isActiveManager, user?.username, filteredActive, assignments])
@@ -454,11 +553,14 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
     if (!isPendingTab || !isActiveManager || !user?.username) return null
     const base = workflowPendingForUser
     if (!activeWf) return base
-    if (activeWf.daily_quota?.quota_reached) return []
-    /** قيد المتابعة = active_tasks + no_answer_tasks (لم يرد لا يضيع من مهام الموظف) */
-    const apiActive = (activeWf.active_tasks || []).map(t => ({ task: t, noAnswer: false }))
-    const apiNoAnswer = (activeWf.no_answer_tasks || []).map(t => ({ task: t, noAnswer: true }))
-    const tasks = [...apiActive, ...apiNoAnswer]
+    /**
+     * قيد المتابعة = كل التعيينات النشطة غير المنجزة (workflow_status = active) — بلا حصر بحصة اليوم
+     * ولا استثناء VIP. «لم يرد» و«المنجزة» تظهر في تبويباتها. المصدر all_assigned_tasks (الأشمل).
+     */
+    const apiActive = (activeWf.all_assigned_tasks || [])
+      .filter(t => (t.workflow_status ?? 'active') === 'active')
+      .map(t => ({ task: t, noAnswer: false }))
+    const tasks = [...apiActive]
     if (tasks.length === 0) return base
 
     const byId = new Map(base.map(s => [Number(s.id), s]))
@@ -652,7 +754,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
               </>
             )}
             {isCompletedTab && (
-              <span>{scopedCompleted.length} متجر — العودة لقيد المكالمة بعد 30 يوماً من تاريخ المكالمة (Cron)</span>
+              <span>{scopedCompleted.length} متجر — تُعاد تلقائياً في اليوم 30 من كل شهر (Cron)</span>
             )}
             {isUnreachableTab && (
               <span>
@@ -689,6 +791,22 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm font-medium">
           <CheckCircle2 size={16} />
           {successMsg}
+        </div>
+      )}
+
+      {/* رسالة خطأ */}
+      {errorMsg && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium">
+          <X size={16} />
+          {errorMsg}
+        </div>
+      )}
+
+      {/* رسالة نتيجة إعادة الضبط */}
+      {resetMsg && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-medium">
+          <CheckCircle2 size={16} />
+          {resetMsg}
         </div>
       )}
 
@@ -834,7 +952,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
           </div>
 
           {/* تبويب وضع التعيين */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setAssignMode('manual')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -856,6 +974,14 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             >
               <Shuffle size={13} />
               توزيع تلقائي
+            </button>
+            <button
+              onClick={handleBulkUnassign}
+              disabled={saving === true}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              <X size={13} />
+              إلغاء التعيين ({selectedIds.size})
             </button>
           </div>
 
@@ -942,7 +1068,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             <p className="text-[11px] text-emerald-800/80 mt-0.5">
               {fromDailyTasks
                 ? 'ما يظهر هنا معيّن لك ولم تُكمّل بعد (استبيان + تم الرد). عند الإكمال يُزال من القائمة. لم يتم الوصول يظهر في تبويبه.'
-                : '«تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول». بعد 30 يوماً من «منجز» تُعاد تلقائياً إلى قيد المتابعة.'}
+                : '«تم الرد» يُنقل إلى «منجز»؛ «لم يرد» أو «مشغول» يُضاف إلى «لم يتم الوصول». في اليوم 30 من كل شهر تُعاد المنجزات تلقائياً إلى قيد المتابعة.'}
             </p>
             {activeDailyQuota && !activeDailyQuota.quota_reached && (
               <p className="text-[11px] font-semibold text-emerald-900 mt-2 tabular-nums">
@@ -1038,6 +1164,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                         )}
                       onEliteSurveyClick={store => setSurveyModalStore(store)}
                       onCallStore={handleEliteCall}
+                      eliteCanUnassign={s => !!realAssignee(s.id)}
+                      onEliteUnassign={handleUnassign}
+                      eliteUnassignLoadingId={unassignLoading}
                     />
                   </section>
                 ))}
@@ -1045,7 +1174,7 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
             )
           )}
 
-          {!activeDailyQuota?.quota_reached && !isExecutive && (
+          {!isExecutive && (
           <StoreTable
             variant="elite"
             stores={pendingDisplayStores}
@@ -1088,14 +1217,27 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
 
       {isCompletedTab && (
         <>
-          <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm">
-            <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
-              <BadgeCheck size={17} className="text-violet-600 shrink-0" />
-              المتاجر المنجزة
-            </h2>
-            <p className="text-[11px] text-violet-800/80 mt-0.5">
-              بعد 30 يوماً من تاريخ المكالمة تُعاد تلقائياً إلى «قيد المكالمة» (مهمة Cron: check-completed-merchants.php).
-            </p>
+          <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/90 to-white px-4 py-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-violet-900 flex items-center gap-2">
+                <BadgeCheck size={17} className="text-violet-600 shrink-0" />
+                المتاجر المنجزة
+              </h2>
+              <p className="text-[11px] text-violet-800/80 mt-0.5">
+                تُعاد يدوياً إلى «قيد المتابعة» بالزر أدناه، أو تلقائياً عبر مهمة Cron.
+              </p>
+            </div>
+            {isExecutive && (
+              <button
+                type="button"
+                onClick={() => handleResetStores('completed')}
+                disabled={resetLoading !== null}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-violet-700 border border-violet-300 bg-white hover:bg-violet-50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={resetLoading === 'completed' ? 'animate-spin' : ''} />
+                إعادة للمتابعة ({scopedCompleted.length})
+              </button>
+            )}
           </div>
           <StoreTable
             variant="elite"
@@ -1117,14 +1259,27 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
 
       {isUnreachableTab && (
         <>
-          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-l from-amber-50/90 to-white px-4 py-3 shadow-sm">
-            <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
-              <PhoneOff size={17} className="text-amber-600 shrink-0" />
-              لم يتم الوصول للمتجر
-            </h2>
-            <p className="text-[11px] text-amber-900/80 mt-0.5">
-              تُسجَّل هنا عند اختيار «لم يرد» أو «مشغول» في مكالمة عامة، أو عند زر «لم يرد» في المتابعة الدورية. عند «تم الرد» في مكالمة لاحقة يُنقل المتجر إلى «المتاجر المنجزة».
-            </p>
+          <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-l from-amber-50/90 to-white px-4 py-3 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <PhoneOff size={17} className="text-amber-600 shrink-0" />
+                لم يتم الوصول للمتجر
+              </h2>
+              <p className="text-[11px] text-amber-900/80 mt-0.5">
+                تُسَجَّل هنا عند «لم يرد» أو «مشغول». عند «تم الرد» ينتقل المتجر إلى «المنجزة».
+              </p>
+            </div>
+            {isExecutive && (
+              <button
+                type="button"
+                onClick={() => handleResetStores('unreachable')}
+                disabled={resetLoading !== null}
+                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-700 border border-amber-300 bg-white hover:bg-amber-50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={resetLoading === 'unreachable' ? 'animate-spin' : ''} />
+                إعادة للمتابعة ({unreachableDisplayStores.length})
+              </button>
+            )}
           </div>
           <StoreTable
             variant="elite"
