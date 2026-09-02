@@ -37,9 +37,25 @@ if (!defined('SURVEY_COOLDOWN_DAYS')) {
     define('SURVEY_COOLDOWN_DAYS', 30);
 }
 
+/**
+ * تحقق مرة واحدة فقط (عبر ملف علامة على القرص) بدل إعادة تشغيل نفس أوامر
+ * ALTER/CREATE TABLE في كل طلب — تشغيلها بكل طلب يسبب تنافساً على قفل الجدول
+ * (table lock) عند التزامن (مثل التعيين الجماعي)، ما يُفشل جزءاً من الطلبات.
+ */
+function nawras_schema_marker_done(string $key): bool {
+    return is_file(__DIR__ . '/cache/.schema_' . $key);
+}
+function nawras_schema_marker_set(string $key): void {
+    @file_put_contents(__DIR__ . '/cache/.schema_' . $key, (string) time());
+}
+
 function ensure_workflow_schema(PDO $pdo) {
     static $done = false;
     if ($done) {
+        return;
+    }
+    if (nawras_schema_marker_done('workflow')) {
+        $done = true;
         return;
     }
     ensure_active_pool_rotation_schema($pdo);
@@ -65,12 +81,17 @@ function ensure_workflow_schema(PDO $pdo) {
     }
     ensure_inactive_daily_stats_schema($pdo);
     ensure_active_daily_stats_schema($pdo);
+    nawras_schema_marker_set('workflow');
     $done = true;
 }
 
 function ensure_active_daily_stats_schema(PDO $pdo) {
     static $done = false;
     if ($done) {
+        return;
+    }
+    if (nawras_schema_marker_done('active_daily_stats')) {
+        $done = true;
         return;
     }
     $pdo->exec("
@@ -82,6 +103,7 @@ function ensure_active_daily_stats_schema(PDO $pdo) {
             PRIMARY KEY (username, work_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    nawras_schema_marker_set('active_daily_stats');
     $done = true;
 }
 
@@ -115,6 +137,10 @@ function ensure_inactive_daily_stats_schema(PDO $pdo) {
     if ($done) {
         return;
     }
+    if (nawras_schema_marker_done('inactive_daily_stats')) {
+        $done = true;
+        return;
+    }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS inactive_manager_daily_stats (
             username VARCHAR(191) NOT NULL,
@@ -124,6 +150,7 @@ function ensure_inactive_daily_stats_schema(PDO $pdo) {
             PRIMARY KEY (username, work_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    nawras_schema_marker_set('inactive_daily_stats');
     $done = true;
 }
 
@@ -275,6 +302,10 @@ function ensure_active_pool_rotation_schema(PDO $pdo) {
     if ($done) {
         return;
     }
+    if (nawras_schema_marker_done('active_pool_rotation')) {
+        $done = true;
+        return;
+    }
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS active_manager_pool_rotation (
             username VARCHAR(191) NOT NULL,
@@ -285,6 +316,7 @@ function ensure_active_pool_rotation_schema(PDO $pdo) {
             INDEX idx_user_recent (username, slot_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    nawras_schema_marker_set('active_pool_rotation');
     $done = true;
 }
 
