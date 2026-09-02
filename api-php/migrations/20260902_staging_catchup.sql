@@ -1,33 +1,30 @@
 -- =============================================================================
 -- تحديث قاعدة بيانات staging لمطابقة الإنتاج — 2026-09-02
--- يجمع محتوى: 20260402_production_schema_alignment.sql +
---              20260406_inactive_manager_daily_stats.sql +
---              20260406_quick_verification_resolutions.sql +
---              جدول store_branch_map (ميزة الفروع، أضيف 2026-09-01)
--- آمن للتشغيل أكثر من مرة: تجاهل أخطاء "Duplicate column" / "already exists".
+-- نسخة idempotent بالكامل (IF NOT EXISTS على كل عمود/جدول) — آمنة للتشغيل
+-- دفعة واحدة حتى لو بعض الأعمدة موجودة أصلاً، بدون توقف عند أول خطأ.
 -- =============================================================================
 
 SET NAMES utf8mb4;
 
 -- ─── call_logs ───────────────────────────────────────────────────────────────
-ALTER TABLE call_logs ADD COLUMN outcome VARCHAR(32) NULL DEFAULT NULL AFTER note;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS outcome VARCHAR(32) NULL DEFAULT NULL AFTER note;
 
 -- ─── store_states (احتضان + مساعدات استعادة 30 يوم) ──────────────────────────
-ALTER TABLE store_states ADD COLUMN registration_date DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN first_shipped_date DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN incubation_stage ENUM('day0','day3','day10','graduation_ready','graduated') DEFAULT 'day0';
-ALTER TABLE store_states ADD COLUMN next_call_date DATE NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN inc_call1_at DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN inc_call2_at DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN inc_call3_at DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN last_call_date DATETIME NULL DEFAULT NULL;
-ALTER TABLE store_states ADD COLUMN officer_performance_error TINYINT(1) NOT NULL DEFAULT 0;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS registration_date DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS first_shipped_date DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS incubation_stage ENUM('day0','day3','day10','graduation_ready','graduated') DEFAULT 'day0';
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS next_call_date DATE NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS inc_call1_at DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS inc_call2_at DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS inc_call3_at DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS last_call_date DATETIME NULL DEFAULT NULL;
+ALTER TABLE store_states ADD COLUMN IF NOT EXISTS officer_performance_error TINYINT(1) NOT NULL DEFAULT 0;
 
 -- ─── surveys (CSAT مقابل ملاحظة غير نشط؛ تحليلات المدراء تفلتر حسب survey_kind) ─
-ALTER TABLE surveys ADD COLUMN survey_kind VARCHAR(32) NULL DEFAULT 'active_csat';
-ALTER TABLE surveys ADD COLUMN submitted_username VARCHAR(100) NULL DEFAULT NULL;
-ALTER TABLE surveys ADD COLUMN satisfaction_score VARCHAR(16) NULL DEFAULT NULL;
-ALTER TABLE surveys ADD COLUMN satisfaction_gap_tags JSON NULL DEFAULT NULL;
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS survey_kind VARCHAR(32) NULL DEFAULT 'active_csat';
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS submitted_username VARCHAR(100) NULL DEFAULT NULL;
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS satisfaction_score VARCHAR(16) NULL DEFAULT NULL;
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS satisfaction_gap_tags JSON NULL DEFAULT NULL;
 
 -- ─── store_assignments (دوران 50 متجر، سير عمل عدم الرد) ──────────────────────
 CREATE TABLE IF NOT EXISTS store_assignments (
@@ -39,9 +36,9 @@ CREATE TABLE IF NOT EXISTS store_assignments (
     notes        TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-ALTER TABLE store_assignments ADD COLUMN workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active';
-ALTER TABLE store_assignments ADD COLUMN workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
-ALTER TABLE store_assignments ADD COLUMN assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active';
+ALTER TABLE store_assignments ADD COLUMN IF NOT EXISTS workflow_status ENUM('active','no_answer') NOT NULL DEFAULT 'active';
+ALTER TABLE store_assignments ADD COLUMN IF NOT EXISTS workflow_updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
+ALTER TABLE store_assignments ADD COLUMN IF NOT EXISTS assignment_queue ENUM('active','inactive') NOT NULL DEFAULT 'active';
 
 -- ─── المهام اليومية (إخفاء "تم" لكل يوم) ──────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_task_dismissals (
