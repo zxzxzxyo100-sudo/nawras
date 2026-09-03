@@ -1,11 +1,11 @@
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import {
   Store, TrendingUp,
-  Users, LogOut, Baby, X,
+  Users, Baby, X,
   ChevronDown, Circle, Layers, Lock, Phone,
 } from 'lucide-react'
-import { useAuth, ROLES } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
@@ -453,14 +453,9 @@ function navGroupsForUser(role) {
 }
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user, logout, can } = useAuth()
+  const { user, can } = useAuth()
   const { shouldAlert: privateTicketNavAlert } = usePrivateTicketsAlert()
-  const navigate = useNavigate()
-  function handleLogout() { logout(); navigate('/login') }
   function handleNav()    { if (onClose) onClose() }
-
-  const roleLabel = ROLES[user?.role]?.label ?? ''
-  const initials  = user?.fullname?.split(' ').map(w => w[0]).join('').slice(0, 2) ?? 'م'
 
   return (
     <aside
@@ -721,34 +716,14 @@ export default function Sidebar({ isOpen, onClose }) {
 
       </nav>
 
-      {/* ── User ─────────────────────────────── */}
-      <div className="relative z-10 p-4 border-t border-white/5 space-y-2">
-        {/* بيانات المستخدم */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.06] ring-1 ring-white/5">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0 shadow-lg shadow-violet-900/30 ring-1 ring-white/15"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
-          >
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-bold truncate">{user?.fullname}</p>
-            <p className="text-white/40 text-[10px] truncate">{roleLabel}</p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all text-xs font-semibold"
-        >
-          <LogOut size={13} />
-          تسجيل الخروج
-        </button>
-        {typeof __BUILD_ID__ !== 'undefined' && __BUILD_ID__ ? (
+      {/* ── معلومات البناء (تشخيصية فقط) — بيانات المستخدم/تسجيل الخروج انتقلت لقائمة الهيدر ── */}
+      {typeof __BUILD_ID__ !== 'undefined' && __BUILD_ID__ ? (
+        <div className="relative z-10 p-3 border-t border-white/5">
           <p className="text-white/30 text-[9px] text-center leading-tight px-1" title="يتحدّد عند كل npm run build:staging — إن لم يتغيَر بعد الرفع فالمتصفح أو السيرفر يعرض نسخة قديمة">
             واجهة: {__BUILD_ID__}
           </p>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </aside>
   )
 }
