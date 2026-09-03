@@ -1,4 +1,8 @@
-export default function StatCard({ title, value, subtitle, icon: Icon, color = 'blue', onClick }) {
+/**
+ * trend (اختياري): { value: number, positiveIsGood?: boolean, label?: string }
+ * value موجب = سهم لأعلى، سالب = سهم لأسفل. positiveIsGood يحدد لون الشارة (افتراضياً true).
+ */
+export default function StatCard({ title, value, subtitle, icon: Icon, color = 'blue', onClick, trend }) {
   const colors = {
     blue:   { bg: 'bg-blue-50',    icon: 'bg-blue-600',    text: 'text-blue-600',    bar: 'bg-blue-500'    },
     green:  { bg: 'bg-emerald-50', icon: 'bg-emerald-600', text: 'text-emerald-600', bar: 'bg-emerald-500' },
@@ -7,6 +11,9 @@ export default function StatCard({ title, value, subtitle, icon: Icon, color = '
     purple: { bg: 'bg-purple-50',  icon: 'bg-purple-600',  text: 'text-purple-600',  bar: 'bg-purple-500'  },
   }
   const c = colors[color] || colors.blue
+  const hasTrend = trend && Number.isFinite(trend.value)
+  const trendUp = hasTrend && trend.value >= 0
+  const trendGood = hasTrend ? (trend.positiveIsGood ?? true) === trendUp : true
 
   return (
     <div
@@ -15,17 +22,22 @@ export default function StatCard({ title, value, subtitle, icon: Icon, color = '
     >
       <div className={`absolute top-0 right-0 left-0 h-1 ${c.bar}`} />
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-slate-500 text-xs lg:text-sm font-medium mb-1 leading-tight">{title}</p>
-          <p className="text-2xl lg:text-3xl font-bold text-slate-800">{value?.toLocaleString('ar-SA') ?? '—'}</p>
-          {subtitle && <p className="text-slate-400 text-xs mt-1 leading-tight">{subtitle}</p>}
+        <div className={`w-9 h-9 lg:w-11 lg:h-11 rounded-xl ${c.bg} flex items-center justify-center flex-shrink-0`}>
+          {Icon && <Icon size={17} className={c.text} />}
         </div>
-        {Icon && (
-          <div className={`w-9 h-9 lg:w-11 lg:h-11 rounded-xl ${c.icon} flex items-center justify-center shadow-md flex-shrink-0`}>
-            <Icon size={17} className="text-white" />
-          </div>
+        {hasTrend && (
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            trendGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+          }`}>
+            {trendUp ? '↑' : '↓'} {Math.abs(trend.value)}%
+          </span>
         )}
       </div>
+      <p className="text-2xl lg:text-3xl font-black text-slate-800 mt-3">{value?.toLocaleString('ar-SA') ?? '—'}</p>
+      <p className="text-slate-500 text-xs lg:text-sm font-medium mt-1 leading-tight">{title}</p>
+      {(subtitle || trend?.label) && (
+        <p className="text-slate-400 text-[11px] mt-1 leading-tight">{subtitle || trend.label}</p>
+      )}
     </div>
   )
 }

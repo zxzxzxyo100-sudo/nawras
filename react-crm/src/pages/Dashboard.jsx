@@ -7,12 +7,14 @@ import {
   ResponsiveContainer, PieChart, Pie,
 } from 'recharts'
 import StatusBadge from '../components/StatusBadge'
+import StatCard from '../components/StatCard'
 import { STATUS_COLORS } from '../config/designTokens'
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
   Award, Activity, ArrowUpRight, Baby,
   BarChart3, ArrowBigUp, ArrowBigDown, ArrowLeftRight, Loader2, BadgeCheck,
+  Filter, Users, X as XIcon,
 } from 'lucide-react'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth, ROLES } from '../contexts/AuthContext'
@@ -120,8 +122,40 @@ export default function Dashboard() {
     return ROLES[r]?.views?.includes('users') ?? false
   }, [user?.role])
 
-  /** فلتر بسيط لقسم «أحدث المتاجر» — أي الفئات تُعرض ضمن أحدث 5 سجلات */
-  const [recentStoresFilter, setRecentStoresFilter] = useState('new_incubating')
+  // ── فلتر الداشبورد (حالة المتجر + مسؤول المتابعة) — يؤثر على البطاقات/الدونات/الجدول ──
+  const [filterBucket, setFilterBucket] = useState('')
+  const [filterAssignee, setFilterAssignee] = useState('')
+
+  const assigneeOptions = useMemo(() => {
+    const set = new Set()
+    Object.values(assignments || {}).forEach(a => { if (a?.assigned_to) set.add(a.assigned_to) })
+    return [...set].sort((a, b) => a.localeCompare(b, 'ar'))
+  }, [assignments])
+
+  const filteredStores = useMemo(() => {
+    return allStores.filter(s => {
+      if (filterBucket && s.bucket !== filterBucket) return false
+      if (filterAssignee) {
+        const row = assignments?.[s.id] ?? assignments?.[String(s.id)]
+        if (row?.assigned_to !== filterAssignee) return false
+      }
+      return true
+    })
+  }, [allStores, filterBucket, filterAssignee, assignments])
+
+  const filteredCounts = useMemo(() => {
+    const c = {}
+    filteredStores.forEach(s => { c[s.bucket] = (c[s.bucket] || 0) + 1 })
+    c.total = filteredStores.length
+    return c
+  }, [filteredStores])
+
+  const hasDashboardFilter = Boolean(filterBucket || filterAssignee)
+  function clearDashboardFilter() {
+    setFilterBucket('')
+    setFilterAssignee('')
+  }
+
   const [staffMissions, setStaffMissions] = useState(null)
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
@@ -380,6 +414,88 @@ export default function Dashboard() {
         <div className="relative z-10 border-t border-slate-100/90 px-4 pb-3 sm:hidden">
           <NawrasTaglineStack compact className="pt-2" />
         </div>
+      </motion.div>
+
+      {/* ══ Filter Bar ══════════════════════════════════════════════ */}
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.4, delay: 0.05 }}
+        className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm flex flex-wrap items-center gap-2"
+      >
+        <Filter size={15} className="text-violet-500 shrink-0 mx-1" />
+        <select
+          value={filterBucket}
+          onChange={e => setFilterBucket(e.target.value)}
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+        >
+          <option value="">كل حالات المتجر</option>
+          <option value="new_registered">جديد — بانتظار أول شحنة</option>
+          <option value="incubating">تحت الاحتضان</option>
+          <option value="active_shipping">نشط يشحن</option>
+          <option value="hot_inactive">غير نشط ساخن</option>
+          <option value="cold_inactive">غير نشط بارد</option>
+          <option value="frozen_merchants">مجمّد</option>
+          <option value="completed_merchants">منجز</option>
+          <option value="unreachable_merchants">لم يتم الوصول</option>
+        </select>
+        {assigneeOptions.length > 0 && (
+          <select
+            value={filterAssignee}
+            onChange={e => setFilterAssignee(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+          >
+            <option value="">كل مسؤولي المتابعة</option>
+            {assigneeOptions.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        )}
+        {hasDashboardFilter && (
+          <button
+            type="button"
+            onClick={clearDashboardFilter}
+            className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 transition-colors"
+          >
+            <XIcon size={13} />
+            إعادة تعيين
+          </button>
+        )}
+        <span className="mr-auto text-xs text-slate-400 font-medium">
+          {hasDashboardFilter
+            ? `${(filteredCounts.total || 0).toLocaleString('ar-SA')} متجر مطابق`
+            : 'الفلترة تُحدّث البطاقات والرسم والجدول أدناه'}
+        </span>
+      </motion.div>
+
+      {/* ══ KPI Cards ═══════════════════════════════════════════════ */}
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4"
+      >
+        {[
+          can('hot_inactive') && {
+            title: 'غير نشط ساخن', value: filteredCounts.hot_inactive || 0, icon: Flame, color: 'red',
+            subtitle: 'يحتاج متابعة عاجلة',
+          },
+          can('cold_inactive') && {
+            title: 'غير نشط بارد', value: filteredCounts.cold_inactive || 0, icon: Snowflake, color: 'amber',
+          },
+          can('new') && {
+            title: 'جديدة', value: filteredCounts.new_registered || 0, icon: Store, color: 'blue',
+          },
+          can('active') && {
+            title: 'نشط يشحن', value: filteredCounts.active_shipping || 0, icon: TrendingUp, color: 'green',
+          },
+          { title: 'إجمالي المتاجر', value: filteredCounts.total ?? counts.total ?? 0, icon: Package, color: 'purple' },
+        ].filter(Boolean).map((k, i) => (
+          <motion.div key={k.title} variants={fadeUp} transition={{ delay: i * 0.05 }}>
+            <StatCard {...k} />
+          </motion.div>
+        ))}
       </motion.div>
 
       {user?.role === 'active_manager' && (
@@ -911,17 +1027,9 @@ export default function Dashboard() {
                 أحدث المتاجر
               </h2>
               <div className="flex items-center gap-2">
-                <select
-                  value={recentStoresFilter}
-                  onChange={e => setRecentStoresFilter(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
-                >
-                  <option value="new_incubating">جديدة واحتضان</option>
-                  <option value="active_shipping">نشط يشحن</option>
-                  <option value="hot_inactive">غير نشط ساخن</option>
-                  <option value="cold_inactive">غير نشط بارد</option>
-                  <option value="all">كل الفئات</option>
-                </select>
+                {hasDashboardFilter && (
+                  <span className="text-[11px] font-semibold text-violet-600 bg-violet-50 px-2 py-1 rounded-lg">مُصفّى</span>
+                )}
                 <button type="button" onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors shrink-0">
                   عرض الكل <ArrowUpRight size={11} />
                 </button>
@@ -931,16 +1039,7 @@ export default function Dashboard() {
               <table className="w-full text-sm">
                 <tbody>
                   {(() => {
-                    const tag = (arr, bucket) => (arr || []).map(s => ({ ...s, bucket }))
-                    const pools = {
-                      new_incubating: [...tag(stores.new_registered, 'new_registered'), ...tag(stores.incubating, 'incubating')],
-                      active_shipping: tag(stores.active_shipping, 'active_shipping'),
-                      hot_inactive: tag(stores.hot_inactive, 'hot_inactive'),
-                      cold_inactive: tag(stores.cold_inactive, 'cold_inactive'),
-                      all: Object.entries(stores).flatMap(([bucket, arr]) => tag(arr, bucket)),
-                    }
-                    const pool = pools[recentStoresFilter] || pools.new_incubating
-                    const rows = [...pool]
+                    const rows = [...filteredStores]
                       .sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0))
                       .slice(0, 5)
                     if (rows.length === 0) {
@@ -984,23 +1083,26 @@ export default function Dashboard() {
               <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
               توزيع المتاجر حسب الفئة
             </h2>
-            <p className="text-white/40 text-xs mt-0.5">{(counts.total || 0).toLocaleString('ar-SA')} متجر إجمالي</p>
+            <p className="text-white/40 text-xs mt-0.5">{(filteredCounts.total || 0).toLocaleString('ar-SA')} متجر {hasDashboardFilter ? 'مطابق للفلتر' : 'إجمالي'}</p>
           </div>
 
           {(() => {
             const rows = [
-              can('active') && { key: 'active_shipping', label: 'نشط يشحن', v: counts.active_shipping || 0 },
-              can('hot_inactive') && { key: 'hot_inactive', label: 'غير نشط ساخن', v: counts.hot_inactive || 0 },
-              can('cold_inactive') && { key: 'cold_inactive', label: 'غير نشط بارد', v: counts.cold_inactive || 0 },
-              can('new') && { key: 'incubating', label: 'جديدة واحتضان', v: counts.incubating || 0 },
-              can('active') && { key: 'frozen_merchants', label: 'مجمدة', v: counts.frozen_merchants || 0 },
+              can('active') && { key: 'active_shipping', label: 'نشط يشحن', v: filteredCounts.active_shipping || 0 },
+              can('hot_inactive') && { key: 'hot_inactive', label: 'غير نشط ساخن', v: filteredCounts.hot_inactive || 0 },
+              can('cold_inactive') && { key: 'cold_inactive', label: 'غير نشط بارد', v: filteredCounts.cold_inactive || 0 },
+              can('new') && { key: 'new_registered', label: 'جديدة', v: filteredCounts.new_registered || 0 },
+              can('new') && { key: 'incubating', label: 'تحت الاحتضان', v: filteredCounts.incubating || 0 },
+              can('active') && { key: 'frozen_merchants', label: 'مجمدة', v: filteredCounts.frozen_merchants || 0 },
+              can('active') && { key: 'completed_merchants', label: 'منجزة', v: filteredCounts.completed_merchants || 0 },
+              can('active') && { key: 'unreachable_merchants', label: 'لم يتم الوصول', v: filteredCounts.unreachable_merchants || 0 },
             ].filter(row => row && row.v > 0)
             if (rows.length === 0) {
               return <p className="text-white/40 text-xs text-center py-6">لا توجد بيانات كافية للعرض</p>
             }
             return (
               <>
-                <div className="h-40 w-full">
+                <div className="relative h-40 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -1019,10 +1121,16 @@ export default function Dashboard() {
                       <Tooltip content={<CustomTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-white text-xl font-black tabular-nums leading-none">
+                      {(filteredCounts.total || 0).toLocaleString('ar-SA')}
+                    </p>
+                    <p className="text-white/40 text-[10px] mt-1">إجمالي المتاجر</p>
+                  </div>
                 </div>
                 <div className="space-y-2.5">
                   {rows.map(row => {
-                    const pct = counts.total ? Math.round((row.v / counts.total) * 100) : 0
+                    const pct = filteredCounts.total ? Math.round((row.v / filteredCounts.total) * 100) : 0
                     const hex = STATUS_COLORS[row.key]?.hex || '#8b5cf6'
                     return (
                       <div key={row.key} className="flex items-center justify-between">
