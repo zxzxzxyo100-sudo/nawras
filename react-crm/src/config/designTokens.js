@@ -105,5 +105,5 @@ export const KPI_PALETTE = {
 export const CARD_RADIUS = 'rounded-2xl'
 export const CARD_SHADOW = 'shadow-sm'
 export const CARD_BORDER = 'border border-slate-200/80'
-export const SIDEBAR_GRADIENT_ACTIVE = 'linear-gradient(135deg, rgba(124,58,237,0.32), rgba(168,85,247,0.16))'
-export const SIDEBAR_GLOW_ACTIVE = '0 0 22px rgba(139,92,246,0.18)'
+export const SIDEBAR_GRADIENT_ACTIVE = 'linear-gradient(135deg, rgba(13,148,136,0.32), rgba(45,212,191,0.16))'
+export const SIDEBAR_GLOW_ACTIVE = '0 0 22px rgba(20,184,166,0.18)'
