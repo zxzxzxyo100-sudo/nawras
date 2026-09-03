@@ -1,60 +1,21 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
-  LayoutDashboard, Store, TrendingUp,
-  Users, LogOut, Baby, X, BarChart2, Crown,
-  ChevronDown, Circle, Layers, Lock, BadgeCheck, Package, ClipboardList, Phone,
+  Store, TrendingUp,
+  Users, LogOut, Baby, X,
+  ChevronDown, Circle, Layers, Lock, Phone,
 } from 'lucide-react'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
+import { SIDEBAR_GRADIENT_ACTIVE, SIDEBAR_GLOW_ACTIVE } from '../config/designTokens'
+import {
+  NAV_ALL, STORES_SUB, ACTIVE_SUB, INCUBATION_SUB, INACTIVE_SUB, STAFF_PERFORMANCE_SUB,
+} from '../config/navStructure'
 
-const NAV_ALL = [
-  { to: '/',              label: 'لوحة التحكم',       icon: LayoutDashboard, view: 'dashboard'    },
-  { to: '/tasks',         label: 'المهام',            icon: ClipboardList,   view: 'tasks'        },
-  { to: '/active/pending', label: 'قيد المتابعة',     icon: TrendingUp,      view: 'active'       },
-  { to: '/quick-verification', label: 'التحقيق السريع', icon: BadgeCheck,   view: 'quick_verification' },
-  { to: '/new',           label: 'المتاجر',            icon: Store,           view: 'new'          },
-  { to: '/vip',           label: 'كبار التجار',        icon: Crown,           view: 'vip_merchants' },
-  { to: '/performance',   label: 'أدائي',              icon: BarChart2,       view: 'dashboard'    },
-  { to: '/users',         label: 'إدارة المستخدمين',    icon: Users,           view: 'users'        },
-  { to: '/lead-management', label: 'جمع البيانات والمتابعة', icon: Phone,       view: 'lead_management' },
-  { to: '/analytics/logistics', label: 'تحليلات اللوجستيات', icon: Package,   view: 'dashboard' },
-]
-
-/** المتاجر — كل المتاجر ثم جديدة (48 ساعة) ثم تحت الاحتضان — مستقلة عن مسار الاحتضان */
-const STORES_SUB = [
-  { to: '/new', label: 'كل المتاجر', kind: 'all' },
-  { to: '/new?view=new48', label: 'جديدة', kind: 'new48' },
-  { to: '/new?bucket=incubating', label: 'تحت الاحتضان', kind: 'new_inc' },
-]
-
-/** نشط يشحن — قيد المكالمة / المنجزة (مثل مسار الاحتضان) */
-const ACTIVE_SUB = [
-  { to: '/active/pending', label: 'قيد المتابعة', kind: 'pending' },
-  { to: '/active/completed', label: 'المتاجر المنجزة', kind: 'completed' },
-  { to: '/active/unreachable', label: 'لم يتم الوصول للمتجر', kind: 'unreachable' },
-]
-
-/** مسار الاحتضان — أسفل المتاجر */
-const INCUBATION_SUB = [
-  { to: '/incubation/between-calls', label: 'بين المكالمات', kind: 'between' },
-  { to: '/incubation/call-delay', label: 'تأخير المكالمة', kind: 'delay' },
-  { to: '/incubation/call-1', label: 'المكالمة الأولى', kind: 'call1' },
-  { to: '/incubation/call-2', label: 'المكالمة الثانية', kind: 'call2' },
-  { to: '/incubation/call-3', label: 'المكالمة الثالثة', kind: 'call3' },
-  { to: '/incubation/new-completed', label: 'المتاجر الجديدة المنجزة', kind: 'new_completed' },
-]
-
-/** ترتيب: ساخنة → باردة → جاري الاستعادة → تمت الاستعادة */
-const INACTIVE_SUB = [
-  { to: '/hot-inactive/all',       label: 'غير نشطة ساخنة', view: 'hot_inactive' },
-  { to: '/cold-inactive',          label: 'غير نشطة باردة', view: 'cold_inactive' },
-  { to: '/hot-inactive/restoring', label: 'جاري الاستعادة', viewAny: ['hot_inactive', 'cold_inactive'] },
-  { to: '/hot-inactive/restored',  label: 'تمت الاستعادة — المنجزة',  viewAny: ['hot_inactive', 'cold_inactive'] },
-]
+const ACTIVE_GROUP_STYLE = { background: SIDEBAR_GRADIENT_ACTIVE, boxShadow: SIDEBAR_GLOW_ACTIVE }
 
 function canInactiveSub(item, canFn) {
   if (item.viewAny?.length) return item.viewAny.some(v => canFn(v))
@@ -134,10 +95,7 @@ function StoresNavGroup({ can, onClose }) {
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
           isStoresSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isStoresSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
+        style={isStoresSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isStoresSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
@@ -194,10 +152,7 @@ function ActiveNavGroup({ can, onClose }) {
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
           isActiveSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isActiveSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
+        style={isActiveSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isActiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
@@ -254,10 +209,7 @@ function IncubationNavGroup({ can, onClose }) {
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
           isIncubationSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isIncubationSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
+        style={isIncubationSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isIncubationSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
@@ -356,10 +308,7 @@ function InactiveNavGroup({ can, onClose }) {
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
           isInactiveSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isInactiveSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
+        style={isInactiveSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isInactiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
@@ -421,15 +370,6 @@ const NAV_GROUPS = [
 ]
 
 /** أداء الفريق — أهداف اليوم + الإحصائيات */
-const STAFF_PERFORMANCE_SUB = [
-  { to: '/staff-performance', label: 'أهداف اليوم', kind: 'goals' },
-  { to: '/staff-performance/stats', label: 'الإحصائيات', kind: 'stats' },
-  { to: '/staff-performance/recovery-report', label: 'تقرير الاستعادة', kind: 'recovery' },
-  { to: '/staff-performance/conversion-report', label: 'تقرير نسبة التحويل', kind: 'conversion' },
-  { to: '/staff-performance/satisfaction-report', label: 'تقرير معدل الرضا', kind: 'satisfaction' },
-  { to: '/staff-performance/incubation-calls-report', label: 'تقرير مكالمات الاحتضان', kind: 'incubation_calls' },
-]
-
 function staffPerfSubActive(kind, pathname) {
   if (kind === 'goals') {
     return pathname === '/staff-performance' || pathname === '/staff-performance/'
@@ -462,10 +402,7 @@ function StaffPerformanceNavGroup({ can, onClose }) {
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right ${
           isSection ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'
         }`}
-        style={isSection ? {
-          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))',
-          boxShadow: '0 0 20px rgba(139,92,246,0.15)',
-        } : {}}
+        style={isSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
@@ -543,12 +480,12 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* ── Logo ─────────────────────────────── */}
       <div className="relative z-10 px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg bg-black flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-violet-900/40 ring-1 ring-white/10 bg-black flex items-center justify-center">
             <img src="/favicon.png" alt="النورس" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
-            <p className="text-white font-black text-sm leading-tight">النورس</p>
-            <p className="text-purple-400 text-[10px] font-medium">CRM System</p>
+            <p className="text-white font-black text-[15px] leading-tight tracking-tight">النورس</p>
+            <p className="text-purple-300/90 text-[10px] font-semibold tracking-wide">CRM System</p>
             <NawrasTaglineStack light compact className="mt-2 border-t border-white/10 pt-2" />
           </div>
         </div>
@@ -568,7 +505,7 @@ export default function Sidebar({ isOpen, onClose }) {
               to="/lead-management"
               onClick={handleNav}
               className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${isActive ? 'text-white' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
-              style={({ isActive }) => isActive ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' } : {}}
+              style={({ isActive }) => isActive ? ACTIVE_GROUP_STYLE : {}}
             >
               {({ isActive }) => (<>
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
@@ -614,7 +551,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }`
                   }
                   style={({ isActive }) => isActive
-                    ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                    ? ACTIVE_GROUP_STYLE
                     : {}
                   }
                 >
@@ -691,7 +628,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     style={({ isActive }) => {
                       if (frostDash) return {}
                       return isActive
-                        ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                        ? ACTIVE_GROUP_STYLE
                         : {}
                     }}
                   >
@@ -751,7 +688,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     style={({ isActive }) => {
                       if (frostDash) return {}
                       return isActive
-                        ? { background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(168,85,247,0.15))', boxShadow: '0 0 20px rgba(139,92,246,0.15)' }
+                        ? ACTIVE_GROUP_STYLE
                         : {}
                     }}
                   >
@@ -787,9 +724,9 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* ── User ─────────────────────────────── */}
       <div className="relative z-10 p-4 border-t border-white/5 space-y-2">
         {/* بيانات المستخدم */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.06] ring-1 ring-white/5">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0 shadow-lg shadow-violet-900/30 ring-1 ring-white/15"
             style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)' }}
           >
             {initials}

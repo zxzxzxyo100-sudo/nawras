@@ -4,8 +4,10 @@ import { motion } from 'framer-motion'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, PieChart, Pie,
 } from 'recharts'
+import StatusBadge from '../components/StatusBadge'
+import { STATUS_COLORS } from '../config/designTokens'
 import {
   TrendingUp, Flame, Snowflake, Store,
   RefreshCw, AlertCircle, Package, Phone,
@@ -118,6 +120,8 @@ export default function Dashboard() {
     return ROLES[r]?.views?.includes('users') ?? false
   }, [user?.role])
 
+  /** فلتر بسيط لقسم «أحدث المتاجر» — أي الفئات تُعرض ضمن أحدث 5 سجلات */
+  const [recentStoresFilter, setRecentStoresFilter] = useState('new_incubating')
   const [staffMissions, setStaffMissions] = useState(null)
   const [missionsLoading, setMissionsLoading] = useState(false)
   const [missionsErr, setMissionsErr] = useState('')
@@ -899,44 +903,78 @@ export default function Dashboard() {
         {/* أحدث المتاجر — يظهر لمن لديه صلاحية «المتاجر» فقط */}
         {can('new') && (
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-slate-50">
               <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
                   <Store size={14} className="text-violet-600" />
                 </div>
-                أحدث المتاجر المسجلة
+                أحدث المتاجر
               </h2>
-              <button type="button" onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors">
-                عرض الكل <ArrowUpRight size={11} />
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={recentStoresFilter}
+                  onChange={e => setRecentStoresFilter(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+                >
+                  <option value="new_incubating">جديدة واحتضان</option>
+                  <option value="active_shipping">نشط يشحن</option>
+                  <option value="hot_inactive">غير نشط ساخن</option>
+                  <option value="cold_inactive">غير نشط بارد</option>
+                  <option value="all">كل الفئات</option>
+                </select>
+                <button type="button" onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors shrink-0">
+                  عرض الكل <ArrowUpRight size={11} />
+                </button>
+              </div>
             </div>
-            <div>
-              {[...(stores.new_registered || []), ...(stores.incubating || [])].sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0)).slice(0, 5).map((s, i) => {
-                const hours = s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 3600000) : null
-                return (
-                  <div key={s.id} className={`flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer ${i !== 4 ? 'border-b border-slate-50' : ''}`}>
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                      {s.name?.charAt(0) || '؟'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-slate-800 font-semibold text-sm truncate">
-                        <StoreNameWithId store={s} nameClassName="font-semibold text-slate-800 text-sm" idClassName="font-mono text-xs text-slate-500 font-semibold" />
-                      </div>
-                      <p className="text-slate-400 text-xs">{hours !== null ? (hours < 24 ? `منذ ${hours} ساعة` : `منذ ${Math.floor(hours / 24)} يوم`) : '—'}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${parseInt(s.total_shipments) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {parseInt(s.total_shipments) || 0} طرد
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <tbody>
+                  {(() => {
+                    const tag = (arr, bucket) => (arr || []).map(s => ({ ...s, bucket }))
+                    const pools = {
+                      new_incubating: [...tag(stores.new_registered, 'new_registered'), ...tag(stores.incubating, 'incubating')],
+                      active_shipping: tag(stores.active_shipping, 'active_shipping'),
+                      hot_inactive: tag(stores.hot_inactive, 'hot_inactive'),
+                      cold_inactive: tag(stores.cold_inactive, 'cold_inactive'),
+                      all: Object.entries(stores).flatMap(([bucket, arr]) => tag(arr, bucket)),
+                    }
+                    const pool = pools[recentStoresFilter] || pools.new_incubating
+                    const rows = [...pool]
+                      .sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0))
+                      .slice(0, 5)
+                    if (rows.length === 0) {
+                      return (
+                        <tr><td className="px-5 py-6 text-center text-slate-400 text-xs">لا توجد متاجر بهذه الفئة</td></tr>
+                      )
+                    }
+                    return rows.map((s, i) => {
+                      const hours = s.registered_at ? Math.floor((new Date() - new Date(s.registered_at)) / 3600000) : null
+                      return (
+                        <tr key={s.id} className={`hover:bg-slate-50 transition-colors cursor-pointer ${i !== rows.length - 1 ? 'border-b border-slate-50' : ''}`}>
+                          <td className="px-5 py-3 w-10">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                              {s.name?.charAt(0) || '؟'}
+                            </div>
+                          </td>
+                          <td className="px-1 py-3 min-w-0">
+                            <StoreNameWithId store={s} nameClassName="font-semibold text-slate-800 text-sm" idClassName="font-mono text-xs text-slate-500 font-semibold" />
+                            <p className="text-slate-400 text-xs mt-0.5">{hours !== null ? (hours < 24 ? `منذ ${hours} ساعة` : `منذ ${Math.floor(hours / 24)} يوم`) : '—'}</p>
+                          </td>
+                          <td className="px-3 py-3 text-left whitespace-nowrap">
+                            <StatusBadge category={s.bucket} size="sm" />
+                          </td>
+                        </tr>
+                      )
+                    })
+                  })()}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* توزيع فوري */}
+        {/* توزيع الفئات — Donut */}
         <div
           className={`rounded-2xl p-5 lg:p-6 flex flex-col gap-4 ${can('new') ? '' : 'lg:col-span-3'}`}
           style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
@@ -944,39 +982,65 @@ export default function Dashboard() {
           <div>
             <h2 className="text-white font-bold text-sm flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-              توزيع الفئات
+              توزيع المتاجر حسب الفئة
             </h2>
             <p className="text-white/40 text-xs mt-0.5">{(counts.total || 0).toLocaleString('ar-SA')} متجر إجمالي</p>
           </div>
 
-          {[
-            can('active') && { label: 'نشط يشحن',   v: counts.active_shipping || 0, color: '#10b981', bg: '#10b98115' },
-            can('hot_inactive') && { label: 'غير نشط ساخن', v: counts.hot_inactive    || 0, color: '#f59e0b', bg: '#f59e0b15' },
-            can('cold_inactive') && { label: 'غير نشط بارد', v: counts.cold_inactive   || 0, color: '#8b5cf6', bg: '#8b5cf615' },
-            can('new') && { label: 'جديدة & احتضان', v: counts.incubating  || 0, color: '#a78bfa', bg: '#a78bfa15' },
-          ].filter(Boolean).map(row => {
-            const pct = counts.total ? Math.round((row.v / counts.total) * 100) : 0
+          {(() => {
+            const rows = [
+              can('active') && { key: 'active_shipping', label: 'نشط يشحن', v: counts.active_shipping || 0 },
+              can('hot_inactive') && { key: 'hot_inactive', label: 'غير نشط ساخن', v: counts.hot_inactive || 0 },
+              can('cold_inactive') && { key: 'cold_inactive', label: 'غير نشط بارد', v: counts.cold_inactive || 0 },
+              can('new') && { key: 'incubating', label: 'جديدة واحتضان', v: counts.incubating || 0 },
+              can('active') && { key: 'frozen_merchants', label: 'مجمدة', v: counts.frozen_merchants || 0 },
+            ].filter(row => row && row.v > 0)
+            if (rows.length === 0) {
+              return <p className="text-white/40 text-xs text-center py-6">لا توجد بيانات كافية للعرض</p>
+            }
             return (
-              <div key={row.label}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.color }} />
-                    <span className="text-white/70 text-xs">{row.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/40 text-xs">{pct}%</span>
-                    <span className="text-white font-bold text-sm">{row.v.toLocaleString('ar-SA')}</span>
-                  </div>
+              <>
+                <div className="h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={rows}
+                        dataKey="v"
+                        nameKey="label"
+                        innerRadius="62%"
+                        outerRadius="95%"
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {rows.map(row => (
+                          <Cell key={row.key} fill={STATUS_COLORS[row.key]?.hex || '#8b5cf6'} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: row.bg }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${pct}%`, background: row.color }}
-                  />
+                <div className="space-y-2.5">
+                  {rows.map(row => {
+                    const pct = counts.total ? Math.round((row.v / counts.total) * 100) : 0
+                    const hex = STATUS_COLORS[row.key]?.hex || '#8b5cf6'
+                    return (
+                      <div key={row.key} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: hex }} />
+                          <span className="text-white/70 text-xs">{row.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-white/40 text-xs">{pct}%</span>
+                          <span className="text-white font-bold text-sm tabular-nums">{row.v.toLocaleString('ar-SA')}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
+              </>
             )
-          })}
+          })()}
         </div>
       </motion.div>
     </div>
