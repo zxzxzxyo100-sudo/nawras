@@ -100,6 +100,13 @@ export const addUser = (data) =>
 export const updateUser = (data) =>
   http.post('/auth.php?action=update_user', data).then(r => r.data)
 
+/** تغيير كلمة مرور المستخدم الحالي (نفسه فقط — يعتمد على الجلسة) */
+export const changePassword = (currentPassword, newPassword) =>
+  http.post('/auth.php?action=change_password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  }).then(r => r.data)
+
 export const deleteUser = (id) =>
   http.post('/auth.php?action=delete_user', { id }).then(r => r.data)
 

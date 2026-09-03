@@ -1,11 +1,18 @@
 @import "tailwindcss";
 
+/** الوضع الداكن يُفعَّل بإضافة/إزالة class="dark" على <html> (يتحكم بها ThemeContext)،
+ *  وليس بتفضيل نظام التشغيل — حتى يبقى الاختيار بيد المستخدم ومحفوظاً بـ localStorage. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * { box-sizing: border-box; }
   body {
     font-family: 'Cairo', 'Segoe UI', sans-serif;
     direction: rtl;
     background-color: #f1f5f9;
+  }
+  html.dark body {
+    background-color: #0b1120;
   }
   /* شريط تمرير أفقي مرئي للجداول العريضة على الموبايل (WebKit يخفيه افتراضياً على iOS) */
   .overflow-x-auto::-webkit-scrollbar {

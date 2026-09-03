@@ -134,6 +134,46 @@ elseif ($action === 'delete_user') {
     jsonResponse(['success' => true]);
 }
 
+/**
+ * تغيير كلمة مرور المستخدم الحالي (وليس أي مستخدم آخر) — يعتمد على الجلسة فقط
+ * (session id)، لا على id يُرسله الطرف الأمامي، ويتحقق من كلمة المرور الحالية
+ * قبل السماح بالتغيير. يخزّن كلمة المرور الجديدة مُشفّرة (password_hash) —
+ * على عكس add_user/update_user اللتين تخزّنان القيمة كما وصلت (نص صريح تاريخياً).
+ */
+elseif ($action === 'change_password') {
+    $sessUser = $_SESSION['nawras_user'] ?? null;
+    if (!is_array($sessUser) || empty($sessUser['id'])) {
+        jsonResponse(['success' => false, 'error' => 'يجب تسجيل الدخول'], 401);
+    }
+    $current = (string) ($input['current_password'] ?? '');
+    $new     = (string) ($input['new_password'] ?? '');
+    if ($new === '' || strlen($new) < 6) {
+        jsonResponse(['success' => false, 'error' => 'كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل'], 400);
+    }
+    try {
+        $stmt = $pdo->prepare('SELECT password FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([(int) $sessUser['id']]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            jsonResponse(['success' => false, 'error' => 'المستخدم غير موجود'], 404);
+        }
+        $stored = (string) ($row['password'] ?? '');
+        if (strlen($stored) >= 60 && strncmp($stored, '$2', 2) === 0) {
+            $ok = password_verify($current, $stored);
+        } else {
+            $ok = hash_equals($stored, $current);
+        }
+        if (!$ok) {
+            jsonResponse(['success' => false, 'error' => 'كلمة المرور الحالية غير صحيحة'], 401);
+        }
+        $hashed = password_hash($new, PASSWORD_DEFAULT);
+        $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([$hashed, (int) $sessUser['id']]);
+        jsonResponse(['success' => true]);
+    } catch (Exception $e) {
+        jsonResponse(['success' => false, 'error' => 'خطأ بقاعدة البيانات: ' . $e->getMessage()], 500);
+    }
+}
+
 else {
     jsonResponse(['error' => 'Unknown action'], 400);
 }

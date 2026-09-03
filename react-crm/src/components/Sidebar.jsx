@@ -3,14 +3,16 @@ import { useState, useEffect } from 'react'
 import {
   Store, TrendingUp,
   Users, Baby, X,
-  ChevronDown, Circle, Layers, Lock, Phone,
+  ChevronDown, Circle, Layers, Lock, Phone, RotateCcw, RefreshCw,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useStores } from '../contexts/StoresContext'
 import { usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { DISABLE_POINTS_AND_PERFORMANCE } from '../config/features'
 import { IS_STAGING_OR_DEV } from '../config/envFlags'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { SIDEBAR_GRADIENT_ACTIVE, SIDEBAR_GLOW_ACTIVE } from '../config/designTokens'
+import { resetActiveStores, resetInactivePool, refreshStorePool, fillAllInactiveQueues } from '../services/api'
 import {
   NAV_ALL, STORES_SUB, ACTIVE_SUB, INCUBATION_SUB, INACTIVE_SUB, STAFF_PERFORMANCE_SUB,
 } from '../config/navStructure'
@@ -358,15 +360,127 @@ function navItemVisible(item, can, loggedIn) {
 }
 
 // تقسيم روابط التنقل لمجموعات
+/**
+ * إعادة ضبط — أدوات تنفيذية نُقلت من صفحاتها السابقة (نشط يشحن/لوحة التحكم)
+ * إلى مكان واحد بالسايدبار: إعادة المتاجر المنجزة/لم يتم الرد لقيد المتابعة،
+ * وتحديث مجمع الاستعادة. نفس الاستدعاءات والمنطق بالضبط، بدون تغيير وظيفي.
+ */
+function AdminResetGroup({ can }) {
+  const { user } = useAuth()
+  const { reload } = useStores()
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(null)
+  const [msg, setMsg] = useState('')
+
+  if (!can('users')) return null
+
+  async function handleReset(type) {
+    const label = type === 'completed' ? 'المنجزة' : 'لم يتم الرد'
+    if (!window.confirm(`هل أنت متأكد من إعادة متاجر «${label}» إلى قيد المتابعة؟`)) return
+    setLoading(type)
+    setMsg('')
+    try {
+      const res = await resetActiveStores(type, user?.username || '')
+      if (res?.success) {
+        setMsg(res.message || 'تمت الإعادة بنجاح')
+        await reload()
+      } else {
+        setMsg('حدث خطأ أثناء الإعادة')
+      }
+    } catch {
+      setMsg('خطأ في الاتصال بالخادم')
+    } finally {
+      setLoading(null)
+      setTimeout(() => setMsg(''), 4000)
+    }
+  }
+
+  async function handleRefreshPool() {
+    setLoading('pool')
+    setMsg('جارٍ تحرير السجلات القديمة…')
+    try {
+      const resetRes = await resetInactivePool({ user_role: 'executive', assigned_by: user?.username || '' })
+      const cleared = resetRes?.cleared ?? 0
+      const filled1 = resetRes?.filled ?? 0
+      setMsg(`تم تحرير ${cleared} سجل — جارٍ تحديث بيانات المتاجر (30-90 ث)…`)
+      const storeRes = await refreshStorePool()
+      const hotCount = storeRes?.counts?.hot_inactive ?? null
+      const fillRes = await fillAllInactiveQueues({ user_role: 'executive', assigned_by: user?.username || '' })
+      const filled2 = Object.values(fillRes?.filled_inactive_per_user || {}).reduce((a, b) => a + b, 0)
+      await reload()
+      const totalFilled = filled1 + filled2
+      setMsg(
+        `تم بنجاح — حُرِّر ${cleared} سجل، أُضيف ${totalFilled} متجر للطوابير` +
+        (hotCount != null ? ` — المجمع: ${hotCount} ساخن` : '')
+      )
+    } catch {
+      setMsg('خطأ أثناء تحديث المجمع — حاول مرة أخرى')
+    } finally {
+      setLoading(null)
+      setTimeout(() => setMsg(''), 8000)
+    }
+  }
+
+  return (
+    <div className="mb-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 text-right text-white/40 hover:text-white/80 hover:bg-white/5"
+      >
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/5">
+          <RotateCcw size={14} className="text-white/50" />
+        </div>
+        <span className="flex-1 truncate">إعادة ضبط</span>
+        <ChevronDown size={14} className={`text-white/50 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mr-2 mt-0.5 pr-2 border-r border-white/10 space-y-1">
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={() => handleReset('completed')}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold text-white/60 hover:text-white/90 hover:bg-white/5 transition-colors disabled:opacity-50 text-right"
+          >
+            <RefreshCw size={12} className={loading === 'completed' ? 'animate-spin text-amber-400' : 'text-white/30'} />
+            <span>إعادة المنجزة للمتابعة</span>
+          </button>
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={() => handleReset('unreachable')}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold text-white/60 hover:text-white/90 hover:bg-white/5 transition-colors disabled:opacity-50 text-right"
+          >
+            <RefreshCw size={12} className={loading === 'unreachable' ? 'animate-spin text-amber-400' : 'text-white/30'} />
+            <span>إعادة «لم يتم الرد» للمتابعة</span>
+          </button>
+          <button
+            type="button"
+            disabled={loading !== null}
+            onClick={handleRefreshPool}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold text-white/60 hover:text-white/90 hover:bg-white/5 transition-colors disabled:opacity-50 text-right"
+          >
+            <RefreshCw size={12} className={loading === 'pool' ? 'animate-spin text-amber-400' : 'text-white/30'} />
+            <span>تحديث مجمع الاستعادة</span>
+          </button>
+          {msg && <p className="text-[10px] text-white/50 px-3 pt-1 leading-relaxed">{msg}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const NAV_GROUPS = [
   { label: 'الرئيسية', keys: ['/', '/tasks', '/quick-verification'] },
   { label: 'المتاجر',   keys: ['__store_section__'] },
   {
     label: 'الإدارة',
     keys: DISABLE_POINTS_AND_PERFORMANCE
-      ? ['/users', '__staff_performance_group__']
-      : ['/performance', '/users', '__staff_performance_group__'],
+      ? ['__staff_performance_group__']
+      : ['/performance', '__staff_performance_group__'],
   },
+  { label: 'الإعدادات', keys: ['/users'] },
+  { label: 'إعادة ضبط', keys: ['__admin_reset_group__'] },
 ]
 
 /** أداء الفريق — أهداف اليوم + الإحصائيات */
@@ -649,6 +763,20 @@ export default function Sidebar({ isOpen, onClose }) {
                   </NavLink>
                     )
                   })}
+                </div>
+              </div>
+            )
+          }
+
+          if (group.keys.includes('__admin_reset_group__')) {
+            if (!can('users')) return null
+            return (
+              <div key={group.label} className="mb-5">
+                <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest px-3 mb-2">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  <AdminResetGroup can={can} />
                 </div>
               </div>
             )
