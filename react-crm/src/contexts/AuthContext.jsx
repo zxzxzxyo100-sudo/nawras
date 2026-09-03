@@ -49,9 +49,9 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true }
   }, [])
 
-  async function login(username, password) {
+  async function login(email, password) {
     try {
-      const res = await apiLogin(username, password)
+      const res = await apiLogin(email, password)
       if (!res?.success) throw new Error(res?.error || 'بيانات غير صحيحة')
       const ru = res.user
       const roleRaw = typeof ru?.role === 'string' ? ru.role.trim() : ru?.role

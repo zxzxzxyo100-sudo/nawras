@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, FlaskConical, Bell, ChevronLeft, LogOut, Settings } from 'lucide-react'
+import { Menu, FlaskConical, Bell, ChevronLeft, LogOut, Settings, Ticket, AlertCircle } from 'lucide-react'
 import Sidebar from './Sidebar'
 import MobileBottomNav from './MobileBottomNav'
 import FloatingCallBar from './FloatingCallBar'
@@ -9,7 +9,7 @@ import StoreDrawer from './StoreDrawer'
 import SettingsModal from './SettingsModal'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth, ROLES } from '../contexts/AuthContext'
-import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
+import { PrivateTicketsAlertProvider, usePrivateTicketsAlert } from '../contexts/PrivateTicketsAlertContext'
 import { labelForPath } from '../utils/breadcrumb'
 import logo from '../assets/images/logo.png'
 
@@ -22,11 +22,13 @@ const FLOATING_CALL_ROLES = ['inactive_manager', 'active_manager', 'incubation_o
 function LayoutInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const [headerOpenStore, setHeaderOpenStore] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { openCount, openTickets } = usePrivateTicketsAlert()
   /** التحقيق السريع: عرض كامل ملتصق بحواف منطقة المحتوى (دون p-4 الافتراضية) */
   const isQuickVerification = pathname === '/quick-verification'
   const currentPageLabel = useMemo(() => labelForPath(pathname), [pathname])
@@ -194,13 +196,62 @@ function LayoutInner() {
             {/* يسار: إشعارات + المستخدم */}
             <div className="relative z-10 flex items-center gap-2 shrink-0">
               <NawrasTaglineStack className="hidden xl:block max-w-[180px] me-1" />
-              <button
-                type="button"
-                title="الإشعارات"
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              >
-                <Bell size={17} />
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  title="الإشعارات"
+                  onClick={() => setNotifOpen(o => !o)}
+                  className="relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Bell size={17} />
+                  {openCount > 0 && (
+                    <span className="absolute -top-0.5 -end-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+                      {openCount > 9 ? '9+' : openCount}
+                    </span>
+                  )}
+                </button>
+                {notifOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
+                    <div className="absolute end-0 top-full mt-2 z-20 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-1.5 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.22)]">
+                      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100">الإشعارات</p>
+                        {openCount > 0 && (
+                          <span className="text-[10px] font-bold text-red-600">{openCount} مفتوحة</span>
+                        )}
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {openTickets.length === 0 ? (
+                          <p className="px-3 py-6 text-center text-[11px] text-slate-400">لا توجد تذاكر خاصة مفتوحة حالياً</p>
+                        ) : (
+                          openTickets.map(t => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setNotifOpen(false)
+                                navigate('/')
+                              }}
+                              className="w-full flex items-start gap-2 px-3 py-2.5 text-start hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-b-0"
+                            >
+                              {Number(t.is_mandatory) === 1 ? (
+                                <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                              ) : (
+                                <Ticket size={14} className="mt-0.5 shrink-0 text-violet-500" />
+                              )}
+                              <span className="min-w-0">
+                                <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{t.title}</span>
+                                <span className="block text-[11px] text-slate-500 dark:text-slate-400 truncate">{t.body}</span>
+                                <span className="block text-[10px] text-slate-400 mt-0.5">من: {t.created_by_username}</span>
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="relative">
                 <button
                   type="button"

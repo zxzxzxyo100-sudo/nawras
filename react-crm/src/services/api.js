@@ -49,7 +49,7 @@ function parseApiErrorBody(data) {
 }
 
 const FALLBACK_401_AR =
-  'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم وكلمة المرور؛ على التجريبي تأكد أن الحساب موجود في قاعدة بيانات التجريب وليس الإنتاج فقط.'
+  'بيانات الدخول غير صحيحة. تحقق من البريد الإلكتروني وكلمة المرور؛ على التجريبي تأكد أن الحساب موجود في قاعدة بيانات التجريب وليس الإنتاج فقط.'
 
 /** تسجيل الدخول — يمرّر رسالة الخادم العربية بدل رسالة axios الافتراضية */
 /** إن كانت cookie الجلسة ما زالت صالحة ولم يُخزَّن session_resume بعد — يُعاد التوكن دون إعادة إدخال كلمة المرور */
@@ -67,9 +67,9 @@ export async function logoutServer() {
   }
 }
 
-export async function login(username, password) {
+export async function login(email, password) {
   try {
-    const r = await http.post('/auth.php?action=login', { username, password })
+    const r = await http.post('/auth.php?action=login', { email, password })
     return r.data
   } catch (e) {
     const status = e.response?.status
