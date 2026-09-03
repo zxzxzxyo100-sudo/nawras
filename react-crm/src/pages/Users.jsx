@@ -7,7 +7,7 @@ import ResponsiveDataView, { DataCard } from '../components/ResponsiveDataView'
 
 const ROLE_OPTIONS = Object.entries(ROLES).map(([value, { label }]) => ({ value, label }))
 
-const EMPTY_FORM = { username: '', fullname: '', password: '', role: 'active_manager' }
+const EMPTY_FORM = { username: '', email: '', fullname: '', password: '', role: 'active_manager' }
 
 export default function Users() {
   const { user } = useAuth()
@@ -47,7 +47,7 @@ export default function Users() {
   function openAdd() { setEditing(null); setForm(EMPTY_FORM); setError(''); setShowForm(true) }
   function openEdit(u) {
     setEditing(u)
-    setForm({ username: u.username, fullname: u.fullname, password: '', role: u.role })
+    setForm({ username: u.username, email: u.email || '', fullname: u.fullname, password: '', role: u.role })
     setError('')
     setShowForm(true)
   }
@@ -104,7 +104,7 @@ export default function Users() {
         renderCard={(u) => (
           <DataCard
             title={u.fullname}
-            subtitle={u.username}
+            subtitle={u.email || u.username}
             badge={ROLES[u.role]?.label ?? u.role}
             rows={[
               ...(user?.role === 'executive' && u.role === 'inactive_manager'
@@ -127,6 +127,7 @@ export default function Users() {
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-xs font-semibold">
                 <th className="text-right px-5 py-3">الاسم</th>
+                <th className="text-right px-5 py-3">البريد الإلكتروني</th>
                 <th className="text-right px-5 py-3">اسم المستخدم</th>
                 <th className="text-right px-5 py-3">الصلاحية</th>
                 {user?.role === 'executive' && (
@@ -140,6 +141,7 @@ export default function Users() {
               {users.map(u => (
                 <tr key={u.id} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-4 font-medium text-slate-800">{u.fullname}</td>
+                  <td className="px-5 py-4 text-slate-500 text-xs" dir="ltr">{u.email || <span className="text-red-400">— غير مضاف —</span>}</td>
                   <td className="px-5 py-4 text-slate-500 font-mono text-xs">{u.username}</td>
                   <td className="px-5 py-4">
                     <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
@@ -202,6 +204,7 @@ export default function Users() {
             <form onSubmit={handleSave} className="p-5 space-y-4">
               {error && <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">{error}</div>}
               <Field label="الاسم الكامل" value={form.fullname} onChange={v => setForm(f => ({ ...f, fullname: v }))} required />
+              <Field label="البريد الإلكتروني (لتسجيل الدخول)" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" required />
               <Field label="اسم المستخدم" value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} required />
               <Field label={editing ? 'كلمة مرور جديدة (اتركها فارغة للإبقاء)' : 'كلمة المرور'} value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" required={!editing} />
               <div>

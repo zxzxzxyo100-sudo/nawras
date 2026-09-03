@@ -3,6 +3,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/session-resume-lib.php';
+require_once __DIR__ . '/workflow-queue-lib.php';
 nawras_configure_session_cookie();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -14,20 +15,50 @@ try {
     jsonResponse(['success' => false, 'error' => 'Database connection failed: ' . $e->getMessage()], 500);
 }
 
+/** يضيف عمود email إلى users مرة واحدة فقط (عبر ملف علامة) — تسجيل الدخول أصبح بالبريد بدل اسم المستخدم */
+function ensure_users_email_schema(PDO $pdo) {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    if (nawras_schema_marker_done('users_email')) {
+        $done = true;
+        return;
+    }
+    try {
+        $pdo->exec('ALTER TABLE users ADD COLUMN email VARCHAR(190) NULL DEFAULT NULL AFTER username');
+    } catch (Throwable $e) {
+    }
+    try {
+        $pdo->exec('ALTER TABLE users ADD UNIQUE INDEX idx_users_email (email)');
+    } catch (Throwable $e) {
+    }
+    nawras_schema_marker_set('users_email');
+    $done = true;
+}
+ensure_users_email_schema($pdo);
+
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
 if ($action === 'login') {
     try {
-        $username = trim((string) ($input['username'] ?? ''));
+        $email    = strtolower(trim((string) ($input['email'] ?? '')));
         $password = (string) ($input['password'] ?? '');
 
-        if ($username === '') {
-            jsonResponse(['success' => false, 'error' => 'Username is required'], 400);
+        if ($email === '') {
+            jsonResponse(['success' => false, 'error' => 'البريد الإلكتروني مطلوب'], 400);
         }
 
-        $stmt = $pdo->prepare('SELECT id, username, fullname, role, password FROM users WHERE username = ?');
-        $stmt->execute([$username]);
+        /**
+         * أثناء فترة انتقال الحسابات القديمة (التي لم يُضَف لها بريد بعد عبر
+         * صفحة إدارة المستخدمين): إن لم يوجد تطابق بالبريد، يُقبل نفس الحقل
+         * كاسم مستخدم أيضاً — حتى لا يُقفَل أي حساب قبل أن يُستكمَل تعيين
+         * البريد لجميع الحسابات. لا يظهر أي حقل "اسم مستخدم" بالواجهة —
+         * هذا فقط شبكة أمان خلفية تُزال لاحقاً بعد اكتمال الترحيل.
+         */
+        $stmt = $pdo->prepare('SELECT id, username, fullname, role, password FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1');
+        $stmt->execute([$email, $email]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
@@ -104,29 +135,47 @@ elseif ($action === 'logout') {
 }
 
 elseif ($action === 'list_users') {
-    $stmt = $pdo->query("SELECT id, username, fullname, role, created_at FROM users ORDER BY id");
+    $stmt = $pdo->query("SELECT id, username, email, fullname, role, created_at FROM users ORDER BY id");
     jsonResponse(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
 elseif ($action === 'add_user') {
-    $stmt = $pdo->prepare("INSERT INTO users (username, fullname, password, role) VALUES (?, ?, ?, ?)");
+    $email = strtolower(trim((string) ($input['email'] ?? '')));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        jsonResponse(['success' => false, 'error' => 'يجب إدخال بريد إلكتروني صالح'], 400);
+    }
+    $stmt = $pdo->prepare("INSERT INTO users (username, email, fullname, password, role) VALUES (?, ?, ?, ?, ?)");
     try {
-        $stmt->execute([$input['username'], $input['fullname'], $input['password'], $input['role']]);
+        $stmt->execute([$input['username'], $email, $input['fullname'], $input['password'], $input['role']]);
         jsonResponse(['success' => true, 'id' => $pdo->lastInsertId()]);
     } catch (PDOException $e) {
-        jsonResponse(['success' => false, 'error' => 'Username already exists'], 400);
+        if (strpos($e->getMessage(), 'idx_users_email') !== false) {
+            jsonResponse(['success' => false, 'error' => 'البريد الإلكتروني مستخدم بالفعل'], 400);
+        }
+        jsonResponse(['success' => false, 'error' => 'اسم المستخدم موجود بالفعل'], 400);
     }
 }
 
 elseif ($action === 'update_user') {
-    if (!empty($input['password'])) {
-        $stmt = $pdo->prepare("UPDATE users SET username=?, fullname=?, password=?, role=? WHERE id=?");
-        $stmt->execute([$input['username'], $input['fullname'], $input['password'], $input['role'], $input['id']]);
-    } else {
-        $stmt = $pdo->prepare("UPDATE users SET username=?, fullname=?, role=? WHERE id=?");
-        $stmt->execute([$input['username'], $input['fullname'], $input['role'], $input['id']]);
+    $email = strtolower(trim((string) ($input['email'] ?? '')));
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        jsonResponse(['success' => false, 'error' => 'يجب إدخال بريد إلكتروني صالح'], 400);
     }
-    jsonResponse(['success' => true]);
+    try {
+        if (!empty($input['password'])) {
+            $stmt = $pdo->prepare("UPDATE users SET username=?, email=?, fullname=?, password=?, role=? WHERE id=?");
+            $stmt->execute([$input['username'], $email, $input['fullname'], $input['password'], $input['role'], $input['id']]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE users SET username=?, email=?, fullname=?, role=? WHERE id=?");
+            $stmt->execute([$input['username'], $email, $input['fullname'], $input['role'], $input['id']]);
+        }
+        jsonResponse(['success' => true]);
+    } catch (PDOException $e) {
+        if (strpos($e->getMessage(), 'idx_users_email') !== false) {
+            jsonResponse(['success' => false, 'error' => 'البريد الإلكتروني مستخدم بالفعل'], 400);
+        }
+        jsonResponse(['success' => false, 'error' => 'اسم المستخدم موجود بالفعل'], 400);
+    }
 }
 
 elseif ($action === 'delete_user') {

@@ -16,6 +16,7 @@ export function PrivateTicketsAlertProvider({ children }) {
   const { user } = useAuth()
   const [openCount, setOpenCount] = useState(0)
   const [openMandatoryCount, setOpenMandatoryCount] = useState(0)
+  const [openTickets, setOpenTickets] = useState([])
   const [pulseTick, setPulseTick] = useState(0)
   const lastOpenRef = useRef(null)
 
@@ -26,6 +27,7 @@ export function PrivateTicketsAlertProvider({ children }) {
       lastOpenRef.current = null
       setOpenCount(0)
       setOpenMandatoryCount(0)
+      setOpenTickets([])
       return
     }
     try {
@@ -47,6 +49,7 @@ export function PrivateTicketsAlertProvider({ children }) {
 
       setOpenCount(n)
       setOpenMandatoryCount(m)
+      setOpenTickets(open)
     } catch {
       /* ignore */
     }
@@ -82,6 +85,7 @@ export function PrivateTicketsAlertProvider({ children }) {
       shouldAlert: staffAlert && openCount > 0,
       openCount,
       openMandatoryCount,
+      openTickets,
       pulseTick,
       refreshPrivateTicketsAlert: refresh,
     }),
@@ -89,6 +93,7 @@ export function PrivateTicketsAlertProvider({ children }) {
       staffAlert,
       openCount,
       openMandatoryCount,
+      openTickets,
       pulseTick,
       refresh,
     ]
@@ -108,6 +113,7 @@ export function usePrivateTicketsAlert() {
       shouldAlert: false,
       openCount: 0,
       openMandatoryCount: 0,
+      openTickets: [],
       pulseTick: 0,
       refreshPrivateTicketsAlert: async () => {},
     }
