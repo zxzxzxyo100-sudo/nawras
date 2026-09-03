@@ -242,18 +242,27 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   }
 
   // ينفّذ طلبات التعيين على دفعات صغيرة بدل إطلاقها كلها دفعة واحدة،
-  // ولا يوقف بقية الدفعة إذا فشل طلب واحد فقط
-  async function runAssignBatch(ids, buildPayload, { chunkSize = 8 } = {}) {
-    const idList = [...ids]
-    const failed = []
-    for (let i = 0; i < idList.length; i += chunkSize) {
-      const chunk = idList.slice(i, i + chunkSize)
-      const results = await Promise.allSettled(chunk.map(id => assignStore(buildPayload(id))))
-      results.forEach((r, idx) => {
-        if (r.status === 'rejected') failed.push(chunk[idx])
-      })
+  // ولا يوقف بقية الدفعة إذا فشل طلب واحد فقط. دفعات صغيرة (3) لأن الاستضافة
+  // المشتركة تحدّ عدد اتصالات قاعدة البيانات المتزامنة — دفعات أكبر تُفشل جزءاً
+  // من الطلبات بصمت (خطأ اتصال). يعيد محاولة الفاشلين مرة واحدة تلقائياً (واحد
+  // تلو الآخر) قبل الإبلاغ عن فشل نهائي، لأن أغلب الأخطاء هنا مؤقتة (تزاحم اتصال).
+  async function runAssignBatch(ids, buildPayload, { chunkSize = 3 } = {}) {
+    async function attempt(idList, size) {
+      const failed = []
+      for (let i = 0; i < idList.length; i += size) {
+        const chunk = idList.slice(i, i + size)
+        const results = await Promise.allSettled(chunk.map(id => assignStore(buildPayload(id))))
+        results.forEach((r, idx) => {
+          if (r.status === 'rejected') failed.push(chunk[idx])
+        })
+      }
+      return failed
     }
-    return failed
+
+    const firstPassFailed = await attempt([...ids], chunkSize)
+    if (firstPassFailed.length === 0) return []
+    // إعادة محاولة الفاشلين بدفعات أصغر (تسلسلية) — يمتص أغلب أخطاء تزاحم الاتصال المؤقتة
+    return attempt(firstPassFailed, 1)
   }
 
   // تعيين جماعي يدوي (كل المحددين → يوزر واحد)
