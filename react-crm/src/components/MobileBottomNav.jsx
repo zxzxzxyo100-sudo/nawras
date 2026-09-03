@@ -39,7 +39,7 @@ export default function MobileBottomNav() {
                 className={({ isActive }) =>
                   `flex flex-col items-center justify-center gap-1 min-h-[56px] px-1 py-1.5 text-[10px] font-semibold transition-colors ${
                     isActive
-                      ? 'text-violet-700'
+                      ? 'text-teal-700'
                       : 'text-slate-500 hover:text-slate-800'
                   }`
                 }
@@ -48,7 +48,7 @@ export default function MobileBottomNav() {
                   <>
                     <span
                       className={`flex h-7 w-7 items-center justify-center rounded-xl transition-colors ${
-                        isActive ? 'bg-violet-100' : 'bg-transparent'
+                        isActive ? 'bg-teal-100' : 'bg-transparent'
                       }`}
                     >
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />

@@ -100,7 +100,7 @@ function StoresNavGroup({ can, onClose }) {
         style={isStoresSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isStoresSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isStoresSection ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5'
         }`}>
           <Store size={14} className={isStoresSection ? 'text-white' : 'text-white/50'} />
         </div>
@@ -157,7 +157,7 @@ function ActiveNavGroup({ can, onClose }) {
         style={isActiveSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isActiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isActiveSection ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5'
         }`}>
           <TrendingUp size={14} className={isActiveSection ? 'text-white' : 'text-white/50'} />
         </div>
@@ -214,7 +214,7 @@ function IncubationNavGroup({ can, onClose }) {
         style={isIncubationSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isIncubationSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isIncubationSection ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5'
         }`}>
           <Baby size={14} className={isIncubationSection ? 'text-white' : 'text-white/50'} />
         </div>
@@ -313,7 +313,7 @@ function InactiveNavGroup({ can, onClose }) {
         style={isInactiveSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isInactiveSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isInactiveSection ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5'
         }`}>
           <Layers size={14} className={isInactiveSection ? 'text-white' : 'text-white/50'} />
         </div>
@@ -519,7 +519,7 @@ function StaffPerformanceNavGroup({ can, onClose }) {
         style={isSection ? ACTIVE_GROUP_STYLE : {}}
       >
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isSection ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5'
+          isSection ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5'
         }`}>
           <Users size={14} className={isSection ? 'text-white' : 'text-white/50'} />
         </div>
@@ -583,18 +583,18 @@ export default function Sidebar({ isOpen, onClose }) {
     >
       <NawrasHeroImageLayer opacity={0.1} footerCropPct={16} className="mix-blend-soft-light" />
       <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0d0520]/98 via-[#120828]/97 to-[#0a0318]/98 lg:from-[#0d0520]/94 lg:via-[#120828]/92 lg:to-[#0a0318]/96"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#04211d]/98 via-[#083330]/97 to-[#031815]/98 lg:from-[#04211d]/94 lg:via-[#083330]/92 lg:to-[#031815]/96"
         aria-hidden
       />
       {/* ── Logo ─────────────────────────────── */}
       <div className="relative z-10 px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-violet-900/40 ring-1 ring-white/10 bg-black flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-teal-900/40 ring-1 ring-white/10 bg-black flex items-center justify-center">
             <img src="/favicon.png" alt="النورس" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <p className="text-white font-black text-[15px] leading-tight tracking-tight">النورس</p>
-            <p className="text-purple-300/90 text-[10px] font-semibold tracking-wide">CRM System</p>
+            <p className="text-teal-300/90 text-[10px] font-semibold tracking-wide">CRM System</p>
             <NawrasTaglineStack light compact className="mt-2 border-t border-white/10 pt-2" />
           </div>
         </div>
@@ -617,11 +617,11 @@ export default function Sidebar({ isOpen, onClose }) {
               style={({ isActive }) => isActive ? ACTIVE_GROUP_STYLE : {}}
             >
               {({ isActive }) => (<>
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-violet-500 shadow-lg shadow-violet-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isActive ? 'bg-teal-500 shadow-lg shadow-teal-500/30' : 'bg-white/5 group-hover:bg-white/10'}`}>
                   <Phone size={14} className={isActive ? 'text-white' : 'text-white/50'} />
                 </div>
                 <span className="truncate">جمع البيانات والمتابعة</span>
-                {isActive && <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />}
+                {isActive && <div className="mr-auto w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />}
               </>)}
             </NavLink>
           </div>
@@ -668,14 +668,14 @@ export default function Sidebar({ isOpen, onClose }) {
                     <>
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${
                         isActive
-                          ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                          ? 'bg-teal-500 shadow-lg shadow-teal-500/30'
                           : 'bg-white/5 group-hover:bg-white/10'
                       }`}>
                         <item.icon size={14} className={isActive ? 'text-white' : 'text-white/50'} />
                       </div>
                       <span className="truncate">{item.label}</span>
                       {isActive && (
-                        <div className="mr-auto w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                        <div className="mr-auto w-1.5 h-1.5 rounded-full bg-teal-400 flex-shrink-0" />
                       )}
                     </>
                   )}
@@ -749,14 +749,14 @@ export default function Sidebar({ isOpen, onClose }) {
                               ? 'bg-cyan-400/25 shadow-[0_0_14px_rgba(200,255,255,0.35)] border border-white/20'
                               : 'bg-white/15 border border-white/15'
                             : isActive
-                              ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                              ? 'bg-teal-500 shadow-lg shadow-teal-500/30'
                               : 'bg-white/5 group-hover:bg-white/10'
                         }`}>
                           <item.icon size={14} className={frostDash ? 'text-cyan-100' : (isActive ? 'text-white' : 'text-white/50')} />
                         </div>
                         <span className="truncate">{item.label}</span>
                         {isActive && (
-                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-violet-400'}`} />
+                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-teal-400'}`} />
                         )}
                       </>
                     )}
@@ -823,14 +823,14 @@ export default function Sidebar({ isOpen, onClose }) {
                               ? 'bg-cyan-400/25 shadow-[0_0_14px_rgba(200,255,255,0.35)] border border-white/20'
                               : 'bg-white/15 border border-white/15'
                             : isActive
-                              ? 'bg-violet-500 shadow-lg shadow-violet-500/30'
+                              ? 'bg-teal-500 shadow-lg shadow-teal-500/30'
                               : 'bg-white/5 group-hover:bg-white/10'
                         }`}>
                           <item.icon size={14} className={frostDash ? 'text-cyan-100' : (isActive ? 'text-white' : 'text-white/50')} />
                         </div>
                         <span className="truncate">{item.label}</span>
                         {isActive && (
-                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-violet-400'}`} />
+                          <div className={`mr-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${frostDash ? 'bg-cyan-200 shadow-[0_0_8px_rgba(200,255,255,0.75)]' : 'bg-teal-400'}`} />
                         )}
                       </>
                     )}
