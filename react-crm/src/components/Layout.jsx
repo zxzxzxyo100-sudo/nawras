@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, FlaskConical, Bell, ChevronLeft, LogOut } from 'lucide-react'
+import { Menu, FlaskConical, Bell, ChevronLeft, LogOut, Settings } from 'lucide-react'
 import Sidebar from './Sidebar'
 import MobileBottomNav from './MobileBottomNav'
 import FloatingCallBar from './FloatingCallBar'
 import HeaderSearch from './HeaderSearch'
 import StoreDrawer from './StoreDrawer'
+import SettingsModal from './SettingsModal'
 import { NawrasHeroImageLayer, NawrasTaglineStack } from './NawrasBrandBackdrop'
 import { useAuth, ROLES } from '../contexts/AuthContext'
 import { PrivateTicketsAlertProvider } from '../contexts/PrivateTicketsAlertContext'
@@ -22,6 +23,7 @@ function LayoutInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [headerOpenStore, setHeaderOpenStore] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -47,7 +49,7 @@ function LayoutInner() {
   }, [sidebarOpen])
 
   return (
-    <div className="flex min-h-screen bg-slate-50" dir="rtl">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -151,7 +153,7 @@ function LayoutInner() {
 
         {/* شريط علوي للشاشات الكبيرة — كل الصفحات ما عدا التحقيق السريع (له هيدر خاص) */}
         {!isQuickVerification && (
-          <div className="relative z-20 hidden lg:flex items-center gap-4 overflow-visible border-b border-slate-200/90 bg-white/95 px-6 py-2.5 shadow-sm backdrop-blur-md">
+          <div className="relative z-20 hidden lg:flex items-center gap-4 overflow-visible border-b border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-6 py-2.5 shadow-sm backdrop-blur-md">
             <NawrasHeroImageLayer opacity={0.11} footerCropPct={15} />
             <div
               className="pointer-events-none absolute inset-0 bg-gradient-to-l from-slate-50/95 via-white/88 to-indigo-50/40"
@@ -219,9 +221,9 @@ function LayoutInner() {
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                    <div className="absolute end-0 top-full mt-2 z-20 w-52 rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.22)]">
-                      <div className="px-3 py-2 border-b border-slate-100">
-                        <p className="text-xs font-bold text-slate-800 truncate">{user?.fullname}</p>
+                    <div className="absolute end-0 top-full mt-2 z-20 w-52 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-1.5 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.22)]">
+                      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{user?.fullname}</p>
                         <p className="text-[10px] text-slate-400 truncate">{roleLabel}</p>
                       </div>
                       <button
@@ -231,6 +233,17 @@ function LayoutInner() {
                       >
                         <LogOut size={13} />
                         تسجيل الخروج
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false)
+                          setSettingsOpen(true)
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <Settings size={13} />
+                        الإعدادات
                       </button>
                     </div>
                   </>
@@ -243,6 +256,8 @@ function LayoutInner() {
         {headerOpenStore && (
           <StoreDrawer store={headerOpenStore} onClose={() => setHeaderOpenStore(null)} />
         )}
+
+        {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
         <main
           className={`flex-1 overflow-auto pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-0 ${isQuickVerification ? 'p-0' : 'p-4 lg:p-6'}`}

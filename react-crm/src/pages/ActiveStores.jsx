@@ -9,7 +9,7 @@ import CallModal from '../components/CallModal'
 import ActiveStoreSurveyModal from '../components/ActiveStoreSurveyModal'
 import { useStores } from '../contexts/StoresContext'
 import { useAuth } from '../contexts/AuthContext'
-import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow, resetActiveStores } from '../services/api'
+import { assignStore, listUsers, markSurveyNoAnswer, getMyWorkflow } from '../services/api'
 import { needsActiveSatisfactionSurvey } from '../constants/satisfactionSurvey'
 
 const ACTIVE_SEGMENTS = new Set(['pending', 'completed', 'unreachable'])
@@ -69,8 +69,6 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
   const [surveyModalStore, setSurveyModalStore] = useState(null)
   const [callModalStore, setCallModalStore] = useState(null)
   const [workflowNoAnswerLoading, setWorkflowNoAnswerLoading] = useState(null)
-  const [resetLoading, setResetLoading] = useState(null) // 'completed' | 'unreachable' | 'all'
-  const [resetMsg, setResetMsg] = useState('')
   const [unassignLoading, setUnassignLoading] = useState(null)
 
   const isExecutive = user?.role === 'executive'
@@ -96,26 +94,6 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
       console.error(e)
     } finally {
       setWorkflowNoAnswerLoading(null)
-    }
-  }
-
-  async function handleResetStores(type) {
-    if (!window.confirm(`هل أنت متأكد من إعادة متاجر «${type === 'completed' ? 'المنجزة' : type === 'unreachable' ? 'لم يتم الوصول' : 'المنجزة + لم يتم الوصول'}» إلى قيد المتابعة؟`)) return
-    setResetLoading(type)
-    setResetMsg('')
-    try {
-      const res = await resetActiveStores(type, user?.username || '')
-      if (res?.success) {
-        setResetMsg(res.message || 'تمت الإعادة بنجاح')
-        await reload()
-      } else {
-        setResetMsg('حدث خطأ أثناء الإعادة')
-      }
-    } catch (e) {
-      setResetMsg('خطأ في الاتصال بالخادم')
-    } finally {
-      setResetLoading(null)
-      setTimeout(() => setResetMsg(''), 4000)
     }
   }
 
@@ -811,14 +789,6 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
         </div>
       )}
 
-      {/* رسالة نتيجة إعادة الضبط */}
-      {resetMsg && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl text-sm font-medium">
-          <CheckCircle2 size={16} />
-          {resetMsg}
-        </div>
-      )}
-
       {/* شريط الفلتر — زر واحد يفتح لوحة جانبية (قيد المكالمة فقط) */}
       {isPendingTab && isExecutive && (
         <div className="flex items-center justify-end">
@@ -1233,20 +1203,9 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                 المتاجر المنجزة
               </h2>
               <p className="text-[11px] text-violet-800/80 mt-0.5">
-                تُعاد يدوياً إلى «قيد المتابعة» بالزر أدناه، أو تلقائياً عبر مهمة Cron.
+                تُعاد يدوياً إلى «قيد المتابعة» من «إعادة ضبط» بالقائمة الجانبية، أو تلقائياً عبر مهمة Cron.
               </p>
             </div>
-            {isExecutive && (
-              <button
-                type="button"
-                onClick={() => handleResetStores('completed')}
-                disabled={resetLoading !== null}
-                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-violet-700 border border-violet-300 bg-white hover:bg-violet-50 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={resetLoading === 'completed' ? 'animate-spin' : ''} />
-                إعادة للمتابعة ({scopedCompleted.length})
-              </button>
-            )}
           </div>
           <StoreTable
             variant="elite"
@@ -1278,17 +1237,6 @@ export default function ActiveStores({ embeddedSegment, fromDailyTasks = false }
                 تُسَجَّل هنا عند «لم يرد» أو «مشغول». عند «تم الرد» ينتقل المتجر إلى «المنجزة».
               </p>
             </div>
-            {isExecutive && (
-              <button
-                type="button"
-                onClick={() => handleResetStores('unreachable')}
-                disabled={resetLoading !== null}
-                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-amber-700 border border-amber-300 bg-white hover:bg-amber-50 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={resetLoading === 'unreachable' ? 'animate-spin' : ''} />
-                إعادة للمتابعة ({unreachableDisplayStores.length})
-              </button>
-            )}
           </div>
           <StoreTable
             variant="elite"

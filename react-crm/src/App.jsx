@@ -3,6 +3,7 @@ import { DISABLE_POINTS_AND_PERFORMANCE } from './config/features'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { StoresProvider } from './contexts/StoresContext'
 import { PointsProvider, usePoints } from './contexts/PointsContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -187,14 +188,16 @@ function GlobalAnimations() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <StoresProvider>
-          <PointsProvider>
-            <GlobalAnimations />
-            <AppRoutes />
-          </PointsProvider>
-        </StoresProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <StoresProvider>
+            <PointsProvider>
+              <GlobalAnimations />
+              <AppRoutes />
+            </PointsProvider>
+          </StoresProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }
