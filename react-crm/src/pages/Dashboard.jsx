@@ -53,8 +53,8 @@ const staggerContainer = {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#1e1333] border border-purple-500/30 rounded-xl px-4 py-2.5 shadow-2xl text-right">
-      <p className="text-purple-300 text-xs font-medium mb-1">{label}</p>
+    <div className="bg-[#0b1f1c] border border-teal-500/30 rounded-xl px-4 py-2.5 shadow-2xl text-right">
+      <p className="text-teal-300 text-xs font-medium mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-white text-sm font-bold" style={{ color: p.color }}>
           {p.value} {p.name}
@@ -327,7 +327,7 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-12 h-12 rounded-full border-2 border-purple-200 border-t-purple-500 animate-spin" />
+      <div className="w-12 h-12 rounded-full border-2 border-teal-200 border-t-teal-500 animate-spin" />
       <p className="text-slate-400 text-sm font-medium">جارٍ تحميل البيانات...</p>
     </div>
   )
@@ -353,16 +353,16 @@ export default function Dashboard() {
       >
         <NawrasHeroImageLayer opacity={0.11} footerCropPct={15} />
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-l from-slate-50/95 via-white/85 to-violet-50/25"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-l from-slate-50/95 via-white/85 to-teal-50/25"
           aria-hidden
         />
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
-              لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-purple-500">التحكم</span>
+              لوحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500">التحكم</span>
             </h1>
             <p className="text-slate-400 text-sm mt-0.5">
-              مرحباً <span className="text-violet-600 font-semibold">{user?.fullname}</span>
+              مرحباً <span className="text-teal-600 font-semibold">{user?.fullname}</span>
               {lastLoaded && <span className="mr-2 text-slate-300">• {lastLoaded.toLocaleTimeString('ar-SA')}</span>}
             </p>
           </div>
@@ -373,7 +373,7 @@ export default function Dashboard() {
               disabled={loading || (isExecutive && missionsLoading)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-violet-500/25 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-teal-500/25 transition-all disabled:opacity-50"
             >
               <RefreshCw size={14} className={loading || missionsLoading ? 'animate-spin' : ''} />
               تحديث
@@ -393,11 +393,11 @@ export default function Dashboard() {
         transition={{ duration: 0.4, delay: 0.05 }}
         className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm flex flex-wrap items-center gap-2"
       >
-        <Filter size={15} className="text-violet-500 shrink-0 mx-1" />
+        <Filter size={15} className="text-teal-500 shrink-0 mx-1" />
         <select
           value={filterBucket}
           onChange={e => setFilterBucket(e.target.value)}
-          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-300/60"
         >
           <option value="">كل حالات المتجر</option>
           <option value="new_registered">جديد — بانتظار أول شحنة</option>
@@ -413,7 +413,7 @@ export default function Dashboard() {
           <select
             value={filterAssignee}
             onChange={e => setFilterAssignee(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-300/60"
           >
             <option value="">كل مسؤولي المتابعة</option>
             {assigneeOptions.map(name => (
@@ -425,7 +425,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={clearDashboardFilter}
-            className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 transition-colors"
+            className="inline-flex items-center gap-1 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 hover:bg-teal-100 transition-colors"
           >
             <XIcon size={13} />
             إعادة تعيين
@@ -459,7 +459,7 @@ export default function Dashboard() {
           can('active') && {
             title: 'نشط يشحن', value: filteredCounts.active_shipping || 0, icon: TrendingUp, color: 'green',
           },
-          { title: 'إجمالي المتاجر', value: filteredCounts.total ?? counts.total ?? 0, icon: Package, color: 'purple' },
+          { title: 'إجمالي المتاجر', value: filteredCounts.total ?? counts.total ?? 0, icon: Package, color: 'teal' },
         ].filter(Boolean).map((k, i) => (
           <motion.div key={k.title} variants={fadeUp} transition={{ delay: i * 0.05 }}>
             <StatCard {...k} />
@@ -537,11 +537,11 @@ export default function Dashboard() {
         animate="visible"
         transition={{ duration: 0.5, delay: 0.1 }}
         className="relative rounded-3xl p-4 sm:p-6 lg:p-8 overflow-hidden text-white"
-        style={{ background: 'linear-gradient(135deg, #1e0a3c 0%, #2d1466 50%, #1a0a4e 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #042f2e 0%, #0f4c44 50%, #02201f 100%)' }}
       >
         {/* Decorative blobs */}
-        <div className="absolute top-0 left-1/3 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 right-0 w-48 h-48 bg-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 left-1/3 w-64 h-64 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 right-0 w-48 h-48 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
         {/* نورس في الخلفية */}
         <div className="absolute bottom-2 left-6 pointer-events-none">
           <SeagullMark size={130} opacity={0.055} />
@@ -571,7 +571,7 @@ export default function Dashboard() {
               className="flex items-start gap-3"
             >
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                <s.icon size={18} className="text-violet-300" />
+                <s.icon size={18} className="text-teal-300" />
               </div>
               <div>
                 <p className="text-white/50 text-xs font-medium">{s.label}</p>
@@ -806,18 +806,18 @@ export default function Dashboard() {
         {/* Area Chart — سير العمل */}
         <div
           className="lg:col-span-3 rounded-2xl p-5 lg:p-6"
-          style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+          style={{ background: 'linear-gradient(145deg, #08201d, #0e2f29)' }}
         >
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-white font-bold text-base flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
                 سير العمل اليومي
               </h2>
               <p className="text-white/40 text-xs mt-0.5">المكالمات والشحنات – آخر 7 أيام</p>
             </div>
             <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5 text-violet-400"><span className="w-3 h-0.5 rounded-full bg-violet-400 inline-block" /> مكالمات</span>
+              <span className="flex items-center gap-1.5 text-teal-400"><span className="w-3 h-0.5 rounded-full bg-teal-400 inline-block" /> مكالمات</span>
               <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-3 h-0.5 rounded-full bg-emerald-400 inline-block" /> شحنات</span>
             </div>
           </div>
@@ -828,8 +828,8 @@ export default function Dashboard() {
               <svg>
                 <defs>
                   <linearGradient id="gradCalls" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#14b8a6" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gradShip" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
@@ -841,7 +841,7 @@ export default function Dashboard() {
               <XAxis dataKey="day" tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#ffffff40', fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="مكالمات" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#gradCalls)" dot={{ fill: '#8b5cf6', r: 3, strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="مكالمات" stroke="#14b8a6" strokeWidth={2.5} fill="url(#gradCalls)" dot={{ fill: '#14b8a6', r: 3, strokeWidth: 0 }} />
               <Area type="monotone" dataKey="شحنات"   stroke="#10b981" strokeWidth={2.5} fill="url(#gradShip)"  dot={{ fill: '#10b981', r: 3, strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -851,7 +851,7 @@ export default function Dashboard() {
         {/* Bar Chart — أداء الموظفين (executive فقط) / أداء الموظف (نشطة، استعادة، جديد، …) */}
         <div
           className="lg:col-span-2 rounded-2xl p-5 lg:p-6"
-          style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+          style={{ background: 'linear-gradient(145deg, #08201d, #0e2f29)' }}
         >
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -883,8 +883,8 @@ export default function Dashboard() {
                 <svg>
                   <defs>
                     <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" />
-                      <stop offset="100%" stopColor="#7c3aed" />
+                      <stop offset="0%" stopColor="#5eead4" />
+                      <stop offset="100%" stopColor="#0d9488" />
                     </linearGradient>
                     <linearGradient id="barGradTop" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#fbbf24" />
@@ -925,17 +925,17 @@ export default function Dashboard() {
               <div key={emp.name} className="flex items-center gap-2.5">
                 <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0 ${
                   i === 0 ? 'bg-amber-500/30 text-amber-300' :
-                  i === 1 ? 'bg-violet-500/30 text-violet-300' :
+                  i === 1 ? 'bg-teal-500/30 text-teal-300' :
                             'bg-white/10 text-white/40'
                 }`}>{i + 1}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="text-white/80 text-xs font-medium truncate">{emp.name}</span>
-                    <span className={`text-xs font-bold mr-2 ${i === 0 ? 'text-amber-300' : 'text-violet-300'}`}>{emp.مكالمات}</span>
+                    <span className={`text-xs font-bold mr-2 ${i === 0 ? 'text-amber-300' : 'text-teal-300'}`}>{emp.مكالمات}</span>
                   </div>
                   <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${i === 0 ? 'bg-amber-400' : 'bg-violet-500'}`}
+                      className={`h-full rounded-full ${i === 0 ? 'bg-amber-400' : 'bg-teal-500'}`}
                       style={{ width: `${(emp.مكالمات / (employeeData[0]?.مكالمات || 1)) * 100}%` }}
                     />
                   </div>
@@ -960,16 +960,16 @@ export default function Dashboard() {
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-slate-50">
               <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center">
-                  <Store size={14} className="text-violet-600" />
+                <div className="w-7 h-7 rounded-lg bg-teal-100 flex items-center justify-center">
+                  <Store size={14} className="text-teal-600" />
                 </div>
                 أحدث المتاجر
               </h2>
               <div className="flex items-center gap-2">
                 {hasDashboardFilter && (
-                  <span className="text-[11px] font-semibold text-violet-600 bg-violet-50 px-2 py-1 rounded-lg">مُصفّى</span>
+                  <span className="text-[11px] font-semibold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg">مُصفّى</span>
                 )}
-                <button type="button" onClick={() => navigate('/new')} className="text-violet-600 text-xs font-semibold hover:text-violet-800 flex items-center gap-0.5 transition-colors shrink-0">
+                <button type="button" onClick={() => navigate('/new')} className="text-teal-600 text-xs font-semibold hover:text-teal-800 flex items-center gap-0.5 transition-colors shrink-0">
                   عرض الكل <ArrowUpRight size={11} />
                 </button>
               </div>
@@ -991,7 +991,7 @@ export default function Dashboard() {
                       return (
                         <tr key={s.id} className={`hover:bg-slate-50 transition-colors cursor-pointer ${i !== rows.length - 1 ? 'border-b border-slate-50' : ''}`}>
                           <td className="px-5 py-3 w-10">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                               {s.name?.charAt(0) || '؟'}
                             </div>
                           </td>
@@ -1015,11 +1015,11 @@ export default function Dashboard() {
         {/* توزيع الفئات — Donut */}
         <div
           className={`rounded-2xl p-5 lg:p-6 flex flex-col gap-4 ${can('new') ? '' : 'lg:col-span-3'}`}
-          style={{ background: 'linear-gradient(145deg, #0f0820, #160d2e)' }}
+          style={{ background: 'linear-gradient(145deg, #08201d, #0e2f29)' }}
         >
           <div>
             <h2 className="text-white font-bold text-sm flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
               توزيع المتاجر حسب الفئة
             </h2>
             <p className="text-white/40 text-xs mt-0.5">{(filteredCounts.total || 0).toLocaleString('ar-SA')} متجر {hasDashboardFilter ? 'مطابق للفلتر' : 'إجمالي'}</p>
@@ -1054,7 +1054,7 @@ export default function Dashboard() {
                         stroke="none"
                       >
                         {rows.map(row => (
-                          <Cell key={row.key} fill={STATUS_COLORS[row.key]?.hex || '#8b5cf6'} />
+                          <Cell key={row.key} fill={STATUS_COLORS[row.key]?.hex || '#14b8a6'} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
@@ -1070,7 +1070,7 @@ export default function Dashboard() {
                 <div className="space-y-2.5">
                   {rows.map(row => {
                     const pct = filteredCounts.total ? Math.round((row.v / filteredCounts.total) * 100) : 0
-                    const hex = STATUS_COLORS[row.key]?.hex || '#8b5cf6'
+                    const hex = STATUS_COLORS[row.key]?.hex || '#14b8a6'
                     return (
                       <div key={row.key} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">

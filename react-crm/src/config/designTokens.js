@@ -98,6 +98,7 @@ export const KPI_PALETTE = {
   amber:  { bg: 'bg-amber-50',   icon: 'bg-amber-600',   text: 'text-amber-600',   bar: 'bg-amber-500' },
   red:    { bg: 'bg-red-50',     icon: 'bg-red-600',     text: 'text-red-600',     bar: 'bg-red-500' },
   purple: { bg: 'bg-purple-50',  icon: 'bg-purple-600',  text: 'text-purple-600',  bar: 'bg-purple-500' },
+  teal:   { bg: 'bg-teal-50',    icon: 'bg-teal-600',    text: 'text-teal-600',    bar: 'bg-teal-500' },
 }
 
 /** ثوابت بصرية قياسية — تُستخدم بدل تكرار نفس القيم يدوياً بكل مكوّن */
