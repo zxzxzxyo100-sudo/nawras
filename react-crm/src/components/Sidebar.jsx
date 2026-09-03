@@ -16,6 +16,7 @@ import { resetActiveStores, resetInactivePool, refreshStorePool, fillAllInactive
 import {
   NAV_ALL, STORES_SUB, ACTIVE_SUB, INCUBATION_SUB, INACTIVE_SUB, STAFF_PERFORMANCE_SUB,
 } from '../config/navStructure'
+import logo from '../assets/images/logo.png'
 
 const ACTIVE_GROUP_STYLE = { background: SIDEBAR_GRADIENT_ACTIVE, boxShadow: SIDEBAR_GLOW_ACTIVE }
 
@@ -589,8 +590,8 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* ── Logo ─────────────────────────────── */}
       <div className="relative z-10 px-5 pt-6 pb-4 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-teal-900/40 ring-1 ring-white/10 bg-black flex items-center justify-center">
-            <img src="/favicon.png" alt="النورس" className="w-full h-full object-cover" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-teal-900/40 ring-1 ring-white/10 bg-black flex items-center justify-center p-1.5">
+            <img src={logo} alt="النورس" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0">
             <p className="text-white font-black text-[15px] leading-tight tracking-tight">النورس</p>
